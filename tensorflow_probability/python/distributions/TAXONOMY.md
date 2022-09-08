@@ -82,6 +82,7 @@ limitations under the License.
 
 [NegativeBinomial](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/NegativeBinomial),
 [Poisson](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/Poisson),
+ZeroInflatedNegativeBinomial,
 [Zipf](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/Zipf)
 
 # Continuous Distributions
@@ -241,6 +242,7 @@ limitations under the License.
 
 [Blockwise](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/Blockwise),
 [Independent](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/Independent),
+Inflated,
 [Masked](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/Masked),
 [Mixture](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/Mixture),
 [MixtureSameFamily](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/MixtureSameFamily),

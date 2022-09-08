@@ -19,10 +19,10 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import mvn_diag
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.sts import SmoothSeasonal
-from tensorflow_probability.python.sts import SmoothSeasonalStateSpaceModel
+from tensorflow_probability.python.sts.components.smooth_seasonal import SmoothSeasonal
+from tensorflow_probability.python.sts.components.smooth_seasonal import SmoothSeasonalStateSpaceModel
 
 
 class _SmoothSeasonalStateSpaceModelTest(object):
@@ -57,7 +57,7 @@ class _SmoothSeasonalStateSpaceModelTest(object):
     initial_state_loc = self._build_placeholder(np.ones([2]))
     initial_state_scale = tf.zeros_like(initial_state_loc)
 
-    initial_state_prior = tfd.MultivariateNormalDiag(
+    initial_state_prior = mvn_diag.MultivariateNormalDiag(
         loc=initial_state_loc, scale_diag=initial_state_scale)
 
     ssm = SmoothSeasonalStateSpaceModel(

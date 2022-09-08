@@ -19,7 +19,6 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
@@ -32,6 +31,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import special
 from tensorflow_probability.python.math.numeric import log1psquare
 
 __all__ = [
@@ -490,7 +490,7 @@ def quantile(value, loc, scale, skewness):
   # X ~ Normal(loc=0, scale=1) => 2 * X**2 ~ Gamma(alpha=0.5, beta=1)
   probs = (one - value * (one + squared_skewness)) * tf.where(
       cond, one, -tf.math.reciprocal(squared_skewness))
-  gamma_quantile = _numpy_cast(tfp_math.igammainv(half, p=probs), dtype)
+  gamma_quantile = _numpy_cast(special.igammainv(half, p=probs), dtype)
 
   abs_skewness = tf.math.abs(skewness)
   adj_scale = tf.math.abs(scale) * tf.where(
@@ -571,10 +571,10 @@ def _two_piece_normal_sample_gradient(skewness, samples):
 
   grad_left_piece = (
       -samples / skewness + scale * two * sqrt_pi_over_two *
-      tfp_math.erfcx(-safe_left_z / sqrt_2))
+      special.erfcx(-safe_left_z / sqrt_2))
   grad_right_piece = (
       samples / skewness + scale * two * sqrt_pi_over_two *
-      tfp_math.erfcx(safe_right_z / sqrt_2))
+      special.erfcx(safe_right_z / sqrt_2))
 
   return tf.where(left_piece, grad_left_piece, grad_right_piece)
 

@@ -23,8 +23,12 @@ import numpy as np
 from scipy import stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.bijectors import transform_diagonal
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -38,7 +42,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
 
   def _random_chol(self, *shape):
     mat = self._rng.rand(*shape)
-    chol = tfb.TransformDiagonal(tfb.Softplus())(mat)
+    chol = transform_diagonal.TransformDiagonal(softplus.Softplus())(mat)
     chol = tf.linalg.band_part(chol, -1, 0)
     sigma = tf.matmul(chol, chol, adjoint_b=True)
     return self.evaluate(chol), self.evaluate(sigma)
@@ -47,7 +51,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
     mu = self._rng.rand(4)
     chol, sigma = self._random_chol(4, 4)
     chol = chol * np.array([1., -1., -1., 1.], dtype=chol.dtype)
-    mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
+    mvn = mvn_tril.MultivariateNormalTriL(mu, chol, validate_args=True)
     x = self._rng.rand(4)
     log_pdf = mvn.log_prob(x)
     pdf = mvn.prob(x)
@@ -66,7 +70,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
   def testLogPDFScalarBatch(self):
     mu = self._rng.rand(2)
     chol, sigma = self._random_chol(2, 2)
-    mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
+    mvn = mvn_tril.MultivariateNormalTriL(mu, chol, validate_args=True)
     x = self._rng.rand(2)
 
     log_pdf = mvn.log_prob(x)
@@ -84,7 +88,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
   def testLogPDFXIsHigherRank(self):
     mu = self._rng.rand(2)
     chol, sigma = self._random_chol(2, 2)
-    mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
+    mvn = mvn_tril.MultivariateNormalTriL(mu, chol, validate_args=True)
     x = self._rng.rand(3, 2)
 
     log_pdf = mvn.log_prob(x)
@@ -103,7 +107,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
   def testLogPDFXLowerDimension(self):
     mu = self._rng.rand(3, 2)
     chol, sigma = self._random_chol(3, 2, 2)
-    mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
+    mvn = mvn_tril.MultivariateNormalTriL(mu, chol, validate_args=True)
     x = self._rng.rand(2)
 
     log_pdf = mvn.log_prob(x)
@@ -123,7 +127,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
   def testEntropy(self):
     mu = self._rng.rand(2)
     chol, sigma = self._random_chol(2, 2)
-    mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
+    mvn = mvn_tril.MultivariateNormalTriL(mu, chol, validate_args=True)
     entropy = mvn.entropy()
 
     scipy_mvn = stats.multivariate_normal(mean=mu, cov=sigma)
@@ -134,7 +138,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
   def testEntropyMultidimensional(self):
     mu = self._rng.rand(3, 5, 2)
     chol, sigma = self._random_chol(3, 5, 2, 2)
-    mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
+    mvn = mvn_tril.MultivariateNormalTriL(mu, chol, validate_args=True)
     entropy = mvn.entropy()
 
     # Scipy doesn't do batches, so test one of them.
@@ -147,7 +151,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
     mu = self._rng.rand(2)
     chol, sigma = self._random_chol(2, 2)
     n = tf.constant(100000)
-    mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
+    mvn = mvn_tril.MultivariateNormalTriL(mu, chol, validate_args=True)
     samples = mvn.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, [int(100e3), 2])
@@ -158,14 +162,14 @@ class MultivariateNormalTriLTest(test_util.TestCase):
     mu = None
     chol = [[1., 0.], [0., 0.]]
     with self.assertRaisesOpError('Singular operator'):
-      mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
+      mvn = mvn_tril.MultivariateNormalTriL(mu, chol, validate_args=True)
       self.evaluate(mvn.sample(seed=test_util.test_seed()))
 
   def testSampleWithSampleShape(self):
     mu = self._rng.rand(3, 5, 2)
     chol, sigma = self._random_chol(3, 5, 2, 2)
 
-    mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
+    mvn = mvn_tril.MultivariateNormalTriL(mu, chol, validate_args=True)
     samples_val = self.evaluate(mvn.sample(
         (10, 11, 12), seed=test_util.test_seed()))
 
@@ -188,7 +192,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
     mu = self._rng.rand(3, 5, 2)
     chol, sigma = self._random_chol(3, 5, 2, 2)
 
-    mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
+    mvn = mvn_tril.MultivariateNormalTriL(mu, chol, validate_args=True)
     n = tf.constant(100000)
     samples = mvn.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
@@ -205,7 +209,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
     mu = self._rng.rand(3, 5, 2)
     chol, _ = self._random_chol(3, 5, 2, 2)
 
-    mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
+    mvn = mvn_tril.MultivariateNormalTriL(mu, chol, validate_args=True)
 
     # Shapes known at graph construction time.
     self.assertEqual((2,), tuple(tensorshape_util.as_list(mvn.event_shape)))
@@ -233,12 +237,12 @@ class MultivariateNormalTriLTest(test_util.TestCase):
     event_shape = [2]
     mu_a, sigma_a = self._random_mu_and_sigma(batch_shape, event_shape)
     mu_b, sigma_b = self._random_mu_and_sigma(batch_shape, event_shape)
-    mvn_a = tfd.MultivariateNormalTriL(
+    mvn_a = mvn_tril.MultivariateNormalTriL(
         loc=mu_a, scale_tril=np.linalg.cholesky(sigma_a), validate_args=True)
-    mvn_b = tfd.MultivariateNormalTriL(
+    mvn_b = mvn_tril.MultivariateNormalTriL(
         loc=mu_b, scale_tril=np.linalg.cholesky(sigma_b), validate_args=True)
 
-    kl = tfd.kl_divergence(mvn_a, mvn_b)
+    kl = kullback_leibler.kl_divergence(mvn_a, mvn_b)
     self.assertEqual(batch_shape, kl.shape)
 
     kl_v = self.evaluate(kl)
@@ -250,12 +254,12 @@ class MultivariateNormalTriLTest(test_util.TestCase):
     event_shape = [3]
     mu_a, sigma_a = self._random_mu_and_sigma(batch_shape, event_shape)
     mu_b, sigma_b = self._random_mu_and_sigma(batch_shape, event_shape)
-    mvn_a = tfd.MultivariateNormalTriL(
+    mvn_a = mvn_tril.MultivariateNormalTriL(
         loc=mu_a, scale_tril=np.linalg.cholesky(sigma_a), validate_args=True)
-    mvn_b = tfd.MultivariateNormalTriL(
+    mvn_b = mvn_tril.MultivariateNormalTriL(
         loc=mu_b, scale_tril=np.linalg.cholesky(sigma_b), validate_args=True)
 
-    kl = tfd.kl_divergence(mvn_a, mvn_b)
+    kl = kullback_leibler.kl_divergence(mvn_a, mvn_b)
     self.assertEqual(batch_shape, kl.shape)
 
     kl_v = self.evaluate(kl)
@@ -272,12 +276,12 @@ class MultivariateNormalTriLTest(test_util.TestCase):
     mu_a, sigma_a = self._random_mu_and_sigma(batch_shape, event_shape)
     # No batch shape.
     mu_b, sigma_b = self._random_mu_and_sigma([], event_shape)
-    mvn_a = tfd.MultivariateNormalTriL(
+    mvn_a = mvn_tril.MultivariateNormalTriL(
         loc=mu_a, scale_tril=np.linalg.cholesky(sigma_a), validate_args=True)
-    mvn_b = tfd.MultivariateNormalTriL(
+    mvn_b = mvn_tril.MultivariateNormalTriL(
         loc=mu_b, scale_tril=np.linalg.cholesky(sigma_b), validate_args=True)
 
-    kl = tfd.kl_divergence(mvn_a, mvn_b)
+    kl = kullback_leibler.kl_divergence(mvn_a, mvn_b)
     self.assertEqual(batch_shape, kl.shape)
 
     kl_v = self.evaluate(kl)
@@ -292,11 +296,11 @@ class MultivariateNormalTriLTest(test_util.TestCase):
     batch_shape = [2]
     event_shape = [3]
     mu_a, sigma_a = self._random_mu_and_sigma(batch_shape, event_shape)
-    mvn_a = tfd.MultivariateNormalTriL(
+    mvn_a = mvn_tril.MultivariateNormalTriL(
         loc=mu_a, scale_tril=np.linalg.cholesky(sigma_a), validate_args=True)
 
     # Should be zero since KL(p || p) = =.
-    kl = tfd.kl_divergence(mvn_a, mvn_a)
+    kl = kullback_leibler.kl_divergence(mvn_a, mvn_a)
     self.assertEqual(batch_shape, kl.shape)
 
     kl_v = self.evaluate(kl)
@@ -312,11 +316,11 @@ class MultivariateNormalTriLTest(test_util.TestCase):
     true_variance = np.diag(true_covariance)
     true_stddev = np.sqrt(true_variance)
 
-    dist = tfd.MultivariateNormalTriL(
+    dist = mvn_tril.MultivariateNormalTriL(
         loc=mu, scale_tril=scale_tril, validate_args=True)
 
     # The following distributions will test the KL divergence calculation.
-    mvn_chol = tfd.MultivariateNormalTriL(
+    mvn_chol = mvn_tril.MultivariateNormalTriL(
         loc=np.array([0.5, 1.2], dtype=np.float32),
         scale_tril=np.array([[3., 0], [1, 2]], dtype=np.float32),
         validate_args=True)
@@ -329,7 +333,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
 
     sample_kl_chol = tf.reduce_mean(
         dist.log_prob(samps) - mvn_chol.log_prob(samps), axis=0)
-    analytical_kl_chol = tfd.kl_divergence(dist, mvn_chol)
+    analytical_kl_chol = kullback_leibler.kl_divergence(dist, mvn_chol)
 
     scale = dist.scale.to_dense()
 
@@ -406,7 +410,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
   def testVariableLocation(self):
     loc = tf.Variable([1., 1.])
     scale = tf.eye(2)
-    d = tfd.MultivariateNormalTriL(loc, scale, validate_args=True)
+    d = mvn_tril.MultivariateNormalTriL(loc, scale, validate_args=True)
     self.evaluate(loc.initializer)
     with tf.GradientTape() as tape:
       lp = d.log_prob([0., 0.])
@@ -417,7 +421,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
   def testVariableScale(self):
     loc = tf.constant([1., 1.])
     scale = tf.Variable([[1., 0.], [0., 1.]])
-    d = tfd.MultivariateNormalTriL(loc, scale, validate_args=True)
+    d = mvn_tril.MultivariateNormalTriL(loc, scale, validate_args=True)
     self.evaluate(scale.initializer)
     with tf.GradientTape() as tape:
       lp = d.log_prob([0., 0.])
@@ -432,7 +436,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
     # expected.
     loc = tf.constant([1., 1.], dtype=np.float32)
     scale = tf.Variable(np.eye(2, dtype=np.float32))
-    d = tfd.MultivariateNormalTriL(loc, scale, validate_args=True)
+    d = mvn_tril.MultivariateNormalTriL(loc, scale, validate_args=True)
     self.evaluate(scale.initializer)
     with self.assertRaises(Exception):
       with tf.control_dependencies([scale.assign([[1., 0.], [1., 0.]])]):
@@ -448,13 +452,14 @@ class MultivariateNormalTriLTest(test_util.TestCase):
 
     n = 2_500
     stream = test_util.test_seed_stream()
-    samps = tfd.Normal(0, 1).sample(n, seed=stream())
+    samps = normal.Normal(0, 1).sample(n, seed=stream())
 
-    scale = tfd.LogNormal(0, .2).sample([7, 1], seed=stream())
-    mvn = tfd.MultivariateNormalTriL(
-        loc=tf.zeros([n]), scale_tril=tf.linalg.diag(tf.zeros([n]) + scale),
+    scale = lognormal.LogNormal(0, .2).sample([7, 1], seed=stream())
+    mvn = mvn_tril.MultivariateNormalTriL(
+        loc=tf.zeros([n]),
+        scale_tril=tf.linalg.diag(tf.zeros([n]) + scale),
         experimental_use_kahan_sum=True)
-    mvn64 = tfd.MultivariateNormalTriL(
+    mvn64 = mvn_tril.MultivariateNormalTriL(
         loc=tf.zeros([n], dtype=tf.float64),
         scale_tril=tf.linalg.diag(
             tf.zeros([n], dtype=tf.float64) + tf.cast(scale, tf.float64)))
@@ -497,7 +502,7 @@ class MultivariateNormalTriLSlicingTest(test_util.TestCase):
 
   def _random_chol(self, *shape):
     mat = self._rng.rand(*shape)
-    chol = tfb.TransformDiagonal(tfb.Softplus())(mat)
+    chol = transform_diagonal.TransformDiagonal(softplus.Softplus())(mat)
     chol = tf.linalg.band_part(chol, -1, 0)
     sigma = tf.matmul(chol, chol, adjoint_b=True)
     return self.evaluate(chol), self.evaluate(sigma)
@@ -521,7 +526,7 @@ class MultivariateNormalTriLSlicingTest(test_util.TestCase):
     # chol has batch [7, 4, 1] and event [2,2]
     mu = self._rng.rand(4, 3, 1)
     chol, _ = self._random_chol(7, 4, 1, 2, 2)
-    dist = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
+    dist = mvn_tril.MultivariateNormalTriL(mu, chol, validate_args=True)
     batch_shape = tensorshape_util.as_list(dist.batch_shape)
     probs = self.evaluate(dist.prob([0, 0]))
     for slicer in slicers:
@@ -538,7 +543,7 @@ class MultivariateNormalTriLSlicingTest(test_util.TestCase):
     chol, _ = self._random_chol(2, 7, 6, 9, event_dim, event_dim)
     slicer = make_slicer[44:-52:-3, tf.newaxis, -94::, tf.newaxis, 5, 1]
 
-    dist = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
+    dist = mvn_tril.MultivariateNormalTriL(mu, chol, validate_args=True)
     batch_shape = tensorshape_util.as_list(dist.batch_shape)
     probs = self.evaluate(dist.prob([0] * event_dim))
     batch_shape = slicer(np.zeros(batch_shape)).shape
@@ -564,7 +569,7 @@ class MultivariateNormalTriLSlicingTest(test_util.TestCase):
     # rank (i.e. the native rank for loc is 1, but mu has rank 0).
     mu = self._rng.rand()
     chol, _ = self._random_chol(7, 4, 2, 2)
-    dist = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
+    dist = mvn_tril.MultivariateNormalTriL(mu, chol, validate_args=True)
     batch_shape = tensorshape_util.as_list(dist.batch_shape)
     probs = self.evaluate(dist.prob([0, 0]))
     for slicer in slicers:
@@ -583,7 +588,7 @@ class MultivariateNormalTriLSlicingTest(test_util.TestCase):
     chol, _ = self._random_chol(7, 4, 1, 2, 2)
     chol = tf.Variable(chol)
     self.evaluate([mu.initializer, chol.initializer])
-    dist = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
+    dist = mvn_tril.MultivariateNormalTriL(mu, chol, validate_args=True)
     for slicer in [make_slicer[:5], make_slicer[..., -1], make_slicer[:, 1::2]]:
       with tf.GradientTape() as tape:
         dist = slicer(dist)
@@ -602,7 +607,7 @@ class MultivariateNormalTriLSlicingTest(test_util.TestCase):
     cov = tf.matmul(x, x, transpose_b=True)
     chol = tf.linalg.cholesky(cov)
     loc = tf.random.normal([4, 1, 3, 1], seed=seed_stream())
-    mvn = tfd.MultivariateNormalTriL(loc, chol, validate_args=True)
+    mvn = mvn_tril.MultivariateNormalTriL(loc, chol, validate_args=True)
     self.assertAllEqual((4, 5, 3), mvn.batch_shape)
     self.assertAllEqual((2,), mvn.event_shape)
     mvn2 = mvn[:, 3:, ..., ::-1, tf.newaxis]

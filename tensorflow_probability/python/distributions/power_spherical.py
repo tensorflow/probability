@@ -18,7 +18,6 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import invert as invert_bijector
 from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
@@ -37,6 +36,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import special
 from tensorflow_probability.python.random import random_ops
 
 
@@ -219,7 +219,7 @@ class PowerSpherical(distribution.AutoCompositeTensorDistribution):
 
     return ((concentration1 + concentration0) * np.log(2.) +
             concentration0 * np.log(np.pi) +
-            tfp_math.log_gamma_difference(concentration0, concentration1))
+            special.log_gamma_difference(concentration0, concentration1))
 
   def _sample_control_dependencies(self, samples):
     """Check samples for proper shape and whether samples are unit vectors."""

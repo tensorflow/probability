@@ -22,11 +22,17 @@ from absl.testing import parameterized
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.experimental.mcmc import covariance_reducer
+from tensorflow_probability.python.experimental.mcmc import expectations_reducer
 from tensorflow_probability.python.experimental.mcmc.internal import test_fixtures
+from tensorflow_probability.python.experimental.mcmc.sample_fold import sample_chain_with_burnin
+from tensorflow_probability.python.experimental.mcmc.sample_fold import sample_fold
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.mcmc import hmc
 
 
 JAX_MODE = False
@@ -38,9 +44,9 @@ class SampleFoldTest(test_util.TestCase):
   def test_simple_operation(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
     fake_reducer = test_fixtures.NaiveMeanReducer()
-    seed1, seed2 = tfp.random.split_seed(
+    seed1, seed2 = samplers.split_seed(
         test_util.test_seed(sampler_type='stateless'))
-    reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
+    reduction_rslt, last_sample, kr = sample_fold(
         num_steps=5,
         current_state=0.,
         kernel=fake_kernel,
@@ -54,7 +60,7 @@ class SampleFoldTest(test_util.TestCase):
     self.assertEqual(10, kernel_results.counter_2)
 
     # Warm-restart the underlying kernel but not the reduction
-    reduction_rslt_2, last_sample_2, kr_2 = tfp.experimental.mcmc.sample_fold(
+    reduction_rslt_2, last_sample_2, kr_2 = sample_fold(
         num_steps=5,
         current_state=last_sample,
         kernel=fake_kernel,
@@ -71,9 +77,9 @@ class SampleFoldTest(test_util.TestCase):
   def test_reducer_warm_restart(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
     fake_reducer = test_fixtures.NaiveMeanReducer()
-    seed1, seed2 = tfp.random.split_seed(
+    seed1, seed2 = samplers.split_seed(
         test_util.test_seed(sampler_type='stateless'))
-    red_res, last_sample, kr, red_states = tfp.experimental.mcmc.sample_fold(
+    red_res, last_sample, kr, red_states = sample_fold(
         num_steps=5,
         current_state=0.,
         kernel=fake_kernel,
@@ -88,7 +94,7 @@ class SampleFoldTest(test_util.TestCase):
     self.assertEqual(10, kernel_results.counter_2)
 
     # Warm-restart the underlying kernel and the reduction
-    reduction_rslt_2, last_sample_2, kr_2 = tfp.experimental.mcmc.sample_fold(
+    reduction_rslt_2, last_sample_2, kr_2 = sample_fold(
         num_steps=5,
         current_state=last_sample,
         previous_kernel_results=kernel_results,
@@ -107,7 +113,7 @@ class SampleFoldTest(test_util.TestCase):
   def test_current_state(self, curr_state):
     fake_kernel = test_fixtures.TestTransitionKernel()
     fake_reducer = test_fixtures.NaiveMeanReducer()
-    reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
+    reduction_rslt, last_sample, kr = sample_fold(
         num_steps=5,
         current_state=curr_state,
         kernel=fake_kernel,
@@ -128,8 +134,9 @@ class SampleFoldTest(test_util.TestCase):
       assert isinstance(
           kernel_results, test_fixtures.TestTransitionKernelResults)
       return kernel_results.counter_2
-    reduction = tfp.experimental.mcmc.ExpectationsReducer(reduction_target)
-    reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
+
+    reduction = expectations_reducer.ExpectationsReducer(reduction_target)
+    reduction_rslt, last_sample, kr = sample_fold(
         num_steps=5,
         current_state=0.,
         kernel=kernel,
@@ -144,11 +151,11 @@ class SampleFoldTest(test_util.TestCase):
 
   def test_nested_reducers(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
-    fake_reducers = [
-        [test_fixtures.NaiveMeanReducer(),
-         tfp.experimental.mcmc.CovarianceReducer()],
-        [test_fixtures.NaiveMeanReducer()]]
-    reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
+    fake_reducers = [[
+        test_fixtures.NaiveMeanReducer(),
+        covariance_reducer.CovarianceReducer()
+    ], [test_fixtures.NaiveMeanReducer()]]
+    reduction_rslt, last_sample, kr = sample_fold(
         num_steps=3,
         current_state=0.,
         kernel=fake_kernel,
@@ -168,8 +175,8 @@ class SampleFoldTest(test_util.TestCase):
 
   def test_true_streaming_covariance(self):
     fake_kernel = test_fixtures.TestTransitionKernel(())
-    cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
-    reduction_rslt, _, _ = tfp.experimental.mcmc.sample_fold(
+    cov_reducer = covariance_reducer.CovarianceReducer()
+    reduction_rslt, _, _ = sample_fold(
         num_steps=20,
         current_state=tf.convert_to_tensor([0., 0.]),
         kernel=fake_kernel,
@@ -183,11 +190,10 @@ class SampleFoldTest(test_util.TestCase):
 
   def test_batched_streaming_covariance(self):
     fake_kernel = test_fixtures.TestTransitionKernel((2, 3))
-    cov_reducer = tfp.experimental.mcmc.CovarianceReducer(event_ndims=1)
-    reduction_rslt, last_sample, _ = tfp.experimental.mcmc.sample_fold(
+    cov_reducer = covariance_reducer.CovarianceReducer(event_ndims=1)
+    reduction_rslt, last_sample, _ = sample_fold(
         num_steps=5,
-        current_state=tf.convert_to_tensor(
-            [[0., 0., 0.], [0., 0., 0.]]),
+        current_state=tf.convert_to_tensor([[0., 0., 0.], [0., 0., 0.]]),
         kernel=fake_kernel,
         reducer=cov_reducer,
         seed=test_util.test_seed())
@@ -200,13 +206,13 @@ class SampleFoldTest(test_util.TestCase):
     fake_kernel = test_fixtures.RandomTransitionKernel()
     fake_reducer = test_fixtures.NaiveMeanReducer()
     seed = test_util.test_seed(sampler_type='stateless')
-    first_reduction_rslt, _, _ = tfp.experimental.mcmc.sample_fold(
+    first_reduction_rslt, _, _ = sample_fold(
         num_steps=3,
         current_state=0.,
         kernel=fake_kernel,
         reducer=fake_reducer,
         seed=seed)
-    second_reduction_rslt, _, _ = tfp.experimental.mcmc.sample_fold(
+    second_reduction_rslt, _, _ = sample_fold(
         num_steps=3,
         current_state=0.,
         kernel=fake_kernel,
@@ -219,7 +225,7 @@ class SampleFoldTest(test_util.TestCase):
   def test_thinning_and_burnin(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
     fake_reducer = test_fixtures.NaiveMeanReducer()
-    reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
+    reduction_rslt, last_sample, kr = sample_fold(
         num_steps=5,
         current_state=0.,
         kernel=fake_kernel,
@@ -241,7 +247,7 @@ class SampleFoldTest(test_util.TestCase):
   def test_tensor_thinning_and_burnin(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
     fake_reducer = test_fixtures.NaiveMeanReducer()
-    reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
+    reduction_rslt, last_sample, kr = sample_fold(
         num_steps=tf.convert_to_tensor(5),
         current_state=0.,
         kernel=fake_kernel,
@@ -262,7 +268,7 @@ class SampleFoldTest(test_util.TestCase):
 
   def test_none_reducer(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
-    reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
+    reduction_rslt, last_sample, kr = sample_fold(
         num_steps=5,
         current_state=0.,
         kernel=fake_kernel,
@@ -279,7 +285,7 @@ class SampleFoldTest(test_util.TestCase):
 
   def test_empty_reducer(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
-    reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
+    reduction_rslt, last_sample, kr = sample_fold(
         num_steps=5,
         current_state=0.,
         kernel=fake_kernel,
@@ -305,13 +311,10 @@ class SampleChainTest(test_util.TestCase):
 
   def test_basic_operation(self):
     kernel = test_fixtures.TestTransitionKernel()
-    seed1, seed2 = tfp.random.split_seed(
+    seed1, seed2 = samplers.split_seed(
         test_util.test_seed(sampler_type='stateless'))
-    result = tfp.experimental.mcmc.sample_chain_with_burnin(
-        num_results=2,
-        current_state=0.,
-        kernel=kernel,
-        seed=seed1)
+    result = sample_chain_with_burnin(
+        num_results=2, current_state=0., kernel=kernel, seed=seed1)
     samples = result.trace
     kernel_results = result.final_kernel_results
     self.assertAllClose(
@@ -324,10 +327,8 @@ class SampleChainTest(test_util.TestCase):
 
     # Warm-restart the underlying kernel.  The Trace does not support warm
     # restart.
-    result_2 = tfp.experimental.mcmc.sample_chain_with_burnin(
-        num_results=2,
-        seed=seed2,
-        **result.resume_kwargs)
+    result_2 = sample_chain_with_burnin(
+        num_results=2, seed=seed2, **result.resume_kwargs)
     samples_2, kernel_results_2 = self.evaluate(
         [result_2.trace, result_2.final_kernel_results])
     self.assertAllClose([3, 4], samples_2)
@@ -336,7 +337,7 @@ class SampleChainTest(test_util.TestCase):
 
   def test_burn_in(self):
     kernel = test_fixtures.TestTransitionKernel()
-    result = tfp.experimental.mcmc.sample_chain_with_burnin(
+    result = sample_chain_with_burnin(
         num_results=2,
         current_state=0.,
         kernel=kernel,
@@ -354,7 +355,7 @@ class SampleChainTest(test_util.TestCase):
 
   def test_thinning(self):
     kernel = test_fixtures.TestTransitionKernel()
-    result = tfp.experimental.mcmc.sample_chain_with_burnin(
+    result = sample_chain_with_burnin(
         num_results=2,
         current_state=0.,
         kernel=kernel,
@@ -372,7 +373,7 @@ class SampleChainTest(test_util.TestCase):
 
   def test_custom_trace(self):
     kernel = test_fixtures.TestTransitionKernel()
-    res = tfp.experimental.mcmc.sample_chain_with_burnin(
+    res = sample_chain_with_burnin(
         num_results=2,
         current_state=0.,
         kernel=kernel,
@@ -394,7 +395,7 @@ class SampleChainTest(test_util.TestCase):
   def test_is_calibrated(self):
     with warnings.catch_warnings(record=True) as triggered:
       kernel = test_fixtures.TestTransitionKernel(is_calibrated=False)
-      tfp.experimental.mcmc.sample_chain_with_burnin(
+      sample_chain_with_burnin(
           num_results=2,
           current_state=0.,
           kernel=kernel,
@@ -414,12 +415,11 @@ class SampleChainTest(test_util.TestCase):
     def sample(chains):
       initial_state = tf.zeros([chains, 1])
       def log_prob(x):
-        return tf.reduce_sum(tfp.distributions.Normal(0, 1).log_prob(x), -1)
-      kernel = tfp.mcmc.HamiltonianMonteCarlo(
-          target_log_prob_fn=log_prob,
-          num_leapfrog_steps=3,
-          step_size=1e-3)
-      results = tfp.experimental.mcmc.sample_chain_with_burnin(
+        return tf.reduce_sum(normal.Normal(0, 1).log_prob(x), -1)
+
+      kernel = hmc.HamiltonianMonteCarlo(
+          target_log_prob_fn=log_prob, num_leapfrog_steps=3, step_size=1e-3)
+      results = sample_chain_with_burnin(
           num_results=5,
           num_burnin_steps=4,
           current_state=initial_state,
@@ -433,12 +433,10 @@ class SampleChainTest(test_util.TestCase):
     first_fake_kernel = test_fixtures.RandomTransitionKernel()
     second_fake_kernel = test_fixtures.RandomTransitionKernel()
     seed = test_util.test_seed(sampler_type='stateless')
-    first_trace = tfp.experimental.mcmc.sample_chain_with_burnin(
-        num_results=5,
-        current_state=0.,
-        kernel=first_fake_kernel,
+    first_trace = sample_chain_with_burnin(
+        num_results=5, current_state=0., kernel=first_fake_kernel,
         seed=seed).trace
-    second_trace = tfp.experimental.mcmc.sample_chain_with_burnin(
+    second_trace = sample_chain_with_burnin(
         num_results=5,
         current_state=1.,  # difference should be irrelevant
         kernel=second_fake_kernel,
@@ -471,10 +469,10 @@ class SampleChainGraphTest(test_util.TestCase):
       z = tf.linalg.triangular_solve(true_cov_chol, z[..., tf.newaxis])[..., 0]
       return -0.5 * tf.reduce_sum(z**2., axis=-1)
 
-    states = tfp.experimental.mcmc.sample_chain_with_burnin(
+    states = sample_chain_with_burnin(
         num_results=num_results,
         current_state=[dtype(-2), dtype(2)],
-        kernel=tfp.mcmc.HamiltonianMonteCarlo(
+        kernel=hmc.HamiltonianMonteCarlo(
             target_log_prob_fn=target_log_prob,
             step_size=[0.5, 0.5],
             num_leapfrog_steps=2),

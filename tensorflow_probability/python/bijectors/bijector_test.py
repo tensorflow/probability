@@ -22,7 +22,23 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import bijector as bijector_lib
+from tensorflow_probability.python.bijectors import chain as chain_lib
+from tensorflow_probability.python.bijectors import exp
+from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.bijectors import joint_map
+from tensorflow_probability.python.bijectors import matrix_inverse_tril
+from tensorflow_probability.python.bijectors import power
+from tensorflow_probability.python.bijectors import reshape
+from tensorflow_probability.python.bijectors import restructure
+from tensorflow_probability.python.bijectors import scale as scale_lib
+from tensorflow_probability.python.bijectors import scale_matvec_diag
+from tensorflow_probability.python.bijectors import shift
+from tensorflow_probability.python.bijectors import sigmoid as sigmoid_lib
+from tensorflow_probability.python.bijectors import sinh_arcsinh
+from tensorflow_probability.python.bijectors import softmax_centered
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.bijectors import split
 from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import cache_util
 from tensorflow_probability.python.internal import parameter_properties
@@ -42,11 +58,11 @@ class BaseBijectorTest(test_util.TestCase):
     with self.assertRaisesRegexp(TypeError,
                                  ('Can\'t instantiate abstract class Bijector '
                                   'with abstract methods? __init__')):
-      tfb.Bijector()  # pylint: disable=abstract-class-instantiated
+      bijector_lib.Bijector()  # pylint: disable=abstract-class-instantiated
 
   def testDefaults(self):
 
-    class _BareBonesBijector(tfb.Bijector):
+    class _BareBonesBijector(bijector_lib.Bijector):
       """Minimal specification of a `Bijector`."""
 
       def __init__(self):
@@ -94,14 +110,16 @@ class BaseBijectorTest(test_util.TestCase):
     # Variables.
     v1 = tf.Variable(3, dtype=tf.float32)
     v2 = tf.Variable(4, dtype=tf.float32)
-    self.assertNotEqual(tfb.SinhArcsinh(v1), tfb.SinhArcsinh(v2))
+    self.assertNotEqual(
+        sinh_arcsinh.SinhArcsinh(v1),
+        sinh_arcsinh.SinhArcsinh(v2))
 
   @test_util.disable_test_for_backend(
       disable_numpy=True,
       reason='`convert_to_tensor` casts instead of raising')
   def testChecksDType(self):
 
-    class _TypedIdentity(tfb.Bijector):
+    class _TypedIdentity(bijector_lib.Bijector):
       """Bijector with an explicit dtype."""
 
       def __init__(self, dtype):
@@ -138,7 +156,7 @@ class BaseBijectorTest(test_util.TestCase):
   @test_util.numpy_disable_gradient_test
   def testAutodiffLogDetJacobian(self, bijector_scale):
 
-    class NoJacobianBijector(tfb.Bijector):
+    class NoJacobianBijector(bijector_lib.Bijector):
       """Bijector with no log det jacobian methods."""
 
       def __init__(self, scale=2.):
@@ -190,17 +208,16 @@ class BaseBijectorTest(test_util.TestCase):
   def testCopyExtraArgs(self):
     # Note: we cannot easily test all bijectors since each requires
     # different initialization arguments. We therefore spot test a few.
-    sigmoid = tfb.Sigmoid(low=-1., high=2., validate_args=True)
+    sigmoid = sigmoid_lib.Sigmoid(low=-1., high=2., validate_args=True)
     self.assertEqual(sigmoid.parameters, sigmoid.copy().parameters)
-    chain = tfb.Chain(
-        [
-            tfb.Softplus(hinge_softness=[1., 2.], validate_args=True),
-            tfb.MatrixInverseTriL(validate_args=True)
-        ], validate_args=True)
+    chain = chain_lib.Chain([
+        softplus.Softplus(hinge_softness=[1., 2.], validate_args=True),
+        matrix_inverse_tril.MatrixInverseTriL(validate_args=True)
+    ], validate_args=True)
     self.assertEqual(chain.parameters, chain.copy().parameters)
 
   def testCopyOverride(self):
-    sigmoid = tfb.Sigmoid(low=-1., high=2., validate_args=True)
+    sigmoid = sigmoid_lib.Sigmoid(low=-1., high=2., validate_args=True)
     self.assertEqual(sigmoid.parameters, sigmoid.copy().parameters)
     unused_sigmoid_copy = sigmoid.copy(validate_args=False)
     base_params = sigmoid.parameters.copy()
@@ -213,11 +230,11 @@ class BaseBijectorTest(test_util.TestCase):
     if tf.executing_eagerly():
       self.skipTest('Eager mode.')
 
-    outer_bijector = tfb.Exp(name='Exponential')
+    outer_bijector = exp.Exp(name='Exponential')
     self.assertStartsWith(outer_bijector.name, 'Exponential')
 
     with tf.name_scope('inside'):
-      inner_bijector = tfb.Exp(name='Exponential')
+      inner_bijector = exp.Exp(name='Exponential')
       self.assertStartsWith(inner_bijector.name, 'Exponential')
 
       self.assertStartsWith(inner_bijector.forward(0., name='x').name,
@@ -225,7 +242,7 @@ class BaseBijectorTest(test_util.TestCase):
       self.assertStartsWith(outer_bijector.forward(0., name='x').name,
                             'inside/Exponential_CONSTRUCTED_AT_top_level/x')
 
-      meta_bijector = tfb.Chain([inner_bijector], name='meta_bijector')
+      meta_bijector = chain_lib.Chain([inner_bijector], name='meta_bijector')
       # Check for spurious `_CONSTRUCTED_AT_`.
       self.assertStartsWith(
           meta_bijector.forward(0., name='x').name,
@@ -251,7 +268,7 @@ class BijectorStringReprTest(test_util.TestCase):
     return tf.convert_to_tensor(x)
 
   def test_single_part_str_repr_match_expected(self):
-    bij = tfb.Exp()
+    bij = exp.Exp()
     self.assertContainsInOrder(
         ['tfp.bijectors.Exp("exp", batch_shape=[], min_event_ndims=0)'],
         str(bij))
@@ -260,7 +277,7 @@ class BijectorStringReprTest(test_util.TestCase):
          "inverse_min_event_ndims=0 dtype_x=? dtype_y=?>"],
         repr(bij))
 
-    bij = tfb.Scale([1., 1.], name='myscale')
+    bij = scale_lib.Scale([1., 1.], name='myscale')
     self.assertContainsInOrder(
         ['tfp.bijectors.Scale("myscale", batch_shape=[2], min_event_ndims=0, '
          'dtype=float32)'],
@@ -271,7 +288,7 @@ class BijectorStringReprTest(test_util.TestCase):
          "dtype_y=float32>"],
         repr(bij))
 
-    bij = tfb.Split([3, 4, 2], name='s_p_l_i_t')
+    bij = split.Split([3, 4, 2], name='s_p_l_i_t')
     self.assertContainsInOrder(
         ['tfp.bijectors.Split("s_p_l_i_t", batch_shape=[], '
          'forward_min_event_ndims=1, inverse_min_event_ndims=[1, 1, 1])'],
@@ -285,7 +302,7 @@ class BijectorStringReprTest(test_util.TestCase):
   @test_util.jax_disable_test_missing_functionality('dynamic shape')
   @test_util.numpy_disable_test_missing_functionality('dynamic shape')
   def test_single_part_str_repr_match_expected_dynamic_shape(self):
-    bij = tfb.Scale(self._tensor([1., 1.]), name='dynamic_shape_scale')
+    bij = scale_lib.Scale(self._tensor([1., 1.]), name='dynamic_shape_scale')
     self.assertContainsInOrder(
         ['tfp.bijectors.Scale("dynamic_shape_scale", min_event_ndims=0, '
          'dtype=float32)'],
@@ -297,7 +314,7 @@ class BijectorStringReprTest(test_util.TestCase):
         repr(bij))
 
   def test_invert_str_and_repr_match_expected(self):
-    bij = tfb.Invert(tfb.Split([3, 4, 2]))
+    bij = invert.Invert(split.Split([3, 4, 2]))
     self.assertContainsInOrder(
         ['tfp.bijectors.Invert("invert_split", batch_shape=[], '
          'forward_min_event_ndims=[1, 1, 1], inverse_min_event_ndims=1, '
@@ -314,7 +331,10 @@ class BijectorStringReprTest(test_util.TestCase):
         repr(bij))
 
   def test_composition_str_and_repr_match_expected(self):
-    bij = tfb.Chain([tfb.Exp(), tfb.Shift([1., 2.]), tfb.SoftmaxCentered()])
+    bij = chain_lib.Chain(
+        [exp.Exp(),
+         shift.Shift([1., 2.]),
+         softmax_centered.SoftmaxCentered()])
     self.assertContainsInOrder(
         ['tfp.bijectors.Chain(',
          ('batch_shape=[], min_event_ndims=1, '
@@ -329,14 +349,18 @@ class BijectorStringReprTest(test_util.TestCase):
          '>]>'],
         repr(bij))
 
-    bij = tfb.Chain(
-        [
-            tfb.JointMap({'a': tfb.Exp(),
-                          'b': tfb.ScaleMatvecDiag([2., 2.])}),
-            tfb.Restructure({'a': 0, 'b': 1}, [0, 1]),
-            tfb.Split(2),
-            tfb.Invert(tfb.SoftmaxCentered()),
-        ])
+    bij = chain_lib.Chain([
+        joint_map.JointMap({
+            'a': exp.Exp(),
+            'b': scale_matvec_diag.ScaleMatvecDiag([2., 2.])
+        }),
+        restructure.Restructure({
+            'a': 0,
+            'b': 1
+        }, [0, 1]),
+        split.Split(2),
+        invert.Invert(softmax_centered.SoftmaxCentered()),
+    ])
     self.assertContainsInOrder(
         ['tfp.bijectors.Chain(',
          ('batch_shape=[], forward_min_event_ndims=1, '
@@ -359,9 +383,11 @@ class BijectorStringReprTest(test_util.TestCase):
   @test_util.jax_disable_test_missing_functionality('dynamic shape')
   @test_util.numpy_disable_test_missing_functionality('dynamic shape')
   def test_composition_str_and_repr_match_expected_dynamic_shape(self):
-    bij = tfb.Chain([tfb.Exp(),
-                     tfb.Shift(self._tensor([1., 2.])),
-                     tfb.SoftmaxCentered()])
+    bij = chain_lib.Chain([
+        exp.Exp(),
+        shift.Shift(self._tensor([1., 2.])),
+        softmax_centered.SoftmaxCentered()
+    ])
     self.assertContainsInOrder(
         ['tfp.bijectors.Chain(',
          ('min_event_ndims=1, bijectors=[Exp, Shift, SoftmaxCentered])')],
@@ -375,14 +401,18 @@ class BijectorStringReprTest(test_util.TestCase):
          '>]>'],
         repr(bij))
 
-    bij = tfb.Chain(
-        [
-            tfb.JointMap({'a': tfb.Exp(),
-                          'b': tfb.ScaleMatvecDiag(self._tensor([2., 2.]))}),
-            tfb.Restructure({'a': 0, 'b': 1}, [0, 1]),
-            tfb.Split(2),
-            tfb.Invert(tfb.SoftmaxCentered()),
-        ])
+    bij = chain_lib.Chain([
+        joint_map.JointMap({
+            'a': exp.Exp(),
+            'b': scale_matvec_diag.ScaleMatvecDiag(self._tensor([2., 2.]))
+        }),
+        restructure.Restructure({
+            'a': 0,
+            'b': 1
+        }, [0, 1]),
+        split.Split(2),
+        invert.Invert(softmax_centered.SoftmaxCentered()),
+    ])
     self.assertContainsInOrder(
         ['tfp.bijectors.Chain(',
          ('forward_min_event_ndims=1, '
@@ -407,7 +437,7 @@ class IntentionallyMissingError(Exception):
   pass
 
 
-class ForwardOnlyBijector(tfb.Bijector):
+class ForwardOnlyBijector(bijector_lib.Bijector):
   """Bijector with no inverse methods at all."""
 
   def __init__(self, scale=2., validate_args=False, name=None):
@@ -429,7 +459,7 @@ class ForwardOnlyBijector(tfb.Bijector):
     return tf.math.log(self._scale)
 
 
-class InverseOnlyBijector(tfb.Bijector):
+class InverseOnlyBijector(bijector_lib.Bijector):
   """Bijector with no forward methods at all."""
 
   def __init__(self, scale=2., validate_args=False, name=None):
@@ -451,7 +481,7 @@ class InverseOnlyBijector(tfb.Bijector):
     return -tf.math.log(self._scale)
 
 
-class ExpOnlyJacobian(tfb.Bijector):
+class ExpOnlyJacobian(bijector_lib.Bijector):
   """Only used for jacobian calculations."""
 
   def __init__(self, validate_args=False, forward_min_event_ndims=0):
@@ -470,7 +500,7 @@ class ExpOnlyJacobian(tfb.Bijector):
     return tf.math.log(x)
 
 
-class VectorExpOnlyJacobian(tfb.Bijector):
+class VectorExpOnlyJacobian(bijector_lib.Bijector):
   """An Exp bijector that operates only on vector (or higher-order) events."""
 
   def __init__(self):
@@ -489,7 +519,7 @@ class VectorExpOnlyJacobian(tfb.Bijector):
     return tf.reduce_sum(tf.math.log(x), axis=-1)
 
 
-class ConstantJacobian(tfb.Bijector):
+class ConstantJacobian(bijector_lib.Bijector):
   """Only used for jacobian calculations."""
 
   def __init__(self, forward_min_event_ndims=0):
@@ -508,7 +538,7 @@ class ConstantJacobian(tfb.Bijector):
     return tf.constant(-2., x.dtype)
 
 
-class UniqueCacheKey(tfb.Bijector):
+class UniqueCacheKey(bijector_lib.Bijector):
   """Used to test instance-level caching."""
 
   def __init__(self, forward_min_event_ndims=0):
@@ -530,7 +560,7 @@ class UniqueCacheKey(tfb.Bijector):
     return id(self)
 
 
-class UnspecifiedParameters(tfb.Bijector):
+class UnspecifiedParameters(bijector_lib.Bijector):
   """A bijector that fails to pass `parameters` to the base class."""
 
   def __init__(self, loc):
@@ -585,33 +615,40 @@ class BijectorTestEventNdims(test_util.TestCase):
 class BijectorBatchShapesTest(test_util.TestCase):
 
   @parameterized.named_parameters(
-      ('exp', tfb.Exp, None),
-      ('scale',
-       lambda: tfb.Scale(tf.ones([4, 2])), None),
+      ('exp', exp.Exp, None),
+      ('scale', lambda: scale_lib.Scale(tf.ones([4, 2])), None),
       ('sigmoid',
-       lambda: tfb.Sigmoid(low=tf.zeros([3]), high=tf.ones([4, 1])), None),
+       lambda: sigmoid_lib.Sigmoid(  # pylint: disable=g-long-lambda
+           low=tf.zeros([3]), high=tf.ones([4, 1])), None),
       ('scale_matvec',
-       lambda: tfb.ScaleMatvecDiag([[0.], [3.]]), None),
-      ('invert',
-       lambda: tfb.Invert(tfb.ScaleMatvecDiag(tf.ones([2, 1]))), None),
-      ('reshape',
-       lambda: tfb.Reshape([1], event_shape_in=[1, 1]), None),
-      ('chain',
-       lambda: tfb.Chain([tfb.Power(power=[[2.], [3.]]),  # pylint: disable=g-long-lambda
-                          tfb.Invert(tfb.Split(2))]),
-       None),
-      ('jointmap_01',
-       lambda: tfb.JointMap([tfb.Scale([5, 3]), tfb.Scale([1, 4])]), [0, 1]),
-      ('jointmap_11',
-       lambda: tfb.JointMap([tfb.Scale([5, 3]), tfb.Scale([1, 4])]), [1, 1]),
-      ('jointmap_20',
-       lambda: tfb.JointMap([tfb.Scale([5, 3]), tfb.Scale([1, 4])]), [2, 0]),
-      ('jointmap_22',
-       lambda: tfb.JointMap([tfb.Scale([5, 3]), tfb.Scale([1, 4])]), [2, 2]),
-      ('restructure_with_ragged_event_ndims',
-       lambda: tfb.Restructure(input_structure=[0, 1],  # pylint: disable=g-long-lambda
-                               output_structure={'a': 0, 'b': 1}),
-       [0, 1]))
+       lambda: scale_matvec_diag.ScaleMatvecDiag([[0.], [3.]]), None),
+      ('invert', lambda: invert.Invert(  # pylint: disable=g-long-lambda
+          scale_matvec_diag.ScaleMatvecDiag(tf.ones([2, 1]))), None),
+      ('reshape', lambda: reshape.Reshape([1], event_shape_in=[1, 1]), None),
+      (
+          'chain',
+          lambda: chain_lib.Chain([  # pylint: disable=g-long-lambda
+              power.Power(power=[[2.], [3.]]),
+              invert.Invert(split.Split(2))
+          ]),
+          None),
+      ('jointmap_01', lambda: joint_map.JointMap(  # pylint: disable=g-long-lambda
+          [scale_lib.Scale([5, 3]), scale_lib.Scale([1, 4])]), [0, 1]),
+      ('jointmap_11', lambda: joint_map.JointMap(  # pylint: disable=g-long-lambda
+          [scale_lib.Scale([5, 3]), scale_lib.Scale([1, 4])]), [1, 1]),
+      ('jointmap_20', lambda: joint_map.JointMap(  # pylint: disable=g-long-lambda
+          [scale_lib.Scale([5, 3]), scale_lib.Scale([1, 4])]), [2, 0]),
+      ('jointmap_22', lambda: joint_map.JointMap(  # pylint: disable=g-long-lambda
+          [scale_lib.Scale([5, 3]), scale_lib.Scale([1, 4])]), [2, 2]),
+      (
+          'restructure_with_ragged_event_ndims',
+          lambda: restructure.Restructure(  # pylint: disable=g-long-lambda
+              input_structure=[0, 1],
+              output_structure={
+                  'a': 0,
+                  'b': 1
+              }),
+          [0, 1]))
   def test_batch_shape_matches_output_shapes(self,
                                              bijector_fn,
                                              override_x_event_ndims=None):
@@ -667,9 +704,9 @@ class BijectorBatchShapesTest(test_util.TestCase):
     ildj = bijector.inverse_log_det_jacobian(ys, event_ndims=y_event_ndims)
     self.assertAllEqual(batch_shape_x, ps.shape(ildj))
 
-  @parameterized.named_parameters(
-      ('scale', lambda: tfb.Scale([3.14159])),
-      ('chain', lambda: tfb.Exp()(tfb.Scale([3.14159]))))
+  @parameterized.named_parameters(('scale', lambda: scale_lib.Scale([3.14159])),
+                                  ('chain', lambda: exp.Exp()  # pylint: disable=g-long-lambda
+                                   (scale_lib.Scale([3.14159]))))
   def test_ndims_specification(self, bijector_fn):
     bijector = bijector_fn()
 
@@ -686,28 +723,52 @@ class BijectorBatchShapesTest(test_util.TestCase):
       bijector.experimental_batch_shape_tensor(x_event_ndims=0, y_event_ndims=0)
 
   @parameterized.named_parameters(
-      ('scale', lambda: tfb.Scale(tf.ones([4, 2])), None),
-      ('sigmoid', lambda: tfb.Sigmoid(low=tf.zeros([3]), high=tf.ones([4, 1])),
-       None),
-      ('invert', lambda: tfb.Invert(tfb.ScaleMatvecDiag(tf.ones([2, 1]))),
-       None),
-      ('chain',
-       lambda: tfb.Chain([tfb.Power(power=[[2.], [3.]]),  # pylint: disable=g-long-lambda
-                          tfb.Invert(tfb.Split(2))]),
-       None),
-      ('jointmap_01', lambda: tfb.JointMap(  # pylint: disable=g-long-lambda
-          [tfb.Scale([5, 3]), tfb.Scale([1, 4])]), [0, 1]),
-      ('jointmap_11', lambda: tfb.JointMap(  # pylint: disable=g-long-lambda
-          [tfb.Scale([5, 3]), tfb.Scale([1, 4])]), [1, 1]),
-      ('jointmap_20', lambda: tfb.JointMap(  # pylint: disable=g-long-lambda
-          [tfb.Scale([5, 3]), tfb.Scale([1, 4])]), [2, 0]),
-      ('jointmap_22', lambda: tfb.JointMap(  # pylint: disable=g-long-lambda
-          [tfb.Scale([5, 3]), tfb.Scale([1, 4])]), [2, 2]),
-      ('nested_jointmap',
-       lambda: tfb.JointMap([tfb.JointMap({'a': tfb.Scale([1.]),  # pylint: disable=g-long-lambda
-                                           'b': tfb.Exp()}),
-                             tfb.Scale([1, 4])(tfb.Invert(tfb.Split(2)))]),
-       [{'a': 0, 'b': 0}, [2, 2]]))
+      ('scale', lambda: scale_lib.Scale(tf.ones([4, 2])), None),
+      ('sigmoid',
+       lambda: sigmoid_lib.Sigmoid(  # pylint: disable=g-long-lambda
+           low=tf.zeros([3]), high=tf.ones([4, 1])), None),
+      ('invert', lambda: invert.Invert(  # pylint: disable=g-long-lambda
+          scale_matvec_diag.ScaleMatvecDiag(tf.ones([2, 1]))), None),
+      (
+          'chain',
+          lambda: chain_lib.Chain([  # pylint: disable=g-long-lambda
+              power.Power(power=[[2.], [3.]]),
+              invert.Invert(split.Split(2))
+          ]),
+          None),
+      (
+          'jointmap_01',
+          lambda: joint_map.JointMap(  # pylint: disable=g-long-lambda
+              [scale_lib.Scale([5, 3]), scale_lib.Scale([1, 4])]),
+          [0, 1]),
+      (
+          'jointmap_11',
+          lambda: joint_map.JointMap(  # pylint: disable=g-long-lambda
+              [scale_lib.Scale([5, 3]), scale_lib.Scale([1, 4])]),
+          [1, 1]),
+      (
+          'jointmap_20',
+          lambda: joint_map.JointMap(  # pylint: disable=g-long-lambda
+              [scale_lib.Scale([5, 3]), scale_lib.Scale([1, 4])]),
+          [2, 0]),
+      (
+          'jointmap_22',
+          lambda: joint_map.JointMap(  # pylint: disable=g-long-lambda
+              [scale_lib.Scale([5, 3]), scale_lib.Scale([1, 4])]),
+          [2, 2]),
+      (
+          'nested_jointmap',
+          lambda: joint_map.JointMap([  # pylint: disable=g-long-lambda
+              joint_map.JointMap({
+                  'a': scale_lib.Scale([1.]),
+                  'b': exp.Exp()
+              }),
+              scale_lib.Scale([1, 4])(invert.Invert(split.Split(2)))
+          ]),
+          [{
+              'a': 0,
+              'b': 0
+          }, [2, 2]]))
   def test_with_broadcast_batch_shape(self, bijector_fn, x_event_ndims=None):
     bijector = bijector_fn()
     if x_event_ndims is None:
@@ -729,7 +790,7 @@ class BijectorBatchShapesTest(test_util.TestCase):
         broadcast_bijector, bijector_x_event_ndims=x_event_ndims)
 
     def _maybe_broadcast_param_batch_shape(p, s):
-      if isinstance(p, tfb.Invert) and not p.bijector._params_event_ndims():
+      if isinstance(p, invert.Invert) and not p.bijector._params_event_ndims():
         return s  # Can't broadcast a bijector that doesn't itself have params.
       return ps.broadcast_shape(s, new_batch_shape)
     expected_broadcast_param_batch_shapes = tf.nest.map_structure(
@@ -880,14 +941,14 @@ class BijectorCachingTest(test_util.TestCase):
     self.assertLen(bijector_2._cache.weak_keys(direction='forward'), 1)
 
   def testInstanceCache(self):
-    instance_cache_bijector = tfb.Exp()
+    instance_cache_bijector = exp.Exp()
     instance_cache_bijector._cache = cache_util.BijectorCache(
         bijector=instance_cache_bijector)
-    global_cache_bijector = tfb.Exp()
+    global_cache_bijector = exp.Exp()
 
     # Ensure the global cache does not persist between tests in different
     # execution regimes.
-    tfb.Exp._cache.clear()
+    exp.Exp._cache.clear()
 
     x = tf.constant(0., dtype=tf.float32)
     y = global_cache_bijector.forward(x)
@@ -958,7 +1019,7 @@ class BijectorReduceEventDimsTest(test_util.TestCase):
         self.evaluate(bij.inverse_log_det_jacobian(x)))
 
   def testInverseWithEventDimsOmitted(self):
-    bij = tfb.Split(2)
+    bij = split.Split(2)
 
     self.assertAllEqual(
         0.0,
@@ -1058,11 +1119,11 @@ class NumpyArrayCaching(test_util.TestCase):
 
     x_ = np.array([[-0.1, 0.2], [0.3, -0.4]], np.float32)
     y_ = np.exp(x_)
-    b = tfb.Exp()
+    b = exp.Exp()
 
     # Ensure the global cache does not persist between tests in different
     # execution regimes.
-    tfb.Exp._cache.clear()
+    exp.Exp._cache.clear()
 
     # We will intercept calls to TF to ensure np.array objects don't get
     # converted to tf.Tensor objects.
@@ -1114,7 +1175,7 @@ class TfModuleTest(test_util.TestCase):
     self.assertEqual((-1.,), self.evaluate(g))
 
 
-class _ConditionalBijector(tfb.Bijector):
+class _ConditionalBijector(bijector_lib.Bijector):
 
   def __init__(self):
     parameters = dict(locals())
@@ -1175,7 +1236,7 @@ class ConditionalBijectorTest(test_util.TestCase):
       mock_method.assert_called_once_with(mock.ANY, arg1=arg1, arg2=arg2)
 
 
-class CompositeForwardBijector(tfb.AutoCompositeTensorBijector):
+class CompositeForwardBijector(bijector_lib.AutoCompositeTensorBijector):
 
   def __init__(self, scale=2., validate_args=False, parameters=None, name=None):
     parameters = dict(locals()) if parameters is None else parameters

@@ -20,9 +20,9 @@ import warnings
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.mcmc import kernel
+from tensorflow_probability.python.mcmc import metropolis_hastings
 from tensorflow_probability.python.mcmc.internal.util import is_list_like
 
 InnerKernelResultsWithoutCorrection = collections.namedtuple(
@@ -49,7 +49,7 @@ InnerKernelResultsWithCorrection = collections.namedtuple(
     ])
 
 
-class FakeTransitionKernel(tfp.mcmc.TransitionKernel):
+class FakeTransitionKernel(kernel.TransitionKernel):
   """Fake TransitionKernel for testing MetropolisHastings."""
 
   def __init__(self, is_calibrated, one_step_fn, bootstrap_fn,
@@ -158,7 +158,7 @@ class MetropolisHastingsTest(test_util.TestCase):
         current_state, expected_init_inner_kernel_results)
 
     # Collect actual results.
-    mh = tfp.mcmc.MetropolisHastings(
+    mh = metropolis_hastings.MetropolisHastings(
         FakeTransitionKernel(
             is_calibrated=False,
             one_step_fn=one_step_fn,
@@ -256,7 +256,7 @@ class MetropolisHastingsTest(test_util.TestCase):
         current_state, expected_init_inner_kernel_results)
 
     # Collect actual results.
-    mh = tfp.mcmc.MetropolisHastings(
+    mh = metropolis_hastings.MetropolisHastings(
         FakeTransitionKernel(
             is_calibrated=False,
             one_step_fn=one_step_fn,
@@ -347,7 +347,7 @@ class MetropolisHastingsTest(test_util.TestCase):
     one_step_fn = make_one_step_fn(dtype=self.dtype)
     bootstrap_fn = make_bootstrap_results_fn(init_inner_kernel_results)
 
-    mh = tfp.mcmc.MetropolisHastings(
+    mh = metropolis_hastings.MetropolisHastings(
         FakeTransitionKernel(
             one_step_fn=one_step_fn,
             bootstrap_fn=bootstrap_fn,
@@ -376,7 +376,7 @@ class MetropolisHastingsTest(test_util.TestCase):
         expected_inner_init_kernel_results)
 
     with warnings.catch_warnings(record=True) as w:
-      mh = tfp.mcmc.MetropolisHastings(
+      mh = metropolis_hastings.MetropolisHastings(
           FakeTransitionKernel(
               is_calibrated=True,  # Verify the already-calibrated warning.
               one_step_fn=one_step_fn,

@@ -17,12 +17,13 @@ import numpy as np
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import bernoulli
+from tensorflow_probability.python.distributions import beta_binomial
+from tensorflow_probability.python.distributions import dirichlet_multinomial
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
 
 
 @test_util.test_all_tf_execution_regimes
@@ -32,7 +33,7 @@ class BetaBinomialTest(test_util.TestCase):
     n = np.array((3, 4, 5)).astype(np.float64)
     c1 = np.random.rand(3)
     c0 = np.random.rand(3)
-    dist = tfd.BetaBinomial(n, c1, c0, validate_args=True)
+    dist = beta_binomial.BetaBinomial(n, c1, c0, validate_args=True)
     self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
     self.assertAllEqual([3], self.evaluate(dist.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([]), dist.event_shape)
@@ -42,7 +43,7 @@ class BetaBinomialTest(test_util.TestCase):
     n = np.random.randint(1, 10, size=(5, 4)).astype(np.float64)
     c1 = np.random.rand(2, 1, 1)
     c0 = np.random.rand(3, 1, 5, 1)
-    dist = tfd.BetaBinomial(n, c1, c0, validate_args=True)
+    dist = beta_binomial.BetaBinomial(n, c1, c0, validate_args=True)
     self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
     self.assertAllEqual([3, 2, 5, 4], self.evaluate(dist.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([]), dist.event_shape)
@@ -52,7 +53,7 @@ class BetaBinomialTest(test_util.TestCase):
     n = [3., 4, 5]
     c1 = [[0.5, 1.0, 2.0]]
     c0 = [[[3.0, 2.0, 1.0]]]
-    dist = tfd.BetaBinomial(n, c1, c0)
+    dist = beta_binomial.BetaBinomial(n, c1, c0)
     self.assertEqual([3], dist.total_count.shape)
     self.assertEqual([1, 3], dist.concentration1.shape)
     self.assertEqual([1, 1, 3], dist.concentration0.shape)
@@ -72,7 +73,7 @@ class BetaBinomialTest(test_util.TestCase):
         1. + 2. * tf.random.uniform(
             shape=[4, 3, 1], dtype=tf.float32, seed=seed_stream()))
 
-    dist = tfd.BetaBinomial(n, c1, c0, validate_args=True)
+    dist = beta_binomial.BetaBinomial(n, c1, c0, validate_args=True)
 
     num_samples = int(1e4)
     x = dist.sample(num_samples, seed=seed_stream())
@@ -94,12 +95,12 @@ class BetaBinomialTest(test_util.TestCase):
     c0 = self.evaluate(1. + 2. * tf.random.uniform(
         shape=[4, 3], dtype=tf.float32, seed=seed_stream()))
 
-    beta_binomial = tfd.BetaBinomial(n, c1, c0, validate_args=True)
-    dirichlet_multinomial = tfd.DirichletMultinomial(
+    dist = beta_binomial.BetaBinomial(n, c1, c0, validate_args=True)
+    dm = dirichlet_multinomial.DirichletMultinomial(
         n, tf.stack([c1, c0], axis=-1), validate_args=True)
 
-    beta_binomial_mean = self.evaluate(beta_binomial.mean())
-    dirichlet_multinomial_mean = self.evaluate(dirichlet_multinomial.mean())
+    beta_binomial_mean = self.evaluate(dist.mean())
+    dirichlet_multinomial_mean = self.evaluate(dm.mean())
 
     self.assertEqual((4, 3), beta_binomial_mean.shape)
     self.assertEqual((4, 3, 2), dirichlet_multinomial_mean.shape)
@@ -108,9 +109,8 @@ class BetaBinomialTest(test_util.TestCase):
     self.assertAllClose(n - beta_binomial_mean,
                         np.squeeze(dirichlet_multinomial_mean[..., 1]))
 
-    beta_binomial_variance = self.evaluate(beta_binomial.variance())
-    dirichlet_multinomial_variance = self.evaluate(
-        dirichlet_multinomial.variance())
+    beta_binomial_variance = self.evaluate(dist.variance())
+    dirichlet_multinomial_variance = self.evaluate(dm.variance())
     self.assertEqual((4, 3), beta_binomial_variance.shape)
     self.assertEqual((4, 3, 2), dirichlet_multinomial_variance.shape)
     self.assertAllClose(beta_binomial_variance,
@@ -126,7 +126,7 @@ class BetaBinomialTest(test_util.TestCase):
     c0 = self.evaluate(
         1. + 2. * tf.random.uniform(
             shape=[4, 3, 1], dtype=tf.float32, seed=seed_stream()))
-    dist = tfd.BetaBinomial(
+    dist = beta_binomial.BetaBinomial(
         tf.cast(n, dtype=tf.float32), c1, c0, validate_args=True)
 
     num_samples = int(1e4)
@@ -141,12 +141,12 @@ class BetaBinomialTest(test_util.TestCase):
 
   def testSampleCornerConcentrations(self):
     seed_stream = test_util.test_seed_stream()
-    d = tfd.BetaBinomial(concentration0=[1., 0.], concentration1=[0., 1.],
-                         total_count=50.)
+    d = beta_binomial.BetaBinomial(
+        concentration0=[1., 0.], concentration1=[0., 1.], total_count=50.)
     self.assertAllEqual(d.sample(10, seed=seed_stream()), [[0, 50]] * 10)
 
   def testLogProbCornerCase(self):
-    d = tfd.BetaBinomial(
+    d = beta_binomial.BetaBinomial(
         concentration0=2e-8, concentration1=1.0, total_count=1.0)
     # Numerically 0 is better than numerically +inf
     self.assertAllEqual(d.log_prob(1.0), 0.0)
@@ -166,17 +166,16 @@ class BetaBinomialTest(test_util.TestCase):
         1. + 2. * tf.random.uniform(
             shape=[3], dtype=tf.float32, seed=seed_stream()))
 
-    beta_binomial = tfd.BetaBinomial(n, c1, c0, validate_args=True)
-    dirichlet_multinomial = tfd.DirichletMultinomial(
+    dist = beta_binomial.BetaBinomial(n, c1, c0, validate_args=True)
+    dm = dirichlet_multinomial.DirichletMultinomial(
         n, tf.stack([c1, c0], axis=-1), validate_args=True)
 
     num_samples_to_draw = tf.math.floor(
         1 + st.min_num_samples_for_dkwm_cdf_two_sample_test(.02)[0])
 
-    beta_binomial_samples = beta_binomial.sample(num_samples_to_draw)
+    beta_binomial_samples = dist.sample(num_samples_to_draw)
 
-    dirichlet_multinomial_samples = dirichlet_multinomial.sample(
-        num_samples_to_draw)
+    dirichlet_multinomial_samples = dm.sample(num_samples_to_draw)
     dirichlet_multinomial_samples = tf.squeeze(
         dirichlet_multinomial_samples[..., 0])
 
@@ -184,7 +183,7 @@ class BetaBinomialTest(test_util.TestCase):
         beta_binomial_samples, dirichlet_multinomial_samples))
 
   def testLogProbCountsValid(self):
-    d = tfd.BetaBinomial([10., 4.], 1., 1., validate_args=True)
+    d = beta_binomial.BetaBinomial([10., 4.], 1., 1., validate_args=True)
     d.log_prob([0., 0.])
     d.log_prob([0., 2.])
     d.log_prob([2., 4.])
@@ -206,26 +205,25 @@ class BetaBinomialTest(test_util.TestCase):
     c0 = self.evaluate(1. + 2. * tf.random.uniform(
         shape=[4, 3], dtype=tf.float32, seed=seed_stream()))
 
-    beta_binomial = tfd.BetaBinomial(n, c1, c0, validate_args=True)
-    dirichlet_multinomial = tfd.DirichletMultinomial(
+    dist = beta_binomial.BetaBinomial(n, c1, c0, validate_args=True)
+    dm = dirichlet_multinomial.DirichletMultinomial(
         n, tf.stack([c1, c0], axis=-1), validate_args=True)
 
     num_samples = 3
 
     beta_binomial_sample = self.evaluate(
-        beta_binomial.sample(num_samples, seed=seed_stream()))
-    beta_binomial_log_prob = beta_binomial.log_prob(beta_binomial_sample)
-    dirichlet_multinomial_log_prob = dirichlet_multinomial.log_prob(
+        dist.sample(num_samples, seed=seed_stream()))
+    beta_binomial_log_prob = dist.log_prob(beta_binomial_sample)
+    dirichlet_multinomial_log_prob = dm.log_prob(
         tf.stack([beta_binomial_sample, n - beta_binomial_sample], axis=-1))
     self.assertAllClose(self.evaluate(beta_binomial_log_prob),
                         self.evaluate(dirichlet_multinomial_log_prob),
                         rtol=1e-4, atol=1e-4)
 
     dirichlet_multinomial_sample = self.evaluate(
-        dirichlet_multinomial.sample(num_samples, seed=seed_stream()))
-    dirichlet_multinomial_log_prob = dirichlet_multinomial.log_prob(
-        dirichlet_multinomial_sample)
-    beta_binomial_log_prob = beta_binomial.log_prob(
+        dm.sample(num_samples, seed=seed_stream()))
+    dirichlet_multinomial_log_prob = dm.log_prob(dirichlet_multinomial_sample)
+    beta_binomial_log_prob = dist.log_prob(
         tf.squeeze(dirichlet_multinomial_sample[..., 0]))
     self.assertAllClose(self.evaluate(dirichlet_multinomial_log_prob),
                         self.evaluate(beta_binomial_log_prob),
@@ -239,10 +237,10 @@ class BetaBinomialTest(test_util.TestCase):
     c0 = tf.constant([0.3, 0.3, 0.3])
 
     def f(n, c1, c0):
-      dist = tfd.BetaBinomial(n, c1, c0, validate_args=True)
+      dist = beta_binomial.BetaBinomial(n, c1, c0, validate_args=True)
       return dist.sample(100, seed=test_util.test_seed())
 
-    _, [grad_n, grad_c1, grad_c0] = tfp.math.value_and_gradient(f, [n, c1, c0])
+    _, [grad_n, grad_c1, grad_c0] = gradient.value_and_gradient(f, [n, c1, c0])
     self.assertIsNone(grad_n)
     self.assertIsNone(grad_c1)
     self.assertIsNone(grad_c0)
@@ -251,7 +249,7 @@ class BetaBinomialTest(test_util.TestCase):
     if tf.executing_eagerly():
       msg = 'XLA requires tf.function, mode switching is meaningless.'
       self.skipTest(msg)
-    dist = tfd.BetaBinomial(
+    dist = beta_binomial.BetaBinomial(
         total_count=50, concentration0=1e-7, concentration1=1e-5)
     seed = test_util.test_seed(sampler_type='stateless')
     num_samples = 20000
@@ -267,7 +265,7 @@ class BetaBinomialTest(test_util.TestCase):
     low_samples_mask = sample == 0
     self.assertAllEqual(np.ones_like(sample),
                         high_samples_mask | low_samples_mask)
-    expect = tfd.Bernoulli(probs=100.0/101.0)
+    expect = bernoulli.Bernoulli(probs=100.0 / 101.0)
     self.evaluate(st.assert_true_cdf_equal_by_dkwm(
         samples=tf.cast(high_samples_mask, tf.float32),
         cdf=expect.cdf,
@@ -285,13 +283,13 @@ class BetaBinomialFromVariableTest(test_util.TestCase):
 
   def testAssertionsTotalCount(self):
     total_count = tf.Variable([-1.0, 4.0, 1.0])
-    d = tfd.BetaBinomial(total_count, 1.0, 1.0, validate_args=True)
+    d = beta_binomial.BetaBinomial(total_count, 1.0, 1.0, validate_args=True)
     self.evaluate([v.initializer for v in d.variables])
     with self.assertRaisesOpError('`total_count` must be non-negative.'):
       self.evaluate(d.mean())
 
     total_count = tf.Variable([0.5, 4.0, 1.0])
-    d = tfd.BetaBinomial(total_count, 1.0, 1.0, validate_args=True)
+    d = beta_binomial.BetaBinomial(total_count, 1.0, 1.0, validate_args=True)
     self.evaluate([v.initializer for v in d.variables])
     with self.assertRaisesOpError(
         '`total_count` cannot contain fractional components.'):
@@ -299,7 +297,7 @@ class BetaBinomialFromVariableTest(test_util.TestCase):
 
   def testAssertionsTotalCountMutation(self):
     total_count = tf.Variable([1.0, 4.0, 1.0])
-    d = tfd.BetaBinomial(total_count, 1.0, 1.0, validate_args=True)
+    d = beta_binomial.BetaBinomial(total_count, 1.0, 1.0, validate_args=True)
     self.evaluate([v.initializer for v in d.variables])
     self.evaluate(d.mean())
 
@@ -316,16 +314,20 @@ class BetaBinomialFromVariableTest(test_util.TestCase):
     concentration1 = tf.Variable([1., 2., -3.])
     self.evaluate(concentration1.initializer)
     with self.assertRaisesOpError('Concentration parameter must be positive.'):
-      d = tfd.BetaBinomial(
-          total_count=10, concentration1=concentration1, concentration0=[5.],
+      d = beta_binomial.BetaBinomial(
+          total_count=10,
+          concentration1=concentration1,
+          concentration0=[5.],
           validate_args=True)
       self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertsPositiveConcentration1AfterMutation(self):
     concentration1 = tf.Variable([1., 2., 3.])
     self.evaluate(concentration1.initializer)
-    d = tfd.BetaBinomial(
-        total_count=10, concentration1=concentration1, concentration0=[5.],
+    d = beta_binomial.BetaBinomial(
+        total_count=10,
+        concentration1=concentration1,
+        concentration0=[5.],
         validate_args=True)
     self.evaluate(concentration1.assign([1., 2., -3.]))
     with self.assertRaisesOpError('Concentration parameter must be positive.'):
@@ -334,8 +336,10 @@ class BetaBinomialFromVariableTest(test_util.TestCase):
   @test_util.tf_tape_safety_test
   def testLogProbGradientThroughConcentration1(self):
     concentration1 = tf.Variable(3.)
-    d = tfd.BetaBinomial(
-        total_count=10, concentration1=concentration1, concentration0=5.,
+    d = beta_binomial.BetaBinomial(
+        total_count=10,
+        concentration1=concentration1,
+        concentration0=5.,
         validate_args=True)
     with tf.GradientTape() as tape:
       loss = -d.log_prob([3., 4., 5.])
@@ -347,16 +351,20 @@ class BetaBinomialFromVariableTest(test_util.TestCase):
     concentration0 = tf.Variable([1., 2., -3.])
     self.evaluate(concentration0.initializer)
     with self.assertRaisesOpError('Concentration parameter must be positive.'):
-      d = tfd.BetaBinomial(
-          total_count=10, concentration1=[5.], concentration0=concentration0,
+      d = beta_binomial.BetaBinomial(
+          total_count=10,
+          concentration1=[5.],
+          concentration0=concentration0,
           validate_args=True)
       self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertsPositiveConcentration0AfterMutation(self):
     concentration0 = tf.Variable([1., 2., 3.])
     self.evaluate(concentration0.initializer)
-    d = tfd.BetaBinomial(
-        total_count=10, concentration1=[5.], concentration0=concentration0,
+    d = beta_binomial.BetaBinomial(
+        total_count=10,
+        concentration1=[5.],
+        concentration0=concentration0,
         validate_args=True)
     self.evaluate(concentration0.assign([1., 2., -3.]))
     with self.assertRaisesOpError('Concentration parameter must be positive.'):
@@ -365,8 +373,10 @@ class BetaBinomialFromVariableTest(test_util.TestCase):
   @test_util.tf_tape_safety_test
   def testLogProbGradientThroughConcentration0(self):
     concentration0 = tf.Variable(3.)
-    d = tfd.BetaBinomial(
-        total_count=10, concentration1=0.5, concentration0=concentration0,
+    d = beta_binomial.BetaBinomial(
+        total_count=10,
+        concentration1=0.5,
+        concentration0=concentration0,
         validate_args=True)
     with tf.GradientTape() as tape:
       loss = -d.log_prob([3., 4., 5.])

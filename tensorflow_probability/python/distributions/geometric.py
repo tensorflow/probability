@@ -17,7 +17,6 @@
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
@@ -28,6 +27,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import generic
 
 
 class Geometric(
@@ -183,7 +183,7 @@ class Geometric(
     return tf.where(
         x < 0.,
         dtype_util.as_numpy_dtype(x.dtype)(-np.inf),
-        tfp_math.log1mexp((1. + x) * tf.math.log1p(-probs)))
+        generic.log1mexp((1. + x) * tf.math.log1p(-probs)))
 
   def _log_prob(self, x):
     probs = self._probs_parameter_no_checks()

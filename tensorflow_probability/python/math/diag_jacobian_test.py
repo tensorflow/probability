@@ -18,15 +18,17 @@
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
+from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
 
 
 @test_util.test_all_tf_execution_regimes
 class JacobianTest(test_util.TestCase):
 
+  @test_util.numpy_disable_gradient_test
   def testJacobianDiagonal3DListInput(self):
     """Tests that the diagonal of the Jacobian matrix computes correctly."""
 
@@ -34,7 +36,7 @@ class JacobianTest(test_util.TestCase):
     true_mean = dtype([0, 0, 0])
     true_cov = dtype([[1, 0.25, 0.25], [0.25, 2, 0.25], [0.25, 0.25, 3]])
     chol = tf.linalg.cholesky(true_cov)
-    target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
+    target = mvn_tril.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
 
     # Assume that the state is passed as a list of tensors `x` and `y`.
     # Then the target function is defined as follows:
@@ -46,13 +48,12 @@ class JacobianTest(test_util.TestCase):
     sample_shape = [3, 5]
     state = [tf.ones(sample_shape + [2], dtype=dtype),
              tf.ones(sample_shape + [1], dtype=dtype)]
-    fn_val, grads = tfp.math.value_and_gradient(target_fn, state)
-    grad_fn = lambda *args: tfp.math.value_and_gradient(target_fn, args)[1]
+    fn_val, grads = gradient.value_and_gradient(target_fn, state)
+    grad_fn = lambda *args: gradient.value_and_gradient(target_fn, args)[1]
 
-    _, diag_jacobian_shape_passed = tfp.math.diag_jacobian(
+    _, diag_jacobian_shape_passed = diag_jacobian(
         xs=state, ys=grads, fn=grad_fn, sample_shape=ps.shape(fn_val))
-    _, diag_jacobian_shape_none = tfp.math.diag_jacobian(
-        xs=state, ys=grads, fn=grad_fn)
+    _, diag_jacobian_shape_none = diag_jacobian(xs=state, ys=grads, fn=grad_fn)
 
     true_diag_jacobian_1 = np.zeros(sample_shape + [2])
     true_diag_jacobian_1[..., 0] = -1.05
@@ -74,6 +75,7 @@ class JacobianTest(test_util.TestCase):
                         true_diag_jacobian_2,
                         atol=0.01, rtol=0.01)
 
+  @test_util.numpy_disable_gradient_test
   def testJacobianDiagonal4D(self):
     """Tests that the diagonal of the Jacobian matrix computes correctly."""
 
@@ -82,7 +84,7 @@ class JacobianTest(test_util.TestCase):
     true_cov = dtype([[1, 0.25, 0.25, 0.25], [0.25, 2, 0.25, 0.25],
                       [0.25, 0.25, 3, 0.25], [0.25, 0.25, 0.25, 4]])
     chol = tf.linalg.cholesky(true_cov)
-    target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
+    target = mvn_tril.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
 
     # Assume that the state is passed as a 2x2 matrix of sample_shape = [5, 3]:
     sample_shape = [5, 3]
@@ -91,13 +93,12 @@ class JacobianTest(test_util.TestCase):
       return target.log_prob(z)
 
     state = [tf.ones(sample_shape + [2, 2], dtype=dtype)]
-    fn_val, grads = tfp.math.value_and_gradient(target_fn, state)
-    grad_fn = lambda *args: tfp.math.value_and_gradient(target_fn, args)[1]
+    fn_val, grads = gradient.value_and_gradient(target_fn, state)
+    grad_fn = lambda *args: gradient.value_and_gradient(target_fn, args)[1]
 
-    _, diag_jacobian_shape_passed = tfp.math.diag_jacobian(
+    _, diag_jacobian_shape_passed = diag_jacobian(
         xs=state, ys=grads, fn=grad_fn, sample_shape=ps.shape(fn_val))
-    _, diag_jacobian_shape_none = tfp.math.diag_jacobian(
-        xs=state, ys=grads, fn=grad_fn)
+    _, diag_jacobian_shape_none = diag_jacobian(xs=state, ys=grads, fn=grad_fn)
 
     true_diag_jacobian = np.zeros(sample_shape + [2, 2])
     true_diag_jacobian[..., 0, 0] = -1.06

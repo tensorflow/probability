@@ -19,14 +19,11 @@
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python.bijectors import scale
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
-
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
+from tensorflow_probability.python.util import deferred_tensor
 
 
 class FakeModule(tf.Module):
@@ -86,7 +83,8 @@ class ConvertNonrefToTensorTest(test_util.TestCase):
 
   def test_end_to_end(self):
     x = tf.constant(-0.5)
-    d = tfd.Normal(loc=0., scale=tfp.util.DeferredTensor(x, tf.math.exp))
+    d = normal.Normal(
+        loc=0., scale=deferred_tensor.DeferredTensor(x, tf.math.exp))
     with tf.GradientTape(watch_accessed_variables=False) as tape:
       tape.watch(x)
       negloglik = -d.log_prob(0.)
@@ -171,10 +169,11 @@ class VariableTrackingUtils(test_util.TestCase):
     self.assertFalse(tensor_util.is_module(tf.Variable(0.)))
 
   def test_identity_as_tensor(self):
-    for v in (tf.constant([4., 3.]),
-              tf.Variable(0.),
-              tfp.util.DeferredTensor(tf.Variable(1.), tf.math.exp),
-              tfp.util.TransformedVariable(2., tfb.Scale(tf.Variable(4.)))):
+    for v in (tf.constant([4., 3.]), tf.Variable(0.),
+              deferred_tensor.DeferredTensor(tf.Variable(1.), tf.math.exp),
+              deferred_tensor.TransformedVariable(2.,
+                                                  scale.Scale(
+                                                      tf.Variable(4.)))):
       v_ = tensor_util.identity_as_tensor(v)
       self.assertIsNot(v, v_)
       self.assertIsInstance(v_, tf.Tensor)

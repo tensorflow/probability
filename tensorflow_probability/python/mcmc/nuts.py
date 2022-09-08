@@ -43,10 +43,10 @@ from tensorflow_probability.python.internal import distribute_lib
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.math.generic import log_add_exp
+from tensorflow_probability.python.math import generic
+from tensorflow_probability.python.mcmc import kernel
 from tensorflow_probability.python.mcmc.internal import leapfrog_integrator as leapfrog_impl
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
-from tensorflow_probability.python.mcmc.kernel import TransitionKernel
 
 JAX_MODE = False
 
@@ -162,7 +162,7 @@ class TreeDoublingMetaState(
   __slots__ = ()
 
 
-class NoUTurnSampler(TransitionKernel):
+class NoUTurnSampler(kernel.TransitionKernel):
   """Runs one step of the No U-Turn Sampler.
 
   The No U-Turn Sampler (NUTS) is an adaptive variant of the Hamiltonian Monte
@@ -603,7 +603,8 @@ class NoUTurnSampler(TransitionKernel):
             continue_tree_final,
             candidate_tree_state.weight,
             tf.constant(-np.inf, dtype=candidate_tree_state.weight.dtype))
-        weight_sum = log_add_exp(tree_weight, last_candidate_state.weight)
+        weight_sum = generic.log_add_exp(
+            tree_weight, last_candidate_state.weight)
         log_accept_thresh = tree_weight - last_candidate_state.weight
       else:
         tree_weight = tf.where(
@@ -877,7 +878,8 @@ class NoUTurnSampler(TransitionKernel):
 
       if MULTINOMIAL_SAMPLE:
         not_divergent = -energy_diff < self.max_energy_diff
-        weight_sum = log_add_exp(candidate_tree_state.weight, energy_diff)
+        weight_sum = generic.log_add_exp(
+            candidate_tree_state.weight, energy_diff)
         log_accept_thresh = energy_diff - weight_sum
       else:
         log_slice_sample = current_step_meta_info.log_slice_sample

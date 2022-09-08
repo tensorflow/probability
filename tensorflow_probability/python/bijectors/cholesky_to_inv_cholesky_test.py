@@ -17,7 +17,11 @@
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import cholesky_to_inv_cholesky
+from tensorflow_probability.python.bijectors import exp
+from tensorflow_probability.python.bijectors import fill_scale_tril
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.internal import test_util
 
 
@@ -25,7 +29,7 @@ from tensorflow_probability.python.internal import test_util
 class CholeskyToInvCholeskyTest(test_util.TestCase):
 
   def testBijector(self):
-    bijector = tfb.CholeskyToInvCholesky()
+    bijector = cholesky_to_inv_cholesky.CholeskyToInvCholesky()
     self.assertStartsWith(bijector.name, "cholesky_to_inv_cholesky")
     x = np.array([[3., 0.], [2., 7.]], dtype=np.float32)
     m = x.dot(x.T)
@@ -38,7 +42,7 @@ class CholeskyToInvCholeskyTest(test_util.TestCase):
     self.assertAllClose(x, y_inv_, atol=1.e-5, rtol=1.e-5)
 
   def testBijectorWithTensors(self):
-    bijector = tfb.CholeskyToInvCholesky()
+    bijector = cholesky_to_inv_cholesky.CholeskyToInvCholesky()
     x = np.array([
         [[3., 0.], [1., 4.]],
         [[2., 0.], [7., 1.]]], dtype=np.float32)
@@ -56,10 +60,13 @@ class CholeskyToInvCholeskyTest(test_util.TestCase):
     self.assertAllClose(y_inv_[1, :], y_inv1_, atol=1.e-5, rtol=1.e-5)
     self.assertAllClose(y_inv_, x, atol=1.e-5, rtol=1.e-5)
 
-  def _get_fldj_numerical(self, bijector, x, event_ndims,
+  def _get_fldj_numerical(self,
+                          bijector,
+                          x,
+                          event_ndims,
                           eps=1.e-6,
-                          input_to_vector=tfb.Identity,
-                          output_to_vector=tfb.Identity):
+                          input_to_vector=identity.Identity,
+                          output_to_vector=identity.Identity):
     """Numerically approximate the forward log det Jacobian of a bijector.
 
     Args:
@@ -96,9 +103,9 @@ class CholeskyToInvCholeskyTest(test_util.TestCase):
     )
 
   def testJacobian(self):
-    cholesky_to_vector = tfb.Invert(
-        tfb.FillScaleTriL(diag_bijector=tfb.Exp(), diag_shift=None))
-    bijector = tfb.CholeskyToInvCholesky()
+    cholesky_to_vector = invert.Invert(
+        fill_scale_tril.FillScaleTriL(diag_bijector=exp.Exp(), diag_shift=None))
+    bijector = cholesky_to_inv_cholesky.CholeskyToInvCholesky()
     for x in [np.array([[2.]],
                        dtype=np.float64),
               np.array([[2., 0.],
@@ -117,7 +124,7 @@ class CholeskyToInvCholeskyTest(test_util.TestCase):
       self.assertAllClose(fldj_, fldj_numerical_, rtol=1e-2)
 
   def testJacobianWithTensors(self):
-    bijector = tfb.CholeskyToInvCholesky()
+    bijector = cholesky_to_inv_cholesky.CholeskyToInvCholesky()
     x = np.array([
         [[3., 0.],
          [1., 4.]],

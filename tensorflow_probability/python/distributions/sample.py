@@ -21,7 +21,6 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -32,6 +31,7 @@ from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import generic
 
 
 def _make_summary_statistic(attr):
@@ -228,7 +228,7 @@ class _Sample(distribution_lib.Distribution):
 
   def _sum_fn(self):
     if self._experimental_use_kahan_sum:
-      return lambda x, axis: tfp_math.reduce_kahan_sum(x, axis).total
+      return lambda x, axis: generic.reduce_kahan_sum(x, axis).total
     return tf.math.reduce_sum
 
   def _prepare_for_underlying(self, x):

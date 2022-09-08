@@ -19,7 +19,6 @@ import collections
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import log_prob_ratio
@@ -28,6 +27,7 @@ from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import generic
 
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
@@ -276,7 +276,7 @@ class _Independent(distribution_lib.Distribution):
 
   def _sum_fn(self):
     if self._experimental_use_kahan_sum:
-      return lambda x, axis: tfp_math.reduce_kahan_sum(x, axis).total
+      return lambda x, axis: generic.reduce_kahan_sum(x, axis).total
     return tf.math.reduce_sum
 
   def _sample_and_log_prob(self, sample_shape, seed, **kwargs):
@@ -457,7 +457,7 @@ def _independent_log_prob_ratio(p, x, q, y, name=None):
       checks.append(tf.debugging.assert_equal(
           p.reinterpreted_batch_ndims, q.reinterpreted_batch_ndims))
     if p._experimental_use_kahan_sum or q._experimental_use_kahan_sum:  # pylint: disable=protected-access
-      sum_fn = lambda x, axis: tfp_math.reduce_kahan_sum(x, axis).total
+      sum_fn = lambda x, axis: generic.reduce_kahan_sum(x, axis).total
     else:
       sum_fn = tf.reduce_sum
     with tf.control_dependencies(checks):

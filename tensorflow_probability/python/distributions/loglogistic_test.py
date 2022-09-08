@@ -19,7 +19,7 @@
 import numpy as np
 from scipy import stats
 
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import loglogistic
 from tensorflow_probability.python.internal import test_util
 
 
@@ -30,7 +30,7 @@ class LogLogisticTest(test_util.TestCase):
     log_logistic_scale = np.float32([3., 1.5, 0.75])
     loc = np.log(log_logistic_scale)
     scale = np.float32([0.8, 0.9, 0.5])
-    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
+    dist = loglogistic.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     self.assertAllClose(
         self.evaluate(dist.mean()),
@@ -40,7 +40,7 @@ class LogLogisticTest(test_util.TestCase):
     log_logistic_scale = np.float32([3., 1.5, 0.75])
     loc = np.log(log_logistic_scale)
     scale = np.float32([0.4, 0.6, 1.5])
-    dist = tfd.LogLogistic(
+    dist = loglogistic.LogLogistic(
         loc=loc, scale=scale, validate_args=True, allow_nan_stats=False)
 
     with self.assertRaisesOpError('Condition x < y.*'):
@@ -50,7 +50,7 @@ class LogLogisticTest(test_util.TestCase):
     log_logistic_scale = np.float32([3., 1.5, 0.75])
     loc = np.log(log_logistic_scale)
     scale = np.float32([0.4, 0.3, 0.2])
-    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
+    dist = loglogistic.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     # scipy.stats.fisk.var only works on scalars, so we calculate this in a
     # loop:
@@ -64,7 +64,7 @@ class LogLogisticTest(test_util.TestCase):
     log_logistic_scale = np.float32([3., 1.5, 0.75])
     loc = np.log(log_logistic_scale)
     scale = np.float32([0.4, 0.6, 1.5])
-    dist = tfd.LogLogistic(
+    dist = loglogistic.LogLogistic(
         loc=loc, scale=scale, validate_args=True, allow_nan_stats=False)
 
     with self.assertRaisesOpError('Condition x < y.*'):
@@ -77,7 +77,7 @@ class LogLogisticTest(test_util.TestCase):
     log_logistic_scale = np.float32([3., 1.5, 0.75])
     loc = np.log(log_logistic_scale)
     scale = np.float32([0.4, 0.6, 1.5])
-    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
+    dist = loglogistic.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     mode = log_logistic_scale * ((1. - scale) / (1. + scale))**scale
     mode[2] = 0.
@@ -87,7 +87,7 @@ class LogLogisticTest(test_util.TestCase):
     log_logistic_scale = np.float32([3., 1.5, 0.75])
     loc = np.log(log_logistic_scale)
     scale = np.float32([0.4, 0.6, 1.5])
-    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
+    dist = loglogistic.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     self.assertAllClose(
         self.evaluate(dist.entropy()),
@@ -97,7 +97,7 @@ class LogLogisticTest(test_util.TestCase):
     log_logistic_scale = 1.5
     loc = np.log(log_logistic_scale).astype(np.float32)
     scale = 0.33
-    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
+    dist = loglogistic.LogLogistic(loc=loc, scale=scale, validate_args=True)
     samples = self.evaluate(dist.sample(6000, seed=test_util.test_seed()))
     self.assertAllClose(np.mean(samples), self.evaluate(dist.mean()), atol=0.1)
     self.assertAllClose(np.std(samples), self.evaluate(dist.stddev()), atol=0.5)
@@ -106,7 +106,7 @@ class LogLogisticTest(test_util.TestCase):
     log_logistic_scale = [1.5, 2.]
     loc = np.log(log_logistic_scale)
     scale = 2.5
-    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
+    dist = loglogistic.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     x = np.array([1.], dtype=np.float32)
 
@@ -120,7 +120,7 @@ class LogLogisticTest(test_util.TestCase):
     log_logistic_scale = 1.5
     loc = np.log(log_logistic_scale)
     scale = np.array([2.5, 5.])
-    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
+    dist = loglogistic.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     x = np.array([[1e-4, 1.0], [1.5, 2.0]], dtype=np.float32)
 
@@ -134,7 +134,7 @@ class LogLogisticTest(test_util.TestCase):
     log_logistic_scale = [1.5, 2.]
     loc = np.log(log_logistic_scale)
     scale = 2.5
-    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
+    dist = loglogistic.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     x = np.array([[1e-4, 1.0], [3.0, 2.0]], dtype=np.float32)
 
@@ -148,7 +148,7 @@ class LogLogisticTest(test_util.TestCase):
     log_logistic_scale = [1.5, 2.]
     loc = np.log(log_logistic_scale)
     scale = np.array([2.5, 5.])
-    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
+    dist = loglogistic.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     x = np.array([2.0], dtype=np.float32)
 
@@ -162,7 +162,7 @@ class LogLogisticTest(test_util.TestCase):
     log_logistic_scale = [0.5, 1.5]
     loc = np.log(log_logistic_scale)
     scale = 2.5
-    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
+    dist = loglogistic.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     x = np.array([1e-4], dtype=np.float32)
 
@@ -175,7 +175,7 @@ class LogLogisticTest(test_util.TestCase):
     log_logistic_scale = [0.5, 1.5]
     loc = np.log(log_logistic_scale)
     scale = np.array([0.5, 2.])
-    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
+    dist = loglogistic.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     x = np.array([[1e-4, 2.0], [5.0, 2.0]], dtype=np.float32)
 
@@ -188,7 +188,7 @@ class LogLogisticTest(test_util.TestCase):
     log_logistic_scale = [0.75, 2.5]
     loc = np.log(log_logistic_scale)
     scale = 2.5
-    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
+    dist = loglogistic.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     x = np.array([1e-4], dtype=np.float32)
 
@@ -201,7 +201,7 @@ class LogLogisticTest(test_util.TestCase):
     log_logistic_scale = [0.75, 2.5]
     loc = np.log(log_logistic_scale)
     scale = np.array([0.3, 2.1])
-    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
+    dist = loglogistic.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     x = np.array([[1e-4, 1.0], [5.0, 2.0]], dtype=np.float32)
 
@@ -214,7 +214,7 @@ class LogLogisticTest(test_util.TestCase):
     log_logistic_scale = [0.42, 1.3]
     loc = np.log(log_logistic_scale)
     scale = 2.5
-    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
+    dist = loglogistic.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     x = np.array([[1e-4, 1.0], [3., 2.0]], dtype=np.float32)
 
@@ -227,7 +227,7 @@ class LogLogisticTest(test_util.TestCase):
     log_logistic_scale = 1.5
     loc = np.log(log_logistic_scale)
     scale = np.array([1.2, 5.1])
-    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
+    dist = loglogistic.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     x = np.array([1.0], dtype=np.float32)
 
@@ -237,13 +237,13 @@ class LogLogisticTest(test_util.TestCase):
         stats.fisk.logsf(x, loc=0., scale=log_logistic_scale, c=1. / scale))
 
   def testAssertValidSample(self):
-    dist = tfd.LogLogistic(
+    dist = loglogistic.LogLogistic(
         loc=np.log([1., 1., 4.]), scale=2., validate_args=True)
     with self.assertRaisesOpError('Sample must be non-negative.'):
       self.evaluate(dist.cdf([3., -0.2, 1.]))
 
   def testSupportBijectorOutsideRange(self):
-    dist = tfd.LogLogistic(loc=0., scale=0.5, validate_args=True)
+    dist = loglogistic.LogLogistic(loc=0., scale=0.5, validate_args=True)
     with self.assertRaisesOpError('must be greater than or equal to 0'):
       dist.experimental_default_event_space_bijector().inverse(
           [-4.2, -1e-6, -1.3])

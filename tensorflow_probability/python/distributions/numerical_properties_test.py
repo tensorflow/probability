@@ -45,7 +45,7 @@ WORKING_PRECISION_TEST_BLOCK_LIST = (
     # The difficulty concerns Mixtures of component distributions whose samples
     # have different dtypes.
     'Mixture',
-)
+    'ZeroInflatedNegativeBinomial')
 
 
 NO_NANS_TEST_BLOCK_LIST = (
@@ -116,7 +116,7 @@ LOG_PROB_ACCURACY_BLOCK_LIST = (
     # TODO(axch): Is this the same problem as the NoNansTest exclusion?
     'TruncatedNormal',
     'WishartTriL',
-)
+    'ZeroInflatedNegativeBinomial')
 
 
 SLICING_LOGPROB_ATOL = collections.defaultdict(lambda: 1e-5)

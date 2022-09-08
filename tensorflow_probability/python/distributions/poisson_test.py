@@ -16,14 +16,13 @@
 import numpy as np
 from scipy import stats
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions import poisson as poisson_lib
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import implementation_selection
 from tensorflow_probability.python.internal import test_util
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
 
 
 @test_util.test_all_tf_execution_regimes
@@ -33,7 +32,7 @@ class PoissonTest(test_util.TestCase):
                     rate,
                     validate_args=True,
                     force_probs_to_zero_outside_support=False):
-    return tfd.Poisson(
+    return poisson_lib.Poisson(
         rate=rate,
         validate_args=validate_args,
         force_probs_to_zero_outside_support=force_probs_to_zero_outside_support)
@@ -56,7 +55,7 @@ class PoissonTest(test_util.TestCase):
 
   def testZeroLam(self):
     lam = 0.
-    poisson = tfd.Poisson(rate=lam, validate_args=True)
+    poisson = poisson_lib.Poisson(rate=lam, validate_args=True)
     self.assertAllClose(lam, self.evaluate(poisson.rate))
     self.assertAllClose(0., poisson.prob(3))
     self.assertAllClose(1., poisson.prob(0))
@@ -115,8 +114,9 @@ class PoissonTest(test_util.TestCase):
     # value.
     x = np.array([0., 2., 3., 4., 5., 6.], dtype=np.float32)
 
-    _, dlog_pmf_dlam = self.evaluate(tfp.math.value_and_gradient(
-        lambda lam: self._make_poisson(rate=lam).log_prob(x), lam))
+    _, dlog_pmf_dlam = self.evaluate(
+        gradient.value_and_gradient(
+            lambda lam: self._make_poisson(rate=lam).log_prob(x), lam))
 
     # A finite difference approximation of the derivative.
     eps = 1e-6
@@ -138,8 +138,9 @@ class PoissonTest(test_util.TestCase):
           rate=lam,
           force_probs_to_zero_outside_support=True,
           validate_args=False).log_prob(x)
-    _, dlog_pmf_dlam = self.evaluate(tfp.math.value_and_gradient(
-        poisson_log_prob, lam))
+
+    _, dlog_pmf_dlam = self.evaluate(
+        gradient.value_and_gradient(poisson_log_prob, lam))
 
     self.assertEqual(dlog_pmf_dlam.shape, (batch_size,))
     self.assertAllClose(dlog_pmf_dlam, np.zeros([batch_size]))
@@ -196,7 +197,7 @@ class PoissonTest(test_util.TestCase):
     self.assertEqual(survival.shape, (batch_size,))
     self.assertAllClose(self.evaluate(survival), stats.poisson.sf(x, lam_v))
 
-    small_probs = tfd.Poisson(rate=0.123).log_survival_function(
+    small_probs = poisson_lib.Poisson(rate=0.123).log_survival_function(
         np.linspace(10, 19, 10))
     self.assertAllFinite(self.evaluate(small_probs))
 
@@ -241,7 +242,8 @@ class PoissonTest(test_util.TestCase):
           rate=lam,
           force_probs_to_zero_outside_support=True,
           validate_args=False).cdf(x)
-    _, dcdf_dlam = self.evaluate(tfp.math.value_and_gradient(cdf, lam))
+
+    _, dcdf_dlam = self.evaluate(gradient.value_and_gradient(cdf, lam))
 
     # A finite difference approximation of the derivative.
     eps = 1e-6
@@ -391,7 +393,7 @@ class PoissonLogRateTest(PoissonTest):
                     rate,
                     validate_args=True,
                     force_probs_to_zero_outside_support=False):
-    return tfd.Poisson(
+    return poisson_lib.Poisson(
         log_rate=tf.math.log(rate),
         validate_args=validate_args,
         force_probs_to_zero_outside_support=force_probs_to_zero_outside_support)
@@ -412,7 +414,7 @@ class PoissonLogRateTest(PoissonTest):
   @test_util.tf_tape_safety_test
   def testGradientThroughRate(self):
     log_rate = tf.Variable(3.)
-    dist = tfd.Poisson(log_rate=log_rate, validate_args=True)
+    dist = poisson_lib.Poisson(log_rate=log_rate, validate_args=True)
     with tf.GradientTape() as tape:
       loss = -dist.log_prob([1., 2., 4.])
     grad = tape.gradient(loss, dist.trainable_variables)
@@ -455,7 +457,7 @@ class PoissonSamplingTest(test_util.TestCase):
             poisson_lib.random_poisson._python_function)
 
       log_rates = np.random.rand(4, 3).astype(np.float32)
-      dist = tfd.Poisson(log_rate=log_rates, validate_args=True)
+      dist = poisson_lib.Poisson(log_rate=log_rates, validate_args=True)
       # Verify the compile succeeds going all the way through the distribution.
       self.evaluate(
           tf.function(lambda: dist.sample(5, seed=test_util.test_seed()),
@@ -487,7 +489,7 @@ class PoissonSamplingTest(test_util.TestCase):
         output_dtype=tf.float64,
         seed=test_util.test_seed())
 
-    poisson = tfd.Poisson(log_rate=log_rate, validate_args=True)
+    poisson = poisson_lib.Poisson(log_rate=log_rate, validate_args=True)
     self.evaluate(
         st.assert_true_cdf_equal_by_dkwm(
             samples,
@@ -522,7 +524,7 @@ class PoissonSamplingTest(test_util.TestCase):
         output_dtype=tf.float64,
         seed=test_util.test_seed())
 
-    poisson = tfd.Poisson(log_rate=log_rate, validate_args=True)
+    poisson = poisson_lib.Poisson(log_rate=log_rate, validate_args=True)
     self.evaluate(
         st.assert_true_cdf_equal_by_dkwm(
             samples,
@@ -544,7 +546,7 @@ class PoissonSamplingTest(test_util.TestCase):
     rate = [1., 3., 5., 6., 7., 10., 13.0, 14., 15., 18.]
     log_rate = np.log(rate)
     num_samples = int(1e5)
-    poisson = tfd.Poisson(log_rate=log_rate, validate_args=True)
+    poisson = poisson_lib.Poisson(log_rate=log_rate, validate_args=True)
     self.assertLess(
         self.evaluate(
             st.min_num_samples_for_dkwm_cdf_test(

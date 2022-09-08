@@ -20,13 +20,13 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.bijectors import exp as tfb
+from tensorflow_probability.python.distributions import multivariate_student_t as mvst
+from tensorflow_probability.python.distributions import student_t
 from tensorflow_probability.python.internal import test_util
-
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
+from tensorflow_probability.python.util import deferred_tensor
 
 
 @test_util.test_all_tf_execution_regimes
@@ -61,7 +61,7 @@ class MultivariateStudentTTestFloat32StaticShape(
     diag = self._input(diag)
 
     scale = tf.linalg.LinearOperatorDiag(diag, is_non_singular=True)
-    dist = tfd.MultivariateStudentTLinearOperator(
+    dist = mvst.MultivariateStudentTLinearOperator(
         loc=loc, df=df, scale=scale, validate_args=True)
 
     sample = dist.sample(3, seed=test_util.test_seed())
@@ -106,7 +106,7 @@ class MultivariateStudentTTestFloat32StaticShape(
   def testNonPositiveDf(self):
     with self.assertRaisesOpError('Argument `df` must be positive.'):
       self.evaluate(
-          tfd.MultivariateStudentTLinearOperator(
+          mvst.MultivariateStudentTLinearOperator(
               loc=self._input([0.]),
               df=self._input(0.),
               scale=tf.linalg.LinearOperatorDiag(
@@ -116,7 +116,7 @@ class MultivariateStudentTTestFloat32StaticShape(
   def testBadScaleDType(self):
     with self.assertRaisesRegexp(TypeError,
                                  '`scale` must have floating-point dtype.'):
-      tfd.MultivariateStudentTLinearOperator(
+      mvst.MultivariateStudentTLinearOperator(
           loc=[0.],
           df=1.,
           scale=tf.linalg.LinearOperatorIdentity(
@@ -125,14 +125,14 @@ class MultivariateStudentTTestFloat32StaticShape(
   def testNotPositiveDefinite(self):
     with self.assertRaisesRegexp(ValueError,
                                  '`scale` must be non-singular.'):
-      tfd.MultivariateStudentTLinearOperator(
+      mvst.MultivariateStudentTLinearOperator(
           loc=self._input([0.]),
           df=self._input(1.),
           scale=tf.linalg.LinearOperatorDiag(self._input([1.])),
           validate_args=True)
 
   def testMeanAllDefined(self):
-    dist = tfd.MultivariateStudentTLinearOperator(
+    dist = mvst.MultivariateStudentTLinearOperator(
         loc=self._input([0., 0.]),
         df=self._input(2.),
         scale=tf.linalg.LinearOperatorDiag(
@@ -142,7 +142,7 @@ class MultivariateStudentTTestFloat32StaticShape(
     self.assertAllClose([0., 0.], mean)
 
   def testMeanSomeUndefinedNaNAllowed(self):
-    dist = tfd.MultivariateStudentTLinearOperator(
+    dist = mvst.MultivariateStudentTLinearOperator(
         loc=self._input([[0., 0.], [1., 1.]]),
         df=self._input([1., 2.]),
         scale=tf.linalg.LinearOperatorDiag(
@@ -153,7 +153,7 @@ class MultivariateStudentTTestFloat32StaticShape(
     self.assertAllClose([[np.nan, np.nan], [1., 1.]], mean)
 
   def testMeanSomeUndefinedNaNNotAllowed(self):
-    dist = tfd.MultivariateStudentTLinearOperator(
+    dist = mvst.MultivariateStudentTLinearOperator(
         loc=self._input([[0., 0.], [1., 1.]]),
         df=self._input([1., 2.]),
         scale=tf.linalg.LinearOperatorDiag(
@@ -165,7 +165,7 @@ class MultivariateStudentTTestFloat32StaticShape(
       self.evaluate(dist.mean())
 
   def testMode(self):
-    dist = tfd.MultivariateStudentTLinearOperator(
+    dist = mvst.MultivariateStudentTLinearOperator(
         loc=[0., 0.],
         df=2.,
         scale=tf.linalg.LinearOperatorDiag([[1., 1.]], is_non_singular=True),
@@ -192,7 +192,7 @@ class MultivariateStudentTTestFloat32StaticShape(
     else:
       scale = tf.linalg.LinearOperatorFullMatrix(
           self._input(full), is_non_singular=True)
-    dist = tfd.MultivariateStudentTLinearOperator(
+    dist = mvst.MultivariateStudentTLinearOperator(
         loc=self._input([0., 0.]),
         df=self._input(3.),
         scale=scale,
@@ -203,7 +203,7 @@ class MultivariateStudentTTestFloat32StaticShape(
   def testCovarianceSomeUndefinedNaNAllowed(self):
     scale = tf.linalg.LinearOperatorDiag(
         self._input([2., 2.]), is_non_singular=True)
-    dist = tfd.MultivariateStudentTLinearOperator(
+    dist = mvst.MultivariateStudentTLinearOperator(
         loc=self._input([0., 0.]),
         df=self._input([2., 1.]),
         scale=scale,
@@ -216,7 +216,7 @@ class MultivariateStudentTTestFloat32StaticShape(
   def testCovarianceSomeUndefinedNaNNotAllowed(self):
     scale = tf.linalg.LinearOperatorDiag(
         self._input([2., 2.]), is_non_singular=True)
-    dist = tfd.MultivariateStudentTLinearOperator(
+    dist = mvst.MultivariateStudentTLinearOperator(
         loc=self._input([0., 0.]),
         df=self._input(1.),
         scale=scale,
@@ -251,7 +251,7 @@ class MultivariateStudentTTestFloat32StaticShape(
       scale = tf.linalg.LinearOperatorLowRankUpdate(
           scale, self._input(update), is_non_singular=True)
 
-    dist = tfd.MultivariateStudentTLinearOperator(
+    dist = mvst.MultivariateStudentTLinearOperator(
         loc=self._input([0., 0.]),
         df=self._input(3.),
         scale=scale,
@@ -266,7 +266,7 @@ class MultivariateStudentTTestFloat32StaticShape(
   def testVarianceStdSomeUndefinedNaNAllowed(self):
     scale = tf.linalg.LinearOperatorDiag(
         self._input([2., 2.]), is_non_singular=True)
-    dist = tfd.MultivariateStudentTLinearOperator(
+    dist = mvst.MultivariateStudentTLinearOperator(
         loc=self._input([0., 0.]),
         df=self._input([2., 1.]),
         scale=scale,
@@ -282,7 +282,7 @@ class MultivariateStudentTTestFloat32StaticShape(
   def testVarianceStdSomeUndefinedNaNNotAllowed(self):
     scale = tf.linalg.LinearOperatorDiag(
         self._input([2., 2.]), is_non_singular=True)
-    dist = tfd.MultivariateStudentTLinearOperator(
+    dist = mvst.MultivariateStudentTLinearOperator(
         loc=self._input([0., 0.]),
         df=self._input(1.),
         scale=scale,
@@ -298,7 +298,7 @@ class MultivariateStudentTTestFloat32StaticShape(
   def testEntropy(self):
     scale = tf.linalg.LinearOperatorDiag(
         self._input([2., 2.]), is_non_singular=True)
-    dist = tfd.MultivariateStudentTLinearOperator(
+    dist = mvst.MultivariateStudentTLinearOperator(
         loc=self._input([0., 0.]),
         df=self._input([2., 3.]),
         scale=scale,
@@ -315,7 +315,7 @@ class MultivariateStudentTTestFloat32StaticShape(
         [[2., -1.],
          [-1., 2.]]), is_non_singular=True)
     # pyformat: enable
-    dist = tfd.MultivariateStudentTLinearOperator(
+    dist = mvst.MultivariateStudentTLinearOperator(
         loc=self._input([1., 2.]),
         df=self._input(5.),
         scale=scale,
@@ -331,11 +331,11 @@ class MultivariateStudentTTestFloat32StaticShape(
     # pyformat: enable
     seed = test_util.test_seed()
     tf.random.set_seed(seed)
-    dist1 = tfd.MultivariateStudentTLinearOperator(
+    dist1 = mvst.MultivariateStudentTLinearOperator(
         loc=[1., 2.], df=5., scale=scale, validate_args=True)
     samples1 = self.evaluate(dist1.sample(100, seed=seed))
     tf.random.set_seed(seed)
-    dist2 = tfd.MultivariateStudentTLinearOperator(
+    dist2 = mvst.MultivariateStudentTLinearOperator(
         loc=[1., 2.], df=5., scale=scale, validate_args=True)
     samples2 = self.evaluate(dist2.sample(100, seed=seed))
     self.assertAllClose(samples1, samples2)
@@ -345,8 +345,8 @@ class MultivariateStudentTTestFloat32StaticShape(
     df = self._input(2.)
     loc = self._input([1., 2.])
     diag = self._input([3., 4.])
-    _, [grad_df, grad_loc, grad_diag] = tfp.math.value_and_gradient(
-        lambda d, l, s: tfd.MultivariateStudentTLinearOperator(  # pylint: disable=g-long-lambda
+    _, [grad_df, grad_loc, grad_diag] = gradient.value_and_gradient(
+        lambda d, l, s: mvst.MultivariateStudentTLinearOperator(  # pylint: disable=g-long-lambda
             loc=l,
             df=d,
             scale=tf.linalg.LinearOperatorDiag(s, is_non_singular=True),
@@ -359,7 +359,7 @@ class MultivariateStudentTTestFloat32StaticShape(
   def testSamplingSmallDfNoNaN(self):
     scale = tf.linalg.LinearOperatorDiag(
         self._input([1., 1.]), is_non_singular=True)
-    dist = tfd.MultivariateStudentTLinearOperator(
+    dist = mvst.MultivariateStudentTLinearOperator(
         loc=self._input([0., 0.]),
         df=self._input([1e-1, 1e-5, 1e-10, 1e-20]),
         scale=scale,
@@ -378,7 +378,7 @@ class MultivariateStudentTTestFloat32StaticShape(
         self._input([[1.,  -0.5],
                      [-0.5, 1.]]), is_non_singular=True)
     # pyformat: enable
-    dist = tfd.MultivariateStudentTLinearOperator(
+    dist = mvst.MultivariateStudentTLinearOperator(
         loc=self._input([1., 1.]),
         df=self._input(5.),
         scale=scale,
@@ -402,7 +402,7 @@ class MultivariateStudentTTestFloat32StaticShape(
         self._input([[1.,  -0.5],
                      [-0.5, 1.]]), is_non_singular=True)
     # pyformat: enable
-    dist = tfd.MultivariateStudentTLinearOperator(
+    dist = mvst.MultivariateStudentTLinearOperator(
         loc=self._input([1., 1.]),
         df=self._input(4.),
         scale=scale,
@@ -416,14 +416,14 @@ class MultivariateStudentTTestFloat32StaticShape(
 
   def testLogProbSameFor1D(self):
     # 1D MVT is exactly a regular Student's T distribution.
-    t_dist = tfd.StudentT(
+    t_dist = student_t.StudentT(
         df=self._input(5.),
         loc=self._input(2.),
         scale=self._input(3.),
         validate_args=True)
     scale = tf.linalg.LinearOperatorDiag(self._input([3.]),
                                          is_non_singular=True)
-    mvt_dist = tfd.MultivariateStudentTLinearOperator(
+    mvt_dist = mvst.MultivariateStudentTLinearOperator(
         loc=self._input([2.]),
         df=self._input(5.),
         scale=scale,
@@ -442,7 +442,7 @@ class MultivariateStudentTTestFloat32StaticShape(
     scale = tf.linalg.LinearOperatorDiag([2., 2.], is_non_singular=True)
     self.evaluate(df.initializer)
     with self.assertRaisesOpError('`df` must be positive.'):
-      d = tfd.MultivariateStudentTLinearOperator(
+      d = mvst.MultivariateStudentTLinearOperator(
           loc=1., df=df, scale=scale, validate_args=True)
       self.evaluate(d.entropy())
 
@@ -450,7 +450,7 @@ class MultivariateStudentTTestFloat32StaticShape(
     df = tf.Variable(3.)
     scale = tf.linalg.LinearOperatorDiag([2., 2.], is_non_singular=True)
     self.evaluate(df.initializer)
-    d = tfd.MultivariateStudentTLinearOperator(
+    d = mvst.MultivariateStudentTLinearOperator(
         loc=1., df=df, scale=scale, validate_args=True)
     with self.assertRaisesOpError('`df` must be positive.'):
       with tf.control_dependencies([df.assign(-2.)]):
@@ -459,10 +459,10 @@ class MultivariateStudentTTestFloat32StaticShape(
   @test_util.tf_tape_safety_test
   def testVariableScaleWithDeferredTensor(self):
     scale = tf.linalg.LinearOperatorDiag(
-        tfp.util.TransformedVariable([2., 2.], tfb.Exp()),
+        deferred_tensor.TransformedVariable([2., 2.], tfb.Exp()),
         is_non_singular=True)
     self.evaluate([v.initializer for v in scale.trainable_variables])
-    d = tfd.MultivariateStudentTLinearOperator(
+    d = mvst.MultivariateStudentTLinearOperator(
         loc=1., df=3., scale=scale, validate_args=True)
     with tf.GradientTape() as tape:
       lp = d.log_prob(d.sample(seed=test_util.test_seed()))

@@ -224,11 +224,11 @@ class Empirical(
   def _quantile(self, value, samples=None, **kwargs):
     if NUMPY:
       raise NotImplementedError()
-    from tensorflow_probability.python import stats  # pylint: disable=g-import-not-at-top
+    from tensorflow_probability.python.stats import quantiles  # pylint: disable=g-import-not-at-top
     if samples is None:
       samples = tf.convert_to_tensor(self._samples)
 
-    return stats.percentile(
+    return quantiles.percentile(
         x=samples, q=value * 100, axis=self._samples_axis, **kwargs)
 
   def _sample_n(self, n, seed=None):

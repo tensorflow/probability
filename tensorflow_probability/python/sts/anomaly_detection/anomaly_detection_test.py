@@ -19,13 +19,9 @@ from absl.testing import parameterized
 import numpy as np
 import pandas as pd
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.sts import anomaly_detection
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
 
 
 @test_util.test_graph_and_eager_modes()

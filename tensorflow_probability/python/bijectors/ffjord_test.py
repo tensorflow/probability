@@ -19,7 +19,7 @@
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import ffjord
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow_probability.python.math import gradient as tfp_gradient
 
@@ -38,9 +38,11 @@ class FFJORDBijectorTest(tfp_test_util.TestCase):
   def testBijector(self, dtype):
     tf_dtype = tf.as_dtype(dtype)
     move_ode_fn = lambda t, z: tf.ones_like(z)
-    trace_augmentation_fn = tfb.ffjord.trace_jacobian_exact
-    bijector = tfb.FFJORD(trace_augmentation_fn=trace_augmentation_fn,
-                          state_time_derivative_fn=move_ode_fn, dtype=tf_dtype)
+    trace_augmentation_fn = ffjord.trace_jacobian_exact
+    bijector = ffjord.FFJORD(
+        trace_augmentation_fn=trace_augmentation_fn,
+        state_time_derivative_fn=move_ode_fn,
+        dtype=tf_dtype)
     x = np.zeros((2, 5), dtype=dtype)
     y = np.ones((2, 5), dtype=dtype)
     expected_log_det_jacobian = np.zeros(2, dtype=dtype)
@@ -65,10 +67,12 @@ class FFJORDBijectorTest(tfp_test_util.TestCase):
     def conditional_ode_fn(t, z, c):
       del t  # unused.
       return tf.ones_like(z) * c ** 2
-    trace_augmentation_fn = tfb.ffjord.trace_jacobian_exact
-    bijector = tfb.FFJORD(trace_augmentation_fn=trace_augmentation_fn,
-                          state_time_derivative_fn=conditional_ode_fn,
-                          dtype=tf_dtype)
+
+    trace_augmentation_fn = ffjord.trace_jacobian_exact
+    bijector = ffjord.FFJORD(
+        trace_augmentation_fn=trace_augmentation_fn,
+        state_time_derivative_fn=conditional_ode_fn,
+        dtype=tf_dtype)
     x = tf.zeros((2, 5), dtype=tf_dtype)
     y = tf.ones((2, 5), dtype=tf_dtype) * 4
     c = tf.ones((2, 5), dtype=tf_dtype) * 2
@@ -101,9 +105,11 @@ class FFJORDBijectorTest(tfp_test_util.TestCase):
     tf_dtype = tf.as_dtype(dtype)
     scaling_by_two_exp = np.log(2.0)
     scale_ode_fn = lambda t, z: scaling_by_two_exp * z
-    trace_augmentation_fn = tfb.ffjord.trace_jacobian_exact
-    bijector = tfb.FFJORD(trace_augmentation_fn=trace_augmentation_fn,
-                          state_time_derivative_fn=scale_ode_fn, dtype=tf_dtype)
+    trace_augmentation_fn = ffjord.trace_jacobian_exact
+    bijector = ffjord.FFJORD(
+        trace_augmentation_fn=trace_augmentation_fn,
+        state_time_derivative_fn=scale_ode_fn,
+        dtype=tf_dtype)
     x = np.array([[0.0], [1.0]], dtype=dtype)
     y = np.array([[0.0], [2.0]], dtype=dtype)
     expected_forward_log_det_jacobian = np.array([np.log(2.0)] * 2, dtype=dtype)
@@ -128,9 +134,11 @@ class FFJORDBijectorTest(tfp_test_util.TestCase):
     scaling_matrix = np.diag(matrix_diagonal)
     one_time_scale_matrix = np.diag(np.exp(matrix_diagonal))
     scale_ode_fn = lambda t, z: tf.linalg.matvec(scaling_matrix, z)
-    trace_augmentation_fn = tfb.ffjord.trace_jacobian_exact
-    bijector = tfb.FFJORD(trace_augmentation_fn=trace_augmentation_fn,
-                          state_time_derivative_fn=scale_ode_fn, dtype=tf_dtype)
+    trace_augmentation_fn = ffjord.trace_jacobian_exact
+    bijector = ffjord.FFJORD(
+        trace_augmentation_fn=trace_augmentation_fn,
+        state_time_derivative_fn=scale_ode_fn,
+        dtype=tf_dtype)
     x = np.random.uniform(size=[1, num_dims]).astype(dtype)
     y = np.matmul(x, one_time_scale_matrix)
 
@@ -163,11 +171,13 @@ class FFJORDBijectorTest(tfp_test_util.TestCase):
     scale_ode_fn = lambda t, z: tf.linalg.matvec(scaling_matrix, z)
 
     def trace_augmentation_fn(ode_fn, z_shape, dtype):
-      return tfb.ffjord.trace_jacobian_hutchinson(
+      return ffjord.trace_jacobian_hutchinson(
           ode_fn, z_shape, dtype, num_samples=128, seed=seed)
 
-    bijector = tfb.FFJORD(trace_augmentation_fn=trace_augmentation_fn,
-                          state_time_derivative_fn=scale_ode_fn, dtype=tf_dtype)
+    bijector = ffjord.FFJORD(
+        trace_augmentation_fn=trace_augmentation_fn,
+        state_time_derivative_fn=scale_ode_fn,
+        dtype=tf_dtype)
     x = np.random.uniform(size=[1, num_dims]).astype(dtype)
     y = np.matmul(x, one_time_scale_matrix)
     expected_forward_log_det_jacobian_value = np.log(

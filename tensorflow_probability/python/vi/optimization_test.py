@@ -19,13 +19,23 @@ import numpy as np
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.bijectors import fill_scale_tril
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.distributions import deterministic
+from tensorflow_probability.python.distributions import gaussian_process
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import joint_distribution_auto_batched as jdab
+from tensorflow_probability.python.distributions import joint_distribution_coroutine as jdc
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import poisson
+from tensorflow_probability.python.experimental.util import trainable
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
-
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
+from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic
+from tensorflow_probability.python.util import deferred_tensor
+from tensorflow_probability.python.vi import optimization
 
 
 JAX_MODE = False
@@ -46,12 +56,13 @@ class OptimizationTests(test_util.TestCase):
     # Test that the tape automatically picks up any trainable variables in
     # the model, even though it's just a function with no explicit
     # `.trainable_variables`
-    likelihood_scale = tfp.util.TransformedVariable(
-        1., tfb.Softplus(), name='scale')
+    likelihood_scale = deferred_tensor.TransformedVariable(
+        1., softplus.Softplus(), name='scale')
     def trainable_log_prob(z):
-      lp = tfd.Normal(0., 1.).log_prob(z)
-      lp += tf.reduce_sum(tfd.Normal(
-          z[..., tf.newaxis], likelihood_scale).log_prob(x), axis=-1)
+      lp = normal.Normal(0., 1.).log_prob(z)
+      lp += tf.reduce_sum(
+          normal.Normal(z[..., tf.newaxis], likelihood_scale).log_prob(x),
+          axis=-1)
       return lp
 
     # For this simple normal-normal model, the true posterior is also normal.
@@ -60,10 +71,12 @@ class OptimizationTests(test_util.TestCase):
     z_posterior_mean = (1./sigma**2 * num_samples * mu) / z_posterior_precision
 
     q_loc = tf.Variable(0., name='mu')
-    q_scale = tfp.util.TransformedVariable(1., tfb.Softplus(), name='q_scale')
-    q = tfd.Normal(q_loc, q_scale)
-    loss_curve = tfp.vi.fit_surrogate_posterior(
-        trainable_log_prob, q,
+    q_scale = deferred_tensor.TransformedVariable(
+        1., softplus.Softplus(), name='q_scale')
+    q = normal.Normal(q_loc, q_scale)
+    loss_curve = optimization.fit_surrogate_posterior(
+        trainable_log_prob,
+        q,
         num_steps=1000,
         sample_size=10,
         optimizer=tf.optimizers.Adam(0.1),
@@ -85,16 +98,17 @@ class OptimizationTests(test_util.TestCase):
 
   @test_util.jax_disable_variable_test
   def test_importance_sampling_example(self):
-    init_seed, opt_seed, eval_seed = tfp.random.split_seed(
+    init_seed, opt_seed, eval_seed = samplers.split_seed(
         test_util.test_seed(sampler_type='stateless'), n=3)
 
     def log_prob(z, x):
-      return tfd.Normal(0., 1.).log_prob(z) + tfd.Normal(z, 1.).log_prob(x)
+      return normal.Normal(0., 1.).log_prob(z) + normal.Normal(z,
+                                                               1.).log_prob(x)
     conditioned_log_prob = lambda z: log_prob(z, x=5.)
 
-    q_z = tfp.experimental.util.make_trainable(tfd.Normal, seed=init_seed)
+    q_z = trainable.make_trainable(normal.Normal, seed=init_seed)
     # Fit `q` with an importance-weighted variational loss.
-    loss_curve = tfp.vi.fit_surrogate_posterior(
+    loss_curve = optimization.fit_surrogate_posterior(
         conditioned_log_prob,
         surrogate_posterior=q_z,
         importance_sample_size=10,
@@ -120,9 +134,9 @@ class OptimizationTests(test_util.TestCase):
     self.assertAllClose(posterior_variance, 0.5, atol=1e-1)
 
     # Test reproducibility
-    q_z_again = tfp.experimental.util.make_trainable(tfd.Normal, seed=init_seed)
+    q_z_again = trainable.make_trainable(normal.Normal, seed=init_seed)
     # Fit `q` with an importance-weighted variational loss.
-    loss_curve_again = tfp.vi.fit_surrogate_posterior(
+    loss_curve_again = optimization.fit_surrogate_posterior(
         conditioned_log_prob,
         surrogate_posterior=q_z_again,
         importance_sample_size=10,
@@ -138,20 +152,26 @@ class OptimizationTests(test_util.TestCase):
 
     # Target distribution: equiv to MVNFullCovariance(cov=[[1., 1.], [1., 2.]])
     def p_log_prob(z, x):
-      return tfd.Normal(0., 1.).log_prob(z) + tfd.Normal(z, 1.).log_prob(x)
+      return normal.Normal(0., 1.).log_prob(z) + normal.Normal(z,
+                                                               1.).log_prob(x)
 
     # The Q family is a joint distribution that can express any 2D MVN.
     b = tf.Variable([0., 0.])
-    l = tfp.util.TransformedVariable(tf.eye(2), tfb.FillScaleTriL())
+    l = deferred_tensor.TransformedVariable(
+        tf.eye(2), fill_scale_tril.FillScaleTriL())
     def trainable_q_fn():
-      z = yield tfd.JointDistributionCoroutine.Root(
-          tfd.Normal(b[0], l[0, 0], name='z'))
-      _ = yield tfd.Normal(b[1] + l[1, 0] * z, l[1, 1], name='x')
-    q = tfd.JointDistributionCoroutine(trainable_q_fn)
+      z = yield jdc.JointDistributionCoroutine.Root(
+          normal.Normal(b[0], l[0, 0], name='z'))
+      _ = yield normal.Normal(b[1] + l[1, 0] * z, l[1, 1], name='x')
+
+    q = jdc.JointDistributionCoroutine(trainable_q_fn)
 
     seed = test_util.test_seed()
-    loss_curve = tfp.vi.fit_surrogate_posterior(
-        p_log_prob, q, num_steps=1000, sample_size=100,
+    loss_curve = optimization.fit_surrogate_posterior(
+        p_log_prob,
+        q,
+        num_steps=1000,
+        sample_size=100,
         optimizer=tf.optimizers.Adam(learning_rate=0.1),
         seed=seed)
     self.evaluate(tf1.global_variables_initializer())
@@ -177,33 +197,37 @@ class OptimizationTests(test_util.TestCase):
 
     # Generative model.
     def model_fn():
-      kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+      kernel = exponentiated_quadratic.ExponentiatedQuadratic(
           amplitude=tf.exp(kernel_log_amplitude),
           length_scale=tf.exp(kernel_log_lengthscale))
-      latent_log_rates = yield tfd.JointDistributionCoroutine.Root(
-          tfd.GaussianProcess(
+      latent_log_rates = yield jdc.JointDistributionCoroutine.Root(
+          gaussian_process.GaussianProcess(
               kernel,
               index_points=index_points,
               observation_noise_variance=tf.exp(observation_noise_log_scale),
               name='latent_log_rates'))
-      yield tfd.Independent(
-          tfd.Poisson(log_rate=latent_log_rates),
-          reinterpreted_batch_ndims=1, name='y')
-    model = tfd.JointDistributionCoroutine(model_fn, name='model')
+      yield independent.Independent(
+          poisson.Poisson(log_rate=latent_log_rates),
+          reinterpreted_batch_ndims=1,
+          name='y')
+
+    model = jdc.JointDistributionCoroutine(model_fn, name='model')
 
     # Variational model.
     logit_locs = tf.Variable(tf.zeros(observed_counts.shape))
     logit_softplus_scales = tf.Variable(tf.ones(observed_counts.shape) * -1)
     def variational_model_fn():
-      _ = yield tfd.JointDistributionCoroutine.Root(tfd.Independent(
-          tfd.Normal(loc=logit_locs,
-                     scale=tf.nn.softplus(logit_softplus_scales)),
-          reinterpreted_batch_ndims=1))
-      _ = yield tfd.VectorDeterministic(observed_counts)
-    q = tfd.JointDistributionCoroutine(variational_model_fn,
-                                       name='variational_model')
+      _ = yield jdc.JointDistributionCoroutine.Root(
+          independent.Independent(
+              normal.Normal(
+                  loc=logit_locs, scale=tf.nn.softplus(logit_softplus_scales)),
+              reinterpreted_batch_ndims=1))
+      _ = yield deterministic.VectorDeterministic(observed_counts)
 
-    losses, sample_path = tfp.vi.fit_surrogate_posterior(
+    q = jdc.JointDistributionCoroutine(
+        variational_model_fn, name='variational_model')
+
+    losses, sample_path = optimization.fit_surrogate_posterior(
         target_log_prob_fn=lambda *args: model.log_prob(args),
         surrogate_posterior=q,
         optimizer=tf.optimizers.Adam(learning_rate=0.1),
@@ -227,17 +251,18 @@ class StatelessOptimizationTests(test_util.TestCase):
       self.skipTest('Requires optax.')
     import optax  # pylint: disable=g-import-not-at-top
 
-    init_seed, opt_seed, eval_seed = tfp.random.split_seed(
+    init_seed, opt_seed, eval_seed = samplers.split_seed(
         test_util.test_seed(sampler_type='stateless'), n=3)
 
     def log_prob(z, x):
-      return tfd.Normal(0., 1.).log_prob(z) + tfd.Normal(z, 1.).log_prob(x)
+      return normal.Normal(0., 1.).log_prob(z) + normal.Normal(z,
+                                                               1.).log_prob(x)
     conditioned_log_prob = lambda z: log_prob(z, x=5.)
 
-    init_normal, build_normal = tfp.experimental.util.make_trainable_stateless(
-        tfd.Normal)
+    init_normal, build_normal = trainable.make_trainable_stateless(
+        normal.Normal)
     # Fit `q` with an importance-weighted variational loss.
-    optimized_parameters, _ = tfp.vi.fit_surrogate_posterior_stateless(
+    optimized_parameters, _ = optimization.fit_surrogate_posterior_stateless(
         conditioned_log_prob,
         build_surrogate_posterior_fn=build_normal,
         initial_parameters=init_normal(seed=init_seed),
@@ -263,7 +288,7 @@ class StatelessOptimizationTests(test_util.TestCase):
     self.assertAllClose(posterior_variance, 0.5, atol=1e-1)
 
   def test_inhomogeneous_poisson_process_example(self):
-    opt_seed, eval_seed = tfp.random.split_seed(
+    opt_seed, eval_seed = samplers.split_seed(
         test_util.test_seed(sampler_type='stateless'), n=2)
 
     # Toy 1D data.
@@ -274,24 +299,25 @@ class StatelessOptimizationTests(test_util.TestCase):
 
     # Generative model.
     def model_fn():
-      kernel_amplitude = yield tfd.LogNormal(
+      kernel_amplitude = yield lognormal.LogNormal(
           loc=0., scale=1., name='kernel_amplitude')
-      kernel_lengthscale = yield tfd.LogNormal(
+      kernel_lengthscale = yield lognormal.LogNormal(
           loc=0., scale=1., name='kernel_lengthscale')
-      observation_noise_scale = yield tfd.LogNormal(
+      observation_noise_scale = yield lognormal.LogNormal(
           loc=0., scale=1., name='observation_noise_scale')
-      kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
-          amplitude=kernel_amplitude,
-          length_scale=kernel_lengthscale)
-      latent_log_rates = yield tfd.GaussianProcess(
+      kernel = exponentiated_quadratic.ExponentiatedQuadratic(
+          amplitude=kernel_amplitude, length_scale=kernel_lengthscale)
+      latent_log_rates = yield gaussian_process.GaussianProcess(
           kernel,
           index_points=index_points,
           observation_noise_variance=observation_noise_scale,
           name='latent_log_rates')
-      yield tfd.Independent(tfd.Poisson(log_rate=latent_log_rates),
-                            reinterpreted_batch_ndims=1,
-                            name='y')
-    model = tfd.JointDistributionCoroutineAutoBatched(model_fn)
+      yield independent.Independent(
+          poisson.Poisson(log_rate=latent_log_rates),
+          reinterpreted_batch_ndims=1,
+          name='y')
+
+    model = jdab.JointDistributionCoroutineAutoBatched(model_fn)
     pinned = model.experimental_pin(y=observed_counts)
 
     initial_parameters = (0., 0., 0.,  # Raw kernel parameters.
@@ -305,41 +331,40 @@ class StatelessOptimizationTests(test_util.TestCase):
 
       def variational_model_fn():
         # Fit the kernel parameters as point masses.
-        yield tfd.Deterministic(
+        yield deterministic.Deterministic(
             tf.nn.softplus(raw_kernel_amplitude), name='kernel_amplitude')
-        yield tfd.Deterministic(
+        yield deterministic.Deterministic(
             tf.nn.softplus(raw_kernel_lengthscale), name='kernel_lengthscale')
-        yield tfd.Deterministic(
+        yield deterministic.Deterministic(
             tf.nn.softplus(raw_observation_noise_scale),
             name='kernel_observation_noise_scale')
         # Factored normal posterior over the GP logits.
-        yield tfd.Independent(
-            tfd.Normal(loc=logit_locs,
-                       scale=tf.nn.softplus(logit_raw_scales)),
+        yield independent.Independent(
+            normal.Normal(
+                loc=logit_locs, scale=tf.nn.softplus(logit_raw_scales)),
             reinterpreted_batch_ndims=1,
             name='latent_log_rates')
-      return tfd.JointDistributionCoroutineAutoBatched(variational_model_fn)
+
+      return jdab.JointDistributionCoroutineAutoBatched(variational_model_fn)
 
     if not JAX_MODE:
       return
     import optax  # pylint: disable=g-import-not-at-top
 
-    [
-        optimized_parameters,
-        (losses, _, sample_path)
-    ] = tfp.vi.fit_surrogate_posterior_stateless(
-        target_log_prob_fn=pinned.unnormalized_log_prob,
-        build_surrogate_posterior_fn=build_surrogate_posterior_fn,
-        initial_parameters=initial_parameters,
-        optimizer=optax.adam(learning_rate=0.1),
-        sample_size=1,
-        num_steps=500,
-        trace_fn=lambda traceable_quantities: (  # pylint: disable=g-long-lambda
-            traceable_quantities.loss,
-            tf.nn.softplus(traceable_quantities.parameters[0]),
-            build_surrogate_posterior_fn(
-                *traceable_quantities.parameters).sample(seed=eval_seed)[-1]),
-        seed=opt_seed)
+    [optimized_parameters,
+     (losses, _, sample_path)] = optimization.fit_surrogate_posterior_stateless(
+         target_log_prob_fn=pinned.unnormalized_log_prob,
+         build_surrogate_posterior_fn=build_surrogate_posterior_fn,
+         initial_parameters=initial_parameters,
+         optimizer=optax.adam(learning_rate=0.1),
+         sample_size=1,
+         num_steps=500,
+         trace_fn=lambda traceable_quantities: (  # pylint: disable=g-long-lambda
+             traceable_quantities.loss,
+             tf.nn.softplus(traceable_quantities.parameters[0]),
+             build_surrogate_posterior_fn(*traceable_quantities.parameters).
+             sample(seed=eval_seed)[-1]),
+         seed=opt_seed)
     surrogate_posterior = build_surrogate_posterior_fn(*optimized_parameters)
     surrogate_posterior.sample(seed=eval_seed)
 

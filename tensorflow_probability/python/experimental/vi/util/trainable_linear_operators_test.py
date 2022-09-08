@@ -20,17 +20,16 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.bijectors import scale_matvec_linear_operator
+from tensorflow_probability.python.experimental.util import deferred_module
+from tensorflow_probability.python.experimental.vi.util import trainable_linear_operators
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 
-tfb = tfp.bijectors
-tfd = tfp.distributions
-
 
 def _strip_defer(op):
-  if isinstance(op, tfp.experimental.util.DeferredModule):
+  if isinstance(op, deferred_module.DeferredModule):
     return op._build_module()
   return op
 
@@ -74,7 +73,7 @@ class TrainableLinearOperators(test_util.TestCase):
       ([3, 2, 4], tf.float64, True))
   def test_trainable_linear_operator_diag(self, shape, dtype, use_static_shape):
     scale_initializer = tf.constant(1e-2, dtype=dtype)
-    op = tfp.experimental.vi.util.build_trainable_linear_operator_diag(
+    op = trainable_linear_operators.build_trainable_linear_operator_diag(
         _build_shape(shape, is_static=use_static_shape),
         scale_initializer=scale_initializer,
         dtype=dtype)
@@ -86,9 +85,8 @@ class TrainableLinearOperators(test_util.TestCase):
       (np.array([4, 4], np.int32), tf.float32, True),
       ([6], tf.float64, False))
   def test_trainable_linear_operator_tril(self, shape, dtype, use_static_shape):
-    op = tfp.experimental.vi.util.build_trainable_linear_operator_tril(
-        _build_shape(shape, is_static=use_static_shape),
-        dtype=dtype)
+    op = trainable_linear_operators.build_trainable_linear_operator_tril(
+        _build_shape(shape, is_static=use_static_shape), dtype=dtype)
     dim = shape[-1]
     self._test_linear_operator_shape_and_gradients(
         op, shape[:-1], dim, dim, dtype)
@@ -99,7 +97,7 @@ class TrainableLinearOperators(test_util.TestCase):
   def test_trainable_linear_operator_full_matrix(
       self, shape, dtype, use_static_shape):
     scale_initializer = tf.constant(1e-2, dtype=dtype)
-    op = tfp.experimental.vi.util.build_trainable_linear_operator_full_matrix(
+    op = trainable_linear_operators.build_trainable_linear_operator_full_matrix(
         _build_shape(shape, is_static=use_static_shape),
         scale_initializer=scale_initializer)
     self._test_linear_operator_shape_and_gradients(
@@ -119,12 +117,12 @@ class TrainableLinearOperators(test_util.TestCase):
       )
   def test_trainable_linear_operator_block_tril(
       self, block_dims, batch_shape, operators, dtype, use_static_shape):
-    op = (tfp.experimental.vi.util.
-          build_trainable_linear_operator_block(
-              operators,
-              block_dims=_build_shape(block_dims, is_static=use_static_shape),
-              batch_shape=_build_shape(batch_shape, is_static=use_static_shape),
-              dtype=dtype))
+    op = (
+        trainable_linear_operators.build_trainable_linear_operator_block(
+            operators,
+            block_dims=_build_shape(block_dims, is_static=use_static_shape),
+            batch_shape=_build_shape(batch_shape, is_static=use_static_shape),
+            dtype=dtype))
     dim = sum(block_dims)
     self._test_linear_operator_shape_and_gradients(
         op, batch_shape, dim, dim, dtype)
@@ -132,7 +130,8 @@ class TrainableLinearOperators(test_util.TestCase):
                           tf.linalg.LinearOperatorBlockLowerTriangular)
 
     # Test that bijector builds.
-    tfb.ScaleMatvecLinearOperatorBlock(op, validate_args=True)
+    scale_matvec_linear_operator.ScaleMatvecLinearOperatorBlock(
+        op, validate_args=True)
 
   @parameterized.parameters(
       ((2, 3), (),
@@ -150,45 +149,51 @@ class TrainableLinearOperators(test_util.TestCase):
       )
   def test_trainable_linear_operator_block_diag(
       self, block_dims, batch_shape, operators, dtype, use_static_shape):
-    op = (tfp.experimental.vi.util.
-          build_trainable_linear_operator_block(
-              operators,
-              block_dims=_build_shape(block_dims, is_static=use_static_shape),
-              batch_shape=_build_shape(batch_shape, is_static=use_static_shape),
-              dtype=dtype))
+    op = (
+        trainable_linear_operators.build_trainable_linear_operator_block(
+            operators,
+            block_dims=_build_shape(block_dims, is_static=use_static_shape),
+            batch_shape=_build_shape(batch_shape, is_static=use_static_shape),
+            dtype=dtype))
     dim = sum(block_dims)
     self._test_linear_operator_shape_and_gradients(
         op, batch_shape, dim, dim, dtype)
     self.assertIsInstance(_strip_defer(op), tf.linalg.LinearOperatorBlockDiag)
 
     # Test that bijector builds.
-    tfb.ScaleMatvecLinearOperatorBlock(op, validate_args=True)
+    scale_matvec_linear_operator.ScaleMatvecLinearOperatorBlock(
+        op, validate_args=True)
 
   def test_deterministic_initialization_from_seed(self):
     seed = test_util.test_seed(sampler_type='stateless')
-    op = tfp.experimental.vi.util.build_trainable_linear_operator_block(
+    op = trainable_linear_operators.build_trainable_linear_operator_block(
         operators=(tf.linalg.LinearOperatorDiag,
                    tf.linalg.LinearOperatorLowerTriangular),
-        block_dims=(2, 3), batch_shape=[3], dtype=tf.float32, seed=seed)
+        block_dims=(2, 3),
+        batch_shape=[3],
+        dtype=tf.float32,
+        seed=seed)
     self.evaluate([v.initializer for v in op.trainable_variables])
-    op2 = tfp.experimental.vi.util.build_trainable_linear_operator_block(
+    op2 = trainable_linear_operators.build_trainable_linear_operator_block(
         operators=(tf.linalg.LinearOperatorDiag,
                    tf.linalg.LinearOperatorLowerTriangular),
-        block_dims=(2, 3), batch_shape=[3], dtype=tf.float32, seed=seed)
+        block_dims=(2, 3),
+        batch_shape=[3],
+        dtype=tf.float32,
+        seed=seed)
     self.evaluate([v.initializer for v in op2.trainable_variables])
     self.assertAllEqual(op.to_dense(), op2.to_dense())
 
   def test_undefined_block_dims_raises(self):
     op = (
-        tfp.experimental.vi.util.build_trainable_linear_operator_block(
-            operators=(
-                (tf.linalg.LinearOperatorIdentity(2),),
-                (tf.linalg.LinearOperatorZeros(
-                    3, 2, is_square=False, is_self_adjoint=False,
-                    dtype=tf.float32),
-                 tf.linalg.LinearOperatorDiag(
-                     tf.Variable(tf.ones((2, 3), dtype=tf.float32)),
-                     is_non_singular=True)))))
+        trainable_linear_operators.build_trainable_linear_operator_block(
+            operators=((
+                tf.linalg.LinearOperatorIdentity(2),
+            ), (tf.linalg.LinearOperatorZeros(
+                3, 2, is_square=False, is_self_adjoint=False, dtype=tf.float32),
+                tf.linalg.LinearOperatorDiag(
+                    tf.Variable(tf.ones((2, 3), dtype=tf.float32)),
+                    is_non_singular=True)))))
     self.evaluate([v.initializer for v in op.trainable_variables])
     self.assertAllEqual(self.evaluate(op.shape_tensor()), [2, 5, 5])
     self.assertLen(op.trainable_variables, 1)
@@ -196,14 +201,14 @@ class TrainableLinearOperators(test_util.TestCase):
     operators = (tf.linalg.LinearOperatorIdentity(2),
                  tf.linalg.LinearOperatorDiag)
     with self.assertRaisesRegexp(ValueError, '`block_dims` must be defined'):
-      tfp.experimental.vi.util.build_trainable_linear_operator_block(
+      trainable_linear_operators.build_trainable_linear_operator_block(
           operators)
 
   @parameterized.parameters(
       ((3, 4), tf.float32, True),
       ((2, 4, 2), tf.float64, False))
   def test_linear_operator_zeros(self, shape, dtype, use_static_shape):
-    op = tfp.experimental.vi.util.build_linear_operator_zeros(
+    op = trainable_linear_operators.build_linear_operator_zeros(
         _build_shape(shape, is_static=use_static_shape), dtype=dtype)
     self.assertAllEqual(self.evaluate(op.shape_tensor()), shape)
     self.assertIsInstance(_strip_defer(op), tf.linalg.LinearOperatorZeros)

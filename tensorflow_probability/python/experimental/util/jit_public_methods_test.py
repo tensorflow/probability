@@ -19,14 +19,15 @@ import types
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-import tensorflow_probability as tfp
+from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.distributions import uniform
+from tensorflow_probability.python.experimental.util import jit_public_methods
 from tensorflow_probability.python.internal import test_util
 
 from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
 
-tfb = tfp.bijectors
-tfd = tfp.distributions
-tfe_util = tfp.experimental.util
 
 JAX_MODE = False
 
@@ -39,7 +40,7 @@ class LogProbCanary(object):
 
   def log_prob(self, x):
     self.log_prob_calls += 1
-    return tfd.Normal(0., 1.).log_prob(x)
+    return normal.Normal(0., 1.).log_prob(x)
 
 
 class XLADetector(object):
@@ -55,9 +56,8 @@ class TracedPublicMethodsTest(test_util.TestCase):
     batch_shape = [4]
     sample_shape = [2, 3]
     sample_and_batch_shape = [2, 3, 4]
-    d = tfe_util.JitPublicMethods(
-        tfd.Normal(loc=0.,
-                   scale=tf.ones(batch_shape, dtype=tf.float32)))
+    d = jit_public_methods.JitPublicMethods(
+        normal.Normal(loc=0., scale=tf.ones(batch_shape, dtype=tf.float32)))
     self.assertEqual(d.dtype, tf.float32)
     self.assertAllEqual(d.event_shape, [])
     self.assertAllEqual(d.event_shape_tensor(), [])
@@ -78,16 +78,16 @@ class TracedPublicMethodsTest(test_util.TestCase):
     self.assertAllEqual(d.entropy().shape, batch_shape)
 
     d_copy = d.copy(loc=[1., 2., 3.], scale=1.)
-    self.assertIsInstance(d_copy, tfe_util.JitPublicMethods)
+    self.assertIsInstance(d_copy, jit_public_methods.JitPublicMethods)
     self.assertEqual(d_copy.batch_shape, [3])
 
     d_slice = d_copy[:2]
-    self.assertIsInstance(d_slice, tfe_util.JitPublicMethods)
+    self.assertIsInstance(d_slice, jit_public_methods.JitPublicMethods)
     self.assertEqual(d_slice.batch_shape, [2])
 
   def test_methods_are_wrapped(self):
-    d = tfe_util.JitPublicMethods(
-        tfd.Normal(0., 1.),
+    d = jit_public_methods.JitPublicMethods(
+        normal.Normal(0., 1.),
         methods_to_exclude=('event_shape_tensor', 'batch_shape_tensor'))
     # Wrapped methods should be some sort of non-method type, e.g.:
     #   tensorflow.python.eager.def_function.Function (TF)
@@ -104,11 +104,11 @@ class TracedPublicMethodsTest(test_util.TestCase):
     self.assertIsInstance(d._log_prob, types.MethodType)
 
   def test_works_with_transformed_distributions(self):
-    uniform = tfe_util.JitPublicMethods(tfd.Uniform(0., 1.))
-    td = tfd.TransformedDistribution(
-        distribution=uniform,
-        bijector=tfb.Invert(
-            uniform.experimental_default_event_space_bijector()))
+    dist = jit_public_methods.JitPublicMethods(uniform.Uniform(0., 1.))
+    td = transformed_distribution.TransformedDistribution(
+        distribution=dist,
+        bijector=invert.Invert(
+            dist.experimental_default_event_space_bijector()))
     if JAX_MODE:
       # TODO(b/184565492): Enable passing shapes to jitted methods in JAX.
       x = tf.zeros([], dtype=td.dtype)
@@ -118,15 +118,16 @@ class TracedPublicMethodsTest(test_util.TestCase):
 
   @test_util.jax_disable_test_missing_functionality('b/184565492')
   def test_kl_divergence(self):
-    a, b = tfd.Normal(1., 2.), tfd.Normal(3., 1.)
-    ta, tb = tfe_util.JitPublicMethods(a), tfe_util.JitPublicMethods(b)
+    a, b = normal.Normal(1., 2.), normal.Normal(3., 1.)
+    ta, tb = jit_public_methods.JitPublicMethods(
+        a), jit_public_methods.JitPublicMethods(b)
     kl_a_b = a.kl_divergence(b)
     self.assertAllClose(kl_a_b, a.kl_divergence(tb))
     self.assertAllClose(kl_a_b, ta.kl_divergence(b))
     self.assertAllClose(kl_a_b, ta.kl_divergence(tb))
 
   def test_functions_are_cached(self):
-    d = tfe_util.JitPublicMethods(LogProbCanary())
+    d = jit_public_methods.JitPublicMethods(LogProbCanary())
     d.log_prob(tf.constant(1.))
     d.log_prob(tf.constant(2.))
     self.assertEqual(d.log_prob_calls, 1)
@@ -135,8 +136,9 @@ class TracedPublicMethodsTest(test_util.TestCase):
   @test_util.jax_disable_test_missing_functionality('trace_only')
   def test_trace_only_bypasses_xla(self):
     self.skip_if_no_xla()
-    d = tfe_util.JitPublicMethods(XLADetector())
-    d_trace_only = tfe_util.JitPublicMethods(XLADetector(), trace_only=True)
+    d = jit_public_methods.JitPublicMethods(XLADetector())
+    d_trace_only = jit_public_methods.JitPublicMethods(
+        XLADetector(), trace_only=True)
     self.assertTrue(self.evaluate(d.in_xla_context()))
     self.assertFalse(self.evaluate(d_trace_only.in_xla_context()))
 

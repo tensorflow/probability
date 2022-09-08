@@ -48,7 +48,6 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:nest_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/mcmc:diagnostic",
-        "//tensorflow_probability/python/stats",
     ],
 )
 
@@ -62,7 +61,7 @@ multi_substrate_py_test(
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/mcmc:diagnostic",
     ],
 )

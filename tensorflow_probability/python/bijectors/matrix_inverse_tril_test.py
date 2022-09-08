@@ -17,8 +17,10 @@
 # Dependency imports
 
 import numpy as np
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import fill_triangular
+from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.bijectors import matrix_inverse_tril
 from tensorflow_probability.python.internal import test_util
 
 
@@ -38,7 +40,7 @@ class MatrixInverseTriLBijectorTest(test_util.TestCase):
     return y
 
   def testComputesCorrectValues(self):
-    inv = tfb.MatrixInverseTriL(validate_args=True)
+    inv = matrix_inverse_tril.MatrixInverseTriL(validate_args=True)
     self.assertStartsWith(inv.name, 'matrix_inverse_tril')
     x_ = np.array([[0.7, 0., 0.],
                    [0.1, -1., 0.],
@@ -54,7 +56,7 @@ class MatrixInverseTriLBijectorTest(test_util.TestCase):
     self.assertAllClose(x_, x_back_, atol=0., rtol=1e-5)
 
   def testOneByOneMatrix(self):
-    inv = tfb.MatrixInverseTriL(validate_args=True)
+    inv = matrix_inverse_tril.MatrixInverseTriL(validate_args=True)
     x_ = np.array([[5.]], dtype=np.float32)
     x_inv_ = np.array([[0.2]], dtype=np.float32)
 
@@ -67,7 +69,7 @@ class MatrixInverseTriLBijectorTest(test_util.TestCase):
     self.assertAllClose(x_, x_back_, atol=0., rtol=1e-5)
 
   def testZeroByZeroMatrix(self):
-    inv = tfb.MatrixInverseTriL(validate_args=True)
+    inv = matrix_inverse_tril.MatrixInverseTriL(validate_args=True)
     x_ = np.eye(0, dtype=np.float32)
     x_inv_ = np.eye(0, dtype=np.float32)
 
@@ -82,7 +84,7 @@ class MatrixInverseTriLBijectorTest(test_util.TestCase):
   def testBatch(self):
     # Test batch computation with input shape (2, 1, 2, 2), i.e. batch shape
     # (2, 1).
-    inv = tfb.MatrixInverseTriL(validate_args=True)
+    inv = matrix_inverse_tril.MatrixInverseTriL(validate_args=True)
     x_ = np.array([[[[1., 0.],
                      [2., 3.]]],
                    [[[4., 0.],
@@ -98,7 +100,7 @@ class MatrixInverseTriLBijectorTest(test_util.TestCase):
     self.assertAllClose(x_, x_back_, atol=0., rtol=1e-5)
 
   def testErrorOnInputRankTooLow(self):
-    inv = tfb.MatrixInverseTriL(validate_args=True)
+    inv = matrix_inverse_tril.MatrixInverseTriL(validate_args=True)
     x_ = np.array([0.1], dtype=np.float32)
     rank_error_msg = 'must have rank at least 2'
     with self.assertRaisesWithPredicateMatch(ValueError, rank_error_msg):
@@ -112,7 +114,7 @@ class MatrixInverseTriLBijectorTest(test_util.TestCase):
 
   # TODO(b/80481923): Figure out why these assertions fail, and fix them.
   ## def testErrorOnInputNonSquare(self):
-  ##   inv = tfb.MatrixInverseTriL(validate_args=True)
+  ##   inv = matrix_inverse_tril.MatrixInverseTriL(validate_args=True)
   ##   x_ = np.array([[1., 2., 3.],
   ##                  [4., 5., 6.]], dtype=np.float32)
   ##   square_error_msg = 'must be a square matrix'
@@ -130,7 +132,7 @@ class MatrixInverseTriLBijectorTest(test_util.TestCase):
   ##     self.evaluate(inv.inverse_log_det_jacobian(x_, event_ndims=2))
 
   def testErrorOnInputNotLowerTriangular(self):
-    inv = tfb.MatrixInverseTriL(validate_args=True)
+    inv = matrix_inverse_tril.MatrixInverseTriL(validate_args=True)
     x_ = np.array([[1., 2.],
                    [3., 4.]], dtype=np.float32)
     triangular_error_msg = 'must be lower triangular'
@@ -144,7 +146,7 @@ class MatrixInverseTriLBijectorTest(test_util.TestCase):
       self.evaluate(inv.inverse_log_det_jacobian(x_, event_ndims=2))
 
   def testErrorOnInputSingular(self):
-    inv = tfb.MatrixInverseTriL(validate_args=True)
+    inv = matrix_inverse_tril.MatrixInverseTriL(validate_args=True)
     x_ = np.array([[1., 0.],
                    [0., 0.]], dtype=np.float32)
     nonsingular_error_msg = 'must have all diagonal entries nonzero'
@@ -159,7 +161,7 @@ class MatrixInverseTriLBijectorTest(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test
   def testJacobian(self):
-    bijector = tfb.MatrixInverseTriL()
+    bijector = matrix_inverse_tril.MatrixInverseTriL()
     batch_size = 5
     for ndims in range(2, 5):
       x_ = np.tril(
@@ -167,9 +169,13 @@ class MatrixInverseTriLBijectorTest(test_util.TestCase):
               -1., 1., size=[batch_size, ndims, ndims]).astype(np.float64))
       fldj = bijector.forward_log_det_jacobian(x_, event_ndims=2)
       fldj_theoretical = bijector_test_util.get_fldj_theoretical(
-          bijector, x_, event_ndims=2,
-          input_to_unconstrained=tfb.Invert(tfb.FillTriangular()),
-          output_to_unconstrained=tfb.Invert(tfb.FillTriangular()))
+          bijector,
+          x_,
+          event_ndims=2,
+          input_to_unconstrained=invert.Invert(
+              fill_triangular.FillTriangular()),
+          output_to_unconstrained=invert.Invert(
+              fill_triangular.FillTriangular()))
       fldj_, fldj_theoretical_ = self.evaluate([fldj, fldj_theoretical])
       self.assertAllClose(fldj_, fldj_theoretical_)
 

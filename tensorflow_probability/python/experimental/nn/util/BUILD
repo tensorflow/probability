@@ -43,7 +43,6 @@ py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -74,8 +73,9 @@ py_test(
     srcs = ["kernel_bias_test.py"],
     shard_count = 4,
     deps = [
+        ":kernel_bias",
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/nn/initializers",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -107,8 +107,11 @@ py_test(
     size = "medium",
     srcs = ["random_variable_test.py"],
     deps = [
+        ":random_variable",
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:bernoulli",
+        "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
         # tensorflow/compiler/jit dep,

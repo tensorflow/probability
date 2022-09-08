@@ -21,9 +21,12 @@ import numpy as np
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import linear_gaussian_ssm as lgssm
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import _augment_sample_shape
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import backward_smoothing_update
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import BackwardPassState
@@ -39,6 +42,7 @@ from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
 
 
 tfl = tf.linalg
@@ -51,28 +55,31 @@ class _IIDNormalTest(test_util.TestCase):
                               observation_variance):
     """Build a model whose outputs are IID normal by construction."""
 
-    transition_variance = self._build_placeholder(transition_variance)
-    observation_variance = self._build_placeholder(observation_variance)
+    transition_variance = self._build_placeholder(
+        self.dtype(transition_variance))
+    observation_variance = self._build_placeholder(
+        self.dtype(observation_variance))
 
     # Use orthogonal matrices to project a (potentially
     # high-dimensional) latent space of IID normal variables into a
     # low-dimensional observation that is still IID normal.
     random_orthogonal_matrix = lambda: np.linalg.qr(
         np.random.randn(latent_size, latent_size))[0][:observation_size, :]
-    observation_matrix = self._build_placeholder(random_orthogonal_matrix())
+    observation_matrix = self._build_placeholder(
+        random_orthogonal_matrix().astype(self.dtype))
 
-    model = tfd.LinearGaussianStateSpaceModel(
+    model = lgssm.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
         transition_matrix=self._build_placeholder(
-            np.zeros([latent_size, latent_size])),
-        transition_noise=tfd.MultivariateNormalDiag(
+            np.zeros([latent_size, latent_size]).astype(self.dtype)),
+        transition_noise=mvn_diag.MultivariateNormalDiag(
             scale_diag=tf.sqrt(transition_variance) *
             tf.ones([latent_size], dtype=self.dtype)),
         observation_matrix=observation_matrix,
-        observation_noise=tfd.MultivariateNormalDiag(
+        observation_noise=mvn_diag.MultivariateNormalDiag(
             scale_diag=tf.sqrt(observation_variance) *
             tf.ones([observation_size], dtype=self.dtype)),
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             scale_diag=tf.sqrt(transition_variance) *
             tf.ones([latent_size], dtype=self.dtype)),
         experimental_parallelize=self.parallelize,
@@ -137,7 +144,7 @@ class _IIDNormalTest(test_util.TestCase):
             value=transition_variance_val + observation_variance_val,
             dtype=self.dtype)
         lp_iid = tf.reduce_sum(
-            tfd.Normal(
+            normal.Normal(
                 loc=tf.zeros([], dtype=self.dtype),
                 scale=tf.sqrt(marginal_variance)).log_prob(x),
             axis=(-2, -1))
@@ -198,15 +205,15 @@ class _SanityChecks(test_util.TestCase):
     step_shift = -1.5
     observation_coef = 0.3
     observation_shift = -1.
-    model = tfd.LinearGaussianStateSpaceModel(
+    model = lgssm.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
         transition_matrix=[[step_coef]],
-        transition_noise=tfd.MultivariateNormalDiag(
+        transition_noise=mvn_diag.MultivariateNormalDiag(
             loc=[step_shift], scale_diag=[0.]),
         observation_matrix=[[observation_coef]],
-        observation_noise=tfd.MultivariateNormalDiag(
+        observation_noise=mvn_diag.MultivariateNormalDiag(
             loc=[observation_shift], scale_diag=[0.]),
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             loc=[prior_mean], scale_diag=[0.]),
         experimental_parallelize=self.parallelize,
         validate_args=True)
@@ -233,15 +240,15 @@ class _SanityChecks(test_util.TestCase):
     observation_coef = 20.0
     observation_scale = 1.9
 
-    model = tfd.LinearGaussianStateSpaceModel(
+    model = lgssm.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
         transition_matrix=[[step_coef]],
-        transition_noise=tfd.MultivariateNormalDiag(
+        transition_noise=mvn_diag.MultivariateNormalDiag(
             loc=[0.], scale_diag=[step_scale]),
         observation_matrix=[[observation_coef]],
-        observation_noise=tfd.MultivariateNormalDiag(
+        observation_noise=mvn_diag.MultivariateNormalDiag(
             loc=[0.], scale_diag=[observation_scale]),
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             loc=[0.], scale_diag=[prior_scale]),
         experimental_parallelize=self.parallelize,
         validate_args=True)
@@ -274,15 +281,15 @@ class _SanityChecks(test_util.TestCase):
       t = tf.cast(t, tf.float32)
       return tf.linalg.LinearOperatorFullMatrix([[tf.sqrt(t + 1.)]])
 
-    model = tfd.LinearGaussianStateSpaceModel(
+    model = lgssm.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
         transition_matrix=transition_matrix,
-        transition_noise=tfd.MultivariateNormalDiag(
+        transition_noise=mvn_diag.MultivariateNormalDiag(
             scale_diag=[transition_scale]),
         observation_matrix=observation_matrix,
-        observation_noise=tfd.MultivariateNormalDiag(
+        observation_noise=mvn_diag.MultivariateNormalDiag(
             scale_diag=[observation_noise_scale]),
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             loc=[prior_mean], scale_diag=[prior_scale]),
         experimental_parallelize=self.parallelize,
         validate_args=True)
@@ -318,19 +325,19 @@ class _SanityChecks(test_util.TestCase):
     # Define time-varying transition and observation noise models.
     def transition_noise(t):
       t = tf.cast(t, tf.float32)
-      return tfd.MultivariateNormalDiag(scale_diag=[t])
+      return mvn_diag.MultivariateNormalDiag(scale_diag=[t])
 
     def observation_noise(t):
       t = tf.cast(t, tf.float32)
-      return tfd.MultivariateNormalDiag(scale_diag=[tf.math.log(t + 1)])
+      return mvn_diag.MultivariateNormalDiag(scale_diag=[tf.math.log(t + 1)])
 
-    model = tfd.LinearGaussianStateSpaceModel(
+    model = lgssm.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
         transition_matrix=np.float32([[1.]]),
         transition_noise=transition_noise,
         observation_matrix=np.float32([[1.]]),
         observation_noise=observation_noise,
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             loc=[prior_mean], scale_diag=[prior_scale]),
         experimental_parallelize=self.parallelize,
         validate_args=True)
@@ -353,15 +360,15 @@ class _SanityChecks(test_util.TestCase):
     transition_std = 3.0
     observation_std = 5.0
 
-    model = tfd.LinearGaussianStateSpaceModel(
+    model = lgssm.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
         transition_matrix=tfl.LinearOperatorIdentity(latent_size),
-        transition_noise=tfd.MultivariateNormalDiag(
+        transition_noise=mvn_diag.MultivariateNormalDiag(
             scale_diag=tf.fill([latent_size], tf.square(transition_std))),
         observation_matrix=tfl.LinearOperatorIdentity(latent_size),
-        observation_noise=tfd.MultivariateNormalDiag(
+        observation_noise=mvn_diag.MultivariateNormalDiag(
             scale_diag=tf.fill([latent_size], tf.square(observation_std))),
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             scale_diag=tf.ones([latent_size])),
         experimental_parallelize=self.parallelize,
         validate_args=True)
@@ -385,34 +392,38 @@ class _SanityChecks(test_util.TestCase):
     transition_std = 3.0
     observation_std = 5.0
 
+    dtype = np.float32
+
     num_timesteps = tfp_hps.defer_and_count_usage(
         tf.Variable(1, name='num_timesteps'))
     transition_matrix = tfp_hps.defer_and_count_usage(
-        tf.Variable(np.eye(latent_size), name='transition_matrix'))
+        tf.Variable(
+            np.eye(latent_size).astype(dtype), name='transition_matrix'))
     transition_noise_scale = tfp_hps.defer_and_count_usage(
         tf.Variable(
-            np.full([latent_size], transition_std),
+            np.full([latent_size], transition_std).astype(dtype),
             name='transition_noise_scale'))
     observation_matrix = tfp_hps.defer_and_count_usage(
-        tf.Variable(np.eye(latent_size), name='observation_matrix'))
+        tf.Variable(
+            np.eye(latent_size).astype(dtype), name='observation_matrix'))
     observation_noise_scale = tfp_hps.defer_and_count_usage(
         tf.Variable(
-            np.full([latent_size], observation_std),
+            np.full([latent_size], observation_std).astype(dtype),
             name='observation_noise_scale'))
     initial_state_prior_scale = tfp_hps.defer_and_count_usage(
         tf.Variable(
-            np.full([latent_size], observation_std),
+            np.full([latent_size], observation_std).astype(dtype),
             name='initial_state_prior_scale'))
 
-    model = tfd.LinearGaussianStateSpaceModel(
+    model = lgssm.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
         transition_matrix=transition_matrix,
-        transition_noise=tfd.MultivariateNormalDiag(
+        transition_noise=mvn_diag.MultivariateNormalDiag(
             scale_diag=transition_noise_scale),
         observation_matrix=observation_matrix,
-        observation_noise=tfd.MultivariateNormalDiag(
+        observation_noise=mvn_diag.MultivariateNormalDiag(
             scale_diag=observation_noise_scale),
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             scale_diag=initial_state_prior_scale),
         experimental_parallelize=self.parallelize,
         validate_args=True)
@@ -435,15 +446,15 @@ class _SanityChecks(test_util.TestCase):
     ndims = 2
     step_std = 1.0
     noise_std = 5.0
-    model = tfd.LinearGaussianStateSpaceModel(
+    model = lgssm.LinearGaussianStateSpaceModel(
         num_timesteps=100,
         transition_matrix=tf.linalg.LinearOperatorIdentity(ndims),
-        transition_noise=tfd.MultivariateNormalDiag(
+        transition_noise=mvn_diag.MultivariateNormalDiag(
             scale_diag=step_std**2 * tf.ones([ndims])),
         observation_matrix=tf.linalg.LinearOperatorIdentity(ndims),
-        observation_noise=tfd.MultivariateNormalDiag(
+        observation_noise=mvn_diag.MultivariateNormalDiag(
             scale_diag=noise_std**2 * tf.ones([ndims])),
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             scale_diag=tf.ones([ndims])),
         experimental_parallelize=self.parallelize)
 
@@ -453,14 +464,14 @@ class _SanityChecks(test_util.TestCase):
     # Compute the filtered posterior on latent states given observations,
     # and extract the mean and covariance for the current (final) timestep.
     _, filtered_means, filtered_covs, _, _, _, _ = model.forward_filter(x)
-    current_location_posterior = tfd.MultivariateNormalTriL(
+    current_location_posterior = mvn_tril.MultivariateNormalTriL(
         loc=filtered_means[..., -1, :],
         scale_tril=tf.linalg.cholesky(filtered_covs[..., -1, :, :]))
 
     # Run a smoothing recursion to extract posterior marginals for locations
     # at previous timesteps.
     posterior_means, posterior_covs = model.posterior_marginals(x)
-    initial_location_posterior = tfd.MultivariateNormalTriL(
+    initial_location_posterior = mvn_tril.MultivariateNormalTriL(
         loc=posterior_means[..., 0, :],
         scale_tril=tf.linalg.cholesky(posterior_covs[..., 0, :, :]))
     self.evaluate((
@@ -506,27 +517,28 @@ class _BatchTest(test_util.TestCase):
                                      else observation_noise_batch_shape)
 
     stream = test_util.test_seed_stream()
-    return tfd.LinearGaussianStateSpaceModel(
+    return lgssm.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
-        transition_matrix=samplers.normal(transition_matrix_batch_shape +
-                                          [latent_size, latent_size],
-                                          seed=stream()),
-        transition_noise=tfd.MultivariateNormalDiag(
+        transition_matrix=samplers.normal(
+            transition_matrix_batch_shape + [latent_size, latent_size],
+            seed=stream()),
+        transition_noise=mvn_diag.MultivariateNormalDiag(
             scale_diag=tf.math.softplus(
-                samplers.normal(transition_noise_batch_shape + [latent_size],
-                                seed=stream()))),
-        observation_matrix=samplers.normal(observation_matrix_batch_shape +
-                                           [observation_size, latent_size],
-                                           seed=stream()),
-        observation_noise=tfd.MultivariateNormalDiag(
+                samplers.normal(
+                    transition_noise_batch_shape +
+                    [latent_size], seed=stream()))),
+        observation_matrix=samplers.normal(
+            observation_matrix_batch_shape + [observation_size, latent_size],
+            seed=stream()),
+        observation_noise=mvn_diag.MultivariateNormalDiag(
             scale_diag=tf.math.softplus(
-                samplers.normal(observation_noise_batch_shape +
-                                [observation_size],
-                                seed=stream()))),
-        initial_state_prior=tfd.MultivariateNormalDiag(
+                samplers.normal(
+                    observation_noise_batch_shape + [observation_size],
+                    seed=stream()))),
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             scale_diag=tf.math.softplus(
-                samplers.normal(prior_batch_shape + [latent_size],
-                                seed=stream()))),
+                samplers.normal(
+                    prior_batch_shape + [latent_size], seed=stream()))),
         experimental_parallelize=self.parallelize,
         validate_args=True)
 
@@ -707,15 +719,14 @@ class _MissingObservationsTests(test_util.TestCase):
     # Define a simple random-walk model.
     num_timesteps = 8
     transition_matrix = np.array([[1.]], dtype=np.float32)
-    transition_noise = tfd.MultivariateNormalDiag(
-        scale_diag=scale_diag)
+    transition_noise = mvn_diag.MultivariateNormalDiag(scale_diag=scale_diag)
     observation_matrix = np.array([[1.]], dtype=np.float32)
-    observation_noise = tfd.MultivariateNormalDiag(
+    observation_noise = mvn_diag.MultivariateNormalDiag(
         scale_diag=np.array([0.5], dtype=np.float32))
-    initial_state_prior = tfd.MultivariateNormalDiag(
+    initial_state_prior = mvn_diag.MultivariateNormalDiag(
         loc=np.zeros(shape=[1], dtype=np.float32),
         scale_diag=np.array([1.], dtype=np.float32))
-    model = tfd.LinearGaussianStateSpaceModel(
+    model = lgssm.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
         transition_matrix=transition_matrix,
         transition_noise=transition_noise,
@@ -761,10 +772,10 @@ class _MissingObservationsTests(test_util.TestCase):
                                                  dtype=np.float32)
 
     def collapsed_transition_noise_model(t):
-      return tfd.MultivariateNormalDiag(
+      return mvn_diag.MultivariateNormalDiag(
           scale_diag=[tf.sqrt(collapsed_transition_variances[t])])
 
-    collapsed_model = tfd.LinearGaussianStateSpaceModel(
+    collapsed_model = lgssm.LinearGaussianStateSpaceModel(
         num_timesteps=4,
         transition_matrix=transition_matrix,
         transition_noise=collapsed_transition_noise_model,
@@ -848,7 +859,7 @@ class _MissingObservationsTests(test_util.TestCase):
       return lp
 
     _, grads_ = self.evaluate(
-        tfp.math.value_and_gradient(
+        gradient.value_and_gradient(
             lp_from_scale_diag,
             [tf.constant(np.array([1.], dtype=np.float32))]))
     self.assertAllFinite(grads_)
@@ -863,13 +874,13 @@ class _MissingObservationsTests(test_util.TestCase):
 
     num_timesteps = 8
     batch_shape = [4, 3]
-    batch_model = tfd.LinearGaussianStateSpaceModel(
+    batch_model = lgssm.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
         transition_matrix=transition_matrix,
         transition_noise=transition_noise,
         observation_matrix=observation_matrix,
         observation_noise=observation_noise,
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             scale_diag=np.random.randn(*(batch_shape +
                                          [1])).astype(np.float32)),
         initial_step=0,
@@ -985,21 +996,25 @@ class _KalmanSmootherTest(test_util.TestCase):
     self.transition_matrix = np.array(
         [[1., 0.5, 0.], [-0.2, 0.3, 0.], [0.01, 0.02, 0.97]], dtype=np.float32)
 
-    self.transition_noise = tfd.MultivariateNormalDiag(
+    self.transition_noise = mvn_diag.MultivariateNormalDiag(
         loc=np.array([-4.3, 0.9, 0.], dtype=np.float32),
         scale_diag=np.array([1., 1., 0.5], dtype=np.float32))
 
     self.observation_matrix = np.array(
         [[1., 1., 0.2], [0.3, -0.7, -0.2]], dtype=np.float32)
-    self.observation_noise = tfd.MultivariateNormalDiag(
+    self.observation_noise = mvn_diag.MultivariateNormalDiag(
         loc=np.array([-0.9, 0.1], dtype=np.float32),
         scale_diag=np.array([0.3, 0.1], dtype=np.float32))
 
-    self.initial_state_prior = tfd.MultivariateNormalDiag(
-        loc=np.zeros(shape=[3,], dtype=np.float32),
-        scale_diag=np.ones(shape=[3,], dtype=np.float32))
+    self.initial_state_prior = mvn_diag.MultivariateNormalDiag(
+        loc=np.zeros(shape=[
+            3,
+        ], dtype=np.float32),
+        scale_diag=np.ones(shape=[
+            3,
+        ], dtype=np.float32))
 
-    return tfd.LinearGaussianStateSpaceModel(
+    return lgssm.LinearGaussianStateSpaceModel(
         num_timesteps=5,
         transition_matrix=self.transition_matrix,
         transition_noise=self.transition_noise,
@@ -1204,7 +1219,7 @@ class _KalmanStepsTest(object):
 
     self.bias = np.asarray([-4.3, .9], dtype=np.float32)
     self.get_transition_noise_for_timestep = (
-        lambda t: tfd.MultivariateNormalDiag(self.bias, [1., 1.]))
+        lambda t: mvn_diag.MultivariateNormalDiag(self.bias, [1., 1.]))
 
     self.observation_matrix = np.asarray([[1., 1.], [0.3, -0.7]],
                                          dtype=np.float32)
@@ -1215,7 +1230,7 @@ class _KalmanStepsTest(object):
     self.observation_noise_scale_diag = np.asarray([1., 0.3], dtype=np.float32)
     def get_observation_noise_for_timestep(t):
       del t  # unused
-      return tfd.MultivariateNormalDiag(
+      return mvn_diag.MultivariateNormalDiag(
           loc=self.observation_bias,
           scale_diag=self.observation_noise_scale_diag)
     self.get_observation_noise_for_timestep = get_observation_noise_for_timestep
@@ -1422,7 +1437,7 @@ class _KalmanStepsTest(object):
 
     observation_matrix = tfl.LinearOperatorFullMatrix(
         self.build_tensor([[1., 1.]]))
-    observation_noise = tfd.MultivariateNormalDiag(
+    observation_noise = mvn_diag.MultivariateNormalDiag(
         loc=self.build_tensor([-.9]), scale_diag=self.build_tensor([1.]))
 
     (posterior_mean,
@@ -1434,9 +1449,9 @@ class _KalmanStepsTest(object):
 
     # Ensure we take the scalar-optimized path when shape is static.
     if self.use_static_shape or tf.executing_eagerly():
-      self.assertIsInstance(predictive_dist, tfd.Independent)
+      self.assertIsInstance(predictive_dist, independent.Independent)
     else:
-      self.assertIsInstance(predictive_dist, tfd.MultivariateNormalTriL)
+      self.assertIsInstance(predictive_dist, mvn_tril.MultivariateNormalTriL)
     self.assertAllEqual(
         self.evaluate(predictive_dist.event_shape_tensor()), [1])
     self.assertAllEqual(
@@ -1447,7 +1462,7 @@ class _KalmanStepsTest(object):
     # and vector paths yield the same posterior.
     observation_matrix_extended = tfl.LinearOperatorFullMatrix(
         self.build_tensor([[1., 1.], [0., 0.]]))
-    observation_noise_extended = tfd.MultivariateNormalDiag(
+    observation_noise_extended = mvn_diag.MultivariateNormalDiag(
         loc=self.build_tensor([-.9, 0.]),
         scale_diag=self.build_tensor([1., 1e15]))
     x_observed_extended_tensor = self.build_tensor(
@@ -1461,7 +1476,8 @@ class _KalmanStepsTest(object):
          x_observed_extended_tensor)
 
     # Ensure we took the vector path.
-    self.assertIsInstance(predictive_dist_extended, tfd.MultivariateNormalTriL)
+    self.assertIsInstance(predictive_dist_extended,
+                          mvn_tril.MultivariateNormalTriL)
     self.assertAllEqual(
         self.evaluate(predictive_dist_extended.event_shape_tensor()), [2])
     self.assertAllEqual(
@@ -1616,8 +1632,8 @@ class AugmentSampleShapeTestStatic(test_util.TestCase, _AugmentSampleShapeTest):
   def build_inputs(self, full_batch_shape, partial_batch_shape):
 
     full_batch_shape = np.asarray(full_batch_shape, dtype=np.int32)
-    dist = tfd.Normal(samplers.normal(partial_batch_shape,
-                                      seed=test_util.test_seed()), 1.)
+    dist = normal.Normal(
+        samplers.normal(partial_batch_shape, seed=test_util.test_seed()), 1.)
 
     return full_batch_shape, dist
 
@@ -1641,8 +1657,8 @@ class AugmentSampleShapeTestDynamic(test_util.TestCase,
 
     partial_batch_shape = tf1.placeholder_with_default(
         np.asarray(partial_batch_shape, dtype=np.int32), shape=None)
-    dist = tfd.Normal(samplers.normal(partial_batch_shape,
-                                      seed=test_util.test_seed()), 1.)
+    dist = normal.Normal(
+        samplers.normal(partial_batch_shape, seed=test_util.test_seed()), 1.)
 
     return full_batch_shape, dist
 
@@ -1658,13 +1674,13 @@ class _LinearGaussianStateSpaceModelFromVariableTest(test_util.TestCase):
     observation_matrix = tf.constant([[1.]])
 
     self.evaluate(transition_matrix.initializer)
-    d = tfd.LinearGaussianStateSpaceModel(
+    d = lgssm.LinearGaussianStateSpaceModel(
         transition_matrix=transition_matrix,
-        transition_noise=tfd.MultivariateNormalDiag(scale_diag=[1.]),
+        transition_noise=mvn_diag.MultivariateNormalDiag(scale_diag=[1.]),
         observation_matrix=observation_matrix,
-        observation_noise=tfd.MultivariateNormalDiag(scale_diag=[1.]),
+        observation_noise=mvn_diag.MultivariateNormalDiag(scale_diag=[1.]),
         num_timesteps=2,
-        initial_state_prior=tfd.MultivariateNormalDiag(scale_diag=[1.]),
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(scale_diag=[1.]),
         experimental_parallelize=self.parallelize,
         validate_args=True)
 
@@ -1680,19 +1696,19 @@ class _LinearGaussianStateSpaceModelFromVariableTest(test_util.TestCase):
     def loss_fn(transition_matrix):
       observation_matrix = tf.constant([[1.]])
 
-      d = tfd.LinearGaussianStateSpaceModel(
+      d = lgssm.LinearGaussianStateSpaceModel(
           transition_matrix=transition_matrix,
-          transition_noise=tfd.MultivariateNormalDiag(scale_diag=[1.]),
+          transition_noise=mvn_diag.MultivariateNormalDiag(scale_diag=[1.]),
           observation_matrix=observation_matrix,
-          observation_noise=tfd.MultivariateNormalDiag(scale_diag=[1.]),
+          observation_noise=mvn_diag.MultivariateNormalDiag(scale_diag=[1.]),
           num_timesteps=2,
-          initial_state_prior=tfd.MultivariateNormalDiag(scale_diag=[1.]),
+          initial_state_prior=mvn_diag.MultivariateNormalDiag(scale_diag=[1.]),
           experimental_parallelize=self.parallelize,
           validate_args=True)
       return -d.log_prob(tf.zeros([2, 1]))
 
     transition_matrix = tf.constant([[1.]])
-    _, g = tfp.math.value_and_gradient(loss_fn, [transition_matrix])
+    _, g = gradient.value_and_gradient(loss_fn, [transition_matrix])
     self.assertLen(g, 1)
     self.assertAllNotNone(g)
 
@@ -1702,13 +1718,13 @@ class _LinearGaussianStateSpaceModelFromVariableTest(test_util.TestCase):
     observation_matrix = tf.Variable([[1.]])
 
     self.evaluate(observation_matrix.initializer)
-    d = tfd.LinearGaussianStateSpaceModel(
+    d = lgssm.LinearGaussianStateSpaceModel(
         transition_matrix=transition_matrix,
-        transition_noise=tfd.MultivariateNormalDiag(scale_diag=[1.]),
+        transition_noise=mvn_diag.MultivariateNormalDiag(scale_diag=[1.]),
         observation_matrix=observation_matrix,
-        observation_noise=tfd.MultivariateNormalDiag(scale_diag=[1.]),
+        observation_noise=mvn_diag.MultivariateNormalDiag(scale_diag=[1.]),
         num_timesteps=2,
-        initial_state_prior=tfd.MultivariateNormalDiag(scale_diag=[1.]),
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(scale_diag=[1.]),
         experimental_parallelize=self.parallelize,
         validate_args=True)
 
@@ -1723,19 +1739,19 @@ class _LinearGaussianStateSpaceModelFromVariableTest(test_util.TestCase):
 
     def loss_fn(observation_matrix):
       transition_matrix = tf.constant([[1.]])
-      d = tfd.LinearGaussianStateSpaceModel(
+      d = lgssm.LinearGaussianStateSpaceModel(
           transition_matrix=transition_matrix,
-          transition_noise=tfd.MultivariateNormalDiag(scale_diag=[1.]),
+          transition_noise=mvn_diag.MultivariateNormalDiag(scale_diag=[1.]),
           observation_matrix=observation_matrix,
-          observation_noise=tfd.MultivariateNormalDiag(scale_diag=[1.]),
+          observation_noise=mvn_diag.MultivariateNormalDiag(scale_diag=[1.]),
           num_timesteps=2,
-          initial_state_prior=tfd.MultivariateNormalDiag(scale_diag=[1.]),
+          initial_state_prior=mvn_diag.MultivariateNormalDiag(scale_diag=[1.]),
           experimental_parallelize=self.parallelize,
           validate_args=True)
       return -d.log_prob(tf.zeros([2, 1]))
 
     observation_matrix = tf.constant([[1.]])
-    _, g = tfp.math.value_and_gradient(loss_fn, [observation_matrix])
+    _, g = gradient.value_and_gradient(loss_fn, [observation_matrix])
     self.assertLen(g, 1)
     self.assertAllNotNone(g)
 

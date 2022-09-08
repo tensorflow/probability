@@ -20,8 +20,10 @@ import numpy as np
 from scipy import special as sp_special
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import spherical_uniform
+from tensorflow_probability.python.distributions import von_mises_fisher
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
@@ -32,9 +34,8 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
                          test_util.TestCase):
 
   def testReproducibleGraph(self):
-    vmf = tfp.distributions.VonMisesFisher(
-        mean_direction=tf.math.l2_normalize([1., 2.]),
-        concentration=1.2)
+    vmf = von_mises_fisher.VonMisesFisher(
+        mean_direction=tf.math.l2_normalize([1., 2.]), concentration=1.2)
     seed = test_util.test_seed()
     s1 = self.evaluate(vmf.sample(50, seed=seed))
     if tf.executing_eagerly():
@@ -45,7 +46,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
   def testSampleMeanDir2d(self):
     mean_dirs = tf.math.l2_normalize([[1., 1], [-2, 1], [0, -1]], axis=-1)
     concentration = [[0], [0.1], [2], [40], [1000]]
-    vmf = tfp.distributions.VonMisesFisher(
+    vmf = von_mises_fisher.VonMisesFisher(
         mean_direction=mean_dirs,
         concentration=concentration,
         validate_args=True,
@@ -86,7 +87,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
   def testSampleMeanDir3d(self):
     mean_dir = tf.math.l2_normalize([[1., 2, 3], [-2, -3, -1]], axis=-1)
     concentration = [[0], [0.1], [2], [40], [1000]]
-    vmf = tfp.distributions.VonMisesFisher(
+    vmf = von_mises_fisher.VonMisesFisher(
         mean_direction=mean_dir,
         concentration=concentration,
         validate_args=True,
@@ -254,9 +255,11 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
     mean_direction = tf.nn.l2_normalize(mean_direction, axis=-1)
     concentration = tf.random.uniform(
         minval=1e-4, maxval=10., shape=[5, 1], seed=seed_stream())
-    vmf = tfp.distributions.VonMisesFisher(
-        mean_direction=mean_direction, concentration=concentration,
-        validate_args=True, allow_nan_stats=False)
+    vmf = von_mises_fisher.VonMisesFisher(
+        mean_direction=mean_direction,
+        concentration=concentration,
+        validate_args=True,
+        allow_nan_stats=False)
     self._verifySampleAndPdfConsistency(vmf)
     self._verifyCovariance(vmf)
     self._verifyPdfWithNumpy(vmf)
@@ -273,15 +276,14 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
     # Check that the KL divergence is zero.
     concentration = 0.
 
-    vmf = tfp.distributions.VonMisesFisher(
-        mean_direction=mean_direction,
-        concentration=concentration)
-    su = tfp.distributions.SphericalUniform(dimension=dim)
+    vmf = von_mises_fisher.VonMisesFisher(
+        mean_direction=mean_direction, concentration=concentration)
+    su = spherical_uniform.SphericalUniform(dimension=dim)
 
     x = vmf.sample(int(5e4), seed=test_util.test_seed())
 
     kl_samples = vmf.log_prob(x) - su.log_prob(x)
-    true_kl = tfp.distributions.kl_divergence(vmf, su)
+    true_kl = kullback_leibler.kl_divergence(vmf, su)
     true_kl_, kl_samples_ = self.evaluate([true_kl, kl_samples])
     self.assertAllMeansClose(
         kl_samples_, true_kl_, axis=0, atol=5e-8, rtol=1e-1)
@@ -302,15 +304,14 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
             maxval=20.,
             seed=seed_stream()))
 
-    vmf = tfp.distributions.VonMisesFisher(
-        mean_direction=mean_direction,
-        concentration=concentration)
-    su = tfp.distributions.SphericalUniform(dimension=dim)
+    vmf = von_mises_fisher.VonMisesFisher(
+        mean_direction=mean_direction, concentration=concentration)
+    su = spherical_uniform.SphericalUniform(dimension=dim)
 
     x = vmf.sample(int(5e4), seed=test_util.test_seed())
 
     kl_samples = vmf.log_prob(x) - su.log_prob(x)
-    true_kl = tfp.distributions.kl_divergence(vmf, su)
+    true_kl = kullback_leibler.kl_divergence(vmf, su)
     true_kl_, kl_samples_ = self.evaluate([true_kl, kl_samples])
     self.assertAllMeansClose(
         kl_samples_, true_kl_, axis=0, atol=0.0, rtol=0.3)
@@ -334,7 +335,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
             minval=1.,
             maxval=100.,
             seed=seed_stream()))
-    vmf = tfp.distributions.VonMisesFisher(
+    vmf = von_mises_fisher.VonMisesFisher(
         mean_direction=mean_direction,
         concentration=concentration,
         validate_args=True,
@@ -355,14 +356,16 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
     # There needs to be a 1 dimension in the batch shape to trigger the bug
     mean_dir = tf.math.l2_normalize([1., 2, 3, 4], axis=-1)
     concentration = [0]
-    vmf = tfp.distributions.VonMisesFisher(
-        mean_direction=mean_dir, concentration=concentration,
-        validate_args=True, allow_nan_stats=False)
+    vmf = von_mises_fisher.VonMisesFisher(
+        mean_direction=mean_dir,
+        concentration=concentration,
+        validate_args=True,
+        allow_nan_stats=False)
     self.evaluate(vmf.sample(sample_shape, seed=test_util.test_seed()))
 
   def testAssertsValidImmutableParams(self):
     with self.assertRaisesOpError('`concentration` must be non-negative'):
-      vmf = tfp.distributions.VonMisesFisher(
+      vmf = von_mises_fisher.VonMisesFisher(
           mean_direction=tf.math.l2_normalize([1., 2, 3], axis=-1),
           concentration=-1.,
           validate_args=True,
@@ -371,7 +374,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
 
     with self.assertRaisesOpError(
         '`mean_direction` may not have scalar event shape'):
-      vmf = tfp.distributions.VonMisesFisher(
+      vmf = von_mises_fisher.VonMisesFisher(
           mean_direction=[1.],
           concentration=0.,
           validate_args=True,
@@ -379,7 +382,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
       self.evaluate(vmf.mean())
 
     with self.assertRaisesOpError('`mean_direction` must be unit-length'):
-      vmf = tfp.distributions.VonMisesFisher(
+      vmf = von_mises_fisher.VonMisesFisher(
           mean_direction=tf.convert_to_tensor([1., 2, 3]),
           concentration=1.,
           validate_args=True,
@@ -389,7 +392,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
   def testAssertsValidMutableParams(self):
     mean_direction = tf.Variable(tf.math.l2_normalize([1., 2, 3], axis=-1))
     concentration = tf.Variable(1.)
-    vmf = tfp.distributions.VonMisesFisher(
+    vmf = von_mises_fisher.VonMisesFisher(
         mean_direction=mean_direction,
         concentration=concentration,
         validate_args=True,
@@ -406,7 +409,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
       self.evaluate(vmf.mean())
 
     mean_direction = tf.Variable([1.])
-    vmf = tfp.distributions.VonMisesFisher(
+    vmf = von_mises_fisher.VonMisesFisher(
         mean_direction=mean_direction,
         concentration=concentration,
         validate_args=True,
@@ -419,7 +422,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
   def testAssertValidSample(self):
     mean_dir = tf.math.l2_normalize([[1., 2, 3], [-2, -3, -1]], axis=-1)
     concentration = [[0.], [2.]]
-    vmf = tfp.distributions.VonMisesFisher(
+    vmf = von_mises_fisher.VonMisesFisher(
         mean_direction=mean_dir,
         concentration=concentration,
         validate_args=True,
@@ -447,7 +450,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
     mean_dir = np.array([[1., 2., 3.], [-2., -3., -1.]]).astype(np.float32)
     mean_dir /= np.linalg.norm(mean_dir, axis=-1)[:, np.newaxis]
     concentration = [[0], [0.1], [2], [40], [1000]]
-    dist = tfp.distributions.VonMisesFisher(
+    dist = von_mises_fisher.VonMisesFisher(
         mean_direction=mean_dir,
         concentration=concentration,
         validate_args=True)

@@ -18,14 +18,17 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import mcmc
-from tensorflow_probability.python import vi
 from tensorflow_probability.python.experimental import vi as experimental_vi
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.mcmc import dual_averaging_step_size_adaptation as dassa
+from tensorflow_probability.python.mcmc import hmc
+from tensorflow_probability.python.mcmc import sample
+from tensorflow_probability.python.mcmc import transformed_kernel
 from tensorflow_probability.python.sts.internal import util as sts_util
+from tensorflow_probability.python.vi import optimization
 
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
@@ -464,7 +467,7 @@ def fit_with_hmc(model,
       if variational_optimizer is None:
         variational_optimizer = tf1.train.AdamOptimizer(
             learning_rate=0.1)  # TODO(b/137299119) Replace with TF2 optimizer.
-      loss_curve = vi.fit_surrogate_posterior(
+      loss_curve = optimization.fit_surrogate_posterior(
           target_log_prob_fn,
           variational_posterior,
           sample_size=variational_sample_size,
@@ -488,13 +491,13 @@ def fit_with_hmc(model,
     # Run HMC to sample from the posterior on parameters.
     @tf.function(autograph=False)
     def run_hmc():
-      return mcmc.sample_chain(
+      return sample.sample_chain(
           num_results=num_results,
           current_state=initial_state,
           num_burnin_steps=num_warmup_steps,
-          kernel=mcmc.DualAveragingStepSizeAdaptation(
-              inner_kernel=mcmc.TransformedTransitionKernel(
-                  inner_kernel=mcmc.HamiltonianMonteCarlo(
+          kernel=dassa.DualAveragingStepSizeAdaptation(
+              inner_kernel=transformed_kernel.TransformedTransitionKernel(
+                  inner_kernel=hmc.HamiltonianMonteCarlo(
                       target_log_prob_fn=target_log_prob_fn,
                       step_size=initial_step_size,
                       num_leapfrog_steps=num_leapfrog_steps,

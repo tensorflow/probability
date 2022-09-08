@@ -19,8 +19,9 @@ import math
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import fill_scale_tril
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import normal_conjugate_posteriors as ncp
 from tensorflow_probability.python.internal import test_util
 
 
@@ -35,12 +36,12 @@ class NormalTest(test_util.TestCase):
       x = tf.constant([-2.5, 2.5, 4.0, 0.0, -1.0, 2.0])
       s = tf.reduce_sum(x)
       n = tf.size(x)
-      prior = tfd.Normal(loc=mu0, scale=sigma0)
-      posterior = tfd.normal_conjugates_known_scale_posterior(
+      prior = normal.Normal(loc=mu0, scale=sigma0)
+      posterior = ncp.normal_conjugates_known_scale_posterior(
           prior=prior, scale=sigma, s=s, n=n)
 
       # Smoke test
-      self.assertIsInstance(posterior, tfd.Normal)
+      self.assertIsInstance(posterior, normal.Normal)
       posterior_log_pdf = self.evaluate(posterior.log_prob(x))
       self.assertEqual(posterior_log_pdf.shape, (6,))
 
@@ -54,12 +55,12 @@ class NormalTest(test_util.TestCase):
           a=tf.constant([[-2.5, 2.5, 4.0, 0.0, -1.0, 2.0]], dtype=tf.float32))
       s = tf.reduce_sum(x)
       n = tf.size(x)
-      prior = tfd.Normal(loc=mu0, scale=sigma0)
-      posterior = tfd.normal_conjugates_known_scale_posterior(
+      prior = normal.Normal(loc=mu0, scale=sigma0)
+      posterior = ncp.normal_conjugates_known_scale_posterior(
           prior=prior, scale=sigma, s=s, n=n)
 
       # Smoke test
-      self.assertIsInstance(posterior, tfd.Normal)
+      self.assertIsInstance(posterior, normal.Normal)
       posterior_log_pdf = self.evaluate(posterior.log_prob(x))
       self.assertEqual(posterior_log_pdf.shape, (6, 2))
 
@@ -75,12 +76,12 @@ class NormalTest(test_util.TestCase):
       s = tf.reduce_sum(x, axis=[1])
       x = tf.transpose(a=x)  # Reshape to shape (6, 2)
       n = tf.constant([6] * 2)
-      prior = tfd.Normal(loc=mu0, scale=sigma0)
-      posterior = tfd.normal_conjugates_known_scale_posterior(
+      prior = normal.Normal(loc=mu0, scale=sigma0)
+      posterior = ncp.normal_conjugates_known_scale_posterior(
           prior=prior, scale=sigma, s=s, n=n)
 
       # Smoke test
-      self.assertIsInstance(posterior, tfd.Normal)
+      self.assertIsInstance(posterior, normal.Normal)
 
       # Calculate log_pdf under the 2 models
       posterior_log_pdf = posterior.log_prob(x)
@@ -96,12 +97,12 @@ class NormalTest(test_util.TestCase):
       x = tf.constant([-2.5, 2.5, 4.0, 0.0, -1.0, 2.0])
       s = tf.reduce_sum(x)
       n = tf.size(x)
-      prior = tfd.Normal(loc=mu0, scale=sigma0)
-      predictive = tfd.normal_conjugates_known_scale_predictive(
+      prior = normal.Normal(loc=mu0, scale=sigma0)
+      predictive = ncp.normal_conjugates_known_scale_predictive(
           prior=prior, scale=sigma, s=s, n=n)
 
       # Smoke test
-      self.assertIsInstance(predictive, tfd.Normal)
+      self.assertIsInstance(predictive, normal.Normal)
       predictive_log_pdf = self.evaluate(predictive.log_prob(x))
       self.assertEqual(predictive_log_pdf.shape, (6,))
 
@@ -167,7 +168,7 @@ class NormalTest(test_util.TestCase):
     prior_mean = tf.ones([num_latents])
     prior_scale = tf.eye(num_latents) * 5.
     likelihood_scale = tf.linalg.LinearOperatorLowerTriangular(
-        tfb.FillScaleTriL().forward(
+        fill_scale_tril.FillScaleTriL().forward(
             tf.random.normal(
                 shape=batch_shape + [int(num_outputs * (num_outputs + 1) / 2)],
                 seed=strm())))
@@ -176,7 +177,7 @@ class NormalTest(test_util.TestCase):
     true_latent = tf.random.normal(batch_shape + [num_latents], seed=strm())
     observation = tf.linalg.matvec(linear_transformation, true_latent)
     posterior_mean, posterior_prec = (
-        tfd.mvn_conjugate_linear_update(
+        ncp.mvn_conjugate_linear_update(
             prior_mean=prior_mean,
             prior_scale=prior_scale,
             linear_transformation=linear_transformation,
@@ -202,7 +203,7 @@ class NormalTest(test_util.TestCase):
     linear_transformation = tf.linalg.LinearOperatorIdentity(num_outputs)
     observation = tf.random.normal([num_outputs], seed=strm())
     posterior_mean, posterior_prec = (
-        tfd.mvn_conjugate_linear_update(
+        ncp.mvn_conjugate_linear_update(
             prior_scale=prior_scale,
             linear_transformation=linear_transformation,
             likelihood_scale=likelihood_scale,
@@ -221,10 +222,11 @@ class NormalTest(test_util.TestCase):
         candidate_posterior_prec=posterior_prec.to_dense())
 
     # Also check the result against the scalar calculation.
-    scalar_posterior_dist = tfd.normal_conjugates_known_scale_posterior(
-        prior=tfd.Normal(loc=0., scale=prior_scale.diag_part()),
+    scalar_posterior_dist = ncp.normal_conjugates_known_scale_posterior(
+        prior=normal.Normal(loc=0., scale=prior_scale.diag_part()),
         scale=likelihood_scale.diag_part(),
-        s=observation, n=1)
+        s=observation,
+        n=1)
     (posterior_mean_, posterior_prec_,
      scalar_posterior_mean_, scalar_posterior_prec_) = self.evaluate(
          (posterior_mean, posterior_prec.to_dense(),

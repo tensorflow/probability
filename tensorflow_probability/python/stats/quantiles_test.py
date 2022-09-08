@@ -18,9 +18,11 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
+from tensorflow_probability.python.stats import quantiles
 
 
 @test_util.test_all_tf_execution_regimes
@@ -30,19 +32,19 @@ class BincountTest(test_util.TestCase):
     arr = np.random.randint(0, 10, size=(2, 3, 4)).astype(np.int32)
     tf_counts, tfp_counts = self.evaluate(
         [tf.math.bincount(arr),
-         tfp.stats.count_integers(arr)])
+         quantiles.count_integers(arr)])
     self.assertAllEqual(tf_counts, tfp_counts)
 
   def test_like_tf_math_bincount_if_axis_is_all_the_dims(self):
     arr = np.random.randint(0, 10, size=(2, 3, 4)).astype(np.int32)
     tf_counts, tfp_counts = self.evaluate(
         [tf.math.bincount(arr),
-         tfp.stats.count_integers(arr, axis=[0, 1, 2])])
+         quantiles.count_integers(arr, axis=[0, 1, 2])])
     self.assertAllEqual(tf_counts, tfp_counts)
 
   def test_3d_arr_axis_1_neg1_no_weights(self):
     arr = np.random.randint(0, 10, size=(2, 3, 4)).astype(np.int32)
-    counts = tfp.stats.count_integers(
+    counts = quantiles.count_integers(
         arr, weights=None, axis=[1, -1], minlength=10)
 
     # The first index will be length 10, but it isn't known statically because
@@ -64,7 +66,7 @@ class BincountTest(test_util.TestCase):
   def test_2d_arr_axis_0_yes_weights(self):
     arr = np.random.randint(0, 4, size=(3, 2)).astype(np.int32)
     weights = np.random.rand(3, 2)
-    counts = tfp.stats.count_integers(arr, weights=weights, axis=0, minlength=4)
+    counts = quantiles.count_integers(arr, weights=weights, axis=0, minlength=4)
 
     # The first index will be length 4, but it isn't known statically because
     # bincount needs to figure out how many bins are filled (even if minlength
@@ -89,7 +91,7 @@ class BincountTest(test_util.TestCase):
     target = tf.constant([[1, 0],
                           [1, 1],
                           [0, 1]])
-    result = tfp.stats.count_integers(arr, axis=1)
+    result = quantiles.count_integers(arr, axis=1)
     self.assertAllEqual(self.evaluate(target), self.evaluate(result))
 
 
@@ -99,7 +101,7 @@ class FindBinsTest(test_util.TestCase):
   def test_1d_array_no_extend_lower_and_upper_dtype_int64(self):
     x = [-1., 0., 4., 5., 10., 20.]
     edges = [0., 5., 10.]
-    bins = tfp.stats.find_bins(x, edges, dtype=tf.int64)
+    bins = quantiles.find_bins(x, edges, dtype=tf.int64)
     self.assertDTypeEqual(bins, np.int64)
     self.assertAllEqual((6,), bins.shape)
     bins_ = self.evaluate(bins)
@@ -108,7 +110,7 @@ class FindBinsTest(test_util.TestCase):
   def test_1d_array_extend_lower_and_upper(self):
     x = [-1., 0., 4., 5., 10., 20.]
     edges = [0., 5., 10.]
-    bins = tfp.stats.find_bins(
+    bins = quantiles.find_bins(
         x, edges, extend_lower_interval=True, extend_upper_interval=True)
     self.assertDTypeEqual(bins, np.float32)
     self.assertAllEqual((6,), bins.shape)
@@ -118,7 +120,7 @@ class FindBinsTest(test_util.TestCase):
   def test_1d_array_no_extend_lower_and_upper(self):
     x = [-1., 0., 4., 5., 10., 20.]
     edges = [0., 5., 10.]
-    bins = tfp.stats.find_bins(
+    bins = quantiles.find_bins(
         x, edges, extend_lower_interval=False, extend_upper_interval=False)
     self.assertDTypeEqual(bins, np.float32)
     self.assertAllEqual((6,), bins.shape)
@@ -128,7 +130,7 @@ class FindBinsTest(test_util.TestCase):
   def test_1d_array_example(self):
     x = [0., 5., 6., 10., 20.]
     edges = [0., 5., 10.]
-    bins = tfp.stats.find_bins(x, edges)
+    bins = quantiles.find_bins(x, edges)
     self.assertDTypeEqual(bins, np.float32)
     self.assertAllEqual((5,), bins.shape)
     bins_ = self.evaluate(bins)
@@ -150,7 +152,7 @@ class FindBinsTest(test_util.TestCase):
     expected_bins = [[0, 1, 1],
                      [1, 1, -1]]
 
-    bins = tfp.stats.find_bins(x, edges, dtype=tf.int32)
+    bins = quantiles.find_bins(x, edges, dtype=tf.int32)
     self.assertDTypeEqual(bins, np.int32)
     self.assertAllEqual((2, 3), bins.shape)
     bins_ = self.evaluate(bins)
@@ -159,7 +161,7 @@ class FindBinsTest(test_util.TestCase):
   def test_3d_array_has_expected_bins(self):
     x = np.linspace(0., 1000, 1000, dtype=np.float32).reshape((10, 10, 10))
     edges = [0., 500., 1000.]
-    bins = tfp.stats.find_bins(x, edges)
+    bins = quantiles.find_bins(x, edges)
     self.assertAllEqual(x.shape, bins.shape)
     self.assertDTypeEqual(bins, np.float32)
     flat_bins_ = np.ravel(self.evaluate(bins))
@@ -174,7 +176,7 @@ class FindBinsTest(test_util.TestCase):
     x = np.random.rand(100, 99, 98)
     edges = np.linspace(0., 1., 11)  # Deciles
     edges = edges.reshape((11, 1, 1)) + np.zeros((99, 98))
-    bins = tfp.stats.find_bins(x, edges)
+    bins = quantiles.find_bins(x, edges)
 
     self.assertAllEqual(x.shape, bins.shape)
     self.assertDTypeEqual(bins, np.float64)
@@ -190,7 +192,7 @@ class FindBinsTest(test_util.TestCase):
     x = np.random.rand(100, 99, 98)
     # rank(edges) < rank(x), so it will broadcast.
     edges = np.linspace(0., 1., 11)  # Deciles
-    bins = tfp.stats.find_bins(x, edges)
+    bins = quantiles.find_bins(x, edges)
 
     self.assertAllEqual(x.shape, bins.shape)
     self.assertDTypeEqual(bins, np.float64)
@@ -206,7 +208,7 @@ class FindBinsTest(test_util.TestCase):
     x = [1., 2., 3., 4.]
     edges = [2.]
     with self.assertRaisesRegexp(ValueError, '1 or more bin'):
-      tfp.stats.find_bins(x, edges)
+      quantiles.find_bins(x, edges)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -216,7 +218,7 @@ class HistogramTest(test_util.TestCase):
     n_samples = 1000
     x = np.random.rand(n_samples)
 
-    counts = tfp.stats.histogram(
+    counts = quantiles.histogram(
         x,
         edges=[-1., 0., 0.25, 0.5, 0.75, 0.9],
         # Lowest intervals are [-1, 0), [0, 0.25), [0.25, 0.5)
@@ -251,7 +253,7 @@ class HistogramTest(test_util.TestCase):
     # Intervals are:
     edges = np.float64([-1., 0., 0.5, 1.0, 1.5, 2.0, 2.5])
 
-    counts = tfp.stats.histogram(x, edges=edges, axis=0)
+    counts = quantiles.histogram(x, edges=edges, axis=0)
 
     self.assertAllEqual((6, 2), counts.shape)
     self.assertDTypeEqual(counts, np.float64)
@@ -295,7 +297,7 @@ class HistogramTest(test_util.TestCase):
     # Intervals are:
     edges = np.float64([-1., 0., 0.5, 1.0, 1.5, 2.0, 2.5])
 
-    counts = tfp.stats.histogram(x, edges=edges, axis=0, weights=weights)
+    counts = quantiles.histogram(x, edges=edges, axis=0, weights=weights)
 
     self.assertAllEqual((6, 2), counts.shape)
     self.assertDTypeEqual(counts, np.float64)
@@ -340,7 +342,7 @@ class HistogramTest(test_util.TestCase):
     # Intervals are:
     edges = np.float64([-1., 0., 0.5, 1.0, 1.5, 2.0, 2.5])
 
-    counts = tfp.stats.histogram(x, edges=edges, axis=1, dtype=np.float32)
+    counts = quantiles.histogram(x, edges=edges, axis=1, dtype=np.float32)
 
     self.assertAllEqual((6, 2), counts.shape)
     self.assertDTypeEqual(counts, np.float32)
@@ -389,7 +391,7 @@ class HistogramTest(test_util.TestCase):
     # Now, edges.shape = [4, 2], so edges[:, i] is for x[:, i], i = 0, 1.
     edges = edges.T
 
-    counts = tfp.stats.histogram(
+    counts = quantiles.histogram(
         x, edges=edges, axis=0, extend_lower_interval=True)
 
     self.assertAllEqual((3, 2), counts.shape)
@@ -429,7 +431,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
     for q in [0, 10, 25, 49.9, 50, 50.01, 90, 95, 100]:
       expected_percentile = np.percentile(
           x, q=q, interpolation=self._interpolation, axis=0)
-      pct = tfp.stats.percentile(
+      pct = quantiles.percentile(
           x, q=q, interpolation=self._interpolation, axis=[0])
       self.assertAllEqual((), pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
@@ -439,7 +441,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
     q = np.array([0, 10, 25, 49.9, 50, 50.01, 90, 95, 100])
     expected_percentile = np.percentile(
         x, q=q, interpolation=self._interpolation, axis=0)
-    pct = tfp.stats.percentile(
+    pct = quantiles.percentile(
         x, q=q, interpolation=self._interpolation, axis=[0])
     self.assertAllEqual(q.shape, pct.shape)
     self.assertAllClose(expected_percentile, self.evaluate(pct))
@@ -449,7 +451,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
     for q in [0, 10, 25, 49.9, 50, 50.01, 90, 95, 100]:
       expected_percentile = np.percentile(
           x, q=q, interpolation=self._interpolation)
-      pct = tfp.stats.percentile(x, q=q, interpolation=self._interpolation)
+      pct = quantiles.percentile(x, q=q, interpolation=self._interpolation)
       self.assertAllEqual((), pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
 
@@ -459,9 +461,9 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
       expected_percentile = np.percentile(
           x, q=q, interpolation=self._interpolation, axis=0)
       # Get dim 1 with negative and positive indices.
-      pct_neg_index = tfp.stats.percentile(
+      pct_neg_index = quantiles.percentile(
           x, q=q, interpolation=self._interpolation, axis=[0])
-      pct_pos_index = tfp.stats.percentile(
+      pct_pos_index = quantiles.percentile(
           x, q=q, interpolation=self._interpolation, axis=[0])
       self.assertAllEqual((2,), pct_neg_index.shape)
       self.assertAllEqual((2,), pct_pos_index.shape)
@@ -474,7 +476,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
     q = 10
     expected_percentile = np.percentile(
         x, q=q, interpolation=self._interpolation, axis=0)
-    pct = tfp.stats.percentile(
+    pct = quantiles.percentile(
         x, q=q, interpolation=self._interpolation, axis=[0])
     self.assertAllClose(expected_percentile, self.evaluate(pct))
 
@@ -483,7 +485,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
     for q in [0, 10, 25, 49.9, 50, 50.01, 90, 95, 100]:
       expected_percentile = np.percentile(
           x, q=q, interpolation=self._interpolation, axis=0)
-      pct = tfp.stats.percentile(
+      pct = quantiles.percentile(
           x, q=q, interpolation=self._interpolation, axis=[0])
       self.assertAllEqual((2,), pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
@@ -493,7 +495,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
     for q in [0, 10, 25, 49.9, 50, 50.01, 90, 95, 100]:
       expected_percentile = np.percentile(
           x, q=q, interpolation=self._interpolation, keepdims=True, axis=0)
-      pct = tfp.stats.percentile(
+      pct = quantiles.percentile(
           x, q=q, interpolation=self._interpolation, keepdims=True, axis=[0])
       self.assertAllEqual((1, 2), pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
@@ -503,7 +505,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
     for axis in [None, 0, 1, -2, (0,), (-1,), (-1, 1), (3, 1), (-3, 0)]:
       expected_percentile = np.percentile(
           x, q=0.77, interpolation=self._interpolation, axis=axis)
-      pct = tfp.stats.percentile(
+      pct = quantiles.percentile(
           x, q=0.77, interpolation=self._interpolation, axis=axis)
       self.assertAllEqual(expected_percentile.shape, pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
@@ -514,7 +516,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
     for axis in [None, 0, (-1, 1)]:
       expected_percentile = np.percentile(
           x, q=q, interpolation=self._interpolation, axis=axis)
-      pct = tfp.stats.percentile(
+      pct = quantiles.percentile(
           x, q=q, interpolation=self._interpolation, axis=axis)
       self.assertAllEqual(expected_percentile.shape, pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
@@ -525,7 +527,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
     for axis in [None, 0, (-1, 1)]:
       expected_percentile = np.percentile(
           x, q=q, interpolation=self._interpolation, axis=axis, keepdims=True)
-      pct = tfp.stats.percentile(
+      pct = quantiles.percentile(
           x, q=q, interpolation=self._interpolation, axis=axis, keepdims=True)
       self.assertAllEqual(expected_percentile.shape, pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
@@ -539,7 +541,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
           interpolation=self._interpolation,
           axis=axis,
           keepdims=True)
-      pct = tfp.stats.percentile(
+      pct = quantiles.percentile(
           x,
           q=0.77,
           interpolation=self._interpolation,
@@ -554,7 +556,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
     for axis in [None, 0, 1, -2, (0,), (-1,), (-1, 1), (3, 1), (-3, 0)]:
       expected_percentile = np.percentile(
           x, q=0.77, interpolation=self._interpolation, axis=axis)
-      pct = tfp.stats.percentile(
+      pct = quantiles.percentile(
           x_ph, q=0.77, interpolation=self._interpolation, axis=axis)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
 
@@ -568,7 +570,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
           interpolation=self._interpolation,
           axis=axis,
           keepdims=True)
-      pct = tfp.stats.percentile(
+      pct = quantiles.percentile(
           x_ph,
           q=0.77,
           interpolation=self._interpolation,
@@ -584,7 +586,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
     for q in [0, 10, 25, 49.9, 50, 50.01, 90, 95, 100]:
       expected_percentile = np.percentile(
           x, q=q, interpolation=self._interpolation)
-      pct = tfp.stats.percentile(x, q=q, interpolation=self._interpolation)
+      pct = quantiles.percentile(x, q=q, interpolation=self._interpolation)
       self.assertEqual(tf.int32, pct.dtype)
       self.assertAllEqual((), pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
@@ -600,12 +602,12 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
         expected_percentile = np.percentile(
             xs, q=q, interpolation=self._interpolation)
         self.assertTrue(np.isnan(expected_percentile))
-        pct = tfp.stats.percentile(xs, q=q, interpolation=self._interpolation)
+        pct = quantiles.percentile(xs, q=q, interpolation=self._interpolation)
         self.assertTrue(self.evaluate(tf.math.is_nan(pct)))
       # Test vector percentile as well
       expected_percentiles = np.percentile(
           xs, q=qs, interpolation=self._interpolation)
-      pcts = tfp.stats.percentile(xs, q=qs, interpolation=self._interpolation)
+      pcts = quantiles.percentile(xs, q=qs, interpolation=self._interpolation)
       self.assertAllEqual(expected_percentiles, pcts)
 
 
@@ -616,20 +618,23 @@ class PercentileTestWithLinearInterpolation(
 
   def test_integer_dtype_raises(self):
     with self.assertRaisesRegexp(TypeError, 'not allowed with dtype'):
-      tfp.stats.percentile(x=[1, 2], q=30, interpolation='linear')
+      quantiles.percentile(x=[1, 2], q=30, interpolation='linear')
 
   def test_grads_at_sample_pts_with_no_preserve_gradients(self):
-    dist = tfp.distributions.Normal(np.float64(0), np.float64(1))
+    dist = normal.Normal(np.float64(0), np.float64(1))
     x = dist.sample(10001, seed=test_util.test_seed_stream())
     # 50th quantile will lie exactly on a data point.
     # 49.123... will not
     q = tf.constant(np.array([50, 49.123456789]))  # Percentiles, in [0, 100]
 
-    analytic_pct, grad_analytic_pct = tfp.math.value_and_gradient(
+    analytic_pct, grad_analytic_pct = gradient.value_and_gradient(
         lambda q_: dist.quantile(q_ / 100.), q)
-    sample_pct, grad_sample_pct = tfp.math.value_and_gradient(
-        lambda q_: tfp.stats.percentile(  # pylint: disable=g-long-lambda
-            x, q_, interpolation='linear', preserve_gradients=False),
+    sample_pct, grad_sample_pct = gradient.value_and_gradient(
+        lambda q_: quantiles.percentile(  # pylint: disable=g-long-lambda
+            x,
+            q_,
+            interpolation='linear',
+            preserve_gradients=False),
         q)
 
     [
@@ -662,9 +667,12 @@ class PercentileTestWithLinearInterpolation(
     x = tf.linspace(0., 100., num=100)
     q = tf.constant(50.1234)  # Not a sample point
 
-    sample_pct, d_sample_pct_dq = tfp.math.value_and_gradient(
-        lambda q_: tfp.stats.percentile(  # pylint: disable=g-long-lambda
-            x, q_, interpolation='linear', preserve_gradients=False),
+    sample_pct, d_sample_pct_dq = gradient.value_and_gradient(
+        lambda q_: quantiles.percentile(  # pylint: disable=g-long-lambda
+            x,
+            q_,
+            interpolation='linear',
+            preserve_gradients=False),
         q)
 
     [
@@ -681,16 +689,19 @@ class PercentileTestWithLinearInterpolation(
     self.assertAllClose(1, d_sample_pct_dq, atol=5e-6)
 
   def test_grads_at_sample_pts_with_yes_preserve_gradients(self):
-    dist = tfp.distributions.Normal(np.float64(0), np.float64(1))
+    dist = normal.Normal(np.float64(0), np.float64(1))
     x = dist.sample(10001, seed=test_util.test_seed())
     # 50th quantile will lie exactly on a data point.
     # 49.123... will not
     q = tf.constant(np.array([50, 49.123456789]))  # Percentiles, in [0, 100]
-    analytic_pct, grad_analytic_pct = tfp.math.value_and_gradient(
+    analytic_pct, grad_analytic_pct = gradient.value_and_gradient(
         lambda q_: dist.quantile(q_ / 100.), q)
-    sample_pct, grad_sample_pct = tfp.math.value_and_gradient(
-        lambda q_: tfp.stats.percentile(  # pylint: disable=g-long-lambda
-            x, q_, interpolation='linear', preserve_gradients=True),
+    sample_pct, grad_sample_pct = gradient.value_and_gradient(
+        lambda q_: quantiles.percentile(  # pylint: disable=g-long-lambda
+            x,
+            q_,
+            interpolation='linear',
+            preserve_gradients=True),
         q)
     [
         analytic_pct,
@@ -722,9 +733,12 @@ class PercentileTestWithLinearInterpolation(
     x = tf.linspace(0., 100., num=100)
     q = tf.constant(50.1234)  # Not a sample point
 
-    sample_pct, d_sample_pct_dq = tfp.math.value_and_gradient(
-        lambda q_: tfp.stats.percentile(  # pylint: disable=g-long-lambda
-            x, q_, interpolation='linear', preserve_gradients=True),
+    sample_pct, d_sample_pct_dq = gradient.value_and_gradient(
+        lambda q_: quantiles.percentile(  # pylint: disable=g-long-lambda
+            x,
+            q_,
+            interpolation='linear',
+            preserve_gradients=True),
         q)
 
     [
@@ -749,7 +763,7 @@ class PercentileTestWithMidpointInterpolation(
 
   def test_integer_dtype_raises(self):
     with self.assertRaisesRegexp(TypeError, 'not allowed with dtype'):
-      tfp.stats.percentile(x=[1, 2], q=30, interpolation='midpoint')
+      quantiles.percentile(x=[1, 2], q=30, interpolation='midpoint')
 
 
 @test_util.test_all_tf_execution_regimes
@@ -770,7 +784,7 @@ class PercentileTestWithNearestInterpolation(test_util.TestCase):
     for q in [0, 10.1, 25.1, 49.9, 50.1, 50.01, 89, 100]:
       expected_percentile = np.percentile(
           x, q=q, interpolation=self._interpolation)
-      pct = tfp.stats.percentile(x, q=q, interpolation=self._interpolation)
+      pct = quantiles.percentile(x, q=q, interpolation=self._interpolation)
       self.assertAllEqual((), pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
 
@@ -779,7 +793,7 @@ class PercentileTestWithNearestInterpolation(test_util.TestCase):
     for q in [0, 10.1, 25.1, 49.9, 50.1, 50.01, 89, 100]:
       expected_percentile = np.percentile(
           x, q=q, interpolation=self._interpolation)
-      pct = tfp.stats.percentile(x, q=q, interpolation=self._interpolation)
+      pct = quantiles.percentile(x, q=q, interpolation=self._interpolation)
       self.assertAllEqual((), pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
 
@@ -788,26 +802,26 @@ class PercentileTestWithNearestInterpolation(test_util.TestCase):
     for q in [0, 10.1, 25.1, 49.9, 50.0, 50.1, 50.01, 89, 100]:
       expected_percentile = np.percentile(
           x, q=q, interpolation=self._interpolation)
-      pct = tfp.stats.percentile(x, q=q, interpolation=self._interpolation)
+      pct = quantiles.percentile(x, q=q, interpolation=self._interpolation)
       self.assertAllEqual((), pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
 
   def test_invalid_interpolation_raises(self):
     x = [1., 5., 3., 2., 4.]
     with self.assertRaisesRegexp(ValueError, 'interpolation'):
-      tfp.stats.percentile(x, q=0.5, interpolation='bad')
+      quantiles.percentile(x, q=0.5, interpolation='bad')
 
   def test_2d_q_raises_static(self):
     x = [1., 5., 3., 2., 4.]
     with self.assertRaisesRegexp(ValueError, 'Expected.*ndims'):
-      tfp.stats.percentile(x, q=[[0.5]])
+      quantiles.percentile(x, q=[[0.5]])
 
   def test_2d_q_raises_dynamic(self):
     if tf.executing_eagerly(): return
     x = [1., 5., 3., 2., 4.]
     q_ph = tf1.placeholder_with_default([[0.5]], shape=None)
-    pct = tfp.stats.percentile(x, q=q_ph, validate_args=True,
-                               interpolation=self._interpolation)
+    pct = quantiles.percentile(
+        x, q=q_ph, validate_args=True, interpolation=self._interpolation)
     with self.assertRaisesOpError('rank'):
       self.evaluate(pct)
 
@@ -818,8 +832,8 @@ class PercentileTestWithNearestInterpolation(test_util.TestCase):
     # bounds.
     # TODO(davmre): change `num` back to `int(3e7)` once linspace doesn't break.
     x = tf.linspace(0., 3e7, num=int(3e7) + 2)
-    minval = tfp.stats.percentile(x, q=0, validate_args=True,
-                                  interpolation=self._interpolation)
+    minval = quantiles.percentile(
+        x, q=0, validate_args=True, interpolation=self._interpolation)
     self.assertAllEqual(0, self.evaluate(minval))
 
 
@@ -829,14 +843,14 @@ class QuantilesTest(test_util.TestCase):
 
   def test_quartiles_of_vector(self):
     x = tf.linspace(0., 1000., 10000)
-    cut_points = tfp.stats.quantiles(x, num_quantiles=4)
+    cut_points = quantiles.quantiles(x, num_quantiles=4)
     self.assertAllEqual((5,), cut_points.shape)
     cut_points_ = self.evaluate(cut_points)
     self.assertAllClose([0., 250., 500., 750., 1000.], cut_points_, rtol=0.002)
 
   def test_deciles_of_rank_3_tensor(self):
     x = np.random.rand(3, 100000, 2)
-    cut_points = tfp.stats.quantiles(x, num_quantiles=10, axis=1)
+    cut_points = quantiles.quantiles(x, num_quantiles=10, axis=1)
     self.assertAllEqual((11, 3, 2), cut_points.shape)
     cut_points_ = self.evaluate(cut_points)
 

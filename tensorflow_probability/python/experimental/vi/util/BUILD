@@ -59,7 +59,10 @@ py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/bijectors:scale_matvec_linear_operator",
+        "//tensorflow_probability/python/experimental/util",
+        "//tensorflow_probability/python/experimental/vi/util:trainable_linear_operators",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

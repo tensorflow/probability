@@ -18,7 +18,6 @@
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import correlation_cholesky as correlation_cholesky_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
@@ -29,6 +28,7 @@ from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import special
 
 
 __all__ = [
@@ -260,8 +260,8 @@ class CholeskyLKJ(distribution.AutoCompositeTensorDistribution):
           concentration[..., tf.newaxis] +
           (self.dimension - 1 - dimension_range) / 2.)
       ans = tf.reduce_sum(
-          tfp_math.log_gamma_difference(dimension_range / 2.,
-                                        effective_concentration),
+          special.log_gamma_difference(dimension_range / 2.,
+                                       effective_concentration),
           axis=-1)
       # Then we add to `ans` the sum of `logpi / 2 * k` for `k` run from 1 to
       # `dimension - 1`.

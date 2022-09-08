@@ -21,10 +21,9 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-import tensorflow_probability as tfp
-
-from tensorflow_probability.python.experimental import psd_kernels as tfpk
+from tensorflow_probability.python.experimental.psd_kernels import multitask_kernel
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic
 
 
 @test_util.test_all_tf_execution_regimes
@@ -33,9 +32,9 @@ class MultiTaskKernelTest(test_util.TestCase):
   def testIndependentShape(self):
     amplitude = np.random.uniform(2, 3., size=[3, 1, 2]).astype(np.float32)
     length_scale = np.random.uniform(2, 3., size=[1, 3, 1]).astype(np.float32)
-    base_kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    base_kernel = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude, length_scale)
-    kernel = tfpk.Independent(num_tasks=5, base_kernel=base_kernel)
+    kernel = multitask_kernel.Independent(num_tasks=5, base_kernel=base_kernel)
     self.assertAllEqual([3, 3, 2], self.evaluate(kernel.batch_shape_tensor()))
     matrix_over_all_tasks = kernel.matrix_over_all_tasks(
         tf.ones([4, 1, 1, 1, 3, 2]), tf.ones([5, 1, 1, 1, 1, 4, 2]))
@@ -45,12 +44,12 @@ class MultiTaskKernelTest(test_util.TestCase):
   def testSeparableShape(self):
     amplitude = np.random.uniform(2, 3., size=[3, 1, 2]).astype(np.float32)
     length_scale = np.random.uniform(2, 3., size=[1, 3, 1]).astype(np.float32)
-    base_kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    base_kernel = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude, length_scale)
     task_kernel_matrix_linop = tf.linalg.LinearOperatorIdentity(
         5, batch_shape=[4, 1, 1, 1])
 
-    kernel = tfpk.Separable(
+    kernel = multitask_kernel.Separable(
         num_tasks=5,
         base_kernel=base_kernel,
         task_kernel_matrix_linop=task_kernel_matrix_linop)

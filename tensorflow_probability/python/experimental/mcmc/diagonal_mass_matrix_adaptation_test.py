@@ -21,13 +21,20 @@ import collections
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import sample as sample_dist_lib
+from tensorflow_probability.python.experimental.mcmc import diagonal_mass_matrix_adaptation as dmma
+from tensorflow_probability.python.experimental.mcmc import preconditioned_hmc as phmc
 from tensorflow_probability.python.experimental.mcmc import preconditioning_utils as pu
+from tensorflow_probability.python.experimental.stats import sample_stats
 from tensorflow_probability.python.internal import distribute_lib
 from tensorflow_probability.python.internal import distribute_test_lib
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.mcmc import sample
 
 JAX_MODE = False
 
@@ -65,26 +72,23 @@ class DiagonalMassMatrixAdaptationShapesTest(test_util.TestCase):
        'log_prob_shape': (2, 3)},
   ])
   def testBatches(self, state_part_shape, variance_part_shape, log_prob_shape):
-    dist = tfd.Independent(
-        tfd.Normal(tf.zeros(state_part_shape), tf.ones(state_part_shape)),
+    dist = independent.Independent(
+        normal.Normal(tf.zeros(state_part_shape), tf.ones(state_part_shape)),
         reinterpreted_batch_ndims=len(state_part_shape) - len(log_prob_shape))
     state_part = tf.zeros(state_part_shape)
 
-    running_variance = tfp.experimental.stats.RunningVariance.from_stats(
+    running_variance = sample_stats.RunningVariance.from_stats(
         num_samples=10.,
         mean=tf.zeros(variance_part_shape),
         variance=tf.ones(variance_part_shape))
 
-    kernel = tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo(
-        target_log_prob_fn=dist.log_prob,
-        num_leapfrog_steps=2,
-        step_size=1.)
-    kernel = tfp.experimental.mcmc.DiagonalMassMatrixAdaptation(
-        inner_kernel=kernel,
-        initial_running_variance=running_variance)
+    kernel = phmc.PreconditionedHamiltonianMonteCarlo(
+        target_log_prob_fn=dist.log_prob, num_leapfrog_steps=2, step_size=1.)
+    kernel = dmma.DiagonalMassMatrixAdaptation(
+        inner_kernel=kernel, initial_running_variance=running_variance)
 
     num_results = 5
-    draws = tfp.mcmc.sample_chain(
+    draws = sample.sample_chain(
         num_results=num_results,
         current_state=state_part,
         kernel=kernel,
@@ -96,23 +100,20 @@ class DiagonalMassMatrixAdaptationShapesTest(test_util.TestCase):
 
   def testBatchBroadcast(self):
     n_batches = 8
-    dist = tfd.MultivariateNormalDiag(tf.zeros(3), tf.ones(3))
+    dist = mvn_diag.MultivariateNormalDiag(tf.zeros(3), tf.ones(3))
     target_log_prob_fn = dist.log_prob
-    kernel = tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo(
+    kernel = phmc.PreconditionedHamiltonianMonteCarlo(
         target_log_prob_fn=target_log_prob_fn,
         num_leapfrog_steps=2,
         step_size=1.)
     initial_running_variance = (
-        tfp.experimental.stats.RunningVariance.from_stats(
-            num_samples=1.,
-            mean=tf.zeros(3),
-            variance=tf.ones(3)))
-    kernel = tfp.experimental.mcmc.DiagonalMassMatrixAdaptation(
-        inner_kernel=kernel,
-        initial_running_variance=initial_running_variance)
+        sample_stats.RunningVariance.from_stats(
+            num_samples=1., mean=tf.zeros(3), variance=tf.ones(3)))
+    kernel = dmma.DiagonalMassMatrixAdaptation(
+        inner_kernel=kernel, initial_running_variance=initial_running_variance)
 
     num_results = 5
-    draws = tfp.mcmc.sample_chain(
+    draws = sample.sample_chain(
         num_results=num_results,
         current_state=tf.zeros([n_batches, 3]),
         kernel=kernel,
@@ -123,25 +124,26 @@ class DiagonalMassMatrixAdaptationShapesTest(test_util.TestCase):
     self.assertEqual(draws.shape, (num_results, n_batches, 3))
 
   def testMultipleStateParts(self):
-    dist = tfd.JointDistributionSequential([
-        tfd.MultivariateNormalDiag(tf.zeros(3), tf.ones(3)),
-        tfd.MultivariateNormalDiag(tf.zeros(2), tf.ones(2))])
+    dist = jds.JointDistributionSequential([
+        mvn_diag.MultivariateNormalDiag(tf.zeros(3), tf.ones(3)),
+        mvn_diag.MultivariateNormalDiag(tf.zeros(2), tf.ones(2))
+    ])
     target_log_prob_fn = dist.log_prob
-    kernel = tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo(
+    kernel = phmc.PreconditionedHamiltonianMonteCarlo(
         target_log_prob_fn=target_log_prob_fn,
         num_leapfrog_steps=2,
         step_size=1.)
     initial_running_variance = [
-        tfp.experimental.stats.RunningVariance.from_stats(
+        sample_stats.RunningVariance.from_stats(
             num_samples=1., mean=tf.zeros(3), variance=tf.ones(3)),
-        tfp.experimental.stats.RunningVariance.from_stats(
-            num_samples=1., mean=tf.zeros(2), variance=tf.ones(2))]
-    kernel = tfp.experimental.mcmc.DiagonalMassMatrixAdaptation(
-        inner_kernel=kernel,
-        initial_running_variance=initial_running_variance)
+        sample_stats.RunningVariance.from_stats(
+            num_samples=1., mean=tf.zeros(2), variance=tf.ones(2))
+    ]
+    kernel = dmma.DiagonalMassMatrixAdaptation(
+        inner_kernel=kernel, initial_running_variance=initial_running_variance)
 
     num_results = 5
-    draws = tfp.mcmc.sample_chain(
+    draws = sample.sample_chain(
         num_results=num_results,
         current_state=[tf.zeros(3), tf.zeros(2)],
         kernel=kernel,
@@ -163,32 +165,32 @@ class DiagonalMassMatrixAdaptationTest(test_util.TestCase):
     super(DiagonalMassMatrixAdaptationTest, self).setUp()
 
   def testTurnOnStoreParametersInKernelResults(self):
-    mvn = tfd.MultivariateNormalDiag(self.mvn_mean, scale_diag=self.mvn_scale)
+    mvn = mvn_diag.MultivariateNormalDiag(
+        self.mvn_mean, scale_diag=self.mvn_scale)
     target_log_prob_fn = mvn.log_prob
-    kernel = tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo(
+    kernel = phmc.PreconditionedHamiltonianMonteCarlo(
         target_log_prob_fn=target_log_prob_fn,
         num_leapfrog_steps=2,
         step_size=1.)
     self.assertFalse(kernel.parameters['store_parameters_in_results'])
     initial_running_variance = (
-        tfp.experimental.stats.RunningVariance.from_stats(
+        sample_stats.RunningVariance.from_stats(
             num_samples=1., mean=tf.zeros(3), variance=tf.ones(3)))
-    kernel = tfp.experimental.mcmc.DiagonalMassMatrixAdaptation(
-        inner_kernel=kernel,
-        initial_running_variance=initial_running_variance)
+    kernel = dmma.DiagonalMassMatrixAdaptation(
+        inner_kernel=kernel, initial_running_variance=initial_running_variance)
     self.assertTrue(
         kernel.inner_kernel.parameters['store_parameters_in_results'])
 
   def _run_hmc(self, num_results, initial_running_variance):
-    mvn = tfd.MultivariateNormalDiag(self.mvn_mean, scale_diag=self.mvn_scale)
+    mvn = mvn_diag.MultivariateNormalDiag(
+        self.mvn_mean, scale_diag=self.mvn_scale)
     target_log_prob_fn = mvn.log_prob
-    kernel = tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo(
+    kernel = phmc.PreconditionedHamiltonianMonteCarlo(
         target_log_prob_fn=target_log_prob_fn,
         num_leapfrog_steps=32,
         step_size=0.001)
-    kernel = tfp.experimental.mcmc.DiagonalMassMatrixAdaptation(
-        inner_kernel=kernel,
-        initial_running_variance=initial_running_variance)
+    kernel = dmma.DiagonalMassMatrixAdaptation(
+        inner_kernel=kernel, initial_running_variance=initial_running_variance)
 
     @tf.function
     def do_sample(seed):
@@ -197,8 +199,8 @@ class DiagonalMassMatrixAdaptationTest(test_util.TestCase):
         return (pkr.running_variance,
                 pkr.inner_results.accepted_results.momentum_distribution)
 
-      sample_seed, chain_seed = tfp.random.split_seed(seed, 2)
-      draws, (rv_state, dist) = tfp.mcmc.sample_chain(
+      sample_seed, chain_seed = samplers.split_seed(seed, 2)
+      draws, (rv_state, dist) = sample.sample_chain(
           num_results=num_results,
           current_state=tf.zeros(3),
           kernel=kernel,
@@ -231,7 +233,7 @@ class DiagonalMassMatrixAdaptationTest(test_util.TestCase):
     return self.evaluate(do_sample(test_util.test_seed()))
 
   def testUpdatesCorrectly(self):
-    running_variance = tfp.experimental.stats.RunningVariance.from_shape((3,))
+    running_variance = sample_stats.RunningVariance.from_shape((3,))
     # This is more straightforward than doing the math, but need at least
     # two observations to get a start.
     pseudo_observations = [-tf.ones(3), tf.ones(3)]
@@ -254,7 +256,7 @@ class DiagonalMassMatrixAdaptationTest(test_util.TestCase):
     init_mean = tf.zeros(3)
     init_variance = tf.ones(3)
     initial_running_variance = (
-        tfp.experimental.stats.RunningVariance.from_stats(
+        sample_stats.RunningVariance.from_stats(
             num_samples=10., mean=init_mean, variance=init_variance))
     results = self._run_hmc(
         num_results=50,
@@ -282,7 +284,7 @@ class DiagonalMassMatrixAdaptationTest(test_util.TestCase):
     init_variance = error_factor * tf.convert_to_tensor(self.mvn_scale)**2
     init_mean = tf.convert_to_tensor(self.mvn_mean)
     initial_running_variance = (
-        tfp.experimental.stats.RunningVariance.from_stats(
+        sample_stats.RunningVariance.from_stats(
             num_samples=10., mean=init_mean, variance=init_variance))
     results = self._run_hmc(
         num_results=1000,
@@ -308,7 +310,7 @@ class DiagonalMassMatrixAdaptationTest(test_util.TestCase):
     init_variance = error_factor * mvn_scale**2
     init_mean = tf.convert_to_tensor(self.mvn_mean) + error_factor
     initial_running_variance = (
-        tfp.experimental.stats.RunningVariance.from_stats(
+        sample_stats.RunningVariance.from_stats(
             num_samples=10., mean=init_mean, variance=init_variance))
     results = self._run_hmc(
         num_results=1000,
@@ -326,8 +328,9 @@ class DiagonalMassMatrixAdaptationTest(test_util.TestCase):
     # mean estimates do not get too away if initialized at the true variance
     # and mean.
     initial_running_variance = (
-        tfp.experimental.stats.RunningVariance.from_stats(
-            num_samples=10., mean=self.mvn_mean,
+        sample_stats.RunningVariance.from_stats(
+            num_samples=10.,
+            mean=self.mvn_mean,
             variance=tf.convert_to_tensor(self.mvn_scale)**2))
     results = self._run_hmc(
         num_results=1000,
@@ -362,18 +365,18 @@ class DistributedDiagonalMMATest(distribute_test_lib.DistributedTest):
   def test_dmma_kernel_tracks_axis_names(self):
 
     def _make_kernel(**kwargs):
-      running_variance = tfp.experimental.stats.RunningVariance.from_stats(
-          num_samples=10.,
-          mean=tf.zeros(5),
-          variance=tf.ones(5))
+      running_variance = sample_stats.RunningVariance.from_stats(
+          num_samples=10., mean=tf.zeros(5), variance=tf.ones(5))
 
-      kernel = tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo(
-          target_log_prob_fn=tfd.Sample(tfd.Normal(0., 1.), 5).log_prob,
+      kernel = phmc.PreconditionedHamiltonianMonteCarlo(
+          target_log_prob_fn=sample_dist_lib.Sample(normal.Normal(0., 1.),
+                                                    5).log_prob,
           num_leapfrog_steps=2,
           step_size=1.)
-      kernel = tfp.experimental.mcmc.DiagonalMassMatrixAdaptation(
+      kernel = dmma.DiagonalMassMatrixAdaptation(
           inner_kernel=kernel,
-          initial_running_variance=running_variance, **kwargs)
+          initial_running_variance=running_variance,
+          **kwargs)
       return kernel
 
     kernel = _make_kernel()
@@ -389,23 +392,19 @@ class DistributedDiagonalMMATest(distribute_test_lib.DistributedTest):
       self.skipTest('Test in TF runs into `merge_call` error: see b/178944108')
 
     def target_log_prob(a, b):
-      return (
-          tfd.Normal(0., 1.).log_prob(a)
-          + distribute_lib.psum(tfd.Normal(
-              distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b), 'foo'))
+      return (normal.Normal(0., 1.).log_prob(a) + distribute_lib.psum(
+          normal.Normal(distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b),
+          'foo'))
 
-    running_variance = [tfp.experimental.stats.RunningVariance.from_stats(
-        num_samples=10.,
-        mean=tf.zeros([]),
-        variance=tf.ones([]))] * 2
+    running_variance = [
+        sample_stats.RunningVariance.from_stats(
+            num_samples=10., mean=tf.zeros([]), variance=tf.ones([]))
+    ] * 2
 
-    kernel = tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo(
-        target_log_prob_fn=target_log_prob,
-        num_leapfrog_steps=2,
-        step_size=1.)
-    kernel = tfp.experimental.mcmc.DiagonalMassMatrixAdaptation(
-        inner_kernel=kernel,
-        initial_running_variance=running_variance)
+    kernel = phmc.PreconditionedHamiltonianMonteCarlo(
+        target_log_prob_fn=target_log_prob, num_leapfrog_steps=2, step_size=1.)
+    kernel = dmma.DiagonalMassMatrixAdaptation(
+        inner_kernel=kernel, initial_running_variance=running_variance)
     kernel = kernel.experimental_with_shard_axes([[], ['foo']])
 
     def run(seed):

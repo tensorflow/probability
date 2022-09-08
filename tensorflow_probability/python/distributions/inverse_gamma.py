@@ -18,7 +18,6 @@
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import reciprocal as reciprocal_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
@@ -30,6 +29,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import special
 
 
 __all__ = [
@@ -216,7 +216,7 @@ class InverseGamma(distribution.AutoCompositeTensorDistribution):
 
   def _quantile(self, p):
     return tf.math.reciprocal(
-        tfp_math.igammacinv(self.concentration, p)) * self.scale
+        special.igammacinv(self.concentration, p)) * self.scale
 
   def _entropy(self):
     concentration = tf.convert_to_tensor(self.concentration)

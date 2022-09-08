@@ -17,8 +17,9 @@
 # Dependency imports
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.experimental.mcmc import tracing_reducer
 from tensorflow_probability.python.experimental.mcmc.internal import test_fixtures
+from tensorflow_probability.python.experimental.mcmc.sample_fold import sample_fold
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -30,7 +31,8 @@ class TracingReducerTest(test_util.TestCase):
   def test_tf_while(self):
     def trace_fn(sample, pkr):
       return sample, (sample, pkr), {'one': sample, 'two': pkr}
-    tracer = tfp.experimental.mcmc.TracingReducer(trace_fn=trace_fn)
+
+    tracer = tracing_reducer.TracingReducer(trace_fn=trace_fn)
     state = tracer.initialize(tf.zeros(()), tf.zeros(()))
     def _body(sample, pkr, state):
       new_state = tracer.one_step(sample, state, pkr)
@@ -47,9 +49,9 @@ class TracingReducerTest(test_util.TestCase):
 
   @test_util.jax_disable_test_missing_functionality('dynamic-size TensorArray')
   def test_in_sample_fold(self):
-    tracer = tfp.experimental.mcmc.TracingReducer()
+    tracer = tracing_reducer.TracingReducer()
     fake_kernel = test_fixtures.TestTransitionKernel()
-    trace, final_state, kernel_results = tfp.experimental.mcmc.sample_fold(
+    trace, final_state, kernel_results = sample_fold(
         num_steps=3,
         current_state=0.,
         kernel=fake_kernel,
@@ -67,7 +69,7 @@ class TracingReducerTest(test_util.TestCase):
     self.assertEqual(6, kernel_results.counter_2)
 
   def test_known_size(self):
-    tracer = tfp.experimental.mcmc.TracingReducer(size=3)
+    tracer = tracing_reducer.TracingReducer(size=3)
     self.assertEqual(tracer.size, 3)
     state = tracer.initialize(tf.zeros(()), tf.zeros(()))
     for sample in range(3):

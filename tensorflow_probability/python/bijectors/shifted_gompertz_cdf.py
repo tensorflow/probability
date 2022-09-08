@@ -17,13 +17,14 @@
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import generic
+from tensorflow_probability.python.math import special
 
 
 __all__ = [
@@ -116,7 +117,7 @@ class ShiftedGompertzCDF(bijector.AutoCompositeTensorBijector):
   def _forward(self, x):
     with tf.control_dependencies(self._maybe_assert_valid_x(x)):
       rate = tf.convert_to_tensor(self.rate)
-      log1mexpx = tfp_math.log1mexp(-rate * x)
+      log1mexpx = generic.log1mexp(-rate * x)
       return tf.math.exp(
           log1mexpx - tf.math.exp(-rate * x) / self.concentration)
 
@@ -124,7 +125,7 @@ class ShiftedGompertzCDF(bijector.AutoCompositeTensorBijector):
     with tf.control_dependencies(self._maybe_assert_valid_y(y)):
       concentration = tf.convert_to_tensor(self.concentration)
       reciprocal_concentration = tf.math.reciprocal(concentration)
-      z = -tfp_math.lambertw(
+      z = -special.lambertw(
           reciprocal_concentration * tf.math.exp(
               reciprocal_concentration + tf.math.log(y))) * concentration
       # Due to numerical instability, when y approaches 1, this expression

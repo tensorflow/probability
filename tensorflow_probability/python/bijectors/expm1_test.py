@@ -18,8 +18,9 @@
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import expm1
+from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.internal import test_util
 
 
@@ -28,7 +29,7 @@ class Expm1BijectorTest(test_util.TestCase):
   """Tests correctness of the Y = g(X) = expm1(X) transformation."""
 
   def testBijector(self):
-    bijector = tfb.Expm1()
+    bijector = expm1.Expm1()
     self.assertStartsWith(bijector.name, 'expm1')
     x = [[[-1.], [1.4]]]
     y = np.expm1(x)
@@ -45,7 +46,7 @@ class Expm1BijectorTest(test_util.TestCase):
             x, event_ndims=1)))
 
   def testMatchesExpm1(self):
-    bijector = tfb.Expm1()
+    bijector = expm1.Expm1()
     x = np.random.randn(30)
     y = np.expm1(x)
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))
@@ -54,13 +55,13 @@ class Expm1BijectorTest(test_util.TestCase):
         bijector.inverse(tf.identity(y))))
 
   def testScalarCongruency(self):
-    bijector = tfb.Expm1()
+    bijector = expm1.Expm1()
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=-5., upper_x=2.5, eval_func=self.evaluate,
         rtol=0.15)
 
   def testBijectiveAndFinite(self):
-    bijector = tfb.Expm1()
+    bijector = expm1.Expm1()
     x = np.linspace(-5, 5, num=20).astype(np.float32)
     y = np.logspace(-5, 5, num=20).astype(np.float32)
     bijector_test_util.assert_bijective_and_finite(
@@ -72,8 +73,8 @@ class Log1pBijectorTest(test_util.TestCase):
 
   def testBijectorIsInvertExpm1(self):
     x = np.linspace(0., 10., num=200)
-    log1p = tfb.Log1p()
-    invert_expm1 = tfb.Invert(tfb.Expm1())
+    log1p = expm1.Log1p()
+    invert_expm1 = invert.Invert(expm1.Expm1())
     self.assertAllClose(
         self.evaluate(log1p.forward(x)),
         self.evaluate(invert_expm1.forward(x)))

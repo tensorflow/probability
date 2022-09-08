@@ -24,7 +24,7 @@ from tensorflow_probability.python.distributions import gamma
 from tensorflow_probability.python.distributions import inverse_gamma
 from tensorflow_probability.python.distributions import joint_distribution_auto_batched
 from tensorflow_probability.python.distributions import sample as sample_dist
-from tensorflow_probability.python.experimental.distributions import MultivariateNormalPrecisionFactorLinearOperator
+from tensorflow_probability.python.experimental.distributions.mvn_precision_factor_linop import MultivariateNormalPrecisionFactorLinearOperator
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -56,8 +56,8 @@ class InverseGammaWithSampleUpperBound(inverse_gamma.InverseGamma):
                 lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
 
   def _sample_n(self, n, seed=None):
-  # TODO(b/151571025): revert to `super()._sample_n` once the InverseGamma
-  # sampler is XLA-able.
+    # TODO(b/151571025): revert to `super()._sample_n` once the InverseGamma
+    # sampler is XLA-able.
     xs = 1. / gamma.Gamma(
         concentration=self.concentration, rate=self.scale).sample(
             n, seed=seed)

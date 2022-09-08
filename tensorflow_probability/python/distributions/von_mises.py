@@ -38,6 +38,10 @@ from tensorflow_probability.python.math.gradient import value_and_gradient
 __all__ = ['VonMises']
 
 
+def cosxm1(x):
+  return -2 * tf.math.square(tf.math.sin(x / 2.))
+
+
 class VonMises(distribution.AutoCompositeTensorDistribution):
   """The von Mises distribution over angles.
 
@@ -182,7 +186,7 @@ class VonMises(distribution.AutoCompositeTensorDistribution):
 
   def _log_unnormalized_prob(self, x, loc, concentration):
     z = self._z(x, loc=loc)
-    return concentration * (tf.cos(z) - 1)
+    return concentration * cosxm1(z)
 
   def _prob(self, x):
     concentration = tf.convert_to_tensor(self.concentration)
@@ -401,7 +405,7 @@ def von_mises_cdf(x, concentration):
                                  dcdf_dconcentration_normal)
 
   def grad(dy):
-    prob = tf.exp(concentration * (tf.cos(x) - 1.)) / (
+    prob = tf.exp(concentration * cosxm1(x)) / (
         (2. * np.pi) * tf.math.bessel_i0e(concentration))
     return dy * prob, dy * dcdf_dconcentration
 
@@ -584,7 +588,7 @@ def _von_mises_sample_bwd(_, aux, dy):
   broadcast_concentration = tf.broadcast_to(concentration, ps.shape(samples))
   _, dcdf_dconcentration = value_and_gradient(
       lambda conc: von_mises_cdf(samples, conc), broadcast_concentration)
-  inv_prob = tf.exp(-broadcast_concentration * (tf.cos(samples) - 1.)) * (
+  inv_prob = tf.exp(-broadcast_concentration * cosxm1(samples)) * (
       (2. * np.pi) * tf.math.bessel_i0e(broadcast_concentration))
   # Compute the implicit reparameterization gradient [2],
   # dz/dconc = -(dF(z; conc) / dconc) / p(z; conc)
@@ -611,7 +615,7 @@ def _von_mises_sample_jvp(shape, primals, tangents):
 
   _, dcdf_dconcentration = value_and_gradient(
       lambda conc: von_mises_cdf(samples, conc), broadcast_concentration)
-  inv_prob = tf.exp(-concentration * (tf.cos(samples) - 1.)) * (
+  inv_prob = tf.exp(-concentration * cosxm1(samples)) * (
       (2. * np.pi) * tf.math.bessel_i0e(concentration))
   # Compute the implicit derivative,
   #   dz = dconc * -(dF(z; conc) / dconc) / p(z; conc)

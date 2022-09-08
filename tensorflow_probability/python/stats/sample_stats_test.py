@@ -19,8 +19,8 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.stats import sample_stats
 
 
 @test_util.test_all_tf_execution_regimes
@@ -39,7 +39,7 @@ class _AutoCorrelationTest(object):
     x_ph = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
     # Setting normalize = True means we divide by zero.
-    auto_corr = tfp.stats.auto_correlation(
+    auto_corr = sample_stats.auto_correlation(
         x_ph, axis=1, center=False, normalize=False)
     if self.use_static_shape:
       self.assertEqual((2, 3), auto_corr.shape)
@@ -51,7 +51,7 @@ class _AutoCorrelationTest(object):
     x_ph = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
     # Setting normalize = True means we divide by zero.
-    auto_corr = tfp.stats.auto_correlation(
+    auto_corr = sample_stats.auto_correlation(
         x_ph, axis=1, normalize=False, center=True)
     if self.use_static_shape:
       self.assertEqual((2, 3), auto_corr.shape)
@@ -81,12 +81,8 @@ class _AutoCorrelationTest(object):
 
     x_ph = tf1.placeholder_with_default(
         x, shape=x.shape if self.use_static_shape else None)
-    auto_corr = tfp.stats.auto_correlation(
-        x_ph,
-        axis=axis,
-        max_lags=max_lags,
-        center=center,
-        normalize=normalize)
+    auto_corr = sample_stats.auto_correlation(
+        x_ph, axis=axis, max_lags=max_lags, center=center, normalize=normalize)
     if self.use_static_shape:
       output_shape = list(x.shape)
       output_shape[axis] = max_lags + 1
@@ -157,7 +153,7 @@ class _AutoCorrelationTest(object):
     x = rng.randn(l).astype(self.dtype)
     x_ph = tf1.placeholder_with_default(
         x, shape=(l,) if self.use_static_shape else None)
-    rxx = tfp.stats.auto_correlation(
+    rxx = sample_stats.auto_correlation(
         x_ph, max_lags=l // 2, center=True, normalize=False)
     if self.use_static_shape:
       self.assertAllEqual((l // 2 + 1,), rxx.shape)
@@ -181,7 +177,7 @@ class _AutoCorrelationTest(object):
         (1, 10))).ravel().astype(self.dtype)
     x_ph = tf1.placeholder_with_default(
         x, shape=(1000 * 10,) if self.use_static_shape else None)
-    rxx = tfp.stats.auto_correlation(
+    rxx = sample_stats.auto_correlation(
         x_ph, max_lags=1000 * 10 // 2, center=True, normalize=False)
     if self.use_static_shape:
       self.assertAllEqual((1000 * 10 // 2 + 1,), rxx.shape)
@@ -205,7 +201,7 @@ class _AutoCorrelationTest(object):
     x = 3 * rng.randn(l).astype(self.dtype)
     x_ph = tf1.placeholder_with_default(
         x, shape=(l,) if self.use_static_shape else None)
-    rxx = tfp.stats.auto_correlation(
+    rxx = sample_stats.auto_correlation(
         x_ph, max_lags=l // 2, center=True, normalize=True)
     if self.use_static_shape:
       self.assertAllEqual((l // 2 + 1,), rxx.shape)
@@ -273,7 +269,7 @@ class CovarianceTest(test_util.TestCase):
     y = x + 0.1 * rng.randn(100, 3)
     x[:, 0] += 0.1 * rng.randn(100)
 
-    cov = tfp.stats.covariance(x, y, sample_axis=0, event_axis=None)
+    cov = sample_stats.covariance(x, y, sample_axis=0, event_axis=None)
     self.assertAllEqual((3,), cov.shape)
     cov = self.evaluate(cov)
 
@@ -288,11 +284,11 @@ class CovarianceTest(test_util.TestCase):
     y = x + 0.1 * rng.randn(100, 3, 2)
     x[:, :, 0] += 0.1 * rng.randn(100, 3)
 
-    cov = tfp.stats.covariance(x, y, event_axis=-1)
+    cov = sample_stats.covariance(x, y, event_axis=-1)
     self.assertAllEqual((3, 2, 2), cov.shape)
     cov = self.evaluate(cov)
 
-    cov_kd = tfp.stats.covariance(x, y, event_axis=-1, keepdims=True)
+    cov_kd = sample_stats.covariance(x, y, event_axis=-1, keepdims=True)
     self.assertAllEqual((1, 3, 2, 2), cov_kd.shape)
     cov_kd = self.evaluate(cov_kd)
     self.assertAllClose(cov, cov_kd[0, ...])
@@ -313,11 +309,11 @@ class CovarianceTest(test_util.TestCase):
     y = x + 0.1 * rng.randn(10, 2, 10)
     x[:, :, 0, :] += 0.1 * rng.randn(4, 10, 10)
 
-    cov = tfp.stats.covariance(x, y, sample_axis=[1, 3], event_axis=[2])
+    cov = sample_stats.covariance(x, y, sample_axis=[1, 3], event_axis=[2])
     self.assertAllEqual((4, 2, 2), cov.shape)
     cov = self.evaluate(cov)
 
-    cov_kd = tfp.stats.covariance(
+    cov_kd = sample_stats.covariance(
         x, y, sample_axis=[1, 3], event_axis=[2], keepdims=True)
     self.assertAllEqual((4, 1, 2, 2, 1), cov_kd.shape)
     cov_kd = self.evaluate(cov_kd)
@@ -340,11 +336,11 @@ class CovarianceTest(test_util.TestCase):
     x = rng.randn(2, 3, 4, 5)
     y = x + 0.1 * rng.randn(2, 3, 4, 5)
 
-    cov = tfp.stats.covariance(x, y, sample_axis=[0, 2], event_axis=[1])
+    cov = sample_stats.covariance(x, y, sample_axis=[0, 2], event_axis=[1])
     self.assertAllEqual((3, 3, 5), cov.shape)
     cov = self.evaluate(cov)
 
-    cov_kd = tfp.stats.covariance(
+    cov_kd = sample_stats.covariance(
         x, y, sample_axis=[0, 2], event_axis=[1], keepdims=True)
     self.assertAllEqual((1, 3, 3, 1, 5), cov_kd.shape)
     cov_kd = self.evaluate(cov_kd)
@@ -370,12 +366,12 @@ class CovarianceTest(test_util.TestCase):
     x_ph = tf1.placeholder_with_default(x, shape=None)
     y_ph = tf1.placeholder_with_default(y, shape=None)
 
-    cov = tfp.stats.covariance(
+    cov = sample_stats.covariance(
         x_ph, y_ph, sample_axis=[0, 3], event_axis=[1, 2])
     cov = self.evaluate(cov)
     self.assertAllEqual((3, 4, 3, 4, 6), cov.shape)
 
-    cov_kd = tfp.stats.covariance(
+    cov_kd = sample_stats.covariance(
         x_ph, y_ph, sample_axis=[0, 3], event_axis=[1, 2], keepdims=True)
     cov_kd = self.evaluate(cov_kd)
     self.assertAllEqual((1, 3, 4, 3, 4, 1, 6), cov_kd.shape)
@@ -401,7 +397,7 @@ class CovarianceTest(test_util.TestCase):
     y = x + 0.1 * rng.randn(100, 3, 2)
 
     with self.assertRaisesRegexp(ValueError, 'must be contiguous'):
-      tfp.stats.covariance(x, y, sample_axis=1, event_axis=[0, 2])
+      sample_stats.covariance(x, y, sample_axis=1, event_axis=[0, 2])
 
   def test_overlapping_axis_raises(self):
     rng = test_util.test_np_rng()
@@ -410,7 +406,7 @@ class CovarianceTest(test_util.TestCase):
     y = x + 0.1 * rng.randn(100, 3, 2)
 
     with self.assertRaisesRegexp(ValueError, 'overlapped'):
-      tfp.stats.covariance(x, y, sample_axis=[0, 1], event_axis=[1, 2])
+      sample_stats.covariance(x, y, sample_axis=[0, 1], event_axis=[1, 2])
 
   def test_batch_vector_shape_dtype_ok(self):
     # Test addresses a particular bug.
@@ -418,14 +414,14 @@ class CovarianceTest(test_util.TestCase):
     # This next line failed, due to concatenating [float32, int32, int32]
     # traceback went to tf.concat((batch_axis, event_axis, sample_axis), 0)
     # Test passes when this does not fail.
-    tfp.stats.covariance(x)
+    sample_stats.covariance(x)
 
   def test_jit(self):
     self.skip_if_no_xla()
 
     @tf.function(jit_compile=True)
     def cov(x):
-      return tfp.stats.covariance(x)
+      return sample_stats.covariance(x)
 
     self.evaluate(cov(tf.random.normal([1000, 4], seed=test_util.test_seed())))
 
@@ -449,7 +445,7 @@ class CorrelationTest(test_util.TestCase):
     y = x + 0.1 * rng.randn(100, 3)
     x[:, 0] += 0.1 * rng.randn(100)
 
-    corr = tfp.stats.correlation(x, y, sample_axis=0, event_axis=None)
+    corr = sample_stats.correlation(x, y, sample_axis=0, event_axis=None)
     self.assertAllEqual((3,), corr.shape)
     corr = self.evaluate(corr)
 
@@ -461,7 +457,7 @@ class CorrelationTest(test_util.TestCase):
     # Some big numbers, to test stability.
     x = np.float32(1e10 * rng.randn(100, 3))
 
-    corr = tfp.stats.correlation(x, sample_axis=0, event_axis=1)
+    corr = sample_stats.correlation(x, sample_axis=0, event_axis=1)
     self.assertAllEqual((3, 3), corr.shape)
     corr = self.evaluate(corr)
     self.assertAllClose([1., 1., 1.], np.diag(corr))
@@ -474,11 +470,11 @@ class CorrelationTest(test_util.TestCase):
     y = x + 0.1 * rng.randn(100, 3, 2)
     x[:, :, 0] += 0.1 * rng.randn(100, 3)
 
-    corr = tfp.stats.correlation(x, y, event_axis=-1)
+    corr = sample_stats.correlation(x, y, event_axis=-1)
     self.assertAllEqual((3, 2, 2), corr.shape)
     corr = self.evaluate(corr)
 
-    corr_kd = tfp.stats.correlation(x, y, event_axis=-1, keepdims=True)
+    corr_kd = sample_stats.correlation(x, y, event_axis=-1, keepdims=True)
     self.assertAllEqual((1, 3, 2, 2), corr_kd.shape)
     corr_kd = self.evaluate(corr_kd)
     self.assertAllClose(corr, corr_kd[0, ...])
@@ -505,8 +501,8 @@ class CholeskyCovarianceTest(test_util.TestCase):
     x = np.stack((x0, x1), axis=0)
 
     # chol.shape = [2 (batch), 2x2 (event x event)]
-    chol = tfp.stats.cholesky_covariance(x, sample_axis=1)
-    chol_kd = tfp.stats.cholesky_covariance(x, sample_axis=1, keepdims=True)
+    chol = sample_stats.cholesky_covariance(x, sample_axis=1)
+    chol_kd = sample_stats.cholesky_covariance(x, sample_axis=1, keepdims=True)
 
     # Make sure static shape of keepdims works
     self.assertAllEqual((2, 2, 2), chol.shape)
@@ -531,10 +527,10 @@ class VarianceTest(test_util.TestCase):
     rng = test_util.test_np_rng()
     x = rng.rand(10, 10, 10)
 
-    var = tfp.stats.variance(x, sample_axis=None)
+    var = sample_stats.variance(x, sample_axis=None)
     self.assertAllEqual((), var.shape)
 
-    var_kd = tfp.stats.variance(x, sample_axis=None, keepdims=True)
+    var_kd = sample_stats.variance(x, sample_axis=None, keepdims=True)
     self.assertAllEqual((1, 1, 1), var_kd.shape)
 
     var, var_kd = self.evaluate([var, var_kd])
@@ -547,7 +543,7 @@ class VarianceTest(test_util.TestCase):
     rng = test_util.test_np_rng()
     x = rng.rand(11, 13, 17)
 
-    var = tfp.stats.cumulative_variance(x, sample_axis=1)
+    var = sample_stats.cumulative_variance(x, sample_axis=1)
     self.assertAllEqual((11, 13, 17), var.shape)
 
     var = self.evaluate(var)
@@ -563,7 +559,7 @@ class VarianceTest(test_util.TestCase):
     rng = test_util.test_np_rng()
     x = rng.rand(*shape)
 
-    var = tfp.stats.windowed_variance(
+    var = sample_stats.windowed_variance(
         x, low_indices=low_indices, high_indices=high_indices, axis=1)
 
     var = self.evaluate(var)
@@ -588,7 +584,7 @@ class VarianceTest(test_util.TestCase):
     rng = test_util.test_np_rng()
     x = rng.rand(7)
     # Test variance of an empty set or a "negative singleton" set
-    var = tfp.stats.windowed_variance(
+    var = sample_stats.windowed_variance(
         x, low_indices=[4, 5], high_indices=4, axis=0)
     var = self.evaluate(var)
     self.assertAllClose(var, tf.zeros_like(var))
@@ -597,9 +593,9 @@ class VarianceTest(test_util.TestCase):
     # as the variance of the same set spelled "positively", but we
     # need to be careful about the inclusive/exclusive semantics of
     # the indices.
-    var_neg = tfp.stats.windowed_variance(
+    var_neg = sample_stats.windowed_variance(
         x, low_indices=[3, 5], high_indices=[1, 2])
-    var_pos = tfp.stats.windowed_variance(
+    var_pos = sample_stats.windowed_variance(
         x, low_indices=[1, 2], high_indices=[3, 5])
     var_neg, var_pos = self.evaluate([var_neg, var_pos])
     self.assertAllClose(var_neg, var_pos)
@@ -613,10 +609,10 @@ class StddevTest(test_util.TestCase):
     rng = test_util.test_np_rng()
     x = rng.rand(10, 10, 10)
 
-    stddev = tfp.stats.stddev(x, sample_axis=[1, -1])
+    stddev = sample_stats.stddev(x, sample_axis=[1, -1])
     self.assertAllEqual((10,), stddev.shape)
 
-    stddev_kd = tfp.stats.stddev(x, sample_axis=[1, -1], keepdims=True)
+    stddev_kd = sample_stats.stddev(x, sample_axis=[1, -1], keepdims=True)
     self.assertAllEqual((10, 1, 1), stddev_kd.shape)
 
     stddev, stddev_kd = self.evaluate([stddev, stddev_kd])
@@ -636,7 +632,7 @@ class MeanTest(test_util.TestCase):
     rng = test_util.test_np_rng()
     x = rng.rand(*shape)
 
-    mean = tfp.stats.windowed_mean(
+    mean = sample_stats.windowed_mean(
         x, low_indices=low_indices, high_indices=high_indices, axis=1)
 
     mean = self.evaluate(mean)
@@ -661,7 +657,7 @@ class MeanTest(test_util.TestCase):
     rng = test_util.test_np_rng()
     x = rng.rand(7)
     # Test mean of an empty set
-    mean = tfp.stats.windowed_mean(
+    mean = sample_stats.windowed_mean(
         x, low_indices=[4], high_indices=4, axis=0)
     mean = self.evaluate(mean)
     self.assertAllClose(mean, tf.zeros_like(mean))
@@ -670,17 +666,17 @@ class MeanTest(test_util.TestCase):
     # as the mean of the same set spelled "positively", but we
     # need to be careful about the inclusive/exclusive semantics of
     # the indices.
-    mean_neg = tfp.stats.windowed_mean(
+    mean_neg = sample_stats.windowed_mean(
         x, low_indices=[3, 5], high_indices=[1, 2])
-    mean_pos = tfp.stats.windowed_mean(
+    mean_pos = sample_stats.windowed_mean(
         x, low_indices=[1, 2], high_indices=[3, 5])
     mean_neg, mean_pos = self.evaluate([mean_neg, mean_pos])
     self.assertAllClose(mean_neg, mean_pos)
 
     # Test default windows: [0, 1), [1, 2), [1, 3), [2, 4), etc
     y = [0., 1., 2., 3.]
-    self.assertAllClose(
-        [0., 1., 1.5, 2.5], self.evaluate(tfp.stats.windowed_mean(y)))
+    self.assertAllClose([0., 1., 1.5, 2.5],
+                        self.evaluate(sample_stats.windowed_mean(y)))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -691,7 +687,7 @@ class LogAverageProbsTest(test_util.TestCase):
     # The "expected" calculation is numerically naive.
     probs = tf.math.sigmoid(logits)
     expected = tf.math.log(tf.reduce_mean(probs, axis=0))
-    actual = tfp.stats.log_average_probs(logits, validate_args=True)
+    actual = sample_stats.log_average_probs(logits, validate_args=True)
     self.assertAllClose(*self.evaluate([expected, actual]), rtol=1e-5, atol=0.)
 
   def test_mathematical_correctness_categorical(self):
@@ -699,18 +695,15 @@ class LogAverageProbsTest(test_util.TestCase):
     # The "expected" calculation is numerically naive.
     probs = tf.math.softmax(logits, axis=-1)
     expected = tf.math.log(tf.reduce_mean(probs, axis=0))
-    actual = tfp.stats.log_average_probs(
+    actual = sample_stats.log_average_probs(
         logits, event_axis=-1, validate_args=True)
     self.assertAllClose(*self.evaluate([expected, actual]), rtol=1e-5, atol=0.)
 
   def test_bad_axis_static(self):
     logits = tf.random.normal([10, 3, 4], seed=test_util.test_seed())
     with self.assertRaisesRegexp(ValueError, r'.*must be distinct.'):
-      tfp.stats.log_average_probs(
-          logits,
-          sample_axis=[0, 1, 2],
-          event_axis=-1,
-          validate_args=True)
+      sample_stats.log_average_probs(
+          logits, sample_axis=[0, 1, 2], event_axis=-1, validate_args=True)
 
   def test_bad_axis_dynamic(self):
     if tf.executing_eagerly():
@@ -720,11 +713,12 @@ class LogAverageProbsTest(test_util.TestCase):
     with self.assertRaisesOpError(
         r'Arguments `sample_axis` and `event_axis` must be distinct.'):
       self.evaluate(event_axis.initializer)
-      self.evaluate(tfp.stats.log_average_probs(
-          logits,
-          sample_axis=[0, 1, 2],
-          event_axis=event_axis,
-          validate_args=True))
+      self.evaluate(
+          sample_stats.log_average_probs(
+              logits,
+              sample_axis=[0, 1, 2],
+              event_axis=event_axis,
+              validate_args=True))
 
 
 if __name__ == '__main__':

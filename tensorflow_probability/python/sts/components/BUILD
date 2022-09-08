@@ -54,9 +54,17 @@ multi_substrate_py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:chain",
+        "//tensorflow_probability/python/bijectors:scale",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/bijectors:tanh",
+        "//tensorflow_probability/python/distributions:linear_gaussian_ssm",
+        "//tensorflow_probability/python/distributions:lognormal",
+        "//tensorflow_probability/python/distributions:mvn_diag",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
-        "//tensorflow_probability/python/sts/internal",
+        "//tensorflow_probability/python/sts:structural_time_series",
+        "//tensorflow_probability/python/sts/internal:util",
     ],
 )
 
@@ -65,9 +73,12 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["autoregressive_test.py"],
     deps = [
+        ":autoregressive",
+        ":local_level",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:mvn_diag",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -77,12 +88,20 @@ multi_substrate_py_library(
     name = "autoregressive_integrated_moving_average",
     srcs = ["autoregressive_integrated_moving_average.py"],
     deps = [
+        ":autoregressive",
         ":autoregressive_moving_average",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:chain",
+        "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/bijectors:scale",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/bijectors:tanh",
+        "//tensorflow_probability/python/distributions:linear_gaussian_ssm",
+        "//tensorflow_probability/python/distributions:mvn_diag",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
-        "//tensorflow_probability/python/sts/internal",
+        "//tensorflow_probability/python/sts:structural_time_series",
     ],
 )
 
@@ -91,12 +110,17 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["autoregressive_integrated_moving_average_test.py"],
     deps = [
+        ":autoregressive_integrated_moving_average",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/bijectors:chain",
+        "//tensorflow_probability/python/bijectors:cumsum",
+        "//tensorflow_probability/python/bijectors:invert",
+        "//tensorflow_probability/python/bijectors:reshape",
+        "//tensorflow_probability/python/distributions:linear_gaussian_ssm",
+        "//tensorflow_probability/python/distributions:mvn_diag",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
-        "//tensorflow_probability/python/sts/components",
     ],
 )
 
@@ -106,9 +130,11 @@ multi_substrate_py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:linear_gaussian_ssm",
+        "//tensorflow_probability/python/distributions:mvn_diag",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
-        "//tensorflow_probability/python/sts/internal",
+        "//tensorflow_probability/python/sts:structural_time_series",
     ],
 )
 
@@ -117,9 +143,11 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["autoregressive_moving_average_test.py"],
     deps = [
+        ":autoregressive",
+        ":autoregressive_moving_average",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:mvn_diag",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -131,8 +159,14 @@ multi_substrate_py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:chain",
+        "//tensorflow_probability/python/bijectors:scale",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/distributions:linear_gaussian_ssm",
+        "//tensorflow_probability/python/distributions:lognormal",
+        "//tensorflow_probability/python/distributions:mvn_diag",
         "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/sts/internal",
+        "//tensorflow_probability/python/sts:structural_time_series",
     ],
 )
 
@@ -141,9 +175,10 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["dynamic_regression_test.py"],
     deps = [
+        ":dynamic_regression",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:mvn_diag",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -154,8 +189,14 @@ multi_substrate_py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:chain",
+        "//tensorflow_probability/python/bijectors:scale",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/distributions:linear_gaussian_ssm",
+        "//tensorflow_probability/python/distributions:lognormal",
+        "//tensorflow_probability/python/distributions:mvn_diag",
         "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/sts/internal",
+        "//tensorflow_probability/python/sts:structural_time_series",
     ],
 )
 
@@ -164,9 +205,10 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["local_level_test.py"],
     deps = [
+        ":local_level",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:mvn_diag",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -177,8 +219,14 @@ multi_substrate_py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:chain",
+        "//tensorflow_probability/python/bijectors:scale",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/distributions:linear_gaussian_ssm",
+        "//tensorflow_probability/python/distributions:lognormal",
+        "//tensorflow_probability/python/distributions:mvn_diag",
         "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/sts/internal",
+        "//tensorflow_probability/python/sts:structural_time_series",
     ],
 )
 
@@ -187,9 +235,10 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["local_linear_trend_test.py"],
     deps = [
+        ":local_linear_trend",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:mvn_diag",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -200,8 +249,18 @@ multi_substrate_py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/distributions:half_normal",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:inverse_gamma",
+        "//tensorflow_probability/python/distributions:linear_gaussian_ssm",
+        "//tensorflow_probability/python/distributions:lognormal",
+        "//tensorflow_probability/python/distributions:mvn_diag",
+        "//tensorflow_probability/python/distributions:sample",
+        "//tensorflow_probability/python/distributions:student_t",
         "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/sts/internal",
+        "//tensorflow_probability/python/sts:structural_time_series",
     ],
 )
 
@@ -211,9 +270,15 @@ multi_substrate_py_test(
     srcs = ["regression_test.py"],
     shard_count = 2,
     deps = [
+        ":regression",
+        ":sum",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:cauchy",
+        "//tensorflow_probability/python/distributions:exponential",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:lognormal",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -225,10 +290,18 @@ multi_substrate_py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:chain",
+        "//tensorflow_probability/python/bijectors:scale",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/distributions:linear_gaussian_ssm",
+        "//tensorflow_probability/python/distributions:lognormal",
+        "//tensorflow_probability/python/distributions:mvn_diag",
+        "//tensorflow_probability/python/distributions:mvn_tril",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:docstring_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
-        "//tensorflow_probability/python/sts/internal",
+        "//tensorflow_probability/python/sts:structural_time_series",
     ],
 )
 
@@ -238,9 +311,11 @@ multi_substrate_py_test(
     srcs = ["seasonal_test.py"],
     shard_count = 6,
     deps = [
+        ":seasonal",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:linear_gaussian_ssm",
+        "//tensorflow_probability/python/distributions:mvn_diag",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -251,8 +326,18 @@ multi_substrate_py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:chain",
+        "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/bijectors:scale",
+        "//tensorflow_probability/python/bijectors:sigmoid",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/bijectors:tanh",
+        "//tensorflow_probability/python/distributions:linear_gaussian_ssm",
+        "//tensorflow_probability/python/distributions:lognormal",
+        "//tensorflow_probability/python/distributions:mvn_diag",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/sts/internal",
+        "//tensorflow_probability/python/sts:structural_time_series",
     ],
 )
 
@@ -261,9 +346,11 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["semilocal_linear_trend_test.py"],
     deps = [
+        ":local_linear_trend",
+        ":semilocal_linear_trend",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:mvn_diag",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -275,8 +362,14 @@ multi_substrate_py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:chain",
+        "//tensorflow_probability/python/bijectors:scale",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/distributions:linear_gaussian_ssm",
+        "//tensorflow_probability/python/distributions:lognormal",
+        "//tensorflow_probability/python/distributions:mvn_diag",
         "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/sts/internal",
+        "//tensorflow_probability/python/sts:structural_time_series",
     ],
 )
 
@@ -285,9 +378,10 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["smooth_seasonal_test.py"],
     deps = [
+        ":smooth_seasonal",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:mvn_diag",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -298,8 +392,14 @@ multi_substrate_py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:chain",
+        "//tensorflow_probability/python/bijectors:scale",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/distributions:linear_gaussian_ssm",
+        "//tensorflow_probability/python/distributions:lognormal",
+        "//tensorflow_probability/python/distributions:mvn_diag",
         "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/sts/internal",
+        "//tensorflow_probability/python/sts:structural_time_series",
     ],
 )
 
@@ -309,9 +409,12 @@ multi_substrate_py_test(
     srcs = ["sum_test.py"],
     shard_count = 2,
     deps = [
+        ":local_linear_trend",
+        ":sum",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:linear_gaussian_ssm",
+        "//tensorflow_probability/python/distributions:mvn_diag",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
     ],

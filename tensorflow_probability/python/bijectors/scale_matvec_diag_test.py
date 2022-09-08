@@ -17,7 +17,7 @@
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
-from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import scale_matvec_diag
 from tensorflow_probability.python.internal import test_util
 
 
@@ -31,7 +31,7 @@ class ScaleMatvecDiagTest(test_util.TestCase, parameterized.TestCase):
   )
   def testNoBatch(self, is_static):
     # Corresponds to scale = [[2., 0], [0, 1.]]
-    bijector = tfb.ScaleMatvecDiag(scale_diag=[2., 1])
+    bijector = scale_matvec_diag.ScaleMatvecDiag(scale_diag=[2., 1])
     x = self.maybe_static([1., 1], is_static)
 
     # matmul(sigma, x)
@@ -63,7 +63,7 @@ class ScaleMatvecDiagTest(test_util.TestCase, parameterized.TestCase):
   def testBatch(self, is_static):
     # Corresponds to 1 2x2 matrix, with twos on the diagonal.
     scale_diag = [[2., 2]]
-    bijector = tfb.ScaleMatvecDiag(scale_diag=scale_diag)
+    bijector = scale_matvec_diag.ScaleMatvecDiag(scale_diag=scale_diag)
     x = self.maybe_static([[[1., 1]]], is_static)
     self.assertAllClose([[[2., 2]]], bijector.forward(x))
     self.assertAllClose([[[0.5, 0.5]]], bijector.inverse(x))
@@ -75,7 +75,7 @@ class ScaleMatvecDiagTest(test_util.TestCase, parameterized.TestCase):
     with self.assertRaisesRegexp(
         Exception,
         'Singular operator:  Diagonal contained zero values'):
-      bijector = tfb.ScaleMatvecDiag(
+      bijector = scale_matvec_diag.ScaleMatvecDiag(
           # Has zero on the diagonal.
           scale_diag=[0., 1],
           validate_args=True)

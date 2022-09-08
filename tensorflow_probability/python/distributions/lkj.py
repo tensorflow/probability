@@ -26,7 +26,6 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import cholesky_outer_product as cholesky_outer_product_bijector
@@ -43,6 +42,7 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math import linalg
+from tensorflow_probability.python.math import special
 from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
 from tensorflow_probability.python.random import random_ops
 from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
@@ -528,8 +528,8 @@ class LKJ(distribution.AutoCompositeTensorDistribution):
           concentration[..., tf.newaxis] +
           (self.dimension - 1 - dimension_range) / 2.)
       ans = tf.reduce_sum(
-          tfp_math.log_gamma_difference(dimension_range / 2.,
-                                        effective_concentration),
+          special.log_gamma_difference(
+              dimension_range / 2., effective_concentration),
           axis=-1)
       # Then we add to `ans` the sum of `logpi / 2 * k` for `k` run from 1 to
       # `dimension - 1`.

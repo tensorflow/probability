@@ -22,11 +22,13 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.mcmc import hmc
+from tensorflow_probability.python.mcmc import sample_annealed_importance as sai
+from tensorflow_probability.python.mcmc import transformed_kernel
 
 
 JAX_MODE = False
@@ -69,8 +71,8 @@ class SampleAnnealedImportanceTest(test_util.TestCase):
     def proposal_log_prob(x):
       counter['proposal_calls'] += 1
       event_dims = ps.range(independent_chain_ndims, ps.rank(x))
-      return tf.reduce_sum(tfd.Normal(loc=0., scale=1.).log_prob(x),
-                           axis=event_dims)
+      return tf.reduce_sum(
+          normal.Normal(loc=0., scale=1.).log_prob(x), axis=event_dims)
 
     def target_log_prob(x):
       counter['target_calls'] += 1
@@ -81,20 +83,16 @@ class SampleAnnealedImportanceTest(test_util.TestCase):
 
     if use_transformed_kernel:
       def make_kernel(tlp_fn):
-        return tfp.mcmc.TransformedTransitionKernel(
-            inner_kernel=tfp.mcmc.HamiltonianMonteCarlo(
-                target_log_prob_fn=tlp_fn,
-                step_size=0.5,
-                num_leapfrog_steps=2),
-            bijector=tfb.Identity())
+        return transformed_kernel.TransformedTransitionKernel(
+            inner_kernel=hmc.HamiltonianMonteCarlo(
+                target_log_prob_fn=tlp_fn, step_size=0.5, num_leapfrog_steps=2),
+            bijector=identity.Identity())
     else:
       def make_kernel(tlp_fn):
-        return tfp.mcmc.HamiltonianMonteCarlo(
-            target_log_prob_fn=tlp_fn,
-            step_size=0.5,
-            num_leapfrog_steps=2)
+        return hmc.HamiltonianMonteCarlo(
+            target_log_prob_fn=tlp_fn, step_size=0.5, num_leapfrog_steps=2)
 
-    _, ais_weights, _ = tfp.mcmc.sample_annealed_importance_chain(
+    _, ais_weights, _ = sai.sample_annealed_importance_chain(
         num_steps=num_steps,
         proposal_log_prob_fn=proposal_log_prob,
         target_log_prob_fn=target_log_prob,
@@ -189,10 +187,8 @@ class SampleAnnealedImportanceTest(test_util.TestCase):
 
     seed = test_util.test_seed()
     def make_kernel(tlp_fn):
-      return tfp.mcmc.HamiltonianMonteCarlo(
-          target_log_prob_fn=tlp_fn,
-          step_size=0.5,
-          num_leapfrog_steps=2)
+      return hmc.HamiltonianMonteCarlo(
+          target_log_prob_fn=tlp_fn, step_size=0.5, num_leapfrog_steps=2)
 
     ais_kwargs = dict(
         num_steps=200,
@@ -202,10 +198,10 @@ class SampleAnnealedImportanceTest(test_util.TestCase):
         make_kernel_fn=make_kernel)
 
     seed = test_util.test_seed(sampler_type=sampler_type)
-    _, ais_weights0, _ = tfp.mcmc.sample_annealed_importance_chain(
+    _, ais_weights0, _ = sai.sample_annealed_importance_chain(
         seed=_maybe_seed(seed, sampler_type=sampler_type), **ais_kwargs)
 
-    _, ais_weights1, _ = tfp.mcmc.sample_annealed_importance_chain(
+    _, ais_weights1, _ = sai.sample_annealed_importance_chain(
         seed=_maybe_seed(seed, sampler_type=sampler_type), **ais_kwargs)
 
     ais_weights0_, ais_weights1_ = self.evaluate([

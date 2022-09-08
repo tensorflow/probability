@@ -18,12 +18,10 @@
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
-
-
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
+from tensorflow_probability.python.stats import leave_one_out
 
 
 @test_util.test_all_tf_execution_regimes
@@ -104,8 +102,8 @@ class LogSooMeanTest(test_util.TestCase):
 
     logx = np.linspace(-100., 100., 100).reshape([10, 2, 5])
     np_log_soomean_u, np_log_mean_u = self._numpy_log_soomean_exp(logx, axis=0)
-    [log_soomean_u, log_mean_u] = self.evaluate(
-        tfp.stats.log_soomean_exp(logx, axis=0))
+    [log_soomean_u,
+     log_mean_u] = self.evaluate(leave_one_out.log_soomean_exp(logx, axis=0))
     self.assertAllClose(np_log_mean_u, log_mean_u, rtol=1e-8, atol=0.)
     self.assertAllClose(np_log_soomean_u, log_soomean_u, rtol=1e-7, atol=0.)
 
@@ -115,8 +113,8 @@ class LogSooMeanTest(test_util.TestCase):
     # Using 700 (rather than 1e3) since naive numpy version can't handle higher.
     logx = np.float32([0., 700, -1, 1])
     np_log_soomean_u, np_log_mean_u = self._numpy_log_soomean_exp(logx, axis=0)
-    [log_soomean_u, log_mean_u] = self.evaluate(
-        tfp.stats.log_soomean_exp(logx, axis=0))
+    [log_soomean_u,
+     log_mean_u] = self.evaluate(leave_one_out.log_soomean_exp(logx, axis=0))
     self.assertAllClose(np_log_mean_u, log_mean_u, rtol=1e-6, atol=0.)
     self.assertAllClose(np_log_soomean_u, log_soomean_u, rtol=1e-5, atol=0.)
 
@@ -125,11 +123,12 @@ class LogSooMeanTest(test_util.TestCase):
 
     logx = np.float32([0., -1000, -1, 1])
     np_log_soomean_u, np_log_mean_u = self._numpy_log_soomean_exp(logx, axis=0)
-    [log_soomean_u, log_mean_u] = self.evaluate(
-        tfp.stats.log_soomean_exp(logx, axis=0))
+    [log_soomean_u,
+     log_mean_u] = self.evaluate(leave_one_out.log_soomean_exp(logx, axis=0))
     self.assertAllClose(np_log_mean_u, log_mean_u, rtol=1e-5, atol=0.)
     self.assertAllClose(np_log_soomean_u, log_soomean_u, rtol=1e-4, atol=1e-15)
 
+  @test_util.numpy_disable_gradient_test
   def test_log_soomean_exp_gradient_using_finite_difference_1(self):
     """Tests that gradient calculation correctly handles batches."""
 
@@ -137,14 +136,12 @@ class LogSooMeanTest(test_util.TestCase):
     logx = tf.constant(logx_)
 
     _, grad_log_soomean_u = self.evaluate(
-        tfp.math.value_and_gradient(
-            lambda logx: tfp.stats.log_soomean_exp(logx, axis=0)[0],
-            logx))
+        gradient.value_and_gradient(
+            lambda logx: leave_one_out.log_soomean_exp(logx, axis=0)[0], logx))
 
     _, grad_log_mean_u = self.evaluate(
-        tfp.math.value_and_gradient(
-            lambda logx: tfp.stats.log_soomean_exp(logx, axis=0)[1],
-            logx))
+        gradient.value_and_gradient(
+            lambda logx: leave_one_out.log_soomean_exp(logx, axis=0)[1], logx))
 
     # We skip checking against finite-difference approximation since it
     # doesn't support batches.
@@ -157,6 +154,7 @@ class LogSooMeanTest(test_util.TestCase):
         np.ones_like(grad_log_soomean_u.mean(axis=0)),
         grad_log_soomean_u.mean(axis=0))
 
+  @test_util.numpy_disable_gradient_test
   def test_log_soomean_exp_gradient_using_finite_difference_2(self):
     """Tests that gradient calculation correctly handles overflow."""
 
@@ -170,14 +168,12 @@ class LogSooMeanTest(test_util.TestCase):
     ] = self._numpy_grad_log_soomean_exp(logx_, axis=0, delta=delta)
 
     _, grad_log_soomean_u = self.evaluate(
-        tfp.math.value_and_gradient(
-            lambda logx: tfp.stats.log_soomean_exp(logx, axis=0)[0],
-            logx))
+        gradient.value_and_gradient(
+            lambda logx: leave_one_out.log_soomean_exp(logx, axis=0)[0], logx))
 
     _, grad_log_mean_u = self.evaluate(
-        tfp.math.value_and_gradient(
-            lambda logx: tfp.stats.log_soomean_exp(logx, axis=0)[1],
-            logx))
+        gradient.value_and_gradient(
+            lambda logx: leave_one_out.log_soomean_exp(logx, axis=0)[1], logx))
 
     self.assertAllClose(np_grad_log_mean_u, grad_log_mean_u,
                         rtol=delta, atol=0.)
@@ -191,6 +187,7 @@ class LogSooMeanTest(test_util.TestCase):
         np.ones_like(grad_log_soomean_u.mean(axis=0)),
         grad_log_soomean_u.mean(axis=0))
 
+  @test_util.numpy_disable_gradient_test
   def test_log_soomean_exp_gradient_using_finite_difference_3(self):
     """Tests that gradient calculation correctly handles underlow."""
 
@@ -204,14 +201,12 @@ class LogSooMeanTest(test_util.TestCase):
     ] = self._numpy_grad_log_soomean_exp(logx_, axis=0, delta=delta)
 
     _, grad_log_soomean_u = self.evaluate(
-        tfp.math.value_and_gradient(
-            lambda logx: tfp.stats.log_soomean_exp(logx, axis=0)[0],
-            logx))
+        gradient.value_and_gradient(
+            lambda logx: leave_one_out.log_soomean_exp(logx, axis=0)[0], logx))
 
     _, grad_log_mean_u = self.evaluate(
-        tfp.math.value_and_gradient(
-            lambda logx: tfp.stats.log_soomean_exp(logx, axis=0)[1],
-            logx))
+        gradient.value_and_gradient(
+            lambda logx: leave_one_out.log_soomean_exp(logx, axis=0)[1], logx))
 
     self.assertAllClose(np_grad_log_mean_u, grad_log_mean_u,
                         rtol=delta, atol=delta)
@@ -229,8 +224,8 @@ class LogSooMeanTest(test_util.TestCase):
     logx_ = np.float32([[0., -1000, -1, 1]])
     logx = tf.constant(logx_)
     [means, sums] = self.evaluate([
-        tfp.stats.log_soomean_exp(logx, axis=1),
-        tfp.stats.log_soosum_exp(logx, axis=1),
+        leave_one_out.log_soomean_exp(logx, axis=1),
+        leave_one_out.log_soosum_exp(logx, axis=1),
     ])
     self.assertEqual((1, 4), means[0].shape)
     self.assertEqual((1,), means[1].shape)
@@ -251,8 +246,8 @@ class LogLooMeanTest(test_util.TestCase):
     logx_ = np.float32([[0., -1000, -1, 1]])
     logx = tf.constant(logx_)
     [means, sums] = self.evaluate([
-        tfp.stats.log_loomean_exp(logx, axis=1),
-        tfp.stats.log_loosum_exp(logx, axis=1),
+        leave_one_out.log_loomean_exp(logx, axis=1),
+        leave_one_out.log_loosum_exp(logx, axis=1),
     ])
     self.assertEqual((1, 4), means[0].shape)
     self.assertEqual((1,), means[1].shape)

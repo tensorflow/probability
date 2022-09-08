@@ -19,12 +19,13 @@ import itertools
 from absl.testing import parameterized
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.distributions import bernoulli
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import distribute_lib
 from tensorflow_probability.python.internal import distribute_test_lib as test_lib
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
 
 JAX_MODE = False
 
@@ -123,17 +124,18 @@ class CollectiveTest(test_lib.DistributedTest):
         tf.range(test_lib.NUM_DEVICES * 6.) / 5., [test_lib.NUM_DEVICES, 3, 2])
 
     def compute_dist_grads(x):
-      return tfp.math.value_and_gradient(
+      return gradient.value_and_gradient(
           lambda x: distributed_op(  # pylint: disable=g-long-lambda
               x,
               axis=[0, 1],
-              named_axis=self.axis_name), [x])[1][0]
+              named_axis=self.axis_name),
+          [x])[1][0]
 
     def distributed_run(x):
       return self.per_replica_to_tensor(
           self.strategy_run(compute_dist_grads, (self.shard_values(x),)))
 
-    reduce_grads = tfp.math.value_and_gradient(
+    reduce_grads = gradient.value_and_gradient(
         lambda x: reduce_op(x, axis=None), [x])[1][0]
     dist_grads = distributed_run(x)
     self.assertAllClose(reduce_grads, dist_grads)
@@ -212,7 +214,7 @@ class ShardedFunctionTest(test_lib.DistributedTest):
         out_dtype=tf.float32)
 
     def f_grad(x, y):
-      return tfp.math.value_and_gradient(f_psum, (x, y))[1]
+      return gradient.value_and_gradient(f_psum, (x, y))[1]
 
     x = self.shard_values(tf.ones(4))
     y = self.shard_values(2. * tf.range(4.))
@@ -225,7 +227,7 @@ class ShardedFunctionTest(test_lib.DistributedTest):
         f, (self.axis_name, None), self.axis_name, out_dtype=tf.float32)
 
     def f_grad2(x, y):
-      return tfp.math.value_and_gradient(f_psum, (x, y))[1]
+      return gradient.value_and_gradient(f_psum, (x, y))[1]
 
     x = self.shard_values(tf.range(4.))
     y = 2.
@@ -239,7 +241,7 @@ class ShardedFunctionTest(test_lib.DistributedTest):
         f, (self.axis_name, self.axis_name), None, out_dtype=tf.float32)
 
     def f_grad3(x, y):
-      return tfp.math.value_and_gradient(f_psum, (x, y))[1]
+      return gradient.value_and_gradient(f_psum, (x, y))[1]
 
     x = self.shard_values(tf.range(4.))
     y = self.shard_values(tf.ones(4))
@@ -252,7 +254,7 @@ class ShardedFunctionTest(test_lib.DistributedTest):
         f, (self.axis_name, None), None, out_dtype=tf.float32)
 
     def f_grad4(x, y):
-      return tfp.math.value_and_gradient(f_psum, (x, y))[1]
+      return gradient.value_and_gradient(f_psum, (x, y))[1]
 
     x = self.shard_values(tf.range(4.))
     y = 2.
@@ -292,8 +294,8 @@ class LogProbPartsTest(test_lib.DistributedTest):
     def log_prob_parts(value):
       x, data = value
       return [
-          tfd.Normal(0., 1.).log_prob(x),
-          tf.reduce_sum(tfd.Normal(x, 1.).log_prob(data))
+          normal.Normal(0., 1.).log_prob(x),
+          tf.reduce_sum(normal.Normal(x, 1.).log_prob(data))
       ]
 
     sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
@@ -301,8 +303,8 @@ class LogProbPartsTest(test_lib.DistributedTest):
     self.assertAllEqualNested(
         self.evaluate(sharded_log_prob_parts([tf.constant(0.), data])),
         self.evaluate([
-            tfd.Normal(0., 1.).log_prob(0.),
-            tf.reduce_sum(tfd.Normal(0., 1.).log_prob(data))
+            normal.Normal(0., 1.).log_prob(0.),
+            tf.reduce_sum(normal.Normal(0., 1.).log_prob(data))
         ]))
 
   @test_util.disable_test_for_backend(
@@ -315,8 +317,8 @@ class LogProbPartsTest(test_lib.DistributedTest):
     def log_prob_parts(value):
       x, data = value
       return [
-          tf.reduce_sum(tfd.Normal(0., 1.).log_prob(x)),
-          tf.reduce_sum(tfd.Normal(x, 1.).log_prob(data))
+          tf.reduce_sum(normal.Normal(0., 1.).log_prob(x)),
+          tf.reduce_sum(normal.Normal(x, 1.).log_prob(data))
       ]
 
     sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
@@ -324,8 +326,8 @@ class LogProbPartsTest(test_lib.DistributedTest):
     self.assertAllEqualNested(
         self.evaluate(sharded_log_prob_parts([tf.ones(4), data])),
         self.evaluate([
-            tf.reduce_sum(tfd.Normal(0., 1.).log_prob(tf.ones(4))),
-            tf.reduce_sum(tfd.Normal(tf.ones(4), 1.).log_prob(data))
+            tf.reduce_sum(normal.Normal(0., 1.).log_prob(tf.ones(4))),
+            tf.reduce_sum(normal.Normal(tf.ones(4), 1.).log_prob(data))
         ]))
 
   def test_correct_log_prob_for_global_variable(self):
@@ -335,8 +337,8 @@ class LogProbPartsTest(test_lib.DistributedTest):
       def log_prob_parts(value):
         x, data = value
         return [
-            tfd.Normal(0., 1.).log_prob(x),
-            tf.reduce_sum(tfd.Normal(x, 1.).log_prob(data))
+            normal.Normal(0., 1.).log_prob(x),
+            tf.reduce_sum(normal.Normal(x, 1.).log_prob(data))
         ]
 
       sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
@@ -353,8 +355,8 @@ class LogProbPartsTest(test_lib.DistributedTest):
     self.assertAllEqualNested(
         self.evaluate(out_parts),
         self.evaluate([
-            tf.ones(4) * tfd.Normal(0., 1.).log_prob(0.),
-            tf.ones(4) * tf.reduce_sum(tfd.Normal(0., 1.).log_prob(data))
+            tf.ones(4) * normal.Normal(0., 1.).log_prob(0.),
+            tf.ones(4) * tf.reduce_sum(normal.Normal(0., 1.).log_prob(data))
         ]))
 
   def test_correct_log_prob_for_local_variable(self):
@@ -364,8 +366,8 @@ class LogProbPartsTest(test_lib.DistributedTest):
       def log_prob_parts(value):
         x, data = value
         return [
-            tfd.Normal(0., 1.).log_prob(x),
-            tf.reduce_sum(tfd.Normal(x, 1.).log_prob(data))
+            normal.Normal(0., 1.).log_prob(x),
+            tf.reduce_sum(normal.Normal(x, 1.).log_prob(data))
         ]
 
       sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
@@ -383,8 +385,8 @@ class LogProbPartsTest(test_lib.DistributedTest):
     self.assertAllEqualNested(
         self.evaluate(out_parts),
         self.evaluate([
-            tf.ones(4) * tf.reduce_sum(tfd.Normal(0., 1.).log_prob(x)),
-            tf.ones(4) * tf.reduce_sum(tfd.Normal(0., 1.).log_prob(data))
+            tf.ones(4) * tf.reduce_sum(normal.Normal(0., 1.).log_prob(x)),
+            tf.ones(4) * tf.reduce_sum(normal.Normal(0., 1.).log_prob(data))
         ]))
 
   def test_correct_log_prob_for_global_and_local_variable(self):
@@ -394,9 +396,9 @@ class LogProbPartsTest(test_lib.DistributedTest):
       def log_prob_parts(values):
         w, x, data = values
         return [
-            tfd.Normal(0., 1.).log_prob(w),
-            tfd.Normal(w, 1.).log_prob(x),
-            tf.reduce_sum(tfd.Normal(x, 1.).log_prob(data))
+            normal.Normal(0., 1.).log_prob(w),
+            normal.Normal(w, 1.).log_prob(x),
+            tf.reduce_sum(normal.Normal(x, 1.).log_prob(data))
         ]
 
       sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
@@ -416,9 +418,9 @@ class LogProbPartsTest(test_lib.DistributedTest):
     self.assertAllEqualNested(
         self.evaluate(out_parts),
         self.evaluate([
-            tf.ones(4) * tfd.Normal(0., 1.).log_prob(w),
-            tf.ones(4) * tf.reduce_sum(tfd.Normal(w, 1.).log_prob(x)),
-            tf.ones(4) * tf.reduce_sum(tfd.Normal(x, 1.).log_prob(data))
+            tf.ones(4) * normal.Normal(0., 1.).log_prob(w),
+            tf.ones(4) * tf.reduce_sum(normal.Normal(w, 1.).log_prob(x)),
+            tf.ones(4) * tf.reduce_sum(normal.Normal(x, 1.).log_prob(data))
         ]))
 
   def test_correct_gradient_for_global_variable(self):
@@ -428,8 +430,8 @@ class LogProbPartsTest(test_lib.DistributedTest):
       def log_prob_parts(value):
         x, data = value
         return [
-            tfd.Normal(0., 1.).log_prob(x),
-            tfd.Normal(x, 1.).log_prob(data)
+            normal.Normal(0., 1.).log_prob(x),
+            normal.Normal(x, 1.).log_prob(data)
         ]
 
       def log_prob(x):
@@ -438,7 +440,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
         parts = sharded_log_prob_parts([x, data])
         return tf.add_n(parts)
 
-      return tfp.math.value_and_gradient(log_prob, x)[1]
+      return gradient.value_and_gradient(log_prob, x)[1]
 
     x = tf.constant(1.)
     data = 2 * tf.ones(4)
@@ -447,10 +449,10 @@ class LogProbPartsTest(test_lib.DistributedTest):
         self.strategy_run(run, (x, sharded_data), in_axes=(None, 0)))
 
     def true_log_prob(x):
-      return (tfd.Normal(0., 1.).log_prob(x) +
-              tf.reduce_sum(tfd.Normal(x, 1.).log_prob(data)))
+      return (normal.Normal(0., 1.).log_prob(x) +
+              tf.reduce_sum(normal.Normal(x, 1.).log_prob(data)))
 
-    true_grad = self.evaluate(tfp.math.value_and_gradient(true_log_prob, x)[1])
+    true_grad = self.evaluate(gradient.value_and_gradient(true_log_prob, x)[1])
 
     self.assertAllEqualNested(self.evaluate(out_grads), tf.ones(4) * true_grad)
 
@@ -462,8 +464,8 @@ class LogProbPartsTest(test_lib.DistributedTest):
       def log_prob_parts(value):
         x, data = value
         return [
-            tfd.Normal(0., 1.).log_prob(x),
-            tfd.Normal(x, 1.).log_prob(data)
+            normal.Normal(0., 1.).log_prob(x),
+            normal.Normal(x, 1.).log_prob(data)
         ]
 
       def log_prob(x):
@@ -472,7 +474,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
         parts = sharded_log_prob_parts([x, data])
         return tf.add_n(parts)
 
-      return tfp.math.value_and_gradient(log_prob, x)[1]
+      return gradient.value_and_gradient(log_prob, x)[1]
 
     x = tf.range(4.)
     sharded_x = self.shard_values(x)
@@ -482,10 +484,10 @@ class LogProbPartsTest(test_lib.DistributedTest):
         self.strategy_run(run, (sharded_x, sharded_data)))
 
     def true_log_prob(x):
-      return (tf.reduce_sum(tfd.Normal(0., 1.).log_prob(x)) +
-              tf.reduce_sum(tfd.Normal(x, 1.).log_prob(data)))
+      return (tf.reduce_sum(normal.Normal(0., 1.).log_prob(x)) +
+              tf.reduce_sum(normal.Normal(x, 1.).log_prob(data)))
 
-    true_grad = self.evaluate(tfp.math.value_and_gradient(true_log_prob, x)[1])
+    true_grad = self.evaluate(gradient.value_and_gradient(true_log_prob, x)[1])
 
     self.assertAllEqualNested(self.evaluate(out_grads), true_grad)
 
@@ -496,9 +498,9 @@ class LogProbPartsTest(test_lib.DistributedTest):
       def log_prob_parts(value):
         w, x, data = value
         return [
-            tfd.Normal(0., 1.).log_prob(w),
-            tfd.Normal(w, 1.).log_prob(x),
-            tfd.Normal(x, 1.).log_prob(data)
+            normal.Normal(0., 1.).log_prob(w),
+            normal.Normal(w, 1.).log_prob(x),
+            normal.Normal(x, 1.).log_prob(data)
         ]
 
       def log_prob(*value):
@@ -508,7 +510,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
         parts = sharded_log_prob_parts([w, x, data])
         return tf.add_n(parts)
 
-      return tfp.math.value_and_gradient(log_prob, [w, x])[1]
+      return gradient.value_and_gradient(log_prob, [w, x])[1]
 
     w = tf.constant(1.)
     x = tf.range(4.)
@@ -521,11 +523,11 @@ class LogProbPartsTest(test_lib.DistributedTest):
 
     def true_log_prob(*value):
       w, x = value
-      return (tfd.Normal(0., 1.).log_prob(w) +
-              tf.reduce_sum(tfd.Normal(w, 1.).log_prob(x)) +
-              tf.reduce_sum(tfd.Normal(x, 1.).log_prob(data)))
+      return (normal.Normal(0., 1.).log_prob(w) +
+              tf.reduce_sum(normal.Normal(w, 1.).log_prob(x)) +
+              tf.reduce_sum(normal.Normal(x, 1.).log_prob(data)))
 
-    true_grad = tfp.math.value_and_gradient(true_log_prob, [w, x])[1]
+    true_grad = gradient.value_and_gradient(true_log_prob, [w, x])[1]
     true_grad[0] = tf.ones(4) * true_grad[0]
 
     self.assertAllEqualNested(
@@ -538,11 +540,11 @@ class LogProbPartsTest(test_lib.DistributedTest):
       def log_prob_parts(value):
         w, x, data = value
         return [
-            tf.reduce_sum(tfd.Normal(tf.zeros(2), 1.).log_prob(w), -1),
+            tf.reduce_sum(normal.Normal(tf.zeros(2), 1.).log_prob(w), -1),
             # w is non-scalar, to detect spurious broadcasting.
             # The squares are to add some extra non-linearities.
-            tfd.Normal(tf.reduce_sum(w, -1)**2, 1.).log_prob(x),
-            tfd.Normal(x**2, 1.).log_prob(data)
+            normal.Normal(tf.reduce_sum(w, -1)**2, 1.).log_prob(x),
+            normal.Normal(x**2, 1.).log_prob(data)
         ]
 
       def log_prob(*value):
@@ -552,7 +554,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
         parts = sharded_log_prob_parts([w, x, data])
         return tf.add_n(parts)
 
-      return tfp.math.value_and_gradient(log_prob, [w, x])[1]
+      return gradient.value_and_gradient(log_prob, [w, x])[1]
 
     batch_size = 3
     # We'll add an extra dimensions to w to make sure we get non-scalars inside
@@ -569,13 +571,13 @@ class LogProbPartsTest(test_lib.DistributedTest):
 
     def true_log_prob(*value):
       w, x = value
-      return (tf.reduce_sum(tfd.Normal(tf.zeros(2), 1.).log_prob(w), -1) +
+      return (tf.reduce_sum(normal.Normal(tf.zeros(2), 1.).log_prob(w), -1) +
               tf.reduce_sum(
-                  tfd.Normal(tf.reduce_sum(w, -1, keepdims=True)**2,
-                             1.).log_prob(x), -1) +
-              tf.reduce_sum(tfd.Normal(x**2, 1.).log_prob(data), -1))
+                  normal.Normal(tf.reduce_sum(w, -1, keepdims=True)**2,
+                                1.).log_prob(x), -1) +
+              tf.reduce_sum(normal.Normal(x**2, 1.).log_prob(data), -1))
 
-    true_grad = tfp.math.value_and_gradient(true_log_prob, [w, x])[1]
+    true_grad = gradient.value_and_gradient(true_log_prob, [w, x])[1]
     true_grad[0] = tf.ones([batch_size, 4, 1]) * true_grad[0][:, tf.newaxis]
 
     self.assertAllEqualNested(
@@ -588,9 +590,9 @@ class LogProbPartsTest(test_lib.DistributedTest):
 
       def log_prob_parts(value):
         return {
-            'w': tfd.Normal(0., 1.).log_prob(value['w']),
-            'x': tfd.Normal(value['w'], 1.).log_prob(value['x']),
-            'data': tfd.Normal(value['x'], 1.).log_prob(value['data']),
+            'w': normal.Normal(0., 1.).log_prob(value['w']),
+            'x': normal.Normal(value['w'], 1.).log_prob(value['x']),
+            'data': normal.Normal(value['x'], 1.).log_prob(value['data']),
         }
 
       def log_prob(*value):
@@ -604,7 +606,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
         parts = sharded_log_prob_parts({'w': w, 'x': x, 'data': data})
         return tf.add_n(tf.nest.flatten(parts))
 
-      return tfp.math.value_and_gradient(log_prob, [w, x])[1]
+      return gradient.value_and_gradient(log_prob, [w, x])[1]
 
     w = tf.constant(1.)
     x = tf.range(4.)
@@ -617,11 +619,11 @@ class LogProbPartsTest(test_lib.DistributedTest):
 
     def true_log_prob(*value):
       w, x = value
-      return (tfd.Normal(0., 1.).log_prob(w) +
-              tf.reduce_sum(tfd.Normal(w, 1.).log_prob(x)) +
-              tf.reduce_sum(tfd.Normal(x, 1.).log_prob(data)))
+      return (normal.Normal(0., 1.).log_prob(w) +
+              tf.reduce_sum(normal.Normal(w, 1.).log_prob(x)) +
+              tf.reduce_sum(normal.Normal(x, 1.).log_prob(data)))
 
-    true_grad = tfp.math.value_and_gradient(true_log_prob, [w, x])[1]
+    true_grad = gradient.value_and_gradient(true_log_prob, [w, x])[1]
     true_grad[0] = tf.ones(4) * true_grad[0]
 
     self.assertAllEqualNested(
@@ -635,8 +637,8 @@ class LogProbPartsTest(test_lib.DistributedTest):
       def log_prob_parts(value):
         x, data = value
         return [
-            tfd.Normal(0., 1.).log_prob(x),
-            tfd.Bernoulli(logits=x).log_prob(data)
+            normal.Normal(0., 1.).log_prob(x),
+            bernoulli.Bernoulli(logits=x).log_prob(data)
         ]
 
       def log_prob(x):
@@ -645,7 +647,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
         parts = sharded_log_prob_parts([x, data])
         return tf.add_n(parts)
 
-      return tfp.math.value_and_gradient(log_prob, x)[1]
+      return gradient.value_and_gradient(log_prob, x)[1]
 
     x = tf.range(4.)
     sharded_x = self.shard_values(x)
@@ -655,10 +657,10 @@ class LogProbPartsTest(test_lib.DistributedTest):
         self.strategy_run(run, (sharded_x, sharded_data)))
 
     def true_log_prob(x):
-      return (tf.reduce_sum(tfd.Normal(0., 1.).log_prob(x)) +
-              tf.reduce_sum(tfd.Bernoulli(logits=x).log_prob(data)))
+      return (tf.reduce_sum(normal.Normal(0., 1.).log_prob(x)) +
+              tf.reduce_sum(bernoulli.Bernoulli(logits=x).log_prob(data)))
 
-    true_grad = self.evaluate(tfp.math.value_and_gradient(true_log_prob, x)[1])
+    true_grad = self.evaluate(gradient.value_and_gradient(true_log_prob, x)[1])
 
     self.assertAllEqualNested(self.evaluate(out_grads), true_grad)
 
@@ -671,8 +673,8 @@ class LogProbPartsTest(test_lib.DistributedTest):
         x, y = value
         return [
             # These two RV's do not depend on each other.
-            tfd.Normal(0., 1.).log_prob(x),
-            tfd.Normal(0., 1.).log_prob(y),
+            normal.Normal(0., 1.).log_prob(x),
+            normal.Normal(0., 1.).log_prob(y),
         ]
 
       def log_prob(x, y):
@@ -681,7 +683,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
         parts = sharded_log_prob_parts([x, y])
         return tf.add_n(parts)
 
-      return tfp.math.value_and_gradient(log_prob, (x, y))[1]
+      return gradient.value_and_gradient(log_prob, (x, y))[1]
 
     sharded_x = self.shard_values(tf.range(4.))
     sharded_y = sharded_x
@@ -701,9 +703,9 @@ class LogProbPartsTest(test_lib.DistributedTest):
       def log_prob_parts(value):
         x, data1, data2 = value
         return [
-            tfd.Normal(0., 1.).log_prob(x),
-            tfd.Normal(x, 1.).log_prob(data1),
-            tfd.Normal(x, 1.).log_prob(data2)
+            normal.Normal(0., 1.).log_prob(x),
+            normal.Normal(x, 1.).log_prob(data1),
+            normal.Normal(x, 1.).log_prob(data2)
         ]
 
       def log_prob(x, data1, data2):
@@ -712,7 +714,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
         parts = sharded_log_prob_parts([x, data1, data2])
         return tf.add_n(parts)
 
-      return tfp.math.value_and_gradient(log_prob, (x, data1, data2))
+      return gradient.value_and_gradient(log_prob, (x, data1, data2))
 
     x = tf.constant(1.)
     data1 = 2 * tf.ones(2)
@@ -728,12 +730,12 @@ class LogProbPartsTest(test_lib.DistributedTest):
         outer_run, (x, data1), in_axes=(None, 0), axis_name=self.axis_name)
 
     def true_log_prob(x, data1, data2):
-      return (tfd.Normal(0., 1.).log_prob(x) +
-              tf.reduce_sum(tfd.Normal(x, 1.).log_prob(data1)) +
-              tf.reduce_sum(tfd.Normal(x, 1.).log_prob(data2)))
+      return (normal.Normal(0., 1.).log_prob(x) +
+              tf.reduce_sum(normal.Normal(x, 1.).log_prob(data1)) +
+              tf.reduce_sum(normal.Normal(x, 1.).log_prob(data2)))
 
     true_values, true_grads = self.evaluate(
-        tfp.math.value_and_gradient(true_log_prob, (x, data1, data2)))
+        gradient.value_and_gradient(true_log_prob, (x, data1, data2)))
 
     self.assertAllEqualNested(out_values, tf.ones([2, 2]) * true_values)
     self.assertAllEqualNested(out_grads[0], tf.ones([2, 2]) * true_grads[0])
@@ -751,8 +753,8 @@ class LogProbPartsTest(test_lib.DistributedTest):
       def log_prob_parts(value):
         x, data = value
         return [
-            tfd.Normal(0., 1.).log_prob(x),
-            tfd.Normal(x, 1.).log_prob(data),
+            normal.Normal(0., 1.).log_prob(x),
+            normal.Normal(x, 1.).log_prob(data),
         ]
 
       def log_prob(x, data):
@@ -761,7 +763,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
         parts = sharded_log_prob_parts([x, data])
         return tf.add_n(parts)
 
-      return tfp.math.value_and_gradient(log_prob, (x, data))
+      return gradient.value_and_gradient(log_prob, (x, data))
 
     x = tf.constant(1.)
     data = 2 * tf.ones([2, 2])
@@ -774,11 +776,11 @@ class LogProbPartsTest(test_lib.DistributedTest):
         outer_run, (x, data), in_axes=(None, 0))
 
     def true_log_prob(x, data):
-      return (tfd.Normal(0., 1.).log_prob(x) +
-              tf.reduce_sum(tfd.Normal(x, 1.).log_prob(data)))
+      return (normal.Normal(0., 1.).log_prob(x) +
+              tf.reduce_sum(normal.Normal(x, 1.).log_prob(data)))
 
     true_values, true_grads = self.evaluate(
-        tfp.math.value_and_gradient(true_log_prob, (x, data)))
+        gradient.value_and_gradient(true_log_prob, (x, data)))
 
     self.assertAllEqualNested(out_values, tf.ones([2, 2]) * true_values)
     self.assertAllEqualNested(out_grads[0], tf.ones([2, 2]) * true_grads[0])
@@ -795,9 +797,9 @@ class LogProbPartsTest(test_lib.DistributedTest):
       def log_prob_parts(value):
         x, y, z = value
         return [
-            tfd.Normal(0., 1.).log_prob(x),
-            tfd.Normal(0., 1.).log_prob(y),
-            tfd.Normal(x + y, 1.).log_prob(z),
+            normal.Normal(0., 1.).log_prob(x),
+            normal.Normal(0., 1.).log_prob(y),
+            normal.Normal(x + y, 1.).log_prob(z),
         ]
 
       def log_prob(x, y, z):
@@ -809,13 +811,13 @@ class LogProbPartsTest(test_lib.DistributedTest):
         parts = sharded_log_prob_parts([x, y, z])
         return tf.add_n(parts)
 
-      return tfp.math.value_and_gradient(log_prob, (x, y, z))
+      return gradient.value_and_gradient(log_prob, (x, y, z))
 
     seed = random.PRNGKey(0)
-    x_seed, y_seed, z_seed = tfp.random.split_seed(seed, n=3)
-    x = tfd.Normal(0., 1).sample(seed=x_seed, sample_shape=2)
-    y = tfd.Normal(0., 1.).sample(seed=y_seed, sample_shape=2)
-    z = tfd.Normal(0., 1.).sample(seed=z_seed, sample_shape=[2, 2])
+    x_seed, y_seed, z_seed = samplers.split_seed(seed, n=3)
+    x = normal.Normal(0., 1).sample(seed=x_seed, sample_shape=2)
+    y = normal.Normal(0., 1.).sample(seed=y_seed, sample_shape=2)
+    z = normal.Normal(0., 1.).sample(seed=z_seed, sample_shape=[2, 2])
 
     def outer_run(x, y, z):
       return self.strategy_run(
@@ -825,12 +827,13 @@ class LogProbPartsTest(test_lib.DistributedTest):
         outer_run, (x, y, z), in_axes=(0, None, 0))
 
     def true_log_prob(x, y, z):
-      return (tf.reduce_sum(tfd.Normal(0., 1.).log_prob(x)) +
-              tf.reduce_sum(tfd.Normal(0., 1.).log_prob(y)) +
-              tf.reduce_sum(tfd.Normal(x[:, None] + y[None], 1.).log_prob(z)))
+      return (
+          tf.reduce_sum(normal.Normal(0., 1.).log_prob(x)) +
+          tf.reduce_sum(normal.Normal(0., 1.).log_prob(y)) +
+          tf.reduce_sum(normal.Normal(x[:, None] + y[None], 1.).log_prob(z)))
 
     true_values, true_grads = self.evaluate(
-        tfp.math.value_and_gradient(true_log_prob, (x, y, z)))
+        gradient.value_and_gradient(true_log_prob, (x, y, z)))
 
     self.assertAllClose(
         out_values, tf.ones([2, 2]) * true_values, rtol=1e-6, atol=1e-6)

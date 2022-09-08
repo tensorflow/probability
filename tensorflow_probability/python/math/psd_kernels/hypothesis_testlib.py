@@ -119,6 +119,8 @@ del _instantiable_base_kernels
 MUTEX_PARAMS = (
     set(['length_scale', 'inverse_length_scale']),
     set(['scale_diag', 'inverse_scale_diag']),
+    set(['bias_variance', 'bias_amplitude']),
+    set(['slope_variance', 'slope_amplitude']),
 )
 
 # pylint is unable to handle @hps.composite (e.g. complains "No value for
@@ -1047,12 +1049,14 @@ CONSTRAINTS = {
     # well-conditioned. The ranges below were chosen to ensure kernel
     # matrices are positive definite.
     'amplitude': constrain_to_range(1., 2.),
+    'bias_amplitude': constrain_to_range(0.1, 0.5),
     'bias_variance': constrain_to_range(0.1, 0.5),
     'constant': constrain_to_range(0.1, 0.5),
     'concentration0': constrain_to_range(1., 2.),
     'concentration1': constrain_to_range(1., 2.),
     'df': constrain_to_range(2., 5.),
     'scales': constrain_to_range(1., 2.),
+    'slope_amplitude': constrain_to_range(0.1, 0.5),
     'slope_variance': constrain_to_range(0.1, 0.5),
     'exponent': lambda x: tf.math.floor(constrain_to_range(1, 4.)(x)),
     'length_scale': constrain_to_range(1., 6.),

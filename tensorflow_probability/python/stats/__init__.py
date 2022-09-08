@@ -20,9 +20,7 @@ from tensorflow_probability.python.stats.calibration import brier_decomposition
 from tensorflow_probability.python.stats.calibration import brier_score
 from tensorflow_probability.python.stats.calibration import expected_calibration_error
 from tensorflow_probability.python.stats.calibration import expected_calibration_error_quantiles
-from tensorflow_probability.python.stats.kendalls_tau import iterative_mergesort
 from tensorflow_probability.python.stats.kendalls_tau import kendalls_tau
-from tensorflow_probability.python.stats.kendalls_tau import lexicographical_indirect_sort
 from tensorflow_probability.python.stats.leave_one_out import log_loomean_exp
 from tensorflow_probability.python.stats.leave_one_out import log_loosum_exp
 from tensorflow_probability.python.stats.leave_one_out import log_soomean_exp
@@ -65,9 +63,7 @@ __all__ = [
     'expected_calibration_error_quantiles',
     'find_bins',
     'histogram',
-    'iterative_mergesort',
     'kendalls_tau',
-    'lexicographical_indirect_sort',
     'log_average_probs',
     'log_loomean_exp',
     'log_loosum_exp',

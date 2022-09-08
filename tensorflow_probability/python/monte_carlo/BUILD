@@ -53,9 +53,13 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["expectation_test.py"],
     deps = [
+        ":expectation",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:bernoulli",
+        "//tensorflow_probability/python/distributions:joint_distribution_named",
+        "//tensorflow_probability/python/distributions:kullback_leibler",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

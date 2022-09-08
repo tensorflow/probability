@@ -21,12 +21,11 @@ import numpy as np
 from scipy import stats as sp_stats
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import generalized_pareto as gp
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
 
 
 # Pylint doesn't understand hps.composite.
@@ -48,7 +47,7 @@ def generalized_paretos(draw, batch_shape=None):
           batch_shape,
           params_event_ndims=dict(loc=0, scale=0, concentration=0),
           constraint_fn_for=constraints.get))
-  dist = tfd.GeneralizedPareto(validate_args=draw(hps.booleans()), **params)
+  dist = gp.GeneralizedPareto(validate_args=draw(hps.booleans()), **params)
   if dist.batch_shape != batch_shape:
     raise AssertionError('batch_shape mismatch: expect {} but got {}'.format(
         batch_shape, dist))
@@ -88,7 +87,7 @@ class GeneralizedParetoTest(test_util.TestCase):
     # When loc = concentration = 0, we have an exponential distribution. Check
     # that at 0 we have finite log prob.
     scale = np.array([0.1, 0.5, 1., 2., 5., 10.], dtype=np.float32)
-    dist = tfd.GeneralizedPareto(
+    dist = gp.GeneralizedPareto(
         loc=0, scale=scale, concentration=0, validate_args=True)
     log_pdf = self.evaluate(dist.log_prob(0.))
     self.assertAllClose(-np.log(scale), log_pdf, rtol=1e-5)
@@ -97,7 +96,7 @@ class GeneralizedParetoTest(test_util.TestCase):
     loc = np.array([1., 2., 5.]).astype(np.float32)
     scale = 2.
     concentration = np.array([-5., -3.4, -1.]).astype(np.float32)
-    dist = tfd.GeneralizedPareto(
+    dist = gp.GeneralizedPareto(
         loc=loc, scale=scale, concentration=concentration, validate_args=True)
     log_pdf_at_loc = self.evaluate(dist.log_prob(loc))
     self.assertAllFinite(log_pdf_at_loc)
@@ -111,7 +110,7 @@ class GeneralizedParetoTest(test_util.TestCase):
     loc = np.array([1., 2., 5.]).astype(np.float32)
     scale = 2.
     concentration = np.array([-5., -3.4, 1.]).astype(np.float32)
-    dist = tfd.GeneralizedPareto(
+    dist = gp.GeneralizedPareto(
         loc=loc, scale=scale, concentration=concentration, validate_args=True)
 
     with self.assertRaisesOpError('must be greater than or equal to `loc`'):
@@ -125,7 +124,7 @@ class GeneralizedParetoTest(test_util.TestCase):
     loc = np.array([1., 2., 5.]).astype(np.float32)
     scale = 2.
     concentration = np.array([-5., -2., 1.]).astype(np.float32)
-    dist = tfd.GeneralizedPareto(
+    dist = gp.GeneralizedPareto(
         loc=loc, scale=scale, concentration=concentration, validate_args=True)
 
     x = np.array([1. - 1e-6, 3.1, 4.9]).astype(np.float32)
@@ -198,7 +197,7 @@ class GeneralizedParetoTest(test_util.TestCase):
     scale = np.float32(3.5)
     conc = np.float32(0.07)
     n = 10**5
-    dist = tfd.GeneralizedPareto(
+    dist = gp.GeneralizedPareto(
         loc=loc, scale=scale, concentration=conc, validate_args=True)
     samples = dist.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
@@ -219,9 +218,10 @@ class GeneralizedParetoTest(test_util.TestCase):
     loc = tf.constant(4.0)
     scale = tf.constant(3.0)
     conc = tf.constant(2.0)
-    _, grads = tfp.math.value_and_gradient(
-        lambda *args: tfd.GeneralizedPareto(*args, validate_args=True).sample(  # pylint: disable=g-long-lambda
-            100, seed=test_util.test_seed()), [loc, scale, conc])
+    _, grads = gradient.value_and_gradient(
+        lambda *args: gp.GeneralizedPareto(*args, validate_args=True).sample(  # pylint: disable=g-long-lambda
+            100, seed=test_util.test_seed()),
+        [loc, scale, conc])
     self.assertLen(grads, 3)
     self.assertAllNotNone(grads)
 
@@ -230,7 +230,7 @@ class GeneralizedParetoTest(test_util.TestCase):
     scale = np.linspace(1e-6, 7, 5).reshape([5, 1])
     conc = np.linspace(-1.3, 1.3, 7)
 
-    dist = tfd.GeneralizedPareto(
+    dist = gp.GeneralizedPareto(
         loc=loc, scale=scale, concentration=conc, validate_args=True)
     n = 10**4
     samples = dist.sample(n, seed=test_util.test_seed())
@@ -256,7 +256,7 @@ class GeneralizedParetoTest(test_util.TestCase):
     return ks < 0.02
 
   def testPdfOfSampleMultiDims(self):
-    dist = tfd.GeneralizedPareto(
+    dist = gp.GeneralizedPareto(
         loc=0,
         scale=[[2.], [3.]],
         concentration=[-.37, .11],
@@ -285,14 +285,14 @@ class GeneralizedParetoTest(test_util.TestCase):
   def testNonPositiveInitializationParamsRaises(self):
     scale = tf.constant(0.0, name='scale')
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
-      dist = tfd.GeneralizedPareto(
+      dist = gp.GeneralizedPareto(
           loc=0, scale=scale, concentration=1, validate_args=True)
       self.evaluate(dist.mean())
 
   @test_util.tf_tape_safety_test
   def testGradientThroughConcentration(self):
     concentration = tf.Variable(3.)
-    d = tfd.GeneralizedPareto(
+    d = gp.GeneralizedPareto(
         loc=0, scale=1, concentration=concentration, validate_args=True)
     with tf.GradientTape() as tape:
       loss = -d.log_prob([1., 2., 4.])
@@ -304,14 +304,14 @@ class GeneralizedParetoTest(test_util.TestCase):
     scale = tf.Variable([1., 2., -3.])
     self.evaluate(scale.initializer)
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
-      d = tfd.GeneralizedPareto(
+      d = gp.GeneralizedPareto(
           loc=0, scale=scale, concentration=1, validate_args=True)
       self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertsPositiveScaleAfterMutation(self):
     scale = tf.Variable([1., 2., 3.])
     self.evaluate(scale.initializer)
-    d = tfd.GeneralizedPareto(
+    d = gp.GeneralizedPareto(
         loc=0, scale=scale, concentration=0.25, validate_args=True)
     self.evaluate(d.mean())
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
@@ -322,7 +322,7 @@ class GeneralizedParetoTest(test_util.TestCase):
   def testGradientThroughLocScale(self):
     loc = tf.Variable(1.)
     scale = tf.Variable(2.5)
-    d = tfd.GeneralizedPareto(
+    d = gp.GeneralizedPareto(
         loc=loc, scale=scale, concentration=.15, validate_args=True)
     with tf.GradientTape() as tape:
       loss = -d.log_prob([1., 2., 4.])
@@ -339,7 +339,7 @@ class GeneralizedParetoTest(test_util.TestCase):
     self.evaluate(concentration.initializer)
     self.evaluate(loc.initializer)
 
-    d = tfd.GeneralizedPareto(
+    d = gp.GeneralizedPareto(
         loc=loc, scale=scale, concentration=concentration, validate_args=True)
     p = tf.linspace(0., 1., 1000)[1:-1]
     q = d.quantile(p)
@@ -358,7 +358,7 @@ class GeneralizedParetoTest(test_util.TestCase):
     self.evaluate(concentration.initializer)
     self.evaluate(loc.initializer)
 
-    d = tfd.GeneralizedPareto(
+    d = gp.GeneralizedPareto(
         loc=loc, scale=scale, concentration=concentration, validate_args=True)
     p = tf.linspace(0., 1., 1000)[1:-1]
     q = d.quantile(p)
@@ -373,7 +373,7 @@ class GeneralizedParetoTest(test_util.TestCase):
     scale = tf.constant([0.9, 1., 1.1])[:, tf.newaxis]
     concentration = tf.constant([0.0, 0.4, 0.5, 0.6, 1.0])
 
-    d = tfd.GeneralizedPareto(
+    d = gp.GeneralizedPareto(
         loc=loc, scale=scale, concentration=concentration, validate_args=True)
     p = tf.linspace(0., 1., 1000)[1:-1][:, tf.newaxis, tf.newaxis, tf.newaxis]
     q = d.quantile(p)

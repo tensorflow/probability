@@ -17,8 +17,13 @@
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import chain
+from tensorflow_probability.python.bijectors import scale
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.distributions import linear_gaussian_ssm
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import mvn_diag
+
 from tensorflow_probability.python.internal import dtype_util
 
 from tensorflow_probability.python.sts.internal import util as sts_util
@@ -26,7 +31,8 @@ from tensorflow_probability.python.sts.structural_time_series import Parameter
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
 
 
-class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
+class SmoothSeasonalStateSpaceModel(
+    linear_gaussian_ssm.LinearGaussianStateSpaceModel):
   """State space model for a smooth seasonal effect.
 
   A state space model (SSM) posits a set of latent (unobserved) variables that
@@ -227,12 +233,12 @@ class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       super(SmoothSeasonalStateSpaceModel, self).__init__(
           num_timesteps=num_timesteps,
           transition_matrix=transition_matrix,
-          transition_noise=tfd.MultivariateNormalDiag(
+          transition_noise=mvn_diag.MultivariateNormalDiag(
               scale_diag=(drift_scale[..., tf.newaxis] *
                           tf.ones([2 * num_frequencies], dtype=dtype)),
               name='transition_noise'),
           observation_matrix=observation_matrix,
-          observation_noise=tfd.MultivariateNormalDiag(
+          observation_noise=mvn_diag.MultivariateNormalDiag(
               scale_diag=observation_noise_scale[..., tf.newaxis],
               name='observation_noise'),
           initial_state_prior=initial_state_prior,
@@ -407,14 +413,14 @@ class SmoothSeasonal(StructuralTimeSeries):
       # Heuristic default priors. Overriding these may dramatically
       # change inference performance and results.
       if drift_scale_prior is None:
-        drift_scale_prior = tfd.LogNormal(
+        drift_scale_prior = lognormal.LogNormal(
             loc=tf.math.log(.01 * observed_stddev), scale=3.)
 
       if initial_state_prior is None:
         initial_state_scale = (
             tf.abs(observed_initial) + observed_stddev)[..., tf.newaxis]
         ones = tf.ones([latent_size], dtype=drift_scale_prior.dtype)
-        initial_state_prior = tfd.MultivariateNormalDiag(
+        initial_state_prior = mvn_diag.MultivariateNormalDiag(
             scale_diag=initial_state_scale * ones)
 
       dtype = dtype_util.common_dtype([drift_scale_prior, initial_state_prior])
@@ -425,10 +431,13 @@ class SmoothSeasonal(StructuralTimeSeries):
 
       parameters = []
       if allow_drift:
-        parameters.append(Parameter(
-            'drift_scale', drift_scale_prior,
-            tfb.Chain([tfb.Scale(scale=observed_stddev),
-                       tfb.Softplus(low=dtype_util.eps(dtype))])))
+        parameters.append(
+            Parameter(
+                'drift_scale', drift_scale_prior,
+                chain.Chain([
+                    scale.Scale(scale=observed_stddev),
+                    softplus.Softplus(low=dtype_util.eps(dtype))
+                ])))
       self._allow_drift = allow_drift
 
       super(SmoothSeasonal, self).__init__(

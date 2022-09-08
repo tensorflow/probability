@@ -17,7 +17,6 @@
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import scale as scale_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
@@ -32,6 +31,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import special
 
 
 __all__ = [
@@ -246,7 +246,7 @@ class ExpGamma(distribution.AutoCompositeTensorDistribution):
     return tf.math.igamma(self.concentration, y)
 
   def _quantile(self, p):
-    y = tfp_math.igammainv(self.concentration, p)
+    y = special.igammainv(self.concentration, p)
     if self.rate is None:
       return tf.math.log(y) - self.log_rate
     return tf.math.log(y / self.rate)

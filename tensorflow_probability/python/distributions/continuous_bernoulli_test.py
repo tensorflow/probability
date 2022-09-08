@@ -20,16 +20,18 @@ import numpy as np
 from scipy import special as sp_special
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import continuous_bernoulli
+from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
 
 
 def make_continuous_bernoulli(batch_shape, dtype=tf.float32):
   prob = np.random.uniform(size=list(batch_shape))
   prob = tf.constant(prob, dtype=tf.float32)
-  return tfd.ContinuousBernoulli(probs=prob, dtype=dtype, validate_args=True)
+  return continuous_bernoulli.ContinuousBernoulli(
+      probs=prob, dtype=dtype, validate_args=True)
 
 
 def log_norm_const(probs):
@@ -89,18 +91,21 @@ class ContinuousBernoulliTest(test_util.TestCase):
 
   def testProbs(self):
     prob = [0.2, 0.4]
-    dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
+    dist = continuous_bernoulli.ContinuousBernoulli(
+        probs=prob, validate_args=True)
     self.assertAllClose(prob, self.evaluate(dist.probs))
 
   def testLogits(self):
     logits = [-42.0, 42.0]
-    dist = tfd.ContinuousBernoulli(logits=logits, validate_args=True)
+    dist = continuous_bernoulli.ContinuousBernoulli(
+        logits=logits, validate_args=True)
     self.assertAllClose(logits, self.evaluate(dist.logits))
     self.assertAllClose(
         sp_special.expit(logits), self.evaluate(dist.probs_parameter()))
 
     prob = [0.01, 0.99, 0.42]
-    dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
+    dist = continuous_bernoulli.ContinuousBernoulli(
+        probs=prob, validate_args=True)
     self.assertAllClose(
         sp_special.logit(prob), self.evaluate(dist.logits_parameter())
     )
@@ -110,18 +115,21 @@ class ContinuousBernoulliTest(test_util.TestCase):
     for prob in invalid_probs:
       with self.assertRaisesOpError(
           'probs has components greater than 1'):
-        dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
+        dist = continuous_bernoulli.ContinuousBernoulli(
+            probs=prob, validate_args=True)
         self.evaluate(dist.probs_parameter())
 
     invalid_probs = [-0.01, -3.0]
     for prob in invalid_probs:
       with self.assertRaisesOpError('probs has components less than 0'):
-        dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
+        dist = continuous_bernoulli.ContinuousBernoulli(
+            probs=prob, validate_args=True)
         self.evaluate(dist.probs_parameter())
 
     valid_probs = [0.1, 0.5, 0.9]
     for prob in valid_probs:
-      dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
+      dist = continuous_bernoulli.ContinuousBernoulli(
+          probs=prob, validate_args=True)
       self.assertEqual(np.float32(prob), self.evaluate(dist.probs))
 
   def testShapes(self):
@@ -166,12 +174,13 @@ class ContinuousBernoulliTest(test_util.TestCase):
     self.assertEqual(dist64.dtype, dist64.mode().dtype)
 
   def testFloatMode(self):
-    dist = tfd.ContinuousBernoulli(
+    dist = continuous_bernoulli.ContinuousBernoulli(
         probs=0.6, dtype=tf.float32, validate_args=True)
     self.assertEqual(np.float32(1), self.evaluate(dist.mode()))
 
   def _testPdf(self, **kwargs):
-    dist = tfd.ContinuousBernoulli(validate_args=True, **kwargs)
+    dist = continuous_bernoulli.ContinuousBernoulli(
+        validate_args=True, **kwargs)
     # pylint: disable=bad-continuation
     xs = [
         0.1,
@@ -196,7 +205,8 @@ class ContinuousBernoulliTest(test_util.TestCase):
 
   def testPdfCorrectBroadcastDynamicShape(self):
     prob = tf1.placeholder_with_default([0.2, 0.3, 0.4], shape=None)
-    dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
+    dist = continuous_bernoulli.ContinuousBernoulli(
+        probs=prob, validate_args=True)
     event1 = [0.9, 0.1, 1.0]
     event2 = [[0.9, 0.1, 1.0]]
     self.assertAllClose(
@@ -217,16 +227,14 @@ class ContinuousBernoulliTest(test_util.TestCase):
     self.assertAllClose(
         np.log(pdf(samps, prob)),
         self.evaluate(
-            tfd.ContinuousBernoulli(probs=prob, validate_args=False).log_prob(
-                samps
-            )
-        ),
+            continuous_bernoulli.ContinuousBernoulli(
+                probs=prob, validate_args=False).log_prob(samps)),
     )
 
   def testLogNormalizerIsNotInf(self):
     # Parameterize by logits large in magnitude.
     logits = np.array([-1000., -100., 100., 1000.], dtype=np.float32)
-    dist = tfd.ContinuousBernoulli(logits=logits)
+    dist = continuous_bernoulli.ContinuousBernoulli(logits=logits)
     log_normalizer_ = self.evaluate(dist._log_normalizer())
     self.assertFalse(np.any(np.isinf(log_normalizer_)))
     # The normalizer grows roughly log(abs(logits))
@@ -236,7 +244,7 @@ class ContinuousBernoulliTest(test_util.TestCase):
     # Parameterize by probs near a half
     probs = tf.random.uniform(
         [int(1e4)], minval=0.4, maxval=0.6, seed=test_util.test_seed())
-    dist = tfd.ContinuousBernoulli(probs=probs)
+    dist = continuous_bernoulli.ContinuousBernoulli(probs=probs)
     log_normalizer_ = self.evaluate(dist._log_normalizer())
     self.assertFalse(np.any(np.isinf(log_normalizer_)))
     self.assertFalse(np.any(np.isnan(log_normalizer_)))
@@ -244,7 +252,8 @@ class ContinuousBernoulliTest(test_util.TestCase):
   def testBroadcasting(self):
     probs = lambda prob: tf1.placeholder_with_default(prob, shape=None)
     def dist(p):
-      return tfd.ContinuousBernoulli(probs=probs(p), validate_args=True)
+      return continuous_bernoulli.ContinuousBernoulli(
+          probs=probs(p), validate_args=True)
     self.assertAllClose(0.0, self.evaluate(dist(0.5).log_prob(0.9)))
     self.assertAllClose(
         np.log([1.0, 1.0, 1.0]),
@@ -256,37 +265,44 @@ class ContinuousBernoulliTest(test_util.TestCase):
   def testPdfShapes(self):
     probs = lambda prob: tf1.placeholder_with_default(prob, shape=None)
     def dist(p):
-      return tfd.ContinuousBernoulli(probs=probs(p), validate_args=True)
+      return continuous_bernoulli.ContinuousBernoulli(
+          probs=probs(p), validate_args=True)
     self.assertEqual(
         2, len(self.evaluate(dist([[0.5], [0.5]]).log_prob(0.9)).shape))
 
-    dist = tfd.ContinuousBernoulli(probs=0.5, validate_args=True)
+    dist = continuous_bernoulli.ContinuousBernoulli(
+        probs=0.5, validate_args=True)
     self.assertEqual(
         2, len(self.evaluate(dist.log_prob([[0.9], [0.9]])).shape))
 
-    dist = tfd.ContinuousBernoulli(probs=0.5, validate_args=True)
+    dist = continuous_bernoulli.ContinuousBernoulli(
+        probs=0.5, validate_args=True)
     self.assertAllEqual([], dist.log_prob(0.9).shape)
     self.assertAllEqual([1], dist.log_prob([0.9]).shape)
     self.assertAllEqual([2, 1], dist.log_prob([[0.9], [0.9]]).shape)
 
-    dist = tfd.ContinuousBernoulli(probs=[[0.5], [0.5]], validate_args=True)
+    dist = continuous_bernoulli.ContinuousBernoulli(
+        probs=[[0.5], [0.5]], validate_args=True)
     self.assertAllEqual([2, 1], dist.log_prob(0.9).shape)
 
   def testEntropyNoBatch(self):
     prob = 0.2
-    dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
+    dist = continuous_bernoulli.ContinuousBernoulli(
+        probs=prob, validate_args=True)
     self.assertAllClose(self.evaluate(dist.entropy()), entropy(prob))
 
   def testEntropyWithBatch(self):
     prob = [[0.1, 0.7], [0.2, 0.6]]
-    dist = tfd.ContinuousBernoulli(probs=prob, validate_args=False)
+    dist = continuous_bernoulli.ContinuousBernoulli(
+        probs=prob, validate_args=False)
     self.assertAllClose(
         self.evaluate(dist.entropy()),
         [[entropy(0.1), entropy(0.7)], [entropy(0.2), entropy(0.6)]])
 
   def testSampleN(self):
     prob = [0.2, 0.6]
-    dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
+    dist = continuous_bernoulli.ContinuousBernoulli(
+        probs=prob, validate_args=True)
     n = 100000
     samples = dist.sample(n, seed=test_util.test_seed())
     tensorshape_util.set_shape(samples, [n, 2])
@@ -301,21 +317,25 @@ class ContinuousBernoulliTest(test_util.TestCase):
         atol=1e-2)
     # In this test we're just interested in verifying there isn't a crash
     # owing to mismatched types. b/30940152
-    dist = tfd.ContinuousBernoulli(np.log([0.2, 0.4]), validate_args=True)
+    dist = continuous_bernoulli.ContinuousBernoulli(
+        np.log([0.2, 0.4]), validate_args=True)
     x = dist.sample(1, seed=test_util.test_seed())
     self.assertAllEqual((1, 2), tensorshape_util.as_list(x.shape))
 
   @test_util.numpy_disable_gradient_test
   def testReparameterized(self):
     prob = tf.constant([0.2, 0.6])
-    _, grad_prob = tfp.math.value_and_gradient(
-        lambda x: tfd.ContinuousBernoulli(probs=x, validate_args=True).sample(  # pylint: disable=g-long-lambda
-            100, seed=test_util.test_seed()), prob)
+    _, grad_prob = gradient.value_and_gradient(
+        lambda x: continuous_bernoulli.  # pylint: disable=g-long-lambda
+        ContinuousBernoulli(probs=x, validate_args=True).sample(
+            100, seed=test_util.test_seed()),
+        prob)
     self.assertIsNotNone(grad_prob)
 
   def testSampleDeterministicScalarVsVector(self):
     prob = [0.2, 0.6]
-    dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
+    dist = continuous_bernoulli.ContinuousBernoulli(
+        probs=prob, validate_args=True)
     n = 1000
 
     def _seed(seed=None):
@@ -337,12 +357,14 @@ class ContinuousBernoulliTest(test_util.TestCase):
 
   def testMean(self):
     prob = np.array([[0.2, 0.7], [0.8, 0.4]], dtype=np.float32)
-    dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
+    dist = continuous_bernoulli.ContinuousBernoulli(
+        probs=prob, validate_args=True)
     self.assertAllClose(self.evaluate(dist.mean()), mean(prob))
 
   def testMeanNonInfNaN(self):
     prob = tf.random.uniform([int(1e4)], seed=test_util.test_seed())
-    dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
+    dist = continuous_bernoulli.ContinuousBernoulli(
+        probs=prob, validate_args=True)
     mean_ = self.evaluate(dist.mean())
     self.assertFalse(np.any(np.isinf(mean_)))
     self.assertFalse(np.any(np.isnan(mean_)))
@@ -351,7 +373,8 @@ class ContinuousBernoulliTest(test_util.TestCase):
     # Parameterize by probs near a half
     prob = tf.random.uniform(
         [int(1e4)], minval=0.4, maxval=0.6, seed=test_util.test_seed())
-    dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
+    dist = continuous_bernoulli.ContinuousBernoulli(
+        probs=prob, validate_args=True)
     mean_ = self.evaluate(dist.mean())
     self.assertFalse(np.any(np.isinf(mean_)))
     self.assertFalse(np.any(np.isnan(mean_)))
@@ -359,13 +382,15 @@ class ContinuousBernoulliTest(test_util.TestCase):
   @test_util.numpy_disable_gradient_test
   def testMeanGradsAreNotNaN(self):
     logits = np.linspace(-100, 100, 20)[..., np.newaxis].astype(np.float32)
-    _, grad_logits = tfp.math.value_and_gradient(
-        lambda x: tfd.ContinuousBernoulli(logits=x).mean(), logits)
+    _, grad_logits = gradient.value_and_gradient(
+        lambda x: continuous_bernoulli.ContinuousBernoulli(logits=x).mean(),
+        logits)
     self.assertAllNotNan(self.evaluate(grad_logits))
 
   def testVarianceAndStd(self):
     prob = [[0.2, 0.7], [0.8, 0.4]]
-    dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
+    dist = continuous_bernoulli.ContinuousBernoulli(
+        probs=prob, validate_args=True)
     self.assertAllClose(
         self.evaluate(dist.variance()),
         np.array(
@@ -382,7 +407,7 @@ class ContinuousBernoulliTest(test_util.TestCase):
 
   def testCdfAndLogCdf(self):
     prob = 0.2
-    dist = tfd.ContinuousBernoulli(probs=prob)
+    dist = continuous_bernoulli.ContinuousBernoulli(probs=prob)
     self.assertAllClose(
         self.evaluate(
             dist.cdf(np.array([-2.0, 0.3, 1.1], dtype=np.float32))
@@ -403,13 +428,13 @@ class ContinuousBernoulliTest(test_util.TestCase):
 
   def testCdfCornerCase(self):
     logit = 0.
-    dist = tfd.ContinuousBernoulli(logits=logit)
+    dist = continuous_bernoulli.ContinuousBernoulli(logits=logit)
     xs = np.linspace(0.0, 1.0, 10)
     self.assertAllClose(self.evaluate(dist.cdf(xs)), xs)
 
   def testSurvivalAndLogSurvival(self):
     prob = 0.2
-    dist = tfd.ContinuousBernoulli(probs=prob)
+    dist = continuous_bernoulli.ContinuousBernoulli(probs=prob)
     self.assertAllClose(
         self.evaluate(
             dist.survival_function(
@@ -434,13 +459,14 @@ class ContinuousBernoulliTest(test_util.TestCase):
     probs = np.array(
         [0., 0.1, 0.3, 0.7, 0.9, 1.], dtype=np.float32)[..., np.newaxis]
     logits = np.log(probs) - np.log1p(-probs)
-    dist = tfd.ContinuousBernoulli(logits=logits)
+    dist = continuous_bernoulli.ContinuousBernoulli(logits=logits)
     x = np.array([-1., 0., 0.1, 0.3, 0.7, 0.9, 1., 2.], dtype=np.float32)
     self.assertAllClose(self.evaluate(dist.cdf(x)), cdf(x, probs))
 
   def testQuantile(self):
     prob = 0.2
-    dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
+    dist = continuous_bernoulli.ContinuousBernoulli(
+        probs=prob, validate_args=True)
     self.assertAllClose(
         self.evaluate(
             dist.quantile(np.array([0.1, 0.3, 0.9], dtype=np.float32))
@@ -451,7 +477,8 @@ class ContinuousBernoulliTest(test_util.TestCase):
 
   def testQuantileAtExtremesIsNotNaN(self):
     prob = [[0.], [1.]]
-    dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
+    dist = continuous_bernoulli.ContinuousBernoulli(
+        probs=prob, validate_args=True)
     self.assertAllNotNan(
         self.evaluate(
             dist.quantile(np.array(
@@ -461,13 +488,15 @@ class ContinuousBernoulliTest(test_util.TestCase):
   def testQuantileGradsAreNotNaN(self):
     probs = tf.constant([0.2, 0.6])
     x = np.linspace(0.1, 0.9, 20)[..., np.newaxis].astype(np.float32)
-    _, grad_prob = tfp.math.value_and_gradient(
-        lambda x: tfd.ContinuousBernoulli(probs=probs).quantile(x), x)
+    _, grad_prob = gradient.value_and_gradient(
+        lambda x: continuous_bernoulli.ContinuousBernoulli(probs=probs).  # pylint: disable=g-long-lambda
+        quantile(x), x)
     self.assertAllNotNan(self.evaluate(grad_prob))
 
   def testSampleAtExtremesIsNotNaN(self):
     prob = [[0.], [1.]]
-    dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
+    dist = continuous_bernoulli.ContinuousBernoulli(
+        probs=prob, validate_args=True)
     self.assertAllNotNan(
         self.evaluate(
             dist.sample(int(1e2), seed=test_util.test_seed())))
@@ -477,10 +506,10 @@ class ContinuousBernoulliTest(test_util.TestCase):
     a_p = np.array([0.6] * batch_size, dtype=np.float32)
     b_p = np.array([0.4] * batch_size, dtype=np.float32)
 
-    a = tfd.ContinuousBernoulli(probs=a_p, validate_args=True)
-    b = tfd.ContinuousBernoulli(probs=b_p, validate_args=True)
+    a = continuous_bernoulli.ContinuousBernoulli(probs=a_p, validate_args=True)
+    b = continuous_bernoulli.ContinuousBernoulli(probs=b_p, validate_args=True)
 
-    kl = tfd.kl_divergence(a, b)
+    kl = kullback_leibler.kl_divergence(a, b)
     kl_val = self.evaluate(kl)
 
     kl_expected = (
@@ -501,7 +530,7 @@ class ContinuousBernoulliTest(test_util.TestCase):
     self.assertAllClose(kl_val, kl_expected)
 
   def testLogitsNearZeroNotNaN(self):
-    dist = tfd.ContinuousBernoulli(logits=[-0.1, 0., 0.1])
+    dist = continuous_bernoulli.ContinuousBernoulli(logits=[-0.1, 0., 0.1])
     self.assertAllNotNan(self.evaluate(dist.mean()))
     self.assertAllNotNan(self.evaluate(dist.variance()))
     samples = self.evaluate(dist.sample(int(1e3), seed=test_util.test_seed()))
@@ -528,7 +557,8 @@ class ContinuousBernoulliSlicingTest(test_util.TestCase):
 
   def testScalarSlice(self):
     logits = self.evaluate(tf.random.normal([], seed=test_util.test_seed()))
-    dist = tfd.ContinuousBernoulli(logits=logits, validate_args=True)
+    dist = continuous_bernoulli.ContinuousBernoulli(
+        logits=logits, validate_args=True)
     self.assertAllEqual([], dist.batch_shape)
     self.assertAllEqual([1], dist[tf.newaxis].batch_shape)
     self.assertAllEqual([], dist[...].batch_shape)
@@ -538,9 +568,10 @@ class ContinuousBernoulliSlicingTest(test_util.TestCase):
   def testSlice(self):
     logits = self.evaluate(
         tf.random.normal([20, 3, 1, 5], seed=test_util.test_seed()))
-    dist = tfd.ContinuousBernoulli(logits=logits, validate_args=True)
+    dist = continuous_bernoulli.ContinuousBernoulli(
+        logits=logits, validate_args=True)
     batch_shape = tensorshape_util.as_list(dist.batch_shape)
-    dist_noshape = tfd.ContinuousBernoulli(
+    dist_noshape = continuous_bernoulli.ContinuousBernoulli(
         logits=tf1.placeholder_with_default(logits, shape=None),
         validate_args=True)
 
@@ -571,7 +602,7 @@ class ContinuousBernoulliSlicingTest(test_util.TestCase):
     check(make_slicer[tf.newaxis, :-3, tf.newaxis, ...])
 
     def halfway(x):
-      if isinstance(x, tfd.ContinuousBernoulli):
+      if isinstance(x, continuous_bernoulli.ContinuousBernoulli):
         return x.batch_shape_tensor()[0] // 2
       return x.shape[0] // 2
 
@@ -602,7 +633,8 @@ class ContinuousBernoulliSlicingTest(test_util.TestCase):
     logits = tf.Variable(
         tf.random.normal([20, 3, 1, 5], seed=test_util.test_seed()))
     self.evaluate(logits.initializer)
-    dist = tfd.ContinuousBernoulli(logits=logits, validate_args=True)
+    dist = continuous_bernoulli.ContinuousBernoulli(
+        logits=logits, validate_args=True)
     for slicer in [make_slicer[:5], make_slicer[..., -1], make_slicer[:, 1::2]]:
       with tf.GradientTape() as tape:
         dist = slicer(dist)
@@ -619,7 +651,8 @@ class ContinuousBernoulliSlicingTest(test_util.TestCase):
     logits = tf.Variable(
         tf.random.normal([20, 3, 1, 5], seed=test_util.test_seed()))
     self.evaluate(logits.initializer)
-    dist = tfd.ContinuousBernoulli(logits=logits, validate_args=True)
+    dist = continuous_bernoulli.ContinuousBernoulli(
+        logits=logits, validate_args=True)
     dist = dist[:5]
     with tf.GradientTape() as tape:
       dist = dist.copy(name='contbern2')
@@ -640,7 +673,7 @@ class ContinuousBernoulliSlicingTest(test_util.TestCase):
     logits = tf1.placeholder_with_default(
         tf.random.normal([20, 3, 1, 5], seed=test_util.test_seed()),
         shape=None)
-    dist = tfd.ContinuousBernoulli(
+    dist = continuous_bernoulli.ContinuousBernoulli(
         logits=logits, name='cb1', validate_args=True)
     self.assertIn('cb1', dist.name)
     dist = dist.copy(name='cb2')
@@ -649,7 +682,7 @@ class ContinuousBernoulliSlicingTest(test_util.TestCase):
   def testSliceCopyOverrideNameSliceAgainCopyOverrideLogitsSliceAgain(self):
     seed_stream = test_util.test_seed_stream('slice_continuous_bernoulli')
     logits = tf.random.normal([20, 3, 2, 5], seed=seed_stream())
-    dist = tfd.ContinuousBernoulli(
+    dist = continuous_bernoulli.ContinuousBernoulli(
         logits=logits, name='cb1', validate_args=True)
     self.assertIn('cb1', dist.name)
     dist = dist[:10].copy(name='cb2')
@@ -664,9 +697,8 @@ class ContinuousBernoulliSlicingTest(test_util.TestCase):
 
   def testDocstrSliceExample(self):
     # batch shape [3, 5, 7, 9]
-    cb = tfd.ContinuousBernoulli(
-        logits=tf.zeros([3, 5, 7, 9]), validate_args=True
-    )
+    cb = continuous_bernoulli.ContinuousBernoulli(
+        logits=tf.zeros([3, 5, 7, 9]), validate_args=True)
     self.assertAllEqual((3, 5, 7, 9), cb.batch_shape)
     cb2 = cb[:, tf.newaxis, ..., -2:, 1::2]  # batch shape [3, 1, 5, 2, 4]
     self.assertAllEqual((3, 1, 5, 2, 4), cb2.batch_shape)
@@ -679,7 +711,7 @@ class ContinuousBernoulliFromVariableTest(test_util.TestCase):
   def testGradientLogits(self):
     x = tf.Variable([-1.0, 1])
     self.evaluate(x.initializer)
-    d = tfd.ContinuousBernoulli(logits=x, validate_args=True)
+    d = continuous_bernoulli.ContinuousBernoulli(logits=x, validate_args=True)
     with tf.GradientTape() as tape:
       loss = -d.log_prob([0.1, 0.9])
     g = tape.gradient(loss, d.trainable_variables)
@@ -690,7 +722,7 @@ class ContinuousBernoulliFromVariableTest(test_util.TestCase):
   def testGradientProbs(self):
     x = tf.Variable([0.1, 0.7])
     self.evaluate(x.initializer)
-    d = tfd.ContinuousBernoulli(probs=x, validate_args=True)
+    d = continuous_bernoulli.ContinuousBernoulli(probs=x, validate_args=True)
     with tf.GradientTape() as tape:
       loss = -d.log_prob([0.1, 0.9])
     g = tape.gradient(loss, d.trainable_variables)

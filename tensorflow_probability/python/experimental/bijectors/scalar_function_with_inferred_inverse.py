@@ -17,12 +17,13 @@
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import callable_util
 from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import gradient
+from tensorflow_probability.python.math import root_search
 
 __all__ = ['ScalarFunctionWithInferredInverse']
 
@@ -33,7 +34,7 @@ class ScalarFunctionWithInferredInverse(bijector.Bijector):
   def __init__(self,
                fn,
                domain_constraint_fn=None,
-               root_search_fn=tfp_math.find_root_secant,
+               root_search_fn=root_search.find_root_secant,
                max_iterations=50,
                require_convergence=True,
                additional_scalar_parameters_requiring_gradients=(),
@@ -285,7 +286,7 @@ def _make_gradient_fn_of_y(fn, x):
   """
 
   def _grad_fn(x, *args):
-    _, grads = tfp_math.value_and_gradient(fn, x, *args)
+    _, grads = gradient.value_and_gradient(fn, x, *args)
     return grads if args else [grads]  # Always return a list.
 
   def _grad_fn_of_y_fwd(unused_y, *args):
@@ -298,9 +299,8 @@ def _make_gradient_fn_of_y(fn, x):
   def _second_order_terms(*args):
     """Computes entries of the (Hessian of `fn`) == (Jacobian of `_grad_fn`)."""
     # Partial derivatives of _grad_fn's first output (dy/dx) wrt `(x, *args)`.
-    _, (d2y_dx2, *d2y_dx_dargs) = tfp_math.value_and_gradient(
-        lambda x_and_args: _grad_fn(*x_and_args)[0],
-        (x,) + args,
+    _, (d2y_dx2, *d2y_dx_dargs) = gradient.value_and_gradient(
+        lambda x_and_args: _grad_fn(*x_and_args)[0], (x,) + args,
         auto_unpack_single_arg=False)
 
     # Partial derivatives of additional outputs (dy/da, etc) wrt the input
@@ -315,7 +315,7 @@ def _make_gradient_fn_of_y(fn, x):
     for i in range(len(args)):
       # It may be possible to run this loop in parallel with `vectorized_map`,
       # although this would only matter in cases with >> 1 arguments.
-      _, d2y_dargs2_row = tfp_math.value_and_gradient(
+      _, d2y_dargs2_row = gradient.value_and_gradient(
           lambda args, i=i: _grad_fn(x, *args)[1 + i],
           args,
           auto_unpack_single_arg=False)
@@ -451,10 +451,10 @@ def _make_gradient_fn_of_y(fn, x):
     # 1-2 args.
     gradients = []
     for j in range(1 + len(args)):
-      gradient = 0.
+      g = 0.
       for i in range(1 + len(args)):
-        gradient += dresult_d_grad_fn[i] * jacobian[i][j]
-      gradients.append(gradient)
+        g += dresult_d_grad_fn[i] * jacobian[i][j]
+      gradients.append(g)
     return gradients
 
   def _grad_fn_of_y_jvp(primals, tangents):

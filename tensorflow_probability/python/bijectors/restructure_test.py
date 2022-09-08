@@ -19,8 +19,10 @@ import collections
 # Dependency imports
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import restructure
+from tensorflow_probability.python.distributions import joint_distribution_named
+from tensorflow_probability.python.distributions import joint_distribution_sequential
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import test_util
 
 
@@ -29,11 +31,7 @@ class RestructureBijectorTest(test_util.TestCase):
   """Tests the correctness of the Y = Restructure({nested}) transformation."""
 
   def testListToStructure(self):
-    bij = tfb.Restructure({
-        'foo': [1, 2],
-        'bar': 0,
-        'baz': (3, 4)
-    })
+    bij = restructure.Restructure({'foo': [1, 2], 'bar': 0, 'baz': (3, 4)})
 
     x = [[1, 2, 3], [4, 5, 6], 7., 8., 9.]
     x_ndims = [1, 1, 0, 0, 0]
@@ -55,7 +53,7 @@ class RestructureBijectorTest(test_util.TestCase):
         0., self.evaluate(bij.inverse_log_det_jacobian(y, y_ndims)))
 
   def testDictToStructure(self):
-    bij = tfb.Restructure({
+    bij = restructure.Restructure({
         'foo': ['b', 'c'],
         'bar': 'a',
         'baz': ('d', 'e')
@@ -87,9 +85,9 @@ class RestructureBijectorTest(test_util.TestCase):
         ('c', 7.),
         ('d', 8.),
         ('e', 9.)])
-    bij = tfb.tree_flatten(x)
+    bij = restructure.tree_flatten(x)
 
-    bij_2 = tfb.pack_sequence_as(x)
+    bij_2 = restructure.pack_sequence_as(x)
 
     # Invert assertion arguments to infer structure from bijector output.
     self.assertAllEqualNested(
@@ -98,9 +96,17 @@ class RestructureBijectorTest(test_util.TestCase):
         bij_2.forward(bij.forward(x)), x, check_types=True)
 
   def testStructureToStructure(self):
-    bij = tfb.Restructure(
-        input_structure={'foo': [0, 1], 'bar': 2, 'baz': (3, 4)},
-        output_structure={'zip': [1, 2, 3], 'zap': 0, 'zop': 4})
+    bij = restructure.Restructure(
+        input_structure={
+            'foo': [0, 1],
+            'bar': 2,
+            'baz': (3, 4)
+        },
+        output_structure={
+            'zip': [1, 2, 3],
+            'zap': 0,
+            'zop': 4
+        })
 
     x = {'foo': [0., [1.]],
          'bar': [[2.]],
@@ -122,9 +128,17 @@ class RestructureBijectorTest(test_util.TestCase):
         0., self.evaluate(bij.inverse_log_det_jacobian(y, y_ndims)))
 
   def testEventNdims(self):
-    bij = tfb.Restructure(
-        input_structure={'foo': [0, 1], 'bar': 2, 'baz': (3, 4)},
-        output_structure={'zip': [1, 2, 3], 'zap': 0, 'zop': 4})
+    bij = restructure.Restructure(
+        input_structure={
+            'foo': [0, 1],
+            'bar': 2,
+            'baz': (3, 4)
+        },
+        output_structure={
+            'zip': [1, 2, 3],
+            'zap': 0,
+            'zop': 4
+        })
 
     x_ndims = {'foo': [10, 11], 'bar': 12, 'baz': (13, 14)}
     y_ndims = {'zip': [11, 12, 13], 'zap': 10, 'zop': 14}
@@ -135,17 +149,19 @@ class RestructureBijectorTest(test_util.TestCase):
         x_ndims, bij.inverse_event_ndims(y_ndims), check_types=True)
 
   def testPartsWithUnusedInternalStructure(self):
-    dist = tfd.JointDistributionSequential([
-        tfd.JointDistributionNamed({'a': tfd.Normal(0., 1.)}),
-        tfd.JointDistributionNamed({'b': tfd.Normal(1000., 1.)}),
+    dist = joint_distribution_sequential.JointDistributionSequential([
+        joint_distribution_named.JointDistributionNamed(
+            {'a': normal.Normal(0., 1.)}),
+        joint_distribution_named.JointDistributionNamed(
+            {'b': normal.Normal(1000., 1.)}),
     ])
     x = dist.sample(  # Shape: [{'a': []}, {'b': []}]
         seed=test_util.test_seed(sampler_type='stateless'))
 
     # Test that we can swap the outer list entries, even though they contain
     # internal structure (i.e., are themselves dicts).
-    swap_elements = tfb.Restructure(input_structure=[1, 0],
-                                    output_structure=[0, 1])
+    swap_elements = restructure.Restructure(
+        input_structure=[1, 0], output_structure=[0, 1])
     self.assertAllEqualNested(swap_elements(x), [x[1], x[0]], check_types=True)
 
     swapped_dist = swap_elements(dist)
@@ -156,11 +172,7 @@ class RestructureBijectorTest(test_util.TestCase):
                      [dist.dtype[1], dist.dtype[0]])
 
   def testCompositeTensor(self):
-    bij = tfb.Restructure({
-        'foo': [1, 2],
-        'bar': 0,
-        'baz': (3, 4)
-    })
+    bij = restructure.Restructure({'foo': [1, 2], 'bar': 0, 'baz': (3, 4)})
 
     x = [[1, 2, 3], [4, 5, 6], 7., 8., 9.]
     flat = tf.nest.flatten(bij, expand_composites=True)
@@ -170,7 +182,7 @@ class RestructureBijectorTest(test_util.TestCase):
         tf.function(lambda b_: b_.forward(x))(unflat))
 
   def testFloat64LDJ(self):
-    bij = tfb.Restructure([0, 1])
+    bij = restructure.Restructure([0, 1])
     x = [tf.zeros([], tf.float64), tf.zeros([], tf.float64)]
     event_ndims = [0, 0]
     fldj = bij.forward_log_det_jacobian(x, event_ndims)

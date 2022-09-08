@@ -20,7 +20,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
-from tensorflow_probability.python.optimizer import linesearch
+from tensorflow_probability.python.optimizer.linesearch.hager_zhang import hager_zhang
 
 # A namedtuple to hold the point at which a line function is evaluated, the
 # value of the function, directional derivative, and full gradient evaluated
@@ -206,7 +206,7 @@ def line_search_step(state, value_and_gradients_function, search_direction,
                            df=derivative_at_start_pt,
                            full_gradient=state.objective_gradient)
   inactive = state.failed | state.converged
-  ls_result = linesearch.hager_zhang(
+  ls_result = hager_zhang(
       line_search_value_grad_func,
       initial_step_size=_broadcast(1, state.position),
       value_at_zero=val_0,

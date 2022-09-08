@@ -19,8 +19,12 @@ import collections
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import chain
+from tensorflow_probability.python.bijectors import scale
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.distributions import linear_gaussian_ssm
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import mvn_diag
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 
@@ -31,7 +35,8 @@ from tensorflow_probability.python.sts.structural_time_series import StructuralT
 tfl = tf.linalg
 
 
-class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
+class AdditiveStateSpaceModel(linear_gaussian_ssm.LinearGaussianStateSpaceModel
+                             ):
   """A state space model representing a sum of component state space models.
 
   A state space model (SSM) posits a set of latent (unobserved) variables that
@@ -302,19 +307,22 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
             name='observation_noise_scale',
             dtype=dtype)
         def observation_noise_fn(t):
-          return tfd.MultivariateNormalDiag(
-              loc=(sum([ssm.get_observation_noise_for_timestep(t).mean()
-                        for ssm in component_ssms]) + offset_at_step(t)),
+          return mvn_diag.MultivariateNormalDiag(
+              loc=(sum([
+                  ssm.get_observation_noise_for_timestep(t).mean()
+                  for ssm in component_ssms
+              ]) + offset_at_step(t)),
               scale_diag=observation_noise_scale[..., tf.newaxis])
       else:
         def observation_noise_fn(t):
           offset = offset_at_step(t)
-          return sts_util.sum_mvns(
-              [tfd.MultivariateNormalDiag(
-                  loc=offset,
-                  scale_diag=tf.zeros_like(offset))] +
-              [ssm.get_observation_noise_for_timestep(t)
-               for ssm in component_ssms])
+          return sts_util.sum_mvns([
+              mvn_diag.MultivariateNormalDiag(
+                  loc=offset, scale_diag=tf.zeros_like(offset))
+          ] + [
+              ssm.get_observation_noise_for_timestep(t)
+              for ssm in component_ssms
+          ])
 
       super(AdditiveStateSpaceModel, self).__init__(
           num_timesteps=num_timesteps,
@@ -426,7 +434,7 @@ class Sum(StructuralTimeSeries):
         observed_mean, observed_stddev = 0., 1.
 
       if observation_noise_scale_prior is None:
-        observation_noise_scale_prior = tfd.LogNormal(
+        observation_noise_scale_prior = lognormal.LogNormal(
             loc=tf.math.log(.01 * observed_stddev), scale=2.)
 
       dtype = dtype_util.common_dtype([constant_offset,
@@ -451,11 +459,14 @@ class Sum(StructuralTimeSeries):
 
       # Build parameters list for the combined model, by inheriting parameters
       # from the component models in canonical order.
-      parameters = [Parameter('observation_noise_scale',
-                              observation_noise_scale_prior,
-                              tfb.Chain([
-                                  tfb.Scale(scale=observed_stddev),
-                                  tfb.Softplus(low=dtype_util.eps(dtype))]))]
+      parameters = [
+          Parameter(
+              'observation_noise_scale', observation_noise_scale_prior,
+              chain.Chain([
+                  scale.Scale(scale=observed_stddev),
+                  softplus.Softplus(low=dtype_util.eps(dtype))
+              ]))
+      ]
       for component in components:
         for parameter in component.parameters:
           parameters.append(Parameter(

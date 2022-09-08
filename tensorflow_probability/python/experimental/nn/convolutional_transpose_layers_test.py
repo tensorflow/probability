@@ -17,14 +17,14 @@
 import functools
 # Dependency imports
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.bijectors import sigmoid
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.experimental import nn as tfn
 from tensorflow_probability.python.internal import test_util
-
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
-tfn = tfp.experimental.nn
+from tensorflow_probability.python.util import deferred_tensor
 
 
 class BnnEndToEnd(object):
@@ -50,23 +50,25 @@ class BnnEndToEnd(object):
 
     bottleneck_size = 2
 
-    scale = tfp.util.TransformedVariable(1., tfb.Softplus())
+    scale = deferred_tensor.TransformedVariable(1., softplus.Softplus())
 
-    bnn = tfn.Sequential([
-        make_conv(input_channels, 32, filter_shape=5,
-                  strides=2),                                # [b, 14, 14, 32]
-        tfn.util.flatten_rightmost(ndims=3),                 # [b, 14 * 14 * 32]
-        tfn.AffineVariationalReparameterization(
-            14 * 14 * 32, bottleneck_size),                  # [b, 2]
-        lambda x: x[..., tf.newaxis, tf.newaxis, :],         # [b, 1, 1, 2]
-        make_deconv(2, 64, filter_shape=7, strides=1,
-                    padding='valid'),                        # [b, 7, 7, 64]
-        make_deconv(64, 32, filter_shape=4, strides=4),      # [2, 28, 28, 32]
-        make_conv(32, 1, filter_shape=2, strides=1),         # [2, 28, 28, 1]
-        lambda loc: tfd.Independent(  # pylint: disable=g-long-lambda
-            tfb.Sigmoid()(tfd.Normal(loc, scale)),
-            reinterpreted_batch_ndims=3)  # [b, 28, 28, 1]
-    ], name='bayesian_autoencoder')
+    bnn = tfn.Sequential(
+        [
+            make_conv(input_channels, 32, filter_shape=5,
+                      strides=2),  # [b, 14, 14, 32]
+            tfn.util.flatten_rightmost(ndims=3),  # [b, 14 * 14 * 32]
+            tfn.AffineVariationalReparameterization(14 * 14 * 32,
+                                                    bottleneck_size),  # [b, 2]
+            lambda x: x[..., tf.newaxis, tf.newaxis, :],  # [b, 1, 1, 2]
+            make_deconv(2, 64, filter_shape=7, strides=1,
+                        padding='valid'),  # [b, 7, 7, 64]
+            make_deconv(64, 32, filter_shape=4, strides=4),  # [2, 28, 28, 32]
+            make_conv(32, 1, filter_shape=2, strides=1),  # [2, 28, 28, 1]
+            lambda loc: independent.Independent(  # pylint: disable=g-long-lambda
+                sigmoid.Sigmoid()(normal.Normal(loc, scale)),
+                reinterpreted_batch_ndims=3)  # [b, 28, 28, 1]
+        ],
+        name='bayesian_autoencoder')
 
     # 3  Train.
 

@@ -45,6 +45,7 @@ JIT_SAMPLE_BLOCKLIST = (
     'Independent',  # http://b/164415821
     'Multinomial',
     'NegativeBinomial',  # http://b/170871051
+    'ZeroInflatedNegativeBinomial',  # http://b/170871051
 )
 JIT_LOGPROB_BLOCKLIST = (
     'BatchReshape',  # http://b/161984806
@@ -52,16 +53,19 @@ JIT_LOGPROB_BLOCKLIST = (
     'Independent',  # http://b/164415821
     'MixtureSameFamily',  # http://b/164415821
     'NegativeBinomial',  # http://b/170871051
+    'ZeroInflatedNegativeBinomial',  # http://b/170871051
 )
 
 VMAP_SAMPLE_BLOCKLIST = (
     'BatchReshape',  # Too slow: http://b/170871051
     'NegativeBinomial',  # Times out.
+    'ZeroInflatedNegativeBinomial',  # Times out.
 )
 VMAP_LOGPROB_BLOCKLIST = (
     'BatchReshape',  # http://b/161984806
     'Bates',
     'NegativeBinomial',  # Times out.
+    'ZeroInflatedNegativeBinomial',  # Times out.
     'QuantizedDistribution',  # http://b/162940364
 )
 
@@ -70,12 +74,14 @@ PMAP_SAMPLE_BLOCKLIST = (
     'BatchReshape',  # http://b/163171224
     'MixtureSameFamily',  # Too slow: http://b/170871051
     'NegativeBinomial',  # Too slow: http://b/170871051
+    'ZeroInflatedNegativeBinomial',  # Too slow: http://b/170871051
 )
 PMAP_LOGPROB_BLOCKLIST = (
     'BatchReshape',  # http://b/161984806
     'Bates',
     'MixtureSameFamily',  # http://b/164415821
     'NegativeBinomial',  # Times out.
+    'ZeroInflatedNegativeBinomial',  # Times out.
 )
 
 JVP_SAMPLE_BLOCKLIST = ()
@@ -84,30 +90,36 @@ JVP_LOGPROB_SAMPLE_BLOCKLIST = (
     'GeneralizedExtremeValue',  # http://b/175654800
     'IncrementLogProb',  # Sample and log prob are independent.
     'NegativeBinomial',  # Too slow: http://b/170871051
+    'ZeroInflatedNegativeBinomial',  # Too slow: http://b/170871051
 )
 JVP_LOGPROB_PARAM_BLOCKLIST = (
     'BetaQuotient',  # https://b/178552958
     'NegativeBinomial',  # Too slow: http://b/170871051
+    'ZeroInflatedNegativeBinomial',  # Too slow: http://b/170871051
 )
 
 VJP_SAMPLE_BLOCKLIST = (
     'NegativeBinomial',  # Too slow: http://b/170871051
+    'ZeroInflatedNegativeBinomial',  # Too slow: http://b/170871051
 )
 VJP_LOGPROB_SAMPLE_BLOCKLIST = (
     'BetaQuotient',  # https://b/178552958
     'GeneralizedExtremeValue',  # http://b/175654800
     'IncrementLogProb',  # Sample and log prob are independent.
     'NegativeBinomial',  # Too slow: http://b/170871051
+    'ZeroInflatedNegativeBinomial',  # Too slow: http://b/170871051
 )
 VJP_LOGPROB_PARAM_BLOCKLIST = (
     'BetaQuotient',  # https://b/178552958
     'NegativeBinomial',  # Too slow: http://b/170871051
+    'ZeroInflatedNegativeBinomial',  # Too slow: http://b/170871051
 )
 
 PYTREE_BLOCKLIST = (
     'Bates',
     'MixtureSameFamily',  # Too slow: http://b/170871051
     'NegativeBinomial',  # Too slow: http://b/170871051
+    'ZeroInflatedNegativeBinomial',  # Too slow: http://b/170871051
     'Poisson',  # Too slow: http://b/170871051
     'Sample',  # Too slow: http://b/170871051
     'SinhArcsinh',  # b/183670203
@@ -198,7 +210,7 @@ class _MapTest(test_util.TestCase):
   def testLogProb(self, dist_name, data):
     if (dist_name in self.logprob_blocklist) != FLAGS.blocklists_only:
       self.skipTest('Distribution currently broken.')
-    if dist_name == 'NegativeBinomial':
+    if dist_name in ['NegativeBinomial', 'ZeroInflatedNegativeBinomial']:
       self.skipTest('Skip never-terminating negative binomial vmap logprob.')
     dist = data.draw(dhps.distributions(
         enable_vars=False,

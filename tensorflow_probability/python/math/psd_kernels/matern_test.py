@@ -20,9 +20,9 @@ import numpy as np
 import scipy.special as scipy_special
 import tensorflow.compat.v2 as tf
 
-import tensorflow_probability as tfp
-
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
+from tensorflow_probability.python.math.psd_kernels import matern
 
 
 class _MaternTestCase(test_util.TestCase):
@@ -31,6 +31,8 @@ class _MaternTestCase(test_util.TestCase):
   Subclasses must specify _kernel_type and _numpy_kernel.
   """
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, reason='DType mismatch not caught in numpy.')
   def testMismatchedFloatTypesAreBad(self):
     self._kernel_type(1., 1)  # Should be OK (float32 fallback).
     self._kernel_type(1., np.float64(1.))  # Should be OK.
@@ -182,9 +184,9 @@ class _MaternTestCase(test_util.TestCase):
     x = tf.constant(np.arange(3 * 5, dtype=np.float32).reshape(3, 5))
 
     grads = [
-        tfp.math.value_and_gradient(
-            lambda x: k.apply(x, x)[i], x)[1]  # pylint: disable=cell-var-from-loop
-        for i in range(3)]
+        gradient.value_and_gradient(lambda x: k.apply(x, x)[i], x)[1]  # pylint: disable=cell-var-from-loop
+        for i in range(3)
+    ]
 
     self.assertAllEqual(
         [np.zeros(np.int32(grad.shape), np.float32) for grad in grads],
@@ -205,7 +207,7 @@ class GeneralizedMaternTest(_MaternTestCase):
     # Make sure tests work for scalar DF. Non-scalar DF is handled below.
     if df is None:
       df = np.pi
-    return tfp.math.psd_kernels.GeneralizedMatern(
+    return matern.GeneralizedMatern(
         df=df,
         amplitude=amplitude,
         length_scale=length_scale,
@@ -222,11 +224,8 @@ class GeneralizedMaternTest(_MaternTestCase):
 
   def testValidateDFPositive(self):
     with self.assertRaisesOpError('df must be positive'):
-      k = tfp.math.psd_kernels.GeneralizedMatern(
-          df=-1.,
-          amplitude=1.,
-          length_scale=1.,
-          validate_args=True)
+      k = matern.GeneralizedMatern(
+          df=-1., amplitude=1., length_scale=1., validate_args=True)
       self.evaluate(k.apply([[1.]], [[1.]]))
 
   def testDFBatchShape(self):
@@ -234,7 +233,7 @@ class GeneralizedMaternTest(_MaternTestCase):
     amplitude = np.random.uniform(2, 3., size=[1, 3, 1, 2]).astype(np.float32)
     length_scale = np.random.uniform(
         2, 3., size=[5, 1, 1, 2]).astype(np.float32)
-    k = tfp.math.psd_kernels.GeneralizedMatern(df, amplitude, length_scale)
+    k = matern.GeneralizedMatern(df, amplitude, length_scale)
     self.assertAllEqual(tf.TensorShape([5, 3, 3, 2]), k.batch_shape)
     self.assertAllEqual([5, 3, 3, 2], self.evaluate(k.batch_shape_tensor()))
 
@@ -259,12 +258,12 @@ class GeneralizedMaternTest(_MaternTestCase):
     amplitude = np.array(5., dtype=dtype)
     length_scale = np.array(.2, dtype=dtype)
 
-    k = tfp.math.psd_kernels.GeneralizedMatern(
+    k = matern.GeneralizedMatern(
         df=0.5,
         amplitude=amplitude,
         length_scale=length_scale,
         feature_ndims=feature_ndims)
-    matern_one_half = tfp.math.psd_kernels.MaternOneHalf(
+    matern_one_half = matern.MaternOneHalf(
         amplitude=amplitude,
         length_scale=length_scale,
         feature_ndims=feature_ndims)
@@ -301,12 +300,12 @@ class GeneralizedMaternTest(_MaternTestCase):
     amplitude = np.array(5., dtype=dtype)
     length_scale = np.array(.2, dtype=dtype)
 
-    k = tfp.math.psd_kernels.GeneralizedMatern(
+    k = matern.GeneralizedMatern(
         df=1.5,
         amplitude=amplitude,
         length_scale=length_scale,
         feature_ndims=feature_ndims)
-    matern_three_halves = tfp.math.psd_kernels.MaternThreeHalves(
+    matern_three_halves = matern.MaternThreeHalves(
         amplitude=amplitude,
         length_scale=length_scale,
         feature_ndims=feature_ndims)
@@ -343,12 +342,12 @@ class GeneralizedMaternTest(_MaternTestCase):
     amplitude = np.array(5., dtype=dtype)
     length_scale = np.array(.2, dtype=dtype)
 
-    k = tfp.math.psd_kernels.GeneralizedMatern(
+    k = matern.GeneralizedMatern(
         df=2.5,
         amplitude=amplitude,
         length_scale=length_scale,
         feature_ndims=feature_ndims)
-    matern_five_halves = tfp.math.psd_kernels.MaternFiveHalves(
+    matern_five_halves = matern.MaternFiveHalves(
         amplitude=amplitude,
         length_scale=length_scale,
         feature_ndims=feature_ndims)
@@ -372,9 +371,9 @@ class GeneralizedMaternTest(_MaternTestCase):
     x = tf.constant(np.arange(3 * 5, dtype=np.float32).reshape(3, 5))
 
     grads = [
-        tfp.math.value_and_gradient(
-            lambda x: k.apply(x, x)[i], x)[1]  # pylint: disable=cell-var-from-loop
-        for i in range(3)]
+        gradient.value_and_gradient(lambda x: k.apply(x, x)[i], x)[1]  # pylint: disable=cell-var-from-loop
+        for i in range(3)
+    ]
 
     self.assertAllEqual(
         [np.zeros(np.int32(grad.shape), np.float32) for grad in grads],
@@ -387,21 +386,18 @@ class GeneralizedMaternTest(_MaternTestCase):
     x = tf.constant([5.], dtype=np.float32)
     y = tf.constant([-2.], dtype=np.float32)
     def _apply(df):
-      k = tfp.math.psd_kernels.GeneralizedMatern(
-          df=df,
-          amplitude=1.,
-          length_scale=1.,
-          feature_ndims=1)
+      k = matern.GeneralizedMatern(
+          df=df, amplitude=1., length_scale=1., feature_ndims=1)
       return k.apply(x, y)
     df = tf.constant(2.5, dtype=np.float32)
 
-    self.assertIsNone(tfp.math.value_and_gradient(_apply, df)[1])
+    self.assertIsNone(gradient.value_and_gradient(_apply, df)[1])
 
 
 @test_util.test_all_tf_execution_regimes
 class MaternOneHalfTest(_MaternTestCase):
 
-  _kernel_type = tfp.math.psd_kernels.MaternOneHalf
+  _kernel_type = matern.MaternOneHalf
 
   def _numpy_kernel(self, amplitude, length_scale, x, y):
     norm = np.sqrt(np.sum((x - y)**2)) / length_scale
@@ -411,7 +407,7 @@ class MaternOneHalfTest(_MaternTestCase):
 @test_util.test_all_tf_execution_regimes
 class MaternThreeHalvesTest(_MaternTestCase):
 
-  _kernel_type = tfp.math.psd_kernels.MaternThreeHalves
+  _kernel_type = matern.MaternThreeHalves
 
   def _numpy_kernel(self, amplitude, length_scale, x, y):
     norm = np.sqrt(3. * np.sum((x - y)**2)) / length_scale
@@ -421,7 +417,7 @@ class MaternThreeHalvesTest(_MaternTestCase):
 @test_util.test_all_tf_execution_regimes
 class MaternFiveHalvesTest(_MaternTestCase):
 
-  _kernel_type = tfp.math.psd_kernels.MaternFiveHalves
+  _kernel_type = matern.MaternFiveHalves
 
   def _numpy_kernel(self, amplitude, length_scale, x, y):
     norm = np.sqrt(5. * np.sum((x - y)**2)) / length_scale

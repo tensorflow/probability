@@ -22,15 +22,19 @@ from absl.testing import parameterized
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.distributions import joint_distribution_named as jdn
+from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import student_t
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import gradient
-
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
+from tensorflow_probability.python.stats import leave_one_out
+from tensorflow_probability.python.vi import csiszar_divergence as cd
 
 
 def tridiag(d, diag_value, offdiag_value):
@@ -53,46 +57,40 @@ class AmariAlphaTest(test_util.TestCase):
       for normalized in [True, False]:
         self.assertAllClose(
             self.evaluate(
-                tfp.vi.amari_alpha(
-                    0., alpha=alpha, self_normalized=normalized)),
+                cd.amari_alpha(0., alpha=alpha, self_normalized=normalized)),
             0.)
 
   def test_correct_when_alpha0(self):
     self.assertAllClose(
-        self.evaluate(tfp.vi.amari_alpha(self._logu, alpha=0.)),
-        -self._logu)
+        self.evaluate(cd.amari_alpha(self._logu, alpha=0.)), -self._logu)
 
     self.assertAllClose(
         self.evaluate(
-            tfp.vi.amari_alpha(self._logu, alpha=0., self_normalized=True)),
+            cd.amari_alpha(self._logu, alpha=0., self_normalized=True)),
         -self._logu + (self._u - 1.))
 
   def test_correct_when_alpha1(self):
     self.assertAllClose(
-        self.evaluate(tfp.vi.amari_alpha(self._logu, alpha=1.)),
+        self.evaluate(cd.amari_alpha(self._logu, alpha=1.)),
         self._u * self._logu)
 
     self.assertAllClose(
         self.evaluate(
-            tfp.vi.amari_alpha(self._logu, alpha=1., self_normalized=True)),
+            cd.amari_alpha(self._logu, alpha=1., self_normalized=True)),
         self._u * self._logu - (self._u - 1.))
 
   def test_correct_when_alpha_not_01(self):
     for alpha in [-2, -1., -0.5, 0.5, 2.]:
       self.assertAllClose(
           self.evaluate(
-              tfp.vi.amari_alpha(self._logu,
-                                 alpha=alpha,
-                                 self_normalized=False)),
+              cd.amari_alpha(self._logu, alpha=alpha, self_normalized=False)),
           ((self._u**alpha - 1)) / (alpha * (alpha - 1.)))
 
       self.assertAllClose(
           self.evaluate(
-              tfp.vi.amari_alpha(self._logu,
-                                 alpha=alpha,
-                                 self_normalized=True)),
-          ((self._u**alpha - 1.)
-           - alpha * (self._u - 1)) / (alpha * (alpha - 1.)))
+              cd.amari_alpha(self._logu, alpha=alpha, self_normalized=True)),
+          ((self._u**alpha - 1.) - alpha * (self._u - 1)) / (alpha *
+                                                             (alpha - 1.)))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -106,16 +104,13 @@ class KLReverseTest(test_util.TestCase):
   def test_at_zero(self):
     for normalized in [True, False]:
       self.assertAllClose(
-          self.evaluate(tfp.vi.kl_reverse(0., self_normalized=normalized)),
-          0.)
+          self.evaluate(cd.kl_reverse(0., self_normalized=normalized)), 0.)
 
   def test_correct(self):
-    self.assertAllClose(
-        self.evaluate(tfp.vi.kl_reverse(self._logu)),
-        -self._logu)
+    self.assertAllClose(self.evaluate(cd.kl_reverse(self._logu)), -self._logu)
 
     self.assertAllClose(
-        self.evaluate(tfp.vi.kl_reverse(self._logu, self_normalized=True)),
+        self.evaluate(cd.kl_reverse(self._logu, self_normalized=True)),
         -self._logu + (self._u - 1.))
 
 
@@ -130,16 +125,14 @@ class KLForwardTest(test_util.TestCase):
   def test_at_zero(self):
     for normalized in [True, False]:
       self.assertAllClose(
-          self.evaluate(tfp.vi.kl_forward(0., self_normalized=normalized)),
-          0.)
+          self.evaluate(cd.kl_forward(0., self_normalized=normalized)), 0.)
 
   def test_correct(self):
     self.assertAllClose(
-        self.evaluate(tfp.vi.kl_forward(self._logu)),
-        self._u * self._logu)
+        self.evaluate(cd.kl_forward(self._logu)), self._u * self._logu)
 
     self.assertAllClose(
-        self.evaluate(tfp.vi.kl_forward(self._logu, self_normalized=True)),
+        self.evaluate(cd.kl_forward(self._logu, self_normalized=True)),
         self._u * self._logu - (self._u - 1.))
 
 
@@ -152,33 +145,29 @@ class JensenShannonTest(test_util.TestCase):
     self._u = np.exp(self._logu)
 
   def test_at_zero(self):
-    self.assertAllClose(
-        self.evaluate(tfp.vi.jensen_shannon(0.)), np.log(0.25))
+    self.assertAllClose(self.evaluate(cd.jensen_shannon(0.)), np.log(0.25))
 
   def test_symmetric(self):
     self.assertAllClose(
-        self.evaluate(tfp.vi.jensen_shannon(self._logu)),
-        self.evaluate(tfp.vi.symmetrized_csiszar_function(
-            self._logu, tfp.vi.jensen_shannon)))
+        self.evaluate(cd.jensen_shannon(self._logu)),
+        self.evaluate(
+            cd.symmetrized_csiszar_function(self._logu, cd.jensen_shannon)))
 
     self.assertAllClose(
+        self.evaluate(cd.jensen_shannon(self._logu, self_normalized=True)),
         self.evaluate(
-            tfp.vi.jensen_shannon(self._logu, self_normalized=True)),
-        self.evaluate(tfp.vi.symmetrized_csiszar_function(
-            self._logu,
-            lambda x: tfp.vi.jensen_shannon(x, self_normalized=True))))
+            cd.symmetrized_csiszar_function(
+                self._logu,
+                lambda x: cd.jensen_shannon(x, self_normalized=True))))
 
   def test_correct(self):
     self.assertAllClose(
-        self.evaluate(tfp.vi.jensen_shannon(self._logu)),
-        (self._u * self._logu
-         - (1 + self._u) * np.log1p(self._u)))
+        self.evaluate(cd.jensen_shannon(self._logu)),
+        (self._u * self._logu - (1 + self._u) * np.log1p(self._u)))
 
     self.assertAllClose(
-        self.evaluate(
-            tfp.vi.jensen_shannon(self._logu, self_normalized=True)),
-        (self._u * self._logu
-         - (1 + self._u) * np.log((1 + self._u) / 2)))
+        self.evaluate(cd.jensen_shannon(self._logu, self_normalized=True)),
+        (self._u * self._logu - (1 + self._u) * np.log((1 + self._u) / 2)))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -190,26 +179,25 @@ class ArithmeticGeometricMeanTest(test_util.TestCase):
     self._u = np.exp(self._logu)
 
   def test_at_zero(self):
+    self.assertAllClose(self.evaluate(cd.arithmetic_geometric(0.)), np.log(4))
     self.assertAllClose(
-        self.evaluate(tfp.vi.arithmetic_geometric(0.)), np.log(4))
-    self.assertAllClose(
-        self.evaluate(
-            tfp.vi.arithmetic_geometric(0., self_normalized=True)), 0.)
+        self.evaluate(cd.arithmetic_geometric(0., self_normalized=True)), 0.)
 
   def test_symmetric(self):
     self.assertAllClose(
-        self.evaluate(tfp.vi.arithmetic_geometric(self._logu)),
-        self.evaluate(tfp.vi.symmetrized_csiszar_function(
-            self._logu, tfp.vi.arithmetic_geometric)))
+        self.evaluate(cd.arithmetic_geometric(self._logu)),
+        self.evaluate(
+            cd.symmetrized_csiszar_function(self._logu,
+                                            cd.arithmetic_geometric)))
 
   def test_correct(self):
     self.assertAllClose(
-        self.evaluate(tfp.vi.arithmetic_geometric(self._logu)),
+        self.evaluate(cd.arithmetic_geometric(self._logu)),
         (1. + self._u) * np.log((1. + self._u) / np.sqrt(self._u)))
 
     self.assertAllClose(
         self.evaluate(
-            tfp.vi.arithmetic_geometric(self._logu, self_normalized=True)),
+            cd.arithmetic_geometric(self._logu, self_normalized=True)),
         (1. + self._u) * np.log(0.5 * (1. + self._u) / np.sqrt(self._u)))
 
 
@@ -222,11 +210,11 @@ class TotalVariationTest(test_util.TestCase):
     self._u = np.exp(self._logu)
 
   def test_at_zero(self):
-    self.assertAllClose(self.evaluate(tfp.vi.total_variation(0.)), 0.)
+    self.assertAllClose(self.evaluate(cd.total_variation(0.)), 0.)
 
   def test_correct(self):
     self.assertAllClose(
-        self.evaluate(tfp.vi.total_variation(self._logu)),
+        self.evaluate(cd.total_variation(self._logu)),
         0.5 * np.abs(self._u - 1))
 
 
@@ -239,12 +227,11 @@ class PearsonTest(test_util.TestCase):
     self._u = np.exp(self._logu)
 
   def test_at_zero(self):
-    self.assertAllClose(self.evaluate(tfp.vi.pearson(0.)), 0.)
+    self.assertAllClose(self.evaluate(cd.pearson(0.)), 0.)
 
   def test_correct(self):
     self.assertAllClose(
-        self.evaluate(tfp.vi.pearson(self._logu)),
-        np.square(self._u - 1))
+        self.evaluate(cd.pearson(self._logu)), np.square(self._u - 1))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -256,17 +243,17 @@ class SquaredHellingerTest(test_util.TestCase):
     self._u = np.exp(self._logu)
 
   def test_at_zero(self):
-    self.assertAllClose(self.evaluate(tfp.vi.squared_hellinger(0.)), 0.)
+    self.assertAllClose(self.evaluate(cd.squared_hellinger(0.)), 0.)
 
   def test_symmetric(self):
     self.assertAllClose(
-        self.evaluate(tfp.vi.squared_hellinger(self._logu)),
-        self.evaluate(tfp.vi.symmetrized_csiszar_function(
-            self._logu, tfp.vi.squared_hellinger)))
+        self.evaluate(cd.squared_hellinger(self._logu)),
+        self.evaluate(
+            cd.symmetrized_csiszar_function(self._logu, cd.squared_hellinger)))
 
   def test_correct(self):
     self.assertAllClose(
-        self.evaluate(tfp.vi.squared_hellinger(self._logu)),
+        self.evaluate(cd.squared_hellinger(self._logu)),
         np.square(np.sqrt(self._u) - 1))
 
 
@@ -279,17 +266,17 @@ class TriangularTest(test_util.TestCase):
     self._u = np.exp(self._logu)
 
   def test_at_zero(self):
-    self.assertAllClose(self.evaluate(tfp.vi.triangular(0.)), 0.)
+    self.assertAllClose(self.evaluate(cd.triangular(0.)), 0.)
 
   def test_symmetric(self):
     self.assertAllClose(
-        self.evaluate(tfp.vi.triangular(self._logu)),
-        self.evaluate(tfp.vi.symmetrized_csiszar_function(
-            self._logu, tfp.vi.triangular)))
+        self.evaluate(cd.triangular(self._logu)),
+        self.evaluate(
+            cd.symmetrized_csiszar_function(self._logu, cd.triangular)))
 
   def test_correct(self):
     self.assertAllClose(
-        self.evaluate(tfp.vi.triangular(self._logu)),
+        self.evaluate(cd.triangular(self._logu)),
         np.square(self._u - 1) / (1 + self._u))
 
 
@@ -302,40 +289,40 @@ class TPowerTest(test_util.TestCase):
     self._u = np.exp(self._logu)
 
   def test_at_zero(self):
-    self.assertAllClose(self.evaluate(tfp.vi.t_power(0., t=-0.1)), 0.)
-    self.assertAllClose(self.evaluate(tfp.vi.t_power(0., t=0.5)), 0.)
-    self.assertAllClose(self.evaluate(tfp.vi.t_power(0., t=1.1)), 0.)
+    self.assertAllClose(self.evaluate(cd.t_power(0., t=-0.1)), 0.)
+    self.assertAllClose(self.evaluate(cd.t_power(0., t=0.5)), 0.)
+    self.assertAllClose(self.evaluate(cd.t_power(0., t=1.1)), 0.)
     self.assertAllClose(
-        self.evaluate(tfp.vi.t_power(0., t=-0.1, self_normalized=True)), 0.)
+        self.evaluate(cd.t_power(0., t=-0.1, self_normalized=True)), 0.)
     self.assertAllClose(
-        self.evaluate(tfp.vi.t_power(0., t=0.5, self_normalized=True)), 0.)
+        self.evaluate(cd.t_power(0., t=0.5, self_normalized=True)), 0.)
     self.assertAllClose(
-        self.evaluate(tfp.vi.t_power(0., t=1.1, self_normalized=True)), 0.)
+        self.evaluate(cd.t_power(0., t=1.1, self_normalized=True)), 0.)
 
   def test_correct(self):
     self.assertAllClose(
-        self.evaluate(tfp.vi.t_power(self._logu, t=np.float64(-0.1))),
-        self._u ** -0.1 - 1.)
+        self.evaluate(cd.t_power(self._logu, t=np.float64(-0.1))),
+        self._u**-0.1 - 1.)
     self.assertAllClose(
-        self.evaluate(tfp.vi.t_power(self._logu, t=np.float64(0.5))),
-        -self._u ** 0.5 + 1.)
+        self.evaluate(cd.t_power(self._logu, t=np.float64(0.5))),
+        -self._u**0.5 + 1.)
     self.assertAllClose(
-        self.evaluate(tfp.vi.t_power(self._logu, t=np.float64(1.1))),
-        self._u ** 1.1 - 1.)
+        self.evaluate(cd.t_power(self._logu, t=np.float64(1.1))),
+        self._u**1.1 - 1.)
 
   def test_correct_self_normalized(self):
     self.assertAllClose(
-        self.evaluate(tfp.vi.t_power(self._logu, t=np.float64(-0.1),
-                                     self_normalized=True)),
-        self._u ** -0.1 - 1. + 0.1 * (self._u - 1.))
+        self.evaluate(
+            cd.t_power(self._logu, t=np.float64(-0.1), self_normalized=True)),
+        self._u**-0.1 - 1. + 0.1 * (self._u - 1.))
     self.assertAllClose(
-        self.evaluate(tfp.vi.t_power(self._logu, t=np.float64(0.5),
-                                     self_normalized=True)),
-        -self._u ** 0.5 + 1. + 0.5 * (self._u - 1.))
+        self.evaluate(
+            cd.t_power(self._logu, t=np.float64(0.5), self_normalized=True)),
+        -self._u**0.5 + 1. + 0.5 * (self._u - 1.))
     self.assertAllClose(
-        self.evaluate(tfp.vi.t_power(self._logu, t=np.float64(1.1),
-                                     self_normalized=True)),
-        self._u ** 1.1 - 1. - 1.1 * (self._u - 1.))
+        self.evaluate(
+            cd.t_power(self._logu, t=np.float64(1.1), self_normalized=True)),
+        self._u**1.1 - 1. - 1.1 * (self._u - 1.))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -347,11 +334,11 @@ class Log1pAbsTest(test_util.TestCase):
     self._u = np.exp(self._logu)
 
   def test_at_zero(self):
-    self.assertAllClose(self.evaluate(tfp.vi.log1p_abs(0.)), 0.)
+    self.assertAllClose(self.evaluate(cd.log1p_abs(0.)), 0.)
 
   def test_correct(self):
     self.assertAllClose(
-        self.evaluate(tfp.vi.log1p_abs(self._logu)),
+        self.evaluate(cd.log1p_abs(self._logu)),
         self._u**(np.sign(self._u - 1)) - 1)
 
 
@@ -364,17 +351,16 @@ class JeffreysTest(test_util.TestCase):
     self._u = np.exp(self._logu)
 
   def test_at_zero(self):
-    self.assertAllClose(self.evaluate(tfp.vi.jeffreys(0.)), 0.)
+    self.assertAllClose(self.evaluate(cd.jeffreys(0.)), 0.)
 
   def test_symmetric(self):
     self.assertAllClose(
-        self.evaluate(tfp.vi.jeffreys(self._logu)),
-        self.evaluate(tfp.vi.symmetrized_csiszar_function(
-            self._logu, tfp.vi.jeffreys)))
+        self.evaluate(cd.jeffreys(self._logu)),
+        self.evaluate(cd.symmetrized_csiszar_function(self._logu, cd.jeffreys)))
 
   def test_correct(self):
     self.assertAllClose(
-        self.evaluate(tfp.vi.jeffreys(self._logu)),
+        self.evaluate(cd.jeffreys(self._logu)),
         0.5 * (self._u * self._logu - self._logu))
 
 
@@ -387,12 +373,11 @@ class ChiSquareTest(test_util.TestCase):
     self._u = np.exp(self._logu)
 
   def test_at_zero(self):
-    self.assertAllClose(self.evaluate(tfp.vi.chi_square(0.)), 0.)
+    self.assertAllClose(self.evaluate(cd.chi_square(0.)), 0.)
 
   def test_correct(self):
     self.assertAllClose(
-        self.evaluate(tfp.vi.chi_square(self._logu)),
-        self._u**2 - 1)
+        self.evaluate(cd.chi_square(self._logu)), self._u**2 - 1)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -404,19 +389,17 @@ class ModifiedGanTest(test_util.TestCase):
     self._u = np.exp(self._logu)
 
   def test_at_zero(self):
+    self.assertAllClose(self.evaluate(cd.modified_gan(0.)), np.log(2))
     self.assertAllClose(
-        self.evaluate(tfp.vi.modified_gan(0.)), np.log(2))
-    self.assertAllClose(
-        self.evaluate(
-            tfp.vi.modified_gan(0., self_normalized=True)), np.log(2))
+        self.evaluate(cd.modified_gan(0., self_normalized=True)), np.log(2))
 
   def test_correct(self):
     self.assertAllClose(
-        self.evaluate(tfp.vi.modified_gan(self._logu)),
+        self.evaluate(cd.modified_gan(self._logu)),
         np.log1p(self._u) - self._logu)
 
     self.assertAllClose(
-        self.evaluate(tfp.vi.modified_gan(self._logu, self_normalized=True)),
+        self.evaluate(cd.modified_gan(self._logu, self_normalized=True)),
         np.log1p(self._u) - self._logu + 0.5 * (self._u - 1))
 
 
@@ -441,23 +424,23 @@ class SymmetrizedCsiszarFunctionTest(test_util.TestCase):
           logu - tf.nn.softplus(logu)))
 
     self.assertAllClose(
-        self.evaluate(tfp.vi.symmetrized_csiszar_function(self._logu, js1)),
-        self.evaluate(tfp.vi.jensen_shannon(self._logu)))
+        self.evaluate(cd.symmetrized_csiszar_function(self._logu, js1)),
+        self.evaluate(cd.jensen_shannon(self._logu)))
 
     self.assertAllClose(
-        self.evaluate(tfp.vi.symmetrized_csiszar_function(self._logu, js2)),
-        self.evaluate(tfp.vi.jensen_shannon(self._logu)))
+        self.evaluate(cd.symmetrized_csiszar_function(self._logu, js2)),
+        self.evaluate(cd.jensen_shannon(self._logu)))
 
   def test_jeffreys(self):
     self.assertAllClose(
-        self.evaluate(tfp.vi.symmetrized_csiszar_function(
-            self._logu, tfp.vi.kl_reverse)),
-        self.evaluate(tfp.vi.jeffreys(self._logu)))
+        self.evaluate(
+            cd.symmetrized_csiszar_function(self._logu, cd.kl_reverse)),
+        self.evaluate(cd.jeffreys(self._logu)))
 
     self.assertAllClose(
-        self.evaluate(tfp.vi.symmetrized_csiszar_function(
-            self._logu, tfp.vi.kl_forward)),
-        self.evaluate(tfp.vi.jeffreys(self._logu)))
+        self.evaluate(
+            cd.symmetrized_csiszar_function(self._logu, cd.kl_forward)),
+        self.evaluate(cd.jeffreys(self._logu)))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -470,45 +453,41 @@ class DualCsiszarFunctionTest(test_util.TestCase):
 
   def test_kl_forward(self):
     self.assertAllClose(
-        self.evaluate(
-            tfp.vi.dual_csiszar_function(self._logu, tfp.vi.kl_forward)),
-        self.evaluate(tfp.vi.kl_reverse(self._logu)))
+        self.evaluate(cd.dual_csiszar_function(self._logu, cd.kl_forward)),
+        self.evaluate(cd.kl_reverse(self._logu)))
 
   def test_kl_reverse(self):
     self.assertAllClose(
-        self.evaluate(
-            tfp.vi.dual_csiszar_function(self._logu, tfp.vi.kl_reverse)),
-        self.evaluate(tfp.vi.kl_forward(self._logu)))
+        self.evaluate(cd.dual_csiszar_function(self._logu, cd.kl_reverse)),
+        self.evaluate(cd.kl_forward(self._logu)))
 
 
 @test_util.test_all_tf_execution_regimes
 class MonteCarloVariationalLossTest(test_util.TestCase):
 
   def test_kl_forward(self):
-    q = tfd.Normal(
-        loc=np.ones(6),
-        scale=np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0]))
+    q = normal.Normal(
+        loc=np.ones(6), scale=np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0]))
 
-    p = tfd.Normal(loc=q.loc + 0.1, scale=q.scale - 0.2)
+    p = normal.Normal(loc=q.loc + 0.1, scale=q.scale - 0.2)
 
     seed = test_util.test_seed()
 
-    approx_kl = tfp.vi.monte_carlo_variational_loss(
-        discrepancy_fn=tfp.vi.kl_forward,
+    approx_kl = cd.monte_carlo_variational_loss(
+        discrepancy_fn=cd.kl_forward,
         target_log_prob_fn=p.log_prob,
         surrogate_posterior=q,
         sample_size=int(4e5),
         seed=seed)
 
-    approx_kl_self_normalized = tfp.vi.monte_carlo_variational_loss(
-        discrepancy_fn=(
-            lambda logu: tfp.vi.kl_forward(logu, self_normalized=True)),
+    approx_kl_self_normalized = cd.monte_carlo_variational_loss(
+        discrepancy_fn=(lambda logu: cd.kl_forward(logu, self_normalized=True)),
         target_log_prob_fn=p.log_prob,
         surrogate_posterior=q,
         sample_size=int(4e5),
         seed=seed)
 
-    exact_kl = tfd.kl_divergence(p, q)
+    exact_kl = kullback_leibler.kl_divergence(p, q)
 
     [approx_kl_, approx_kl_self_normalized_, exact_kl_] = self.evaluate([
         approx_kl, approx_kl_self_normalized, exact_kl])
@@ -520,30 +499,28 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
                         rtol=0.06, atol=0.)
 
   def test_kl_reverse(self):
-    q = tfd.Normal(
-        loc=np.ones(6),
-        scale=np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0]))
+    q = normal.Normal(
+        loc=np.ones(6), scale=np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0]))
 
-    p = tfd.Normal(loc=q.loc + 0.1, scale=q.scale - 0.2)
+    p = normal.Normal(loc=q.loc + 0.1, scale=q.scale - 0.2)
 
     seed = test_util.test_seed()
 
-    approx_kl = tfp.vi.monte_carlo_variational_loss(
+    approx_kl = cd.monte_carlo_variational_loss(
         target_log_prob_fn=p.log_prob,
         surrogate_posterior=q,
-        discrepancy_fn=tfp.vi.kl_reverse,
+        discrepancy_fn=cd.kl_reverse,
         sample_size=int(4.5e5),
         seed=seed)
 
-    approx_kl_self_normalized = tfp.vi.monte_carlo_variational_loss(
+    approx_kl_self_normalized = cd.monte_carlo_variational_loss(
         target_log_prob_fn=p.log_prob,
         surrogate_posterior=q,
-        discrepancy_fn=(
-            lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True)),
+        discrepancy_fn=(lambda logu: cd.kl_reverse(logu, self_normalized=True)),
         sample_size=int(4.5e5),
         seed=seed)
 
-    exact_kl = tfd.kl_divergence(q, p)
+    exact_kl = kullback_leibler.kl_divergence(q, p)
 
     [approx_kl_, approx_kl_self_normalized_, exact_kl_] = self.evaluate([
         approx_kl, approx_kl_self_normalized, exact_kl])
@@ -557,32 +534,32 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
   def test_kl_forward_multidim(self):
     d = 5  # Dimension
 
-    p = tfd.MultivariateNormalFullCovariance(
-        covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))
+    p = mvn_tril.MultivariateNormalTriL(
+        scale_tril=tf.linalg.cholesky(
+            tridiag(d, diag_value=1, offdiag_value=0.5)))
 
     # Variance is very high when approximating Forward KL, so we make
     # scale_diag large. This ensures q
     # "covers" p and thus Var_q[p/q] is smaller.
-    q = tfd.MultivariateNormalDiag(scale_diag=[1.]*d)
+    q = mvn_diag.MultivariateNormalDiag(scale_diag=[1.] * d)
 
     seed = test_util.test_seed()
 
-    approx_kl = tfp.vi.monte_carlo_variational_loss(
+    approx_kl = cd.monte_carlo_variational_loss(
         target_log_prob_fn=p.log_prob,
         surrogate_posterior=q,
-        discrepancy_fn=tfp.vi.kl_forward,
+        discrepancy_fn=cd.kl_forward,
         sample_size=int(6e5),
         seed=seed)
 
-    approx_kl_self_normalized = tfp.vi.monte_carlo_variational_loss(
+    approx_kl_self_normalized = cd.monte_carlo_variational_loss(
         target_log_prob_fn=p.log_prob,
         surrogate_posterior=q,
-        discrepancy_fn=(
-            lambda logu: tfp.vi.kl_forward(logu, self_normalized=True)),
+        discrepancy_fn=(lambda logu: cd.kl_forward(logu, self_normalized=True)),
         sample_size=int(6e5),
         seed=seed)
 
-    exact_kl = tfd.kl_divergence(p, q)
+    exact_kl = kullback_leibler.kl_divergence(p, q)
 
     [approx_kl_, approx_kl_self_normalized_, exact_kl_] = self.evaluate([
         approx_kl, approx_kl_self_normalized, exact_kl])
@@ -596,33 +573,33 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
   def test_kl_reverse_multidim(self):
     d = 5  # Dimension
 
-    p = tfd.MultivariateNormalFullCovariance(
-        covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))
+    p = mvn_tril.MultivariateNormalTriL(
+        scale_tril=tf.linalg.cholesky(
+            tridiag(d, diag_value=1, offdiag_value=0.5)))
 
     # Variance is very high when approximating Reverse KL with self
     # normalization, because we pick up a term E_q[p / q]. So we make
     # scale_diag large. This ensures q "covers" p and thus Var_q[p/q] is
     # smaller.
-    q = tfd.MultivariateNormalDiag(scale_diag=[1.]*d)
+    q = mvn_diag.MultivariateNormalDiag(scale_diag=[1.] * d)
 
     seed = test_util.test_seed()
 
-    approx_kl = tfp.vi.monte_carlo_variational_loss(
+    approx_kl = cd.monte_carlo_variational_loss(
         target_log_prob_fn=p.log_prob,
         surrogate_posterior=q,
-        discrepancy_fn=tfp.vi.kl_reverse,
+        discrepancy_fn=cd.kl_reverse,
         sample_size=int(6e5),
         seed=seed)
 
-    approx_kl_self_normalized = tfp.vi.monte_carlo_variational_loss(
+    approx_kl_self_normalized = cd.monte_carlo_variational_loss(
         target_log_prob_fn=p.log_prob,
         surrogate_posterior=q,
-        discrepancy_fn=(
-            lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True)),
+        discrepancy_fn=(lambda logu: cd.kl_reverse(logu, self_normalized=True)),
         sample_size=int(6e5),
         seed=seed)
 
-    exact_kl = tfd.kl_divergence(q, p)
+    exact_kl = kullback_leibler.kl_divergence(q, p)
 
     [approx_kl_, approx_kl_self_normalized_, exact_kl_] = self.evaluate([
         approx_kl, approx_kl_self_normalized, exact_kl])
@@ -637,31 +614,32 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
 
     # Target distribution: equiv to MVNFullCovariance(cov=[[1., 1.], [1., 2.]])
     def target_log_prob_fn(z, x):
-      return tfd.Normal(0., 1.).log_prob(z) + tfd.Normal(z, 1.).log_prob(x)
+      return normal.Normal(0., 1.).log_prob(z) + normal.Normal(z,
+                                                               1.).log_prob(x)
 
     # Factored q distribution: equiv to MVNDiag(scale_diag=[1., sqrt(2)])
-    q_sequential = tfd.JointDistributionSequential([  # Should pass as *args.
-        tfd.Normal(0., 1.),
-        tfd.Normal(0., tf.sqrt(2.))
+    q_sequential = jds.JointDistributionSequential([  # Should pass as *args.
+        normal.Normal(0., 1.),
+        normal.Normal(0., tf.sqrt(2.))
     ])
-    q_named = tfd.JointDistributionNamed({  # Should pass as **kwargs.
-        'x': tfd.Normal(0., tf.sqrt(2.)),
-        'z': tfd.Normal(0., 1.)
+    q_named = jdn.JointDistributionNamed({  # Should pass as **kwargs.
+        'x': normal.Normal(0., tf.sqrt(2.)),
+        'z': normal.Normal(0., 1.)
     })
 
     seed = test_util.test_seed()
 
-    reverse_kl_sequential = tfp.vi.monte_carlo_variational_loss(
+    reverse_kl_sequential = cd.monte_carlo_variational_loss(
         target_log_prob_fn=target_log_prob_fn,
         surrogate_posterior=q_sequential,
-        discrepancy_fn=tfp.vi.kl_reverse,
+        discrepancy_fn=cd.kl_reverse,
         sample_size=int(3e5),
         seed=seed)
 
-    reverse_kl_named = tfp.vi.monte_carlo_variational_loss(
+    reverse_kl_named = cd.monte_carlo_variational_loss(
         target_log_prob_fn=target_log_prob_fn,
         surrogate_posterior=q_named,
-        discrepancy_fn=tfp.vi.kl_reverse,
+        discrepancy_fn=cd.kl_reverse,
         sample_size=int(3e5),
         seed=seed)
 
@@ -677,33 +655,33 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
 
     # Use a normalized target, so the true normalizing constant (lowest possible
     # loss) is zero.
-    target = tfd.Normal(loc=0., scale=1.)
-    proposal = tfd.StudentT(2, loc=3., scale=2.)
+    target = normal.Normal(loc=0., scale=1.)
+    proposal = student_t.StudentT(2, loc=3., scale=2.)
 
-    elbo_loss = tfp.vi.monte_carlo_variational_loss(
+    elbo_loss = cd.monte_carlo_variational_loss(
         target_log_prob_fn=target.log_prob,
         surrogate_posterior=proposal,
-        discrepancy_fn=tfp.vi.kl_reverse,
+        discrepancy_fn=cd.kl_reverse,
         sample_size=int(3e4),
         importance_sample_size=1,
         seed=seed)
     self.assertAllGreater(elbo_loss, 0.)
 
     # Check that importance sampling reduces the loss towards zero.
-    iwae_10_loss = tfp.vi.monte_carlo_variational_loss(
+    iwae_10_loss = cd.monte_carlo_variational_loss(
         target_log_prob_fn=target.log_prob,
         surrogate_posterior=proposal,
-        discrepancy_fn=tfp.vi.kl_reverse,
+        discrepancy_fn=cd.kl_reverse,
         sample_size=int(3e4),
         importance_sample_size=10,
         seed=seed)
     self.assertAllGreater(elbo_loss, iwae_10_loss)
     self.assertAllGreater(iwae_10_loss, 0)
 
-    iwae_100_loss = tfp.vi.monte_carlo_variational_loss(
+    iwae_100_loss = cd.monte_carlo_variational_loss(
         target_log_prob_fn=target.log_prob,
         surrogate_posterior=proposal,
-        discrepancy_fn=tfp.vi.kl_reverse,
+        discrepancy_fn=cd.kl_reverse,
         sample_size=int(3e4),
         importance_sample_size=100,
         seed=seed)
@@ -711,19 +689,19 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
     self.assertAllClose(iwae_100_loss, 0, atol=0.1)
 
     # Check reproducibility
-    elbo_loss_again = tfp.vi.monte_carlo_variational_loss(
+    elbo_loss_again = cd.monte_carlo_variational_loss(
         target_log_prob_fn=target.log_prob,
         surrogate_posterior=proposal,
-        discrepancy_fn=tfp.vi.kl_reverse,
+        discrepancy_fn=cd.kl_reverse,
         sample_size=int(3e4),
         importance_sample_size=1,
         seed=seed)
     self.assertAllClose(elbo_loss_again, elbo_loss)
 
-    iwae_10_loss_again = tfp.vi.monte_carlo_variational_loss(
+    iwae_10_loss_again = cd.monte_carlo_variational_loss(
         target_log_prob_fn=target.log_prob,
         surrogate_posterior=proposal,
-        discrepancy_fn=tfp.vi.kl_reverse,
+        discrepancy_fn=cd.kl_reverse,
         sample_size=int(3e4),
         importance_sample_size=10,
         seed=seed)
@@ -742,10 +720,11 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
 
     def construct_monte_carlo_csiszar_f_divergence(func, gradient_estimator):
       def _fn(s):
-        p = tfd.MultivariateNormalFullCovariance(
-            covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))
-        q = tfd.MultivariateNormalDiag(scale_diag=tf.tile([s], [d]))
-        return tfp.vi.monte_carlo_variational_loss(
+        p = mvn_tril.MultivariateNormalTriL(
+            scale_tril=tf.linalg.cholesky(
+                tridiag(d, diag_value=1, offdiag_value=0.5)))
+        q = mvn_diag.MultivariateNormalDiag(scale_diag=tf.tile([s], [d]))
+        return cd.monte_carlo_variational_loss(
             target_log_prob_fn=p.log_prob,
             surrogate_posterior=q,
             discrepancy_fn=func,
@@ -755,27 +734,27 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
       return _fn
 
     approx_kl = construct_monte_carlo_csiszar_f_divergence(
-        tfp.vi.kl_reverse,
-        gradient_estimator=tfp.vi.GradientEstimators.REPARAMETERIZATION)
+        cd.kl_reverse,
+        gradient_estimator=cd.GradientEstimators.REPARAMETERIZATION)
 
     approx_kl_self_normalized = construct_monte_carlo_csiszar_f_divergence(
-        lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True),
-        gradient_estimator=tfp.vi.GradientEstimators.REPARAMETERIZATION)
+        lambda logu: cd.kl_reverse(logu, self_normalized=True),
+        gradient_estimator=cd.GradientEstimators.REPARAMETERIZATION)
 
     approx_kl_score_trick = construct_monte_carlo_csiszar_f_divergence(
-        tfp.vi.kl_reverse,
-        gradient_estimator=tfp.vi.GradientEstimators.SCORE_FUNCTION)
+        cd.kl_reverse, gradient_estimator=cd.GradientEstimators.SCORE_FUNCTION)
 
     approx_kl_self_normalized_score_trick = (
         construct_monte_carlo_csiszar_f_divergence(
-            lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True),
-            gradient_estimator=tfp.vi.GradientEstimators.SCORE_FUNCTION))
+            lambda logu: cd.kl_reverse(logu, self_normalized=True),
+            gradient_estimator=cd.GradientEstimators.SCORE_FUNCTION))
 
     def exact_kl(s):
-      p = tfd.MultivariateNormalFullCovariance(
-          covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))
-      q = tfd.MultivariateNormalDiag(scale_diag=tf.tile([s], [d]))
-      return tfd.kl_divergence(q, p)
+      p = mvn_tril.MultivariateNormalTriL(
+          scale_tril=tf.linalg.cholesky(
+              tridiag(d, diag_value=1, offdiag_value=0.5)))
+      q = mvn_diag.MultivariateNormalDiag(scale_diag=tf.tile([s], [d]))
+      return kullback_leibler.kl_divergence(q, p)
 
     [
         approx_kl_,
@@ -789,12 +768,12 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
         exact_kl_,
         exact_kl_grad_,
     ] = self.evaluate(
-        list(tfp.math.value_and_gradient(approx_kl, s)) +
-        list(tfp.math.value_and_gradient(approx_kl_self_normalized, s)) +
-        list(tfp.math.value_and_gradient(approx_kl_score_trick, s)) +
-        list(tfp.math.value_and_gradient(
-            approx_kl_self_normalized_score_trick, s)) +
-        list(tfp.math.value_and_gradient(exact_kl, s)))
+        list(gradient.value_and_gradient(approx_kl, s)) +
+        list(gradient.value_and_gradient(approx_kl_self_normalized, s)) +
+        list(gradient.value_and_gradient(approx_kl_score_trick, s)) + list(
+            gradient.value_and_gradient(approx_kl_self_normalized_score_trick,
+                                        s)) +
+        list(gradient.value_and_gradient(exact_kl, s)))
 
     # Test average divergence.
     self.assertAllClose(approx_kl_, exact_kl_,
@@ -825,15 +804,16 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test
   def test_sticking_the_landing_gradient_is_zero_at_optimum(self):
-    target_dist = tfd.Normal(loc=2., scale=3.)
+    target_dist = normal.Normal(loc=2., scale=3.)
 
     def apply_fn(loc, raw_scale):
-      return tfd.Normal(loc=loc, scale=tf.nn.softplus(raw_scale))
+      return normal.Normal(loc=loc, scale=tf.nn.softplus(raw_scale))
+
     optimal_params = (target_dist.mean(),
-                      tfb.Softplus().inverse(target_dist.stddev()))
+                      softplus.Softplus().inverse(target_dist.stddev()))
 
     def loss(params, gradient_estimator):
-      return tfp.vi.monte_carlo_variational_loss(
+      return cd.monte_carlo_variational_loss(
           target_dist.log_prob,
           surrogate_posterior=apply_fn(*params),
           stopped_surrogate_posterior=apply_fn(
@@ -841,16 +821,14 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
           gradient_estimator=gradient_estimator,
           seed=test_util.test_seed(sampler_type='stateless'))
 
-    elbo_loss, _ = tfp.math.value_and_gradient(
+    elbo_loss, _ = gradient.value_and_gradient(
         functools.partial(
-            loss,
-            gradient_estimator=tfp.vi.GradientEstimators.REPARAMETERIZATION),
+            loss, gradient_estimator=cd.GradientEstimators.REPARAMETERIZATION),
         [optimal_params])
-    stl_loss, stl_grad = tfp.math.value_and_gradient(
+    stl_loss, stl_grad = gradient.value_and_gradient(
         functools.partial(
             loss,
-            gradient_estimator=(
-                tfp.vi.GradientEstimators.DOUBLY_REPARAMETERIZED)),
+            gradient_estimator=(cd.GradientEstimators.DOUBLY_REPARAMETERIZED)),
         [optimal_params])
     self.assertAllClose(elbo_loss, stl_loss)
     for g in stl_grad[0]:
@@ -859,14 +837,15 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
   @test_util.numpy_disable_gradient_test
   def test_doubly_reparameterized_reduces_iwae_gradient_variance(self):
 
-    target_dist = tfd.Normal(loc=2., scale=3.)
+    target_dist = normal.Normal(loc=2., scale=3.)
 
     def apply_fn(loc, raw_scale):
-      return tfd.Normal(loc=loc, scale=tf.nn.softplus(raw_scale))
-    initial_params = (-3., tfb.Softplus().inverse(1.))
+      return normal.Normal(loc=loc, scale=tf.nn.softplus(raw_scale))
+
+    initial_params = (-3., softplus.Softplus().inverse(1.))
 
     def loss(params, gradient_estimator, seed):
-      return tfp.vi.monte_carlo_variational_loss(
+      return cd.monte_carlo_variational_loss(
           target_dist.log_prob,
           surrogate_posterior=apply_fn(*params),
           stopped_surrogate_posterior=apply_fn(
@@ -881,19 +860,16 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
     iwae_grads = []
     dreg_grads = []
     for seed in seeds:
-      iwae_loss, iwae_grad = tfp.math.value_and_gradient(
+      iwae_loss, iwae_grad = gradient.value_and_gradient(
           functools.partial(
               loss,
-              gradient_estimator=tfp.vi.GradientEstimators.REPARAMETERIZATION,
-              seed=seed),
-          [initial_params])
-      dreg_loss, dreg_grad = tfp.math.value_and_gradient(
+              gradient_estimator=cd.GradientEstimators.REPARAMETERIZATION,
+              seed=seed), [initial_params])
+      dreg_loss, dreg_grad = gradient.value_and_gradient(
           functools.partial(
               loss,
-              gradient_estimator=(
-                  tfp.vi.GradientEstimators.DOUBLY_REPARAMETERIZED),
-              seed=seed),
-          [initial_params])
+              gradient_estimator=(cd.GradientEstimators.DOUBLY_REPARAMETERIZED),
+              seed=seed), [initial_params])
       self.assertAllClose(iwae_loss, dreg_loss)
       iwae_grads.append(tf.convert_to_tensor(iwae_grad))
       dreg_grads.append(tf.convert_to_tensor(dreg_grad))
@@ -907,26 +883,27 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
         0.)
 
   @parameterized.named_parameters(
-      ('_score_function',
-       # TODO(b/213378570): Support score function gradients for
-       # importance-weighted bounds.
-       tfp.vi.GradientEstimators.SCORE_FUNCTION, 1),
-      ('_reparameterization',
-       tfp.vi.GradientEstimators.REPARAMETERIZATION, 5),
-      ('_doubly_reparameterized',
-       tfp.vi.GradientEstimators.DOUBLY_REPARAMETERIZED, 5),
-      ('_vimco', tfp.vi.GradientEstimators.VIMCO, 5))
+      (
+          '_score_function',
+          # TODO(b/213378570): Support score function gradients for
+          # importance-weighted bounds.
+          cd.GradientEstimators.SCORE_FUNCTION,
+          1),
+      ('_reparameterization', cd.GradientEstimators.REPARAMETERIZATION, 5),
+      ('_doubly_reparameterized', cd.GradientEstimators.DOUBLY_REPARAMETERIZED,
+       5),
+      ('_vimco', cd.GradientEstimators.VIMCO, 5))
   def test_gradient_estimators_do_not_modify_loss(self,
                                                   gradient_estimator,
                                                   importance_sample_size):
 
     def target_log_prob_fn(x):
-      return tfd.Normal(4., scale=1.).log_prob(x)
+      return normal.Normal(4., scale=1.).log_prob(x)
 
     seed = test_util.test_seed(sampler_type='stateless')
     sample_size = 10000
 
-    surrogate_posterior = tfd.Normal(loc=7., scale=2.)
+    surrogate_posterior = normal.Normal(loc=7., scale=2.)
 
     # Manually estimate the expected multi-sample / IWAE loss.
     zs, q_lp = surrogate_posterior.experimental_sample_and_log_prob(
@@ -937,7 +914,7 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
             tf.cast(importance_sample_size, dtype=log_weights.dtype)),
         axis=0)
 
-    loss = tfp.vi.monte_carlo_variational_loss(
+    loss = cd.monte_carlo_variational_loss(
         target_log_prob_fn,
         surrogate_posterior=surrogate_posterior,
         gradient_estimator=gradient_estimator,
@@ -987,23 +964,25 @@ class CsiszarVIMCOTest(test_util.TestCase):
     num_batch_draws = int(3)
     seed = test_util.test_seed(sampler_type='stateless')
 
-    f = lambda logu: tfp.vi.kl_reverse(logu, self_normalized=False)
+    f = lambda logu: cd.kl_reverse(logu, self_normalized=False)
     np_f = lambda logu: -logu
-    p = tfd.MultivariateNormalFullCovariance(
-        covariance_matrix=tridiag(dims, diag_value=1, offdiag_value=0.5))
+    p = mvn_tril.MultivariateNormalTriL(
+        scale_tril=tf.linalg.cholesky(
+            tridiag(dims, diag_value=1, offdiag_value=0.5)))
     # Variance is very high when approximating Forward KL, so we make
     # scale_diag large. This ensures q "covers" p and thus Var_q[p/q] is
     # smaller.
     build_q = (
-        lambda s: tfd.MultivariateNormalDiag(scale_diag=tf.tile([s], [dims])))
+        lambda s: mvn_diag.MultivariateNormalDiag(  # pylint:disable=g-long-lambda
+            scale_diag=tf.tile([s], [dims])))
 
     def vimco_loss(s):
-      return tfp.vi.monte_carlo_variational_loss(
+      return cd.monte_carlo_variational_loss(
           p.log_prob,
           surrogate_posterior=build_q(s),
           importance_sample_size=num_draws,
           sample_size=num_batch_draws,
-          gradient_estimator=tfp.vi.GradientEstimators.VIMCO,
+          gradient_estimator=cd.GradientEstimators.VIMCO,
           discrepancy_fn=f,
           seed=seed)
 
@@ -1014,7 +993,7 @@ class CsiszarVIMCOTest(test_util.TestCase):
       return p.log_prob(x) - q.log_prob(x)
 
     def f_log_sum_u(s):
-      return f(tfp.stats.log_soomean_exp(logu(s), axis=0)[::-1][0])
+      return f(leave_one_out.log_soomean_exp(logu(s), axis=0)[::-1][0])
 
     def q_log_prob_x(s):
       q = build_q(s)
@@ -1025,9 +1004,9 @@ class CsiszarVIMCOTest(test_util.TestCase):
     s = tf.constant(1.)
     logu_ = self.evaluate(logu(s))
     vimco_, grad_vimco_ = self.evaluate(
-        tfp.math.value_and_gradient(vimco_loss, s))
+        gradient.value_and_gradient(vimco_loss, s))
     f_log_sum_u_, grad_mean_f_log_sum_u_ = self.evaluate(
-        tfp.math.value_and_gradient(f_log_sum_u, s))
+        gradient.value_and_gradient(f_log_sum_u, s))
     grad_mean_f_log_sum_u_ /= num_batch_draws
     jacobian_logqx_ = self.evaluate(
         # Compute `jacobian(q_log_prob_x, s)` using `batch_jacobian` and messy
@@ -1052,7 +1031,7 @@ class CsiszarVIMCOTest(test_util.TestCase):
     #
     # Regarding `grad_mean_f_log_sum_u_`, note that we validate the
     # correctness of the zero-th order derivative (for each batch member).
-    # Since `tfp.vi.csiszar_vimco_helper` itself does not manipulate any
+    # Since `cd.csiszar_vimco_helper` itself does not manipulate any
     # gradient information, we can safely rely on TF.
     self.assertAllClose(np_f(np_log_avg_u), f_log_sum_u_, rtol=1e-4, atol=1e-5)
     #
@@ -1076,32 +1055,33 @@ class CsiszarVIMCOTest(test_util.TestCase):
 
     # Target distribution: equiv to MVNFullCovariance(cov=[[1., 1.], [1., 2.]])
     def p_log_prob(z, x):
-      return tfd.Normal(0., 1.).log_prob(z) + tfd.Normal(z, 1.).log_prob(x)
+      return normal.Normal(0., 1.).log_prob(z) + normal.Normal(z,
+                                                               1.).log_prob(x)
 
     # Factored q distribution: equiv to MVNDiag(scale_diag=[1., sqrt(2)])
-    q_sequential = tfd.JointDistributionSequential([  # Should pass as *args.
-        tfd.Normal(0., 1.),
-        tfd.Normal(0., tf.sqrt(2.))
+    q_sequential = jds.JointDistributionSequential([  # Should pass as *args.
+        normal.Normal(0., 1.),
+        normal.Normal(0., tf.sqrt(2.))
     ])
-    q_named = tfd.JointDistributionNamed({  # Should pass as **kwargs.
-        'x': tfd.Normal(0., tf.sqrt(2.)),
-        'z': tfd.Normal(0., 1.)
+    q_named = jdn.JointDistributionNamed({  # Should pass as **kwargs.
+        'x': normal.Normal(0., tf.sqrt(2.)),
+        'z': normal.Normal(0., 1.)
     })
 
     seed = test_util.test_seed()
 
-    reverse_kl_sequential = tfp.vi.monte_carlo_variational_loss(
+    reverse_kl_sequential = cd.monte_carlo_variational_loss(
         p_log_prob,
         surrogate_posterior=q_sequential,
         importance_sample_size=int(3e5),
-        gradient_estimator=tfp.vi.GradientEstimators.VIMCO,
+        gradient_estimator=cd.GradientEstimators.VIMCO,
         seed=seed)
 
-    reverse_kl_named = tfp.vi.monte_carlo_variational_loss(
+    reverse_kl_named = cd.monte_carlo_variational_loss(
         p_log_prob,
         surrogate_posterior=q_named,
         importance_sample_size=int(3e5),
-        gradient_estimator=tfp.vi.GradientEstimators.VIMCO,
+        gradient_estimator=cd.GradientEstimators.VIMCO,
         seed=seed)
 
     [reverse_kl_sequential_, reverse_kl_named_
@@ -1113,28 +1093,29 @@ class CsiszarVIMCOTest(test_util.TestCase):
 
     # Target distribution: equiv to MVNFullCovariance(cov=[[1., 1.], [1., 2.]])
     def p_log_prob(z, x):
-      return tfd.Normal(0., 1.).log_prob(z) + tfd.Normal(z, 1.).log_prob(x)
+      return normal.Normal(0., 1.).log_prob(z) + normal.Normal(z,
+                                                               1.).log_prob(x)
 
     # Factored q distribution: equiv to MVNDiag(scale_diag=[1., sqrt(2)])
-    q = tfd.JointDistributionNamed({  # Should pass as **kwargs.
-        'x': tfd.Normal(0., tf.sqrt(2.)),
-        'z': tfd.Normal(0., 1.)
+    q = jdn.JointDistributionNamed({  # Should pass as **kwargs.
+        'x': normal.Normal(0., tf.sqrt(2.)),
+        'z': normal.Normal(0., 1.)
     })
 
     seed = test_util.test_seed(sampler_type='stateless')
 
-    reverse_kl = tfp.vi.monte_carlo_variational_loss(
+    reverse_kl = cd.monte_carlo_variational_loss(
         p_log_prob,
         surrogate_posterior=q,
         importance_sample_size=10,
-        gradient_estimator=tfp.vi.GradientEstimators.VIMCO,
+        gradient_estimator=cd.GradientEstimators.VIMCO,
         seed=seed)
 
-    reverse_kl_again = tfp.vi.monte_carlo_variational_loss(
+    reverse_kl_again = cd.monte_carlo_variational_loss(
         p_log_prob,
         surrogate_posterior=q,
         importance_sample_size=10,
-        gradient_estimator=tfp.vi.GradientEstimators.VIMCO,
+        gradient_estimator=cd.GradientEstimators.VIMCO,
         seed=seed)
 
     self.assertAllClose(reverse_kl_again, reverse_kl)

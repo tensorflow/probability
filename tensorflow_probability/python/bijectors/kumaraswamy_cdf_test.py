@@ -18,9 +18,9 @@
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import kumaraswamy_cdf
 from tensorflow_probability.python.internal import test_util
 
 
@@ -31,7 +31,7 @@ class KumaraswamyTest(test_util.TestCase):
   def testBijector(self):
     a = 2.
     b = 0.3
-    bijector = tfb.KumaraswamyCDF(
+    bijector = kumaraswamy_cdf.KumaraswamyCDF(
         concentration1=a, concentration0=b, validate_args=True)
     self.assertStartsWith(bijector.name, 'kumaraswamy')
     x = np.array([[[0.1], [0.2], [0.3], [0.4], [0.5]]], dtype=np.float32)
@@ -55,7 +55,7 @@ class KumaraswamyTest(test_util.TestCase):
     # When concentration = 1., forward_log_det_jacobian should be finite at
     # zero.
     concentration0 = np.logspace(0.1, 10., num=20).astype(np.float32)
-    bijector = tfb.KumaraswamyCDF(
+    bijector = kumaraswamy_cdf.KumaraswamyCDF(
         concentration1=1., concentration0=concentration0)
     ildj = self.evaluate(
         bijector.inverse_log_det_jacobian(0., event_ndims=0))
@@ -63,7 +63,7 @@ class KumaraswamyTest(test_util.TestCase):
 
   def testScalarCongruency(self):
     bijector_test_util.assert_scalar_congruency(
-        tfb.KumaraswamyCDF(concentration1=0.5, concentration0=1.1),
+        kumaraswamy_cdf.KumaraswamyCDF(concentration1=0.5, concentration0=1.1),
         lower_x=0.,
         upper_x=1.,
         eval_func=self.evaluate,
@@ -73,7 +73,7 @@ class KumaraswamyTest(test_util.TestCase):
   def testBijectiveAndFinite(self):
     concentration1 = 1.2
     concentration0 = 2.
-    bijector = tfb.KumaraswamyCDF(
+    bijector = kumaraswamy_cdf.KumaraswamyCDF(
         concentration1=concentration1,
         concentration0=concentration0,
         validate_args=True)
@@ -88,7 +88,7 @@ class KumaraswamyTest(test_util.TestCase):
   @test_util.jax_disable_variable_test
   def testVariableConcentration1(self):
     x = tf.Variable(1.)
-    b = tfb.KumaraswamyCDF(
+    b = kumaraswamy_cdf.KumaraswamyCDF(
         concentration0=1., concentration1=x, validate_args=True)
     self.evaluate(x.initializer)
     self.assertIs(x, b.concentration1)
@@ -101,7 +101,7 @@ class KumaraswamyTest(test_util.TestCase):
   @test_util.jax_disable_variable_test
   def testVariableConcentration0(self):
     x = tf.Variable(1.)
-    b = tfb.KumaraswamyCDF(
+    b = kumaraswamy_cdf.KumaraswamyCDF(
         concentration0=x, concentration1=1., validate_args=True)
     self.evaluate(x.initializer)
     self.assertIs(x, b.concentration0)
@@ -116,15 +116,13 @@ class KumaraswamyTest(test_util.TestCase):
     self.evaluate(x.initializer)
     with self.assertRaisesOpError(
         'Argument `concentration1` must be positive.'):
-      b = tfb.KumaraswamyCDF(concentration0=1.,
-                             concentration1=x,
-                             validate_args=True)
+      b = kumaraswamy_cdf.KumaraswamyCDF(
+          concentration0=1., concentration1=x, validate_args=True)
       self.evaluate(b.forward_event_shape_tensor([1, 2, 3]))
     with self.assertRaisesOpError(
         'Argument `concentration0` must be positive.'):
-      b = tfb.KumaraswamyCDF(concentration0=x,
-                             concentration1=1.,
-                             validate_args=True)
+      b = kumaraswamy_cdf.KumaraswamyCDF(
+          concentration0=x, concentration1=1., validate_args=True)
       self.evaluate(b.forward_event_shape_tensor(tf.constant([1, 2, 3])))
 
   @test_util.numpy_disable_gradient_test
@@ -132,7 +130,7 @@ class KumaraswamyTest(test_util.TestCase):
   def testGradient(self):
     x = tf.Variable(1.)
     y = tf.Variable(2.)
-    b = tfb.KumaraswamyCDF(
+    b = kumaraswamy_cdf.KumaraswamyCDF(
         concentration0=x, concentration1=y, validate_args=True)
     with tf.GradientTape() as tape:
       loss = b.forward(1.)

@@ -18,12 +18,13 @@
 from absl import flags
 import numpy as np
 import tensorflow.compat.v1 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import mvn_diag
 from tensorflow_probability.python.experimental.auto_batching import tf_backend
+from tensorflow_probability.python.experimental.mcmc import nuts_autobatching as nuts_exp
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
+from tensorflow_probability.python.mcmc import nuts
+from tensorflow_probability.python.mcmc import sample
 
 flags.DEFINE_string('test_device', None,
                     'TensorFlow device on which to place operators under test')
@@ -33,16 +34,15 @@ FLAGS = flags.FLAGS
 def run_nuts_chain(event_size, batch_size, num_steps):
   def f():
     def target_log_prob_fn(event):
-      return tfd.MultivariateNormalDiag(
-          tf.zeros(event_size),
-          scale_identity_multiplier=1.).log_prob(event)
+      return mvn_diag.MultivariateNormalDiag(
+          tf.zeros(event_size), scale_identity_multiplier=1.).log_prob(event)
 
     state = tf.zeros([batch_size, event_size])
-    chain_state, extra = tfp.mcmc.sample_chain(
+    chain_state, extra = sample.sample_chain(
         num_results=num_steps,
         num_burnin_steps=0,
         current_state=[state],
-        kernel=tfp.experimental.mcmc.NoUTurnSampler(
+        kernel=nuts_exp.NoUTurnSampler(
             target_log_prob_fn,
             step_size=[0.3],
             use_auto_batching=True,
@@ -90,17 +90,17 @@ class NutsXLATest(test_util.TestCase):
     @tf.function(autograph=False)
     def target_log_prob_fn(event):
       with tf.name_scope('nuts_test_target_log_prob'):
-        return tfd.MultivariateNormalDiag(
+        return mvn_diag.MultivariateNormalDiag(
             loc=tf.cast(mu, dtype=tf.float32),
             scale_diag=tf.cast(stddev, dtype=tf.float32)).log_prob(event)
 
     @tf.function(autograph=False, jit_compile=True)
     def _run_nuts_chain():
-      kernel = tfp.mcmc.NoUTurnSampler(
+      kernel = nuts.NoUTurnSampler(
           target_log_prob_fn,
           step_size=[tf.cast(step_size, dtype=tf.float32)],
           unrolled_leapfrog_steps=unrolled_leapfrog_steps)
-      [x], (is_accepted, leapfrogs_taken) = tfp.mcmc.sample_chain(
+      [x], (is_accepted, leapfrogs_taken) = sample.sample_chain(
           num_results=num_steps,
           num_burnin_steps=0,
           current_state=[initial_state],

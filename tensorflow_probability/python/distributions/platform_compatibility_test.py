@@ -33,8 +33,8 @@ import six
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python import experimental
 from tensorflow_probability.python.distributions import hypothesis_testlib as dhps
+from tensorflow_probability.python.experimental.util import composite_tensor
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
@@ -66,6 +66,8 @@ XLA_UNFRIENDLY_DISTS = frozenset([
     'TruncatedNormal',
     'Weibull',
     'WishartTriL',  # log_probs are very far off.
+    # TODO(b/162935914): Needs to use XLA friendly Poisson sampler.
+    'ZeroInflatedNegativeBinomial'
 ])
 
 NO_SAMPLE_PARAM_GRADS = {
@@ -141,6 +143,7 @@ VECTORIZED_LOGPROB_RTOL.update({
     'NegativeBinomial': 1e-5,
     'PERT': 1e-5,
     'PowerSpherical': 5e-5,
+    'ZeroInflatedNegativeBinomial': 1e-5
 })
 
 # TODO(b/142827327): Bring tolerance down to 0 for all distributions.
@@ -217,7 +220,6 @@ XLA_LOGPROB_RTOL.update({
     'SigmoidBeta': 5e-4,
     'StudentT': 1e-5,
     'TruncatedCauchy': 5e-5,
-    'VonMises': 2e-2,  # TODO(b/160000258):
     'VonMisesFisher': 5e-3,
     'WishartTriL': 1e-5,
 })
@@ -234,6 +236,10 @@ SKIP_KL_CHECK_DIST_VAR_GRADS = [
     'Kumaraswamy',  # TD's KL gradients do not rely on bijector variables.
     'LambertWNormal',  # TD's KL gradients do not rely on bijector variables.
     'SinhArcsinh',  # TD's KL gradients do not rely on bijector variables.
+]
+
+SKIP_EXCESSIVE_VAR_USAGE = [
+    'ZeroInflatedNegativeBinomial',
 ]
 
 
@@ -286,6 +292,9 @@ class DistributionGradientTapeAndConcretizationTest(test_util.TestCase):
         continue
       self.assertIs(getattr(dist, k), v)
 
+    if dist_name in SKIP_EXCESSIVE_VAR_USAGE:
+      return
+
     # Check that standard statistics do not read distribution parameters more
     # than twice (once in the stat itself and up to once in any validation
     # assertions).
@@ -299,6 +308,7 @@ class DistributionGradientTapeAndConcretizationTest(test_util.TestCase):
                 ])),
             min_size=3,
             max_size=3))):
+
       hp.note('Testing excessive var usage in {}.{}'.format(dist_name, stat))
       try:
         with tfp_hps.assert_no_excessive_var_usage(
@@ -409,7 +419,7 @@ class DistributionCompositeTensorTest(test_util.TestCase):
     hp.note('Drew samples {}'.format(sample1))
 
     # Sample from the distribution after composite tensoring
-    composite_dist = experimental.as_composite(dist)
+    composite_dist = composite_tensor.as_composite(dist)
     flat = tf.nest.flatten(composite_dist, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(
         composite_dist, flat, expand_composites=True)
@@ -445,7 +455,7 @@ class DistributionCompositeTensorTest(test_util.TestCase):
         dhps.distributions(
             dist_name=dist_name, enable_vars=True, validate_args=False,
             eligibility_filter=(
-                lambda d: type(d).__name__ not in dhps.TF2_UNFRIENDLY_DISTS)))
+                lambda d: d not in dhps.TF2_UNFRIENDLY_DISTS)))
     self.evaluate([v.initializer for v in dist.trainable_variables])
     with tfp_hps.no_tf_rank_errors():
       self._test_sample_and_log_prob(dist_name, dist)

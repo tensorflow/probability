@@ -19,20 +19,21 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-import tensorflow_probability as tfp
-
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math.psd_kernels import exp_sin_squared
 
 
 @test_util.test_all_tf_execution_regimes
 class ExpSinSquaredTest(test_util.TestCase):
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, reason='DType mismatch not caught in numpy.')
   def testMismatchedFloatTypesAreBad(self):
-    tfp.math.psd_kernels.ExpSinSquared(1, 1)  # Should be OK (float32 fallback).
-    tfp.math.psd_kernels.ExpSinSquared(1, np.float64(1))  # Should be OK.
+    exp_sin_squared.ExpSinSquared(1, 1)  # Should be OK (float32 fallback).
+    exp_sin_squared.ExpSinSquared(1, np.float64(1))  # Should be OK.
     with self.assertRaises(TypeError):
-      tfp.math.psd_kernels.ExpSinSquared(1, np.float64(1),
-                                         np.float32(1))  # Should fail.
+      exp_sin_squared.ExpSinSquared(1, np.float64(1),
+                                    np.float32(1))  # Should fail.
 
   def _exp_sin_squared_kernel(self, amplitude, length_scale, period, x, y):
     norm = np.abs(x - y)
@@ -53,7 +54,7 @@ class ExpSinSquaredTest(test_util.TestCase):
     length_scale = np.array(.2, dtype=dtype)
 
     np.random.seed(42)
-    k = tfp.math.psd_kernels.ExpSinSquared(
+    k = exp_sin_squared.ExpSinSquared(
         amplitude=amplitude,
         length_scale=length_scale,
         period=period,
@@ -68,13 +69,11 @@ class ExpSinSquaredTest(test_util.TestCase):
           rtol=1e-4)
 
   def testNoneShapes(self):
-    k = tfp.math.psd_kernels.ExpSinSquared(
-        amplitude=np.reshape([1.] * 6, [3, 2]))
+    k = exp_sin_squared.ExpSinSquared(amplitude=np.reshape([1.] * 6, [3, 2]))
     self.assertAllEqual((3, 2), k.batch_shape)
 
   def testShapesAreCorrect(self):
-    k = tfp.math.psd_kernels.ExpSinSquared(
-        amplitude=1., length_scale=1., period=3.)
+    k = exp_sin_squared.ExpSinSquared(amplitude=1., length_scale=1., period=3.)
 
     x = np.ones([4, 3], np.float32)
     y = np.ones([5, 3], np.float32)
@@ -84,7 +83,7 @@ class ExpSinSquaredTest(test_util.TestCase):
         [2, 4, 5],
         k.matrix(tf.stack([x]*2), tf.stack([y]*2)).shape)
 
-    k = tfp.math.psd_kernels.ExpSinSquared(
+    k = exp_sin_squared.ExpSinSquared(
         amplitude=np.ones([2, 1, 1], np.float32),
         length_scale=np.ones([1, 3, 1], np.float32),
         period=np.ones([2, 1, 1, 1], np.float32))
@@ -101,15 +100,12 @@ class ExpSinSquaredTest(test_util.TestCase):
 
   def testValidateArgs(self):
     with self.assertRaisesOpError('must be positive'):
-      k = tfp.math.psd_kernels.ExpSinSquared(
-          amplitude=-1.,
-          length_scale=-1.,
-          period=-1.,
-          validate_args=True)
+      k = exp_sin_squared.ExpSinSquared(
+          amplitude=-1., length_scale=-1., period=-1., validate_args=True)
       self.evaluate(k.apply([1.], [1.]))
 
     # But `None`'s are ok
-    k = tfp.math.psd_kernels.ExpSinSquared(
+    k = exp_sin_squared.ExpSinSquared(
         amplitude=None, length_scale=None, period=None, validate_args=True)
     self.evaluate(k.apply([1.], [1.]))
 
@@ -118,7 +114,7 @@ class ExpSinSquaredTest(test_util.TestCase):
     amplitude = tf.Variable(1.)
     length_scale = tf.Variable(1.)
     period = tf.Variable(1.)
-    k = tfp.math.psd_kernels.ExpSinSquared(
+    k = exp_sin_squared.ExpSinSquared(
         amplitude=amplitude,
         length_scale=length_scale,
         period=period,

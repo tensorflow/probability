@@ -17,8 +17,8 @@
 # Dependency imports
 
 import numpy as np
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import square
 from tensorflow_probability.python.internal import test_util
 
 
@@ -27,7 +27,7 @@ class SquareBijectorTest(test_util.TestCase):
   """Tests the correctness of the Y = X ** 2 transformation."""
 
   def testBijectorScalar(self):
-    bijector = tfb.Square(validate_args=True)
+    bijector = square.Square(validate_args=True)
     self.assertStartsWith(bijector.name, "square")
     x = [[[1., 5],
           [2, 1]],
@@ -48,7 +48,7 @@ class SquareBijectorTest(test_util.TestCase):
         rtol=1e-7)
 
   def testScalarCongruency(self):
-    bijector = tfb.Square(validate_args=True)
+    bijector = square.Square(validate_args=True)
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=1e-3, upper_x=1.5, eval_func=self.evaluate,
         rtol=0.08)

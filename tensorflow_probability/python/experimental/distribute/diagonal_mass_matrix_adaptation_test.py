@@ -16,17 +16,20 @@
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import sample
+from tensorflow_probability.python.experimental.distribute import sharded
+from tensorflow_probability.python.experimental.mcmc import diagonal_mass_matrix_adaptation as dmma
+from tensorflow_probability.python.experimental.mcmc import preconditioned_hmc as phmc
+from tensorflow_probability.python.experimental.stats import sample_stats
 from tensorflow_probability.python.internal import distribute_test_lib as test_lib
 from tensorflow_probability.python.internal import loop_util
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 
-tfd = tfp.distributions
-tfp_dist = tfp.experimental.distribute
 
-
-class EchoKernel(tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo):
+class EchoKernel(phmc.PreconditionedHamiltonianMonteCarlo):
 
   def __init__(self, *args, **kwargs):
     super().__init__(
@@ -45,9 +48,9 @@ class DiagonalAdaptationTest(test_lib.DistributedTest):
 
   def test_diagonal_mass_matrix_no_distribute(self):
     """Nothing distributed. Make sure EchoKernel works."""
-    kernel = tfp.experimental.mcmc.DiagonalMassMatrixAdaptation(
+    kernel = dmma.DiagonalMassMatrixAdaptation(
         EchoKernel(),
-        tfp.experimental.stats.RunningVariance.from_stats(
+        sample_stats.RunningVariance.from_stats(
             num_samples=10., mean=tf.zeros(3), variance=tf.ones(3)))
     state = tf.zeros(3)
     pkr = kernel.bootstrap_results(state)
@@ -76,13 +79,13 @@ class DiagonalAdaptationTest(test_lib.DistributedTest):
     @tf.function(autograph=False)
     def run(seed):
       dist_seed, *seeds = samplers.split_seed(seed, 11)
-      dist = tfp_dist.Sharded(
-          tfd.Independent(tfd.Normal(tf.zeros(3), tf.ones(3)), 1),
+      dist = sharded.Sharded(
+          independent.Independent(normal.Normal(tf.zeros(3), tf.ones(3)), 1),
           shard_axis_name=self.axis_name)
       state = dist.sample(seed=dist_seed)
-      kernel = tfp.experimental.mcmc.DiagonalMassMatrixAdaptation(
+      kernel = dmma.DiagonalMassMatrixAdaptation(
           EchoKernel(),
-          tfp.experimental.stats.RunningVariance.from_stats(
+          sample_stats.RunningVariance.from_stats(
               num_samples=10., mean=tf.zeros(3), variance=tf.ones(3)))
       pkr = kernel.bootstrap_results(state)
 
@@ -117,13 +120,13 @@ class DiagonalAdaptationTest(test_lib.DistributedTest):
     @tf.function(autograph=False)
     def run(seed):
       dist_seed, *seeds = samplers.split_seed(seed, 11)
-      dist = tfp_dist.Sharded(
-          tfd.Sample(tfd.Normal(0., 1.), 3),
+      dist = sharded.Sharded(
+          sample.Sample(normal.Normal(0., 1.), 3),
           shard_axis_name=self.axis_name)
       state = dist.sample(seed=dist_seed)
-      kernel = tfp.experimental.mcmc.DiagonalMassMatrixAdaptation(
+      kernel = dmma.DiagonalMassMatrixAdaptation(
           EchoKernel(),
-          tfp.experimental.stats.RunningVariance.from_stats(
+          sample_stats.RunningVariance.from_stats(
               num_samples=10., mean=tf.zeros(3), variance=tf.ones(3)))
       pkr = kernel.bootstrap_results(state)
       def body(draw_pkr, i):

@@ -15,7 +15,6 @@
 """Multivariate Normal distribution class initialized with a full covariance."""
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import stats as tfp_stats
 from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import cholesky_outer_product as cholesky_outer_product_bijector
 from tensorflow_probability.python.bijectors import fill_scale_tril as fill_scale_tril_bijector
@@ -25,6 +24,7 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.stats import sample_stats
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
@@ -199,9 +199,9 @@ class MultivariateNormalFullCovariance(mvn_tril.MultivariateNormalTriL):
   @classmethod
   def _maximum_likelihood_parameters(cls, value):
     return {'loc': tf.reduce_mean(value, axis=0),
-            'covariance_matrix': tfp_stats.covariance(value,
-                                                      sample_axis=0,
-                                                      event_axis=-1)}
+            'covariance_matrix': sample_stats.covariance(value,
+                                                         sample_axis=0,
+                                                         event_axis=-1)}
 
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):

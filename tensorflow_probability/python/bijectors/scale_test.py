@@ -20,10 +20,10 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-import tensorflow_probability as tfp
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import scale as scale_lib
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
 
 
 @test_util.test_all_tf_execution_regimes
@@ -32,7 +32,7 @@ class ScaleBijectorTest(test_util.TestCase, parameterized.TestCase):
 
   def testName(self):
     # scale corresponds to 1.
-    bijector = tfb.Scale(scale=-1.)
+    bijector = scale_lib.Scale(scale=-1.)
     self.assertStartsWith(bijector.name, 'scale')
 
   @parameterized.named_parameters(
@@ -43,9 +43,9 @@ class ScaleBijectorTest(test_util.TestCase, parameterized.TestCase):
     log_scale = tf.cast(-2000., dtype)
     x = tf.cast(1., dtype)
     scale = tf.math.exp(log_scale)
-    fldj_linear = tfb.Scale(scale=scale).forward_log_det_jacobian(
+    fldj_linear = scale_lib.Scale(scale=scale).forward_log_det_jacobian(
         x, event_ndims=0)
-    fldj_log = tfb.Scale(log_scale=log_scale).forward_log_det_jacobian(
+    fldj_log = scale_lib.Scale(log_scale=log_scale).forward_log_det_jacobian(
         x, event_ndims=0)
     fldj_linear_, fldj_log_ = self.evaluate([fldj_linear, fldj_log])
     # Using the linear scale will saturate to 0, and produce bad log-det
@@ -60,7 +60,7 @@ class ScaleBijectorTest(test_util.TestCase, parameterized.TestCase):
       dict(testcase_name='dynamic_float64', is_static=False, dtype=np.float64),
   )
   def testNoBatchScale(self, is_static, dtype):
-    bijector = tfb.Scale(scale=dtype(2.))
+    bijector = scale_lib.Scale(scale=dtype(2.))
     x = self.maybe_static(np.array([1., 2, 3], dtype), is_static)
     self.assertAllClose([2., 4, 6], bijector.forward(x))
     self.assertAllClose([.5, 1, 1.5], bijector.inverse(x))
@@ -76,7 +76,7 @@ class ScaleBijectorTest(test_util.TestCase, parameterized.TestCase):
   )
   def testBatchScale(self, is_static, dtype):
     # Batched scale
-    bijector = tfb.Scale(scale=dtype([2., 3.]))
+    bijector = scale_lib.Scale(scale=dtype([2., 3.]))
     x = self.maybe_static(np.array([1.], dtype=dtype), is_static)
     self.assertAllClose([2., 3.], bijector.forward(x))
     self.assertAllClose([0.5, 1./3.], bijector.inverse(x))
@@ -89,7 +89,7 @@ class ScaleBijectorTest(test_util.TestCase, parameterized.TestCase):
       dict(testcase_name='float64', dtype=np.float64),
   )
   def testScalarCongruency(self, dtype):
-    bijector = tfb.Scale(scale=dtype(0.42))
+    bijector = scale_lib.Scale(scale=dtype(0.42))
     bijector_test_util.assert_scalar_congruency(
         bijector,
         lower_x=dtype(-2.),
@@ -101,7 +101,7 @@ class ScaleBijectorTest(test_util.TestCase, parameterized.TestCase):
       dict(testcase_name='float64', dtype=np.float64),
   )
   def testScalarCongruencyLogScale(self, dtype):
-    bijector = tfb.Scale(log_scale=dtype(np.log(0.42)))
+    bijector = scale_lib.Scale(log_scale=dtype(np.log(0.42)))
     bijector_test_util.assert_scalar_congruency(
         bijector,
         lower_x=dtype(-2.),
@@ -111,7 +111,7 @@ class ScaleBijectorTest(test_util.TestCase, parameterized.TestCase):
   @test_util.jax_disable_variable_test
   @test_util.numpy_disable_gradient_test
   def testVariableGradients(self):
-    b = tfb.Scale(scale=tf.Variable(2.))
+    b = scale_lib.Scale(scale=tf.Variable(2.))
 
     with tf.GradientTape() as tape:
       y = b.forward(.1)
@@ -120,29 +120,29 @@ class ScaleBijectorTest(test_util.TestCase, parameterized.TestCase):
   @test_util.numpy_disable_gradient_test
   def testNonVariableGradients(self):
     def _func(scale):
-      b = tfb.Scale(scale=scale)
+      b = scale_lib.Scale(scale=scale)
       return b.forward(.1)
 
-    value, grad = tfp.math.value_and_gradient(_func, [2.])
+    value, grad = gradient.value_and_gradient(_func, [2.])
     self.assertAllNotNone([value, grad])
     self.assertAllAssertsNested(self.assertNotAllZero, grad)
 
   def testImmutableScaleAssertion(self):
     with self.assertRaisesOpError('Argument `scale` must be non-zero'):
-      b = tfb.Scale(scale=0., validate_args=True)
+      b = scale_lib.Scale(scale=0., validate_args=True)
       _ = self.evaluate(b.forward(1.))
 
   def testVariableScaleAssertion(self):
     v = tf.Variable(0.)
     self.evaluate(v.initializer)
     with self.assertRaisesOpError('Argument `scale` must be non-zero'):
-      b = tfb.Scale(scale=v, validate_args=True)
+      b = scale_lib.Scale(scale=v, validate_args=True)
       _ = self.evaluate(b.forward(1.))
 
   def testModifiedVariableScaleAssertion(self):
     v = tf.Variable(1.)
     self.evaluate(v.initializer)
-    b = tfb.Scale(scale=v, validate_args=True)
+    b = scale_lib.Scale(scale=v, validate_args=True)
     with self.assertRaisesOpError('Argument `scale` must be non-zero'):
       with tf.control_dependencies([v.assign(0.)]):
         _ = self.evaluate(b.forward(1.))

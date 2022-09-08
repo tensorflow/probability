@@ -20,11 +20,13 @@ import numpy as np
 import pandas as pd
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.sts.components import local_level
 from tensorflow_probability.python.sts.internal import missing_values_util
 from tensorflow_probability.python.sts.internal import util as sts_util
 
@@ -35,14 +37,13 @@ class MultivariateNormalUtilsTest(test_util.TestCase):
   def test_factored_joint_mvn_diag_full(self):
     batch_shape = [3, 2]
 
-    mvn1 = tfd.MultivariateNormalDiag(
-        loc=tf.zeros(batch_shape + [3]),
-        scale_diag=tf.ones(batch_shape + [3]))
+    mvn1 = mvn_diag.MultivariateNormalDiag(
+        loc=tf.zeros(batch_shape + [3]), scale_diag=tf.ones(batch_shape + [3]))
 
-    mvn2 = tfd.MultivariateNormalFullCovariance(
+    mvn2 = mvn_tril.MultivariateNormalTriL(
         loc=tf.ones(batch_shape + [2]),
-        covariance_matrix=(tf.ones(batch_shape + [2, 2]) *
-                           tf.constant([[5., -2], [-2, 3.1]])))
+        scale_tril=(tf.ones(batch_shape + [2, 2]) *
+                    tf.linalg.cholesky([[5., -2], [-2, 3.1]])))
 
     joint = sts_util.factored_joint_mvn([mvn1, mvn2])
     self.assertEqual(self.evaluate(joint.event_shape_tensor()),
@@ -67,17 +68,17 @@ class MultivariateNormalUtilsTest(test_util.TestCase):
 
     event_shape = [3]
     # mvn with batch shape [2]
-    mvn1 = tfd.MultivariateNormalDiag(
+    mvn1 = mvn_diag.MultivariateNormalDiag(
         loc=random_with_shape([2] + event_shape),
         scale_diag=tf.exp(random_with_shape([2] + event_shape)))
 
     # mvn with batch shape [3, 2]
-    mvn2 = tfd.MultivariateNormalDiag(
+    mvn2 = mvn_diag.MultivariateNormalDiag(
         loc=random_with_shape([3, 2] + event_shape),
         scale_diag=tf.exp(random_with_shape([1, 2] + event_shape)))
 
     # mvn with batch shape [1, 2]
-    mvn3 = tfd.MultivariateNormalDiag(
+    mvn3 = mvn_diag.MultivariateNormalDiag(
         loc=random_with_shape([1, 2] + event_shape),
         scale_diag=tf.exp(random_with_shape([2] + event_shape)))
 
@@ -107,10 +108,10 @@ class MultivariateNormalUtilsTest(test_util.TestCase):
     random_with_shape = (
         lambda shape: np.random.standard_normal(shape).astype(np.float32))
 
-    mvn1 = tfd.MultivariateNormalDiag(
+    mvn1 = mvn_diag.MultivariateNormalDiag(
         loc=random_with_shape(batch_shape + [3]),
         scale_diag=np.exp(random_with_shape(batch_shape + [3])))
-    mvn2 = tfd.MultivariateNormalDiag(
+    mvn2 = mvn_diag.MultivariateNormalDiag(
         loc=random_with_shape(batch_shape + [3]),
         scale_diag=np.exp(random_with_shape(batch_shape + [3])))
 
@@ -125,13 +126,13 @@ class MultivariateNormalUtilsTest(test_util.TestCase):
         lambda shape: np.random.standard_normal(shape).astype(np.float32))
 
     event_shape = [3]
-    mvn1 = tfd.MultivariateNormalDiag(
+    mvn1 = mvn_diag.MultivariateNormalDiag(
         loc=random_with_shape([2] + event_shape),
         scale_diag=np.exp(random_with_shape([2] + event_shape)))
-    mvn2 = tfd.MultivariateNormalDiag(
+    mvn2 = mvn_diag.MultivariateNormalDiag(
         loc=random_with_shape([1, 2] + event_shape),
         scale_diag=np.exp(random_with_shape([3, 2] + event_shape)))
-    mvn3 = tfd.MultivariateNormalDiag(
+    mvn3 = mvn_diag.MultivariateNormalDiag(
         loc=random_with_shape([3, 2] + event_shape),
         scale_diag=np.exp(random_with_shape([2] + event_shape)))
 
@@ -149,10 +150,10 @@ class _UtilityTests(test_util.TestCase):
   def test_broadcast_batch_shape(self):
     batch_shapes = ([2], [3, 2], [1, 2])
     distributions = [
-        tfd.Normal(loc=self._build_tensor(np.zeros(batch_shape)),
-                   scale=self._build_tensor(np.ones(batch_shape)))
-        for batch_shape in batch_shapes
-    ]
+        normal.Normal(  # pylint:disable=g-complex-comprehension
+            loc=self._build_tensor(np.zeros(batch_shape)),
+            scale=self._build_tensor(np.ones(batch_shape)))
+        for batch_shape in batch_shapes]
     if self.use_static_shape:
       self.assertEqual(
           [3, 2], sts_util.broadcast_batch_shape(distributions))
@@ -243,8 +244,8 @@ class _UtilityTests(test_util.TestCase):
   def test_pad_batch_dimension_when_input_has_sample_shape(self):
 
     model_batch_shape = [3, 2]
-    model = tfp.sts.LocalLevel(
-        level_scale_prior=tfd.Normal(
+    model = local_level.LocalLevel(
+        level_scale_prior=normal.Normal(
             loc=self._build_tensor(np.random.randn(*model_batch_shape)),
             scale=1.))
 
@@ -263,8 +264,8 @@ class _UtilityTests(test_util.TestCase):
   def test_dont_pad_batch_dimension_when_input_has_no_sample_shape(self):
 
     model_batch_shape = [3, 2]
-    model = tfp.sts.LocalLevel(
-        level_scale_prior=tfd.Normal(
+    model = local_level.LocalLevel(
+        level_scale_prior=normal.Normal(
             loc=self._build_tensor(np.random.randn(*model_batch_shape)),
             scale=1.))
 
@@ -280,39 +281,39 @@ class _UtilityTests(test_util.TestCase):
         self._shape_as_list(observed_time_series))
 
   @parameterized.named_parameters(
-      ('array_with_unit_dim',
-       np.array([[3.], [4.], [5.]]), [3, 1], None),
-      ('array_with_nans',
-       np.array([3., 4., np.nan]), [3, 1], [False, False, True]),
-      ('tensor_with_nans',
-       lambda: tf.constant([3., 4., np.nan]), [3, 1], [False, False, True]),
+      ('array_with_unit_dim', np.array([[3.], [4.], [5.]]), [3, 1], None),
+      ('array_with_nans', np.array([3., 4., np.nan]), [3, 1
+                                                      ], [False, False, True]),
+      ('tensor_with_nans', lambda: tf.constant([3., 4., np.nan]), [3, 1],
+       [False, False, True]),
       ('masked_time_series',
-       tfp.sts.MaskedTimeSeries([1., 2., 3.], [False, True, False]),
-       [3, 1], [False, True, False]),
-      ('masked_time_series_tensor',
-       lambda: tfp.sts.MaskedTimeSeries(tf.constant([1., 2., 3.]),  # pylint: disable=g-long-lambda
-                                        tf.constant([False, True, False])),
-       [3, 1], [False, True, False]),
+       missing_values_util.MaskedTimeSeries(
+           [1., 2., 3.], [False, True, False]), [3, 1], [False, True, False]),
+      (
+          'masked_time_series_tensor',
+          lambda: missing_values_util.MaskedTimeSeries(  # pylint: disable=g-long-lambda
+              tf.constant([1., 2., 3.]),
+              tf.constant([False, True, False])),
+          [3, 1],
+          [False, True, False]),
       ('series_fully_observed',
-       pd.Series([1., 2., 3.],
-                 index=pd.date_range('2014-01-01', '2014-01-03')),
-       [3, 1], None),
+       pd.Series([1., 2., 3.], index=pd.date_range(
+           '2014-01-01', '2014-01-03')), [3, 1], None),
       ('series_partially_observed',
-       pd.Series([1., np.nan, 3.],
-                 index=pd.date_range('2014-01-01', '2014-01-03')),
-       [3, 1], [False, True, False]),
-      ('series_indexed_by_range_only',
-       pd.Series([1., 2., 3.]), [3, 1], None),
+       pd.Series(
+           [1., np.nan, 3.], index=pd.date_range(
+               '2014-01-01', '2014-01-03')), [3, 1], [False, True, False]),
+      ('series_indexed_by_range_only', pd.Series([1., 2., 3.]), [3, 1], None),
       ('dataframe_single_column',
        pd.DataFrame([1., np.nan, 3.],
                     columns=['value'],
-                    index=pd.date_range('2014-01-01', '2014-01-03')),
-       [3, 1], [False, True, False]),
+                    index=pd.date_range('2014-01-01', '2014-01-03')), [3, 1],
+       [False, True, False]),
       ('dataframe_multi_column',
        pd.DataFrame([[1., 4.], [np.nan, 2.], [3., np.nan]],
                     columns=['value1', 'value2'],
-                    index=pd.date_range('2014-01-01', '2014-01-03')),
-       [2, 3, 1], [[False, True, False], [False, False, True]]))
+                    index=pd.date_range('2014-01-01', '2014-01-03')), [2, 3, 1],
+       [[False, True, False], [False, False, True]]))
   def test_canonicalizes_observed_time_series(
       self, observed_time_series, expected_shape, expected_is_missing):
     if callable(observed_time_series):

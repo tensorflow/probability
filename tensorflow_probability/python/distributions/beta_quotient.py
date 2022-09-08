@@ -18,7 +18,6 @@
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import beta as beta_lib
@@ -31,6 +30,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math import hypergeometric as hypgeo
+from tensorflow_probability.python.math import special
 
 __all__ = [
     'BetaQuotient',
@@ -208,8 +208,8 @@ class BetaQuotient(distribution.AutoCompositeTensorDistribution):
     alpha_sum = alpha0 + alpha1
 
     log_normalization = (
-        tfp_math.lbeta(alpha0, beta0) + tfp_math.lbeta(alpha1, beta1))
-    log_normalization = log_normalization - tfp_math.lbeta(
+        special.lbeta(alpha0, beta0) + special.lbeta(alpha1, beta1))
+    log_normalization = log_normalization - special.lbeta(
         alpha_sum, tf.where(x > 1., beta0, beta1))
 
     b = tf.where(x > 1., 1. - beta1, 1 - beta0)

@@ -15,20 +15,20 @@
 """Tests for `random_variable`."""
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import bernoulli
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.experimental.nn.util import random_variable
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
-tfn = tfp.experimental.nn
 
 
 @test_util.test_all_tf_execution_regimes
 class RandomVariableTest(test_util.TestCase):
 
   def test_default_arguments(self):
-    x = tfn.util.RandomVariable(tfd.Normal(0, 1))
+    x = random_variable.RandomVariable(normal.Normal(0, 1))
     x1 = tf.convert_to_tensor(x)
     x2 = tf.convert_to_tensor(x)
     x.reset()
@@ -41,9 +41,9 @@ class RandomVariableTest(test_util.TestCase):
     self.assertStartsWith(x.name, 'Normal')
 
   def test_non_default_arguments(self):
-    x = tfn.util.RandomVariable(
-        tfd.Bernoulli(probs=[[0.25], [0.5]]),
-        tfd.Distribution.mean,
+    x = random_variable.RandomVariable(
+        bernoulli.Bernoulli(probs=[[0.25], [0.5]]),
+        distribution.Distribution.mean,
         dtype=tf.float32,
         shape=[2, None],
         name='custom')
@@ -54,9 +54,9 @@ class RandomVariableTest(test_util.TestCase):
     self.assertEqual('custom', x.name)
 
   def test_set_shape(self):
-    x = tfn.util.RandomVariable(
-        tfd.Bernoulli(probs=[[0.25], [0.5]]),
-        tfd.Distribution.mean,
+    x = random_variable.RandomVariable(
+        bernoulli.Bernoulli(probs=[[0.25], [0.5]]),
+        distribution.Distribution.mean,
         dtype=tf.float32,
         shape=[2, None],
         name='custom')
@@ -67,7 +67,7 @@ class RandomVariableTest(test_util.TestCase):
   def test_non_xla_graph_throws_exception(self):
     if tf.config.functions_run_eagerly():
       self.skipTest('Graph mode test only.')
-    x = tfn.util.RandomVariable(tfd.Normal(0, 1))
+    x = random_variable.RandomVariable(normal.Normal(0, 1))
     @tf.function(autograph=False, jit_compile=True)
     def run():
       tf.convert_to_tensor(x)
@@ -78,8 +78,8 @@ class RandomVariableTest(test_util.TestCase):
   def test_nested_graphs(self):
     if tf.config.functions_run_eagerly():
       self.skipTest('Graph mode test only.')
-    x = tfn.util.RandomVariable(
-        tfd.Normal(0, 1), tfd.Distribution.mean, name='rv')
+    x = random_variable.RandomVariable(
+        normal.Normal(0, 1), distribution.Distribution.mean, name='rv')
     @tf.function(autograph=False, jit_compile=True)
     def run():
       @tf.function(autograph=False, jit_compile=True)

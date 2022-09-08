@@ -42,6 +42,8 @@ multi_substrate_py_library(
     srcs = ["test_fixtures.py"],
     deps = [
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc:reducer",
+        "//tensorflow_probability/python/mcmc:kernel",
+        "//tensorflow_probability/python/random:random_ops",
     ],
 )

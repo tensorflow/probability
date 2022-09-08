@@ -21,9 +21,11 @@ import hypothesis as hp
 import hypothesis.strategies as hps
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import exp
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
+from tensorflow_probability.python.bijectors import normal_cdf
+from tensorflow_probability.python.bijectors import transform_diagonal
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import test_util
 
@@ -43,8 +45,8 @@ class TransformDiagonalBijectorTest(test_util.TestCase):
     for i in range(x.shape[0]):
       np.fill_diagonal(y[i, :, :], np.exp(np.diag(x[i, :, :])))
 
-    exp = tfb.Exp()
-    b = tfb.TransformDiagonal(diag_bijector=exp)
+    diag_bijector = exp.Exp()
+    b = transform_diagonal.TransformDiagonal(diag_bijector=diag_bijector)
 
     y_ = self.evaluate(b.forward(x))
     self.assertAllClose(y, y_)
@@ -56,21 +58,22 @@ class TransformDiagonalBijectorTest(test_util.TestCase):
     ildj = self.evaluate(b.inverse_log_det_jacobian(y, event_ndims=2))
     self.assertAllEqual(
         fldj,
-        self.evaluate(exp.forward_log_det_jacobian(
-            np.array([np.diag(x_mat) for x_mat in x]),
-            event_ndims=1)))
+        self.evaluate(
+            diag_bijector.forward_log_det_jacobian(
+                np.array([np.diag(x_mat) for x_mat in x]), event_ndims=1)))
     self.assertAllEqual(
         ildj,
-        self.evaluate(exp.inverse_log_det_jacobian(
-            np.array([np.diag(y_mat) for y_mat in y]),
-            event_ndims=1)))
+        self.evaluate(
+            diag_bijector.inverse_log_det_jacobian(
+                np.array([np.diag(y_mat) for y_mat in y]), event_ndims=1)))
 
   @test_util.numpy_disable_gradient_test
   def testTheoreticalFldjNormalCDF(self):
     # b/137367959 test failure trigger case (resolved by using
     # experimental_use_pfor=False as fallback instead of primary in
     # bijector_test_util.get_fldj_theoretical)
-    bijector = tfb.TransformDiagonal(diag_bijector=tfb.NormalCDF())
+    bijector = transform_diagonal.TransformDiagonal(
+        diag_bijector=normal_cdf.NormalCDF())
     x = np.zeros([0, 0])
     fldj = bijector.forward_log_det_jacobian(x, event_ndims=2)
     fldj_theoretical = bijector_test_util.get_fldj_theoretical(
@@ -96,7 +99,7 @@ class TransformDiagonalBijectorTest(test_util.TestCase):
     logging.info('Using diagonal bijector %s %s', diag_bijector.name,
                  diag_bijector)
 
-    bijector = tfb.TransformDiagonal(diag_bijector=diag_bijector)
+    bijector = transform_diagonal.TransformDiagonal(diag_bijector=diag_bijector)
     ensure_nonzero_batch = lambda shape: [d if d > 0 else 1 for d in shape]
     shape = data.draw(tfp_hps.shapes().map(ensure_nonzero_batch)) + [dim, dim]
     x = np.random.randn(*shape).astype(np.float64)

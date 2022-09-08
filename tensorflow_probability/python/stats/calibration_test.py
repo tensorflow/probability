@@ -18,8 +18,9 @@ from absl import logging
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.stats import calibration
 
 
 @test_util.test_all_tf_execution_regimes
@@ -41,14 +42,14 @@ class CalibrationTest(test_util.TestCase):
     labels = tf.random.uniform(
         (nsamples,), maxval=nlabels, seed=seed_stream(), dtype=tf.int32)
 
-    uncertainty, resolution, reliability = tfp.stats.brier_decomposition(
+    uncertainty, resolution, reliability = calibration.brier_decomposition(
         labels=labels, logits=logits)
 
     # Recover an estimate of the Brier score from the decomposition
     brier = uncertainty - resolution + reliability
 
     # Estimate Brier score directly
-    brier_direct = tfp.stats.brier_score(labels=labels, logits=logits)
+    brier_direct = calibration.brier_score(labels=labels, logits=logits)
     uncertainty, resolution, reliability, brier, brier_direct = self.evaluate([
         uncertainty,
         resolution,
@@ -87,12 +88,12 @@ class CalibrationTest(test_util.TestCase):
     flat_logits = tf.reshape(logits, [batch_size, nsamples, nlabels])
     flat_labels = tf.reshape(labels, [batch_size, nsamples])
 
-    decomps = tf.stack(tfp.stats.brier_decomposition(labels, logits))
+    decomps = tf.stack(calibration.brier_decomposition(labels, logits))
     decomps = tf.reshape(decomps, [3, batch_size])
 
     decomps_i = []
     for i in range(batch_size):
-      d = tfp.stats.brier_decomposition(flat_labels[i], flat_logits[i])
+      d = calibration.brier_decomposition(flat_labels[i], flat_logits[i])
       decomps_i.append(tf.stack(d))
     decomps, decomps_i = self.evaluate([decomps, tf.stack(decomps_i, axis=-1)])
     for i in range(batch_size):
@@ -106,7 +107,7 @@ class CalibrationTest(test_util.TestCase):
     logits_perturbed = tf.matmul(data, weights_perturbed)
     logits_perturbed += tf.expand_dims(bias, 0)
 
-    _, _, reliability = tfp.stats.brier_decomposition(
+    _, _, reliability = calibration.brier_decomposition(
         labels=labels, logits=logits_perturbed)
 
     return reliability
@@ -119,7 +120,7 @@ class CalibrationTest(test_util.TestCase):
     bias = tf.random.normal((nlabels,), seed=seed_stream())
 
     logits_true = tf.matmul(data, weights) + tf.expand_dims(bias, 0)
-    prob_true = tfp.distributions.Categorical(logits=logits_true)
+    prob_true = categorical.Categorical(logits=logits_true)
     labels = prob_true.sample(1, seed=seed_stream())
     labels = tf.reshape(labels, (tf.size(labels),))
 
@@ -160,8 +161,9 @@ class CalibrationTest(test_util.TestCase):
     logits = tf.math.log(probs)
     labels = tf.convert_to_tensor([1, 0, 0], dtype=tf.int32)
 
-    ece = self.evaluate(tfp.stats.expected_calibration_error(
-        3, logits=logits, labels_true=labels))
+    ece = self.evaluate(
+        calibration.expected_calibration_error(
+            3, logits=logits, labels_true=labels))
 
     self.assertAlmostEqual(0.33333333, ece, places=6,
                            msg='Computed ECE (%.5f) does not match '
@@ -184,7 +186,7 @@ class CalibrationTest(test_util.TestCase):
     seed_stream = test_util.test_seed_stream()
     logits = 2. * tf.random.normal(
         (nsamples, nclasses), seed=seed_stream())
-    py = tfp.distributions.Categorical(logits=logits)
+    py = categorical.Categorical(logits=logits)
     labels = py.sample(seed=seed_stream())
 
     return logits, labels
@@ -207,7 +209,7 @@ class CalibrationTest(test_util.TestCase):
 
     logits = 2.* tf.random.normal(
         (nsamples, nclasses), seed=seed_stream())
-    py = tfp.distributions.Categorical(logits=logits)
+    py = categorical.Categorical(logits=logits)
     labels = py.sample(seed=seed_stream())
     logits_other = 2. * tf.random.normal(
         (nsamples, nclasses), seed=seed_stream())
@@ -221,8 +223,9 @@ class CalibrationTest(test_util.TestCase):
                                                      nsamples):
     logits, labels = self._generate_perfect_calibration_logits(
         nsamples, nclasses)
-    ece = self.evaluate(tfp.stats.expected_calibration_error(
-        num_bins, logits=logits, labels_true=labels))
+    ece = self.evaluate(
+        calibration.expected_calibration_error(
+            num_bins, logits=logits, labels_true=labels))
 
     logging.info('ECE (well-calibrated), num_bins=%d  nclasses=%d  '
                  'nsamples=%d  ECE %.4f', num_bins, nclasses, nsamples, ece)
@@ -240,8 +243,9 @@ class CalibrationTest(test_util.TestCase):
                                                    nsamples):
     logits, labels = self._generate_random_calibration_logits(
         nsamples, nclasses)
-    ece = self.evaluate(tfp.stats.expected_calibration_error(
-        num_bins, logits=logits, labels_true=labels))
+    ece = self.evaluate(
+        calibration.expected_calibration_error(
+            num_bins, logits=logits, labels_true=labels))
 
     logging.info('ECE (uncalibrated), num_bins=%d  nclasses=%d  '
                  'nsamples=%d  ECE %.4f', num_bins, nclasses, nsamples, ece)
@@ -260,7 +264,7 @@ class ExpectedCalibrationErrorQuantiles(test_util.TestCase):
     label = tf.cast([0, 0, 1, 0, 1, 1], dtype=tf.bool)
     log_pred = tf.math.log([0.1, 0.05, 0.5, 0.2, 0.99, 0.99])
     ece, acc, conf, cnt, edges, buckets = self.evaluate(
-        tfp.stats.expected_calibration_error_quantiles(
+        calibration.expected_calibration_error_quantiles(
             label, log_pred, num_buckets=3))
     self.assertNear(0.145, ece, err=1e-6)
     self.assertAllClose([0., 0., 1.], acc, rtol=1e-6, atol=1e-6)
@@ -282,7 +286,7 @@ class ExpectedCalibrationErrorQuantiles(test_util.TestCase):
         [[-1., 0, -2],
          [0, -1, -2]],
     ]
-    d = tfp.distributions.Categorical(logits=logits)
+    d = categorical.Categorical(logits=logits)
     def all_categories(d):
       num_classes = tf.shape(d.logits_parameter())[-1]
       batch_ndims = tf.size(d.batch_shape_tensor())
@@ -298,7 +302,7 @@ class ExpectedCalibrationErrorQuantiles(test_util.TestCase):
                               batch_dims=len(d.batch_shape))
     hit = tf.equal(y, yhat)
     ece, acc, conf, cnt, edges, buckets = self.evaluate(
-        tfp.stats.expected_calibration_error_quantiles(
+        calibration.expected_calibration_error_quantiles(
             hit, pred_log_prob, num_buckets=10))
     self.assertEqual((2,), ece.shape)
     self.assertEqual((10, 2), acc.shape)
@@ -313,7 +317,7 @@ class ExpectedCalibrationErrorQuantiles(test_util.TestCase):
     log_pred = tf.math.log([[0.1, 0.05, 0.5, 0.2, 0.99, 0.99],
                             [0.1, 0.05, 0.5, 0.2, 0.99, 0.99]])
     ece, acc, conf, cnt, edges, buckets = self.evaluate(
-        tfp.stats.expected_calibration_error_quantiles(
+        calibration.expected_calibration_error_quantiles(
             label, log_pred, num_buckets=3, axis=1))
     self.assertAllClose([0.145, 0.145], ece, rtol=1e-6, atol=1e-6)
     self.assertAllClose(np.transpose([[0., 0., 1.],

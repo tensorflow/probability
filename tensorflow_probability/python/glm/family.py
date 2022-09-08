@@ -18,8 +18,14 @@ import contextlib
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.distributions import bernoulli
+from tensorflow_probability.python.distributions import binomial
+from tensorflow_probability.python.distributions import gamma
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import negative_binomial
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import poisson
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
@@ -258,7 +264,7 @@ class CustomExponentialFamily(ExponentialFamily):
     self._distribution_fn = distribution_fn
     self._inverse_link_fn = (
         linear_model_to_mean_fn.forward
-        if isinstance(linear_model_to_mean_fn, bijectors.Bijector)
+        if isinstance(linear_model_to_mean_fn, bijector.Bijector)
         else linear_model_to_mean_fn)
 
   @property
@@ -283,7 +289,7 @@ class Bernoulli(ExponentialFamily):
     return mean, variance, grad_mean
 
   def _as_distribution(self, r):
-    return tfd.Bernoulli(logits=r)
+    return bernoulli.Bernoulli(logits=r)
 
 
 class BernoulliNormalCDF(ExponentialFamily):
@@ -291,7 +297,7 @@ class BernoulliNormalCDF(ExponentialFamily):
 
   def _call(self, r):
     dtype = dtype_util.as_numpy_dtype(r.dtype)
-    d = tfd.Normal(loc=tf.zeros([], dtype), scale=tf.ones([], dtype))
+    d = normal.Normal(loc=tf.zeros([], dtype), scale=tf.ones([], dtype))
     mean = d.cdf(r)
     # var = cdf(r) * cdf(-r) but cdf(-r) = 1 - cdf(r) = survival_function(r).
     variance = mean * d.survival_function(r)
@@ -299,11 +305,11 @@ class BernoulliNormalCDF(ExponentialFamily):
     return mean, variance, grad_mean
 
   def _as_distribution(self, r):
-    return tfd.Bernoulli(logits=DeferredTensor(r, self._as_logits))
+    return bernoulli.Bernoulli(logits=DeferredTensor(r, self._as_logits))
 
   def _as_logits(self, r):
     dtype = dtype_util.as_numpy_dtype(r.dtype)
-    d = tfd.Normal(loc=tf.zeros([], dtype), scale=tf.ones([], dtype))
+    d = normal.Normal(loc=tf.zeros([], dtype), scale=tf.ones([], dtype))
     # logit(ncdf(r)) = log(ncdf(r)) - log(1-ncdf(r)) = logncdf(r) - lognsf(r).
     return d.log_cdf(r) - d.log_survival_function(r)
 
@@ -326,7 +332,7 @@ class Binomial(ExponentialFamily):
   def _as_distribution(self, r):
     total_count = DeferredTensor(
         self._total_count, lambda x: tf.cast(x, r.dtype), dtype=r.dtype)
-    return tfd.Binomial(total_count=total_count, logits=r)
+    return binomial.Binomial(total_count=total_count, logits=r)
 
 
 class GammaExp(ExponentialFamily):
@@ -346,7 +352,7 @@ class GammaExp(ExponentialFamily):
   def _as_distribution(self, r):
     concentration = DeferredTensor(
         self._concentration, lambda x: tf.cast(x, r.dtype), dtype=r.dtype)
-    return tfd.Gamma(
+    return gamma.Gamma(
         concentration=concentration,
         rate=DeferredTensor(r, lambda x: tf.math.exp(-x)))
 
@@ -369,7 +375,7 @@ class GammaSoftplus(ExponentialFamily):
   def _as_distribution(self, r):
     concentration = DeferredTensor(
         self._concentration, lambda x: tf.cast(x, r.dtype), dtype=r.dtype)
-    return tfd.Gamma(
+    return gamma.Gamma(
         concentration=concentration,
         rate=DeferredTensor(r, lambda x: 1. / tf.math.softplus(x)))
 
@@ -382,7 +388,7 @@ class Poisson(ExponentialFamily):
     return mean, variance, grad_mean
 
   def _as_distribution(self, r):
-    return tfd.Poisson(log_rate=r)
+    return poisson.Poisson(log_rate=r)
 
 
 class PoissonSoftplus(ExponentialFamily):
@@ -394,7 +400,7 @@ class PoissonSoftplus(ExponentialFamily):
     return mean, variance, grad_mean
 
   def _as_distribution(self, r):
-    return tfd.Poisson(rate=DeferredTensor(r, tf.math.softplus))
+    return poisson.Poisson(rate=DeferredTensor(r, tf.math.softplus))
 
 
 class LogNormal(ExponentialFamily):
@@ -417,9 +423,8 @@ class LogNormal(ExponentialFamily):
   def _as_distribution(self, r):
     scale = DeferredTensor(
         self._scale, lambda x: tf.cast(x, r.dtype), dtype=r.dtype)
-    return tfd.LogNormal(
-        loc=DeferredTensor(r, lambda x: x - 0.5 * scale**2.),
-        scale=scale)
+    return lognormal.LogNormal(
+        loc=DeferredTensor(r, lambda x: x - 0.5 * scale**2.), scale=scale)
 
 
 class LogNormalSoftplus(ExponentialFamily):
@@ -444,7 +449,7 @@ class LogNormalSoftplus(ExponentialFamily):
   def _as_distribution(self, r):
     scale = DeferredTensor(
         self._scale, lambda x: tf.cast(x, r.dtype), dtype=r.dtype)
-    return tfd.LogNormal(
+    return lognormal.LogNormal(
         loc=DeferredTensor(
             r, lambda x: tf.math.log(tf.math.softplus(x)) - 0.5 * scale**2.),
         scale=scale)
@@ -467,7 +472,7 @@ class Normal(ExponentialFamily):
   def _as_distribution(self, r):
     scale = DeferredTensor(
         self._scale, lambda x: tf.cast(x, r.dtype), dtype=r.dtype)
-    return tfd.Normal(loc=r, scale=scale)
+    return normal.Normal(loc=r, scale=scale)
 
 
 class NormalReciprocal(ExponentialFamily):
@@ -487,7 +492,7 @@ class NormalReciprocal(ExponentialFamily):
   def _as_distribution(self, r):
     scale = DeferredTensor(
         self._scale, lambda x: tf.cast(x, r.dtype), dtype=r.dtype)
-    return tfd.Normal(loc=DeferredTensor(r, tf.math.reciprocal), scale=scale)
+    return normal.Normal(loc=DeferredTensor(r, tf.math.reciprocal), scale=scale)
 
 
 class NegativeBinomial(ExponentialFamily):
@@ -508,7 +513,7 @@ class NegativeBinomial(ExponentialFamily):
   def _as_distribution(self, r):
     total_count = DeferredTensor(
         self._total_count, lambda x: tf.cast(x, r.dtype), dtype=r.dtype)
-    return tfd.NegativeBinomial(
+    return negative_binomial.NegativeBinomial(
         total_count=total_count,
         logits=DeferredTensor(r, lambda x: x - tf.math.log(total_count)))
 
@@ -532,7 +537,9 @@ class NegativeBinomialSoftplus(ExponentialFamily):
   def _as_distribution(self, r):
     total_count = DeferredTensor(
         self._total_count, lambda x: tf.cast(x, r.dtype), dtype=r.dtype)
-    return tfd.NegativeBinomial(
+    return negative_binomial.NegativeBinomial(
         total_count=total_count,
-        logits=DeferredTensor(r, lambda x: tf.math.log(  # pylint: disable=g-long-lambda
-            tf.math.softplus(x)) - tf.math.log(total_count)))
+        logits=DeferredTensor(
+            r,
+            lambda x: tf.math.log(  # pylint: disable=g-long-lambda
+                tf.math.softplus(x)) - tf.math.log(total_count)))

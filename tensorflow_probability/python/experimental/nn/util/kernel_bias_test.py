@@ -15,14 +15,9 @@
 """Tests for kernel_bias."""
 
 # Dependency imports
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.experimental.nn.util import kernel_bias
 from tensorflow_probability.python.internal import test_util
-
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
-tfn = tfp.experimental.nn
 
 
 @test_util.test_all_tf_execution_regimes
@@ -33,7 +28,7 @@ class KernelBiasTest(test_util.TestCase):
     bias_shape = (3,)
     kernel_batch_ndims = 2
     bias_batch_ndims = 2
-    kernel, bias = tfn.util.make_kernel_bias(
+    kernel, bias = kernel_bias.make_kernel_bias(
         kernel_shape,
         bias_shape=bias_shape,
         kernel_batch_ndims=kernel_batch_ndims,
@@ -46,7 +41,7 @@ class KernelBiasTest(test_util.TestCase):
     bias_shape = (3,)
     kernel_batch_ndims = 2
     bias_batch_ndims = 2
-    prior = tfn.util.make_kernel_bias_prior_spike_and_slab(
+    prior = kernel_bias.make_kernel_bias_prior_spike_and_slab(
         kernel_shape,
         bias_shape=bias_shape,
         kernel_batch_ndims=kernel_batch_ndims,
@@ -60,7 +55,7 @@ class KernelBiasTest(test_util.TestCase):
     bias_shape = (3,)
     kernel_batch_ndims = 2
     bias_batch_ndims = 2
-    posterior = tfn.util.make_kernel_bias_posterior_mvn_diag(
+    posterior = kernel_bias.make_kernel_bias_posterior_mvn_diag(
         kernel_shape,
         bias_shape=bias_shape,
         kernel_batch_ndims=kernel_batch_ndims,

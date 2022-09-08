@@ -20,11 +20,10 @@ from scipy import stats
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import moyal
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
 
 
 class _MoyalTest(object):
@@ -37,43 +36,43 @@ class _MoyalTest(object):
   def testMoyalShape(self):
     loc = np.array([3.0] * 5, dtype=self.dtype)
     scale = np.array([3.0] * 5, dtype=self.dtype)
-    moyal = tfd.Moyal(loc=loc, scale=scale, validate_args=True)
+    dist = moyal.Moyal(loc=loc, scale=scale, validate_args=True)
 
-    self.assertEqual((5,), self.evaluate(moyal.batch_shape_tensor()))
-    self.assertEqual(tf.TensorShape([5]), moyal.batch_shape)
-    self.assertAllEqual([], self.evaluate(moyal.event_shape_tensor()))
-    self.assertEqual(tf.TensorShape([]), moyal.event_shape)
+    self.assertEqual((5,), self.evaluate(dist.batch_shape_tensor()))
+    self.assertEqual(tf.TensorShape([5]), dist.batch_shape)
+    self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
+    self.assertEqual(tf.TensorShape([]), dist.event_shape)
 
   def testInvalidScale(self):
     scale = [-.01, 0., 2.]
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
-      moyal = tfd.Moyal(loc=0., scale=scale, validate_args=True)
-      self.evaluate(moyal.mean())
+      dist = moyal.Moyal(loc=0., scale=scale, validate_args=True)
+      self.evaluate(dist.mean())
 
     scale = tf.Variable([.01])
     self.evaluate(scale.initializer)
-    moyal = tfd.Moyal(loc=0., scale=scale, validate_args=True)
-    self.assertIs(scale, moyal.scale)
-    self.evaluate(moyal.mean())
+    dist = moyal.Moyal(loc=0., scale=scale, validate_args=True)
+    self.assertIs(scale, dist.scale)
+    self.evaluate(dist.mean())
     with tf.control_dependencies([scale.assign([-.01])]):
       with self.assertRaisesOpError('Argument `scale` must be positive.'):
-        self.evaluate(moyal.mean())
+        self.evaluate(dist.mean())
 
   def testMoyalLogPdf(self):
     batch_size = 6
     loc = np.array([0.] * batch_size, dtype=self.dtype)
     scale = np.array([3.] * batch_size, dtype=self.dtype)
     x = np.array([2., 3., 4., 5., 6., 7.], dtype=self.dtype)
-    moyal = tfd.Moyal(
+    dist = moyal.Moyal(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         validate_args=True)
-    log_pdf = moyal.log_prob(self.make_tensor(x))
+    log_pdf = dist.log_prob(self.make_tensor(x))
     self.assertAllClose(
         stats.moyal.logpdf(x, loc=loc, scale=scale),
         self.evaluate(log_pdf))
 
-    pdf = moyal.prob(x)
+    pdf = dist.prob(x)
     self.assertAllClose(
         stats.moyal.pdf(x, loc=loc, scale=scale), self.evaluate(pdf))
 
@@ -83,15 +82,15 @@ class _MoyalTest(object):
     scale = np.array([1.0], dtype=self.dtype)
     x = np.array([[2., 3., 4., 5., 6., 7.]], dtype=self.dtype).T
 
-    moyal = tfd.Moyal(
+    dist = moyal.Moyal(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         validate_args=True)
-    log_pdf = moyal.log_prob(self.make_tensor(x))
+    log_pdf = dist.log_prob(self.make_tensor(x))
     self.assertAllClose(
         self.evaluate(log_pdf), stats.moyal.logpdf(x, loc=loc, scale=scale))
 
-    pdf = moyal.prob(self.make_tensor(x))
+    pdf = dist.prob(self.make_tensor(x))
     self.assertAllClose(
         self.evaluate(pdf), stats.moyal.pdf(x, loc=loc, scale=scale))
 
@@ -101,16 +100,16 @@ class _MoyalTest(object):
     scale = np.array([3.] * batch_size, dtype=self.dtype)
     x = np.array([2., 3., 4., 5., 6., 7.], dtype=self.dtype)
 
-    moyal = tfd.Moyal(
+    dist = moyal.Moyal(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         validate_args=True)
 
-    log_cdf = moyal.log_cdf(self.make_tensor(x))
+    log_cdf = dist.log_cdf(self.make_tensor(x))
     self.assertAllClose(
         self.evaluate(log_cdf), stats.moyal.logcdf(x, loc=loc, scale=scale))
 
-    cdf = moyal.cdf(self.make_tensor(x))
+    cdf = dist.cdf(self.make_tensor(x))
     self.assertAllClose(
         self.evaluate(cdf), stats.moyal.cdf(x, loc=loc, scale=scale))
 
@@ -120,17 +119,17 @@ class _MoyalTest(object):
     scale = np.array([1.0], dtype=self.dtype)
     x = np.array([[2., 3., 4., 5., 6., 7.]], dtype=self.dtype).T
 
-    moyal = tfd.Moyal(
+    dist = moyal.Moyal(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         validate_args=True)
 
-    log_cdf = moyal.log_cdf(self.make_tensor(x))
+    log_cdf = dist.log_cdf(self.make_tensor(x))
     self.assertAllClose(
         self.evaluate(log_cdf),
         stats.moyal.logcdf(x, loc=loc, scale=scale))
 
-    cdf = moyal.cdf(self.make_tensor(x))
+    cdf = dist.cdf(self.make_tensor(x))
     self.assertAllClose(
         self.evaluate(cdf),
         stats.moyal.cdf(x, loc=loc, scale=scale))
@@ -140,62 +139,62 @@ class _MoyalTest(object):
     loc = np.array([[2.0, 4.0, 5.0]] * batch_size, dtype=self.dtype)
     scale = np.array([1.0], dtype=self.dtype)
 
-    moyal = tfd.Moyal(
+    dist = moyal.Moyal(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         validate_args=True)
-    self.assertAllClose(self.evaluate(moyal.mean()),
-                        stats.moyal.mean(loc=loc, scale=scale))
+    self.assertAllClose(
+        self.evaluate(dist.mean()), stats.moyal.mean(loc=loc, scale=scale))
 
   def testMoyalVariance(self):
     batch_size = 6
     loc = np.array([[2.0, 4.0, 5.0]] * batch_size, dtype=self.dtype)
     scale = np.array([1.0], dtype=self.dtype)
 
-    moyal = tfd.Moyal(
+    dist = moyal.Moyal(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         validate_args=True)
 
-    self.assertAllClose(self.evaluate(moyal.variance()),
-                        stats.moyal.var(loc=loc, scale=scale))
+    self.assertAllClose(
+        self.evaluate(dist.variance()), stats.moyal.var(loc=loc, scale=scale))
 
   def testMoyalStd(self):
     batch_size = 6
     loc = np.array([[2.0, 4.0, 5.0]] * batch_size, dtype=self.dtype)
     scale = np.array([1.0], dtype=self.dtype)
 
-    moyal = tfd.Moyal(
+    dist = moyal.Moyal(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         validate_args=True)
 
-    self.assertAllClose(self.evaluate(moyal.stddev()),
-                        stats.moyal.std(loc=loc, scale=scale))
+    self.assertAllClose(
+        self.evaluate(dist.stddev()), stats.moyal.std(loc=loc, scale=scale))
 
   def testMoyalMode(self):
     batch_size = 6
     loc = np.array([[2.0, 4.0, 5.0]] * batch_size, dtype=self.dtype)
     scale = np.array([1.0], dtype=self.dtype)
 
-    moyal = tfd.Moyal(
+    dist = moyal.Moyal(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         validate_args=True)
 
-    self.assertAllClose(self.evaluate(moyal.mode()), self.evaluate(moyal.loc))
+    self.assertAllClose(self.evaluate(dist.mode()), self.evaluate(dist.loc))
 
   def testMoyalSample(self):
     loc = self.dtype(4.0)
     scale = self.dtype(1.0)
     n = int(3e5)
 
-    moyal = tfd.Moyal(
+    dist = moyal.Moyal(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         validate_args=True)
 
-    samples = moyal.sample(n, seed=test_util.test_seed())
+    samples = dist.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual((n,), sample_values.shape)
     self.assertAllClose(
@@ -211,12 +210,12 @@ class _MoyalTest(object):
     scale = np.array([1.0, 0.8, 0.5], dtype=self.dtype)
     n = int(2e5)
 
-    moyal = tfd.Moyal(
+    dist = moyal.Moyal(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         validate_args=True)
 
-    samples = moyal.sample(n, seed=test_util.test_seed())
+    samples = dist.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     # TODO(b/157561663): Remove the masking once tf.math.special.erfcinv exists.
     sample_values = np.ma.masked_invalid(sample_values)
@@ -232,12 +231,12 @@ class _MoyalTest(object):
     scale = np.array([1.0, 0.8, 0.5], dtype=self.dtype)
     n = int(1e5)
 
-    moyal = tfd.Moyal(
+    dist = moyal.Moyal(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         validate_args=True)
 
-    samples = moyal.sample(n, seed=test_util.test_seed())
+    samples = dist.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     # TODO(b/157561663): Remove the masking once tf.math.special.erfcinv exists.
     sample_values = np.ma.masked_invalid(sample_values)
@@ -259,10 +258,10 @@ class _MoyalTest(object):
     b_loc = b_loc.reshape((1, 1, len(b_loc), 1))
     b_scale = b_scale.reshape((1, 1, 1, len(b_scale)))
 
-    a = tfd.Moyal(loc=a_loc, scale=a_scale, validate_args=True)
-    b = tfd.Moyal(loc=b_loc, scale=b_scale, validate_args=True)
+    a = moyal.Moyal(loc=a_loc, scale=a_scale, validate_args=True)
+    b = moyal.Moyal(loc=b_loc, scale=b_scale, validate_args=True)
 
-    kl = tfd.kl_divergence(a, b)
+    kl = kullback_leibler.kl_divergence(a, b)
 
     x = a.sample(int(3e5), seed=test_util.test_seed())
     kl_samples = a.log_prob(x) - b.log_prob(x)
@@ -270,7 +269,7 @@ class _MoyalTest(object):
 
     self.assertAllMeansClose(kl_samples_, kl_, axis=0, atol=1e-15, rtol=1e-1)
 
-    zero_kl = tfd.kl_divergence(a, a)
+    zero_kl = kullback_leibler.kl_divergence(a, a)
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(zero_kl), zero_kl])
     self.assertAllClose(true_zero_kl_, zero_kl_)
 

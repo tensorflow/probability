@@ -22,15 +22,17 @@ from scipy.stats import special_ortho_group
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
+from tensorflow_probability.python.optimizer import bfgs
+from tensorflow_probability.python.optimizer import bfgs_utils
 
 
 def _make_val_and_grad_fn(value_fn):
   @functools.wraps(value_fn)
   def val_and_grad(x):
-    return tfp.math.value_and_gradient(value_fn, x)
+    return gradient.value_and_gradient(value_fn, x)
   return val_and_grad
 
 
@@ -52,8 +54,8 @@ class BfgsTest(test_util.TestCase):
       return tf.reduce_sum(scales * tf.math.squared_difference(x, minimum))
 
     start = tf.constant([0.6, 0.8])
-    results = self.evaluate(tfp.optimizer.bfgs_minimize(
-        quadratic, initial_position=start, tolerance=1e-8))
+    results = self.evaluate(
+        bfgs.minimize(quadratic, initial_position=start, tolerance=1e-8))
     self.assertTrue(results.converged)
     final_gradient = results.objective_gradient
     final_gradient_norm = _norm(final_gradient)
@@ -74,7 +76,7 @@ class BfgsTest(test_util.TestCase):
 
     start = tf.constant([0.6, 0.8])
     results = tf.function(
-        tfp.optimizer.bfgs_minimize, jit_compile=True)(
+        bfgs.minimize, jit_compile=True)(
             quadratic, initial_position=start, tolerance=np.float32(1e-8))
 
     results = self.evaluate(results)
@@ -97,9 +99,12 @@ class BfgsTest(test_util.TestCase):
     start = tf.constant([0.6, 0.8])
     test_inv_hessian = tf.constant([[2.0, 1.0], [1.0, 2.0]],
                                    dtype=np.float32)
-    results = self.evaluate(tfp.optimizer.bfgs_minimize(
-        quadratic, initial_position=start, tolerance=1e-8,
-        initial_inverse_hessian_estimate=test_inv_hessian))
+    results = self.evaluate(
+        bfgs.minimize(
+            quadratic,
+            initial_position=start,
+            tolerance=1e-8,
+            initial_inverse_hessian_estimate=test_inv_hessian))
     self.assertTrue(results.converged)
     final_gradient = results.objective_gradient
     final_gradient_norm = _norm(final_gradient)
@@ -121,14 +126,21 @@ class BfgsTest(test_util.TestCase):
     with self.assertRaisesOpError(
         r'Initial inverse Hessian is not positive definite|'
         r'Cholesky.*not successful'):
-      self.evaluate(tfp.optimizer.bfgs_minimize(
-          quadratic, initial_position=start, tolerance=1e-8,
-          initial_inverse_hessian_estimate=bad_inv_hessian))
+      self.evaluate(
+          bfgs.minimize(
+              quadratic,
+              initial_position=start,
+              tolerance=1e-8,
+              initial_inverse_hessian_estimate=bad_inv_hessian))
 
     # simply checking that this runs
-    _ = self.evaluate(tfp.optimizer.bfgs_minimize(
-        quadratic, initial_position=start, tolerance=1e-8,
-        initial_inverse_hessian_estimate=bad_inv_hessian, validate_args=False))
+    _ = self.evaluate(
+        bfgs.minimize(
+            quadratic,
+            initial_position=start,
+            tolerance=1e-8,
+            initial_inverse_hessian_estimate=bad_inv_hessian,
+            validate_args=False))
 
   def test_asymmetric_inverse_hessian_spec(self):
     """Checks that specifying a asymmetric inverse hessian fails."""
@@ -143,9 +155,12 @@ class BfgsTest(test_util.TestCase):
     bad_inv_hessian = tf.constant([[2.0, 0.0], [1.0, 2.0]],
                                   dtype=tf.float32)
     with self.assertRaisesOpError(r'Initial inverse Hessian is not symmetric'):
-      self.evaluate(tfp.optimizer.bfgs_minimize(
-          quadratic, initial_position=start, tolerance=1e-8,
-          initial_inverse_hessian_estimate=bad_inv_hessian))
+      self.evaluate(
+          bfgs.minimize(
+              quadratic,
+              initial_position=start,
+              tolerance=1e-8,
+              initial_inverse_hessian_estimate=bad_inv_hessian))
 
   def test_batched_inverse_hessian(self):
     """Checks that specifying a batch of inverse hessians works."""
@@ -160,9 +175,12 @@ class BfgsTest(test_util.TestCase):
     start = tf.constant([[0.6, 0.8], [0.5, 0.5]], dtype=tf.float32)
     test_inv_hessian = tf.constant([[[2.0, 1.0], [1.0, 2.0]],
                                     [[1.0, 0.0], [0.0, 1.0]]], dtype=tf.float32)
-    results = self.evaluate(tfp.optimizer.bfgs_minimize(
-        batched_quadratic, initial_position=start, tolerance=1e-8,
-        initial_inverse_hessian_estimate=test_inv_hessian))
+    results = self.evaluate(
+        bfgs.minimize(
+            batched_quadratic,
+            initial_position=start,
+            tolerance=1e-8,
+            initial_inverse_hessian_estimate=test_inv_hessian))
     self.assertAllTrue(results.converged)
     final_gradient = results.objective_gradient
     final_gradient_norm = _norm(final_gradient)
@@ -182,8 +200,8 @@ class BfgsTest(test_util.TestCase):
       return tf.reduce_sum(scales * tf.math.squared_difference(x, minimum))
 
     start = tf.ones_like(minimum)
-    results = self.evaluate(tfp.optimizer.bfgs_minimize(
-        quadratic, initial_position=start, tolerance=1e-8))
+    results = self.evaluate(
+        bfgs.minimize(quadratic, initial_position=start, tolerance=1e-8))
     self.assertTrue(results.converged)
     final_gradient = results.objective_gradient
     final_gradient_norm = _norm(final_gradient)
@@ -206,8 +224,8 @@ class BfgsTest(test_util.TestCase):
       return tf.reduce_sum(y * yp) / 2
 
     start = tf.ones_like(minimum)
-    results = self.evaluate(tfp.optimizer.bfgs_minimize(
-        quadratic, initial_position=start, tolerance=1e-8))
+    results = self.evaluate(
+        bfgs.minimize(quadratic, initial_position=start, tolerance=1e-8))
     self.assertTrue(results.converged)
     final_gradient = results.objective_gradient
     final_gradient_norm = _norm(final_gradient)
@@ -229,8 +247,8 @@ class BfgsTest(test_util.TestCase):
       return tf.reduce_sum(y * yp) / 2
 
     start = tf.ones_like(minimum)
-    results = self.evaluate(tfp.optimizer.bfgs_minimize(
-        quadratic, initial_position=start, tolerance=1e-8))
+    results = self.evaluate(
+        bfgs.minimize(quadratic, initial_position=start, tolerance=1e-8))
     self.assertTrue(results.converged)
     final_gradient = results.objective_gradient
     final_gradient_norm = _norm(final_gradient)
@@ -267,8 +285,8 @@ class BfgsTest(test_util.TestCase):
       return fv, tf.stack([dfx, dfy])
 
     start = tf.constant([-1.2, 1.0])
-    results = self.evaluate(tfp.optimizer.bfgs_minimize(
-        rosenbrock, initial_position=start, tolerance=1e-5))
+    results = self.evaluate(
+        bfgs.minimize(rosenbrock, initial_position=start, tolerance=1e-5))
     self.assertTrue(results.converged)
     final_gradient = results.objective_gradient
     final_gradient_norm = _norm(final_gradient)
@@ -303,8 +321,8 @@ class BfgsTest(test_util.TestCase):
     dtype = 'float64'
     for start, expected_minima, expected_evals in starts_and_targets:
       start = tf.constant(start, dtype=dtype)
-      results = self.evaluate(tfp.optimizer.bfgs_minimize(
-          himmelblau, initial_position=start, tolerance=1e-8))
+      results = self.evaluate(
+          bfgs.minimize(himmelblau, initial_position=start, tolerance=1e-8))
       print(results)
       self.assertTrue(results.converged)
       self.assertArrayNear(results.position,
@@ -327,9 +345,12 @@ class BfgsTest(test_util.TestCase):
                                 [-2.805118, 3.131312],
                                 [-3.779310, -3.283186],
                                 [3.584428, -1.848126]], dtype=dtype)
-    batch_results = self.evaluate(tfp.optimizer.bfgs_minimize(
-        himmelblau, initial_position=starts,
-        stopping_condition=tfp.optimizer.converged_all, tolerance=1e-8))
+    batch_results = self.evaluate(
+        bfgs.minimize(
+            himmelblau,
+            initial_position=starts,
+            stopping_condition=bfgs_utils.converged_all,
+            tolerance=1e-8))
 
     self.assertFalse(np.any(batch_results.failed))  # None have failed.
     self.assertTrue(np.all(batch_results.converged))  # All converged.
@@ -359,10 +380,10 @@ class BfgsTest(test_util.TestCase):
                                 [-3.779310, -3.283186],
                                 [3.584428, -1.848126]], dtype=dtype)
     batch_results = tf.function(
-        tfp.optimizer.bfgs_minimize, jit_compile=True)(
+        bfgs.minimize, jit_compile=True)(
             himmelblau,
             initial_position=starts,
-            stopping_condition=tfp.optimizer.converged_all,
+            stopping_condition=bfgs_utils.converged_all,
             tolerance=1e-8)
 
     batch_results = self.evaluate(batch_results)
@@ -392,9 +413,12 @@ class BfgsTest(test_util.TestCase):
 
     # Run with `converged_any` stopping condition, to stop as soon as any of
     # the batch members have converged.
-    batch_results = self.evaluate(tfp.optimizer.bfgs_minimize(
-        himmelblau, initial_position=starts,
-        stopping_condition=tfp.optimizer.converged_any, tolerance=1e-8))
+    batch_results = self.evaluate(
+        bfgs.minimize(
+            himmelblau,
+            initial_position=starts,
+            stopping_condition=bfgs_utils.converged_any,
+            tolerance=1e-8))
 
     self.assertFalse(np.any(batch_results.failed))  # None have failed.
     self.assertTrue(np.any(batch_results.converged))  # At least one converged.
@@ -435,8 +459,9 @@ class BfgsTest(test_util.TestCase):
 
     start = tf.ones(shape=[dim], dtype=dtype)
 
-    results = self.evaluate(tfp.optimizer.bfgs_minimize(
-        neg_log_likelihood, initial_position=start, tolerance=1e-6))
+    results = self.evaluate(
+        bfgs.minimize(
+            neg_log_likelihood, initial_position=start, tolerance=1e-6))
     expected_minima = np.array(
         [-0.020460034354, 0.171708568111, 0.021200423717], dtype='float64')
     expected_evals = 19
@@ -474,8 +499,8 @@ class BfgsTest(test_util.TestCase):
 
     def get_results():
       start = tf.constant(start_position)
-      return self.evaluate(tfp.optimizer.bfgs_minimize(
-          rastrigin, initial_position=start, tolerance=1e-5))
+      return self.evaluate(
+          bfgs.minimize(rastrigin, initial_position=start, tolerance=1e-5))
 
     res1, res2 = get_results(), get_results()
 
@@ -504,8 +529,7 @@ class BfgsTest(test_util.TestCase):
     # Test with a vector of unknown dimension, and a fully unknown shape.
     for shape in ([None], None):
       start = tf1.placeholder(tf.float32, shape=shape)
-      bfgs_op = tfp.optimizer.bfgs_minimize(
-          quadratic, initial_position=start, tolerance=1e-8)
+      bfgs_op = bfgs.minimize(quadratic, initial_position=start, tolerance=1e-8)
       self.assertFalse(bfgs_op.position.shape.is_fully_defined())
 
       with self.cached_session() as session:
@@ -534,8 +558,9 @@ class BfgsTest(test_util.TestCase):
       return answer
 
     start = tf.constant(start)
-    results = self.evaluate(tfp.optimizer.bfgs_minimize(
-        quadratic_with_hole, initial_position=start, tolerance=1e-8))
+    results = self.evaluate(
+        bfgs.minimize(
+            quadratic_with_hole, initial_position=start, tolerance=1e-8))
     self.assertAllTrue(results.converged)
     self.assertAllFalse(results.failed)
     self.assertAllNegativeInf(results.objective_value)
@@ -573,8 +598,9 @@ class BfgsTest(test_util.TestCase):
       return answer
 
     start = tf.constant(start)
-    results = self.evaluate(tfp.optimizer.bfgs_minimize(
-        quadratic_with_spike, initial_position=start, tolerance=1e-8))
+    results = self.evaluate(
+        bfgs.minimize(
+            quadratic_with_spike, initial_position=start, tolerance=1e-8))
     self.assertAllFalse(results.converged)
     self.assertAllTrue(results.failed)
     self.assertAllFinite(results.position)

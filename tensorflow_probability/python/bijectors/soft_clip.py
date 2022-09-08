@@ -18,7 +18,6 @@
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import util as tfp_util
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import chain
@@ -30,6 +29,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.util import deferred_tensor
 
 
 __all__ = [
@@ -218,9 +218,9 @@ class SoftClip(bijector.AutoCompositeTensorBijector):
       if low is not None and high is not None:
         # Support reference tensors (eg Variables) for `high` and `low` by
         # deferring all computation on them until needed.
-        width = tfp_util.DeferredTensor(
+        width = deferred_tensor.DeferredTensor(
             pretransformed_input=high, transform_fn=lambda high: high - low)
-        negated_shrinkage_factor = tfp_util.DeferredTensor(
+        negated_shrinkage_factor = deferred_tensor.DeferredTensor(
             pretransformed_input=width,
             transform_fn=lambda w: tf.cast(  # pylint: disable=g-long-lambda
                 negate * w / softplus_bijector.forward(w), dtype=dtype))
@@ -235,14 +235,14 @@ class SoftClip(bijector.AutoCompositeTensorBijector):
             shift.Shift(width),
             scale.Scale(negate),
             softplus_bijector,
-            shift.Shift(tfp_util.DeferredTensor(low, lambda x: -x))]
+            shift.Shift(deferred_tensor.DeferredTensor(low, lambda x: -x))]
       elif low is not None:
         # Implement a soft lower bound:
         #  softlower(x) := softplus(x - low) + low
         components = [
             shift.Shift(low),
             softplus_bijector,
-            shift.Shift(tfp_util.DeferredTensor(low, lambda x: -x))]
+            shift.Shift(deferred_tensor.DeferredTensor(low, lambda x: -x))]
       elif high is not None:
         # Implement a soft upper bound:
         #  softupper(x) := -softplus(high - x) + high
@@ -250,7 +250,8 @@ class SoftClip(bijector.AutoCompositeTensorBijector):
                       scale.Scale(negate),
                       softplus_bijector,
                       scale.Scale(negate),
-                      shift.Shift(tfp_util.DeferredTensor(high, lambda x: -x))]
+                      shift.Shift(
+                          deferred_tensor.DeferredTensor(high, lambda x: -x))]
 
       self._low = low
       self._high = high

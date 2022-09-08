@@ -19,7 +19,9 @@
 import numpy as np
 from scipy import stats as sp_stats
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import test_util
 
 
@@ -33,7 +35,7 @@ class LogNormalTest(test_util.TestCase):
 
     loc = np.float32([3., 1.5])
     scale = np.float32([0.4, 1.1])
-    dist = tfd.LogNormal(loc=loc, scale=scale, validate_args=True)
+    dist = lognormal.LogNormal(loc=loc, scale=scale, validate_args=True)
 
     self.assertAllClose(self.evaluate(dist.mean()),
                         np.exp(loc + scale**2 / 2))
@@ -48,7 +50,7 @@ class LogNormalTest(test_util.TestCase):
 
   def testLogNormalSample(self):
     loc, scale = 1.5, 0.4
-    dist = tfd.LogNormal(loc=loc, scale=scale, validate_args=True)
+    dist = lognormal.LogNormal(loc=loc, scale=scale, validate_args=True)
     samples = self.evaluate(dist.sample(6000, seed=test_util.test_seed()))
     self.assertAllClose(np.mean(samples),
                         self.evaluate(dist.mean()),
@@ -59,7 +61,7 @@ class LogNormalTest(test_util.TestCase):
 
   def testLogNormalPDF(self):
     loc, scale = 1.5, 0.4
-    dist = tfd.LogNormal(loc=loc, scale=scale, validate_args=True)
+    dist = lognormal.LogNormal(loc=loc, scale=scale, validate_args=True)
 
     x = np.array([1e-4, 1.0, 2.0], dtype=np.float32)
 
@@ -71,7 +73,7 @@ class LogNormalTest(test_util.TestCase):
 
   def testLogNormalCDF(self):
     loc, scale = 1.5, 0.4
-    dist = tfd.LogNormal(loc=loc, scale=scale, validate_args=True)
+    dist = lognormal.LogNormal(loc=loc, scale=scale, validate_args=True)
 
     x = np.array([1e-4, 1.0, 2.0], dtype=np.float32)
 
@@ -88,15 +90,15 @@ class LogNormalTest(test_util.TestCase):
     mu_b = np.array([-3.0] * batch_size)
     sigma_b = np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0])
 
-    ln_a = tfd.LogNormal(loc=mu_a, scale=sigma_a, validate_args=True)
-    ln_b = tfd.LogNormal(loc=mu_b, scale=sigma_b, validate_args=True)
+    ln_a = lognormal.LogNormal(loc=mu_a, scale=sigma_a, validate_args=True)
+    ln_b = lognormal.LogNormal(loc=mu_b, scale=sigma_b, validate_args=True)
 
-    kl = tfd.kl_divergence(ln_a, ln_b)
+    kl = kullback_leibler.kl_divergence(ln_a, ln_b)
     kl_val = self.evaluate(kl)
 
-    normal_a = tfd.Normal(loc=mu_a, scale=sigma_a, validate_args=True)
-    normal_b = tfd.Normal(loc=mu_b, scale=sigma_b, validate_args=True)
-    kl_expected_from_normal = tfd.kl_divergence(normal_a, normal_b)
+    normal_a = normal.Normal(loc=mu_a, scale=sigma_a, validate_args=True)
+    normal_b = normal.Normal(loc=mu_b, scale=sigma_b, validate_args=True)
+    kl_expected_from_normal = kullback_leibler.kl_divergence(normal_a, normal_b)
 
     kl_expected_from_formula = ((mu_a - mu_b)**2 / (2 * sigma_b**2) + 0.5 * (
         (sigma_a**2 / sigma_b**2) - 1 - 2 * np.log(sigma_a / sigma_b)))
@@ -113,19 +115,19 @@ class LogNormalTest(test_util.TestCase):
 
   # TODO(b/144948687) Avoid `nan` at boundary. Ideally we'd do this test:
   # def testPdfAtBoundary(self):
-  #   dist = tfd.LogNormal(loc=5., scale=2.)
+  #   dist = lognormal.LogNormal(loc=5., scale=2.)
   #   pdf = self.evaluate(dist.prob(0.))
   #   log_pdf = self.evaluate(dist.log_prob(0.))
   #   self.assertEqual(pdf, 0.)
   #   self.assertAllNegativeInf(log_pdf)
 
   def testAssertValidSample(self):
-    dist = tfd.LogNormal(loc=[-3., 1., 4.], scale=2., validate_args=True)
+    dist = lognormal.LogNormal(loc=[-3., 1., 4.], scale=2., validate_args=True)
     with self.assertRaisesOpError('Sample must be non-negative.'):
       self.evaluate(dist.cdf([3., -0.2, 1.]))
 
   def testSupportBijectorOutsideRange(self):
-    dist = tfd.LogNormal(loc=1., scale=2., validate_args=True)
+    dist = lognormal.LogNormal(loc=1., scale=2., validate_args=True)
     with self.assertRaisesOpError('must be greater than or equal to 0'):
       dist.experimental_default_event_space_bijector().inverse(
           [-4.2, -1e-6, -1.3])
@@ -136,7 +138,7 @@ class LogNormalTest(test_util.TestCase):
     x = np.array([0.1, 7., 4.], dtype=np.float32)
     mean = sp_stats.lognorm.mean(s=scale, scale=np.exp(loc))
     var = sp_stats.lognorm.var(s=scale, scale=np.exp(loc))
-    lognormal_mean_var = tfd.LogNormal.experimental_from_mean_variance(
+    lognormal_mean_var = lognormal.LogNormal.experimental_from_mean_variance(
         mean, variance=var, validate_args=True)
     expected_log_pdf = sp_stats.lognorm.logpdf(x, s=scale, scale=np.exp(loc))
     log_pdf = lognormal_mean_var.log_prob(x)
@@ -156,7 +158,7 @@ class LogNormalTest(test_util.TestCase):
     variance = tf.convert_to_tensor(
         sp_stats.lognorm.var(s=scale, scale=np.exp(loc)).astype(np.float32))
 
-    dist = tfd.LogNormal.experimental_from_mean_variance(
+    dist = lognormal.LogNormal.experimental_from_mean_variance(
         mean, variance, validate_args=True)
     with tf.GradientTape() as tape:
       tape.watch((mean, variance))

@@ -18,13 +18,13 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import generic
 
 
 __all__ = [
@@ -154,21 +154,21 @@ class Softfloor(bijector.AutoCompositeTensorBijector):
     # We use log_sum_exp and log_sub_exp to make this calculation more
     # numerically stable.
 
-    log_numerator = tfp_math.log_sub_exp(
+    log_numerator = generic.log_sub_exp(
         (one_half + fractional_part) / t, one_half / t)
     # If fractional_part == 0, then we'll get log(0).
     log_numerator = tf.where(
         tf.equal(fractional_part, 0.),
         tf.constant(-np.inf, self.dtype), log_numerator)
-    log_denominator = tfp_math.log_sub_exp(
+    log_denominator = generic.log_sub_exp(
         (one_half + fractional_part) / t, fractional_part / t)
     # If fractional_part == 0, then we'll get log(0).
     log_denominator = tf.where(
         tf.equal(fractional_part, 0.),
         tf.constant(-np.inf, self.dtype), log_denominator)
-    log_denominator = tfp_math.log_add_exp(
+    log_denominator = generic.log_add_exp(
         log_denominator,
-        tfp_math.log_sub_exp(tf.ones([], self.dtype) / t, one_half / t))
+        generic.log_sub_exp(tf.ones([], self.dtype) / t, one_half / t))
     rescaled_part = tf.math.exp(log_numerator - log_denominator)
     # We add a term sigmoid(0.5 / t). When t->infinity, this will be 0.5,
     # which will correctly shift the function so that this acts like the
@@ -190,12 +190,12 @@ class Softfloor(bijector.AutoCompositeTensorBijector):
     zero = tf.zeros([], self.dtype)
     one_half = tf.constant(0.5, self.dtype)
 
-    log_numerator = tfp_math.log_sub_exp(one_half / t + log_f, log_f)
-    log_numerator = tfp_math.log_add_exp(zero, log_numerator)
+    log_numerator = generic.log_sub_exp(one_half / t + log_f, log_f)
+    log_numerator = generic.log_add_exp(zero, log_numerator)
     # When the fractional part is zero, the numerator is 1.
     log_numerator = tf.where(tf.equal(fractional_part, 0.), zero, log_numerator)
-    log_denominator = tfp_math.log_sub_exp(one_half / t, log_f + one_half / t)
-    log_denominator = tfp_math.log_add_exp(log_f, log_denominator)
+    log_denominator = generic.log_sub_exp(one_half / t, log_f + one_half / t)
+    log_denominator = generic.log_add_exp(log_f, log_denominator)
     # When the fractional part is zero, the denominator is 0.5 / t.
     log_denominator = tf.where(
         tf.equal(fractional_part, 0.),
@@ -221,7 +221,7 @@ class Softfloor(bijector.AutoCompositeTensorBijector):
     inner_part = (fractional_part - 0.5) / t
 
     offset = (tf.math.log(t) - tf.math.softplus(0.5 / t) +
-              tfp_math.softplus_inverse(0.5 / t))
+              generic.softplus_inverse(0.5 / t))
 
     return (-tf.math.softplus(-inner_part) -
             tf.math.softplus(inner_part) -

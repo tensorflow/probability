@@ -28,7 +28,8 @@ from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.math import psd_kernels as tfpk
+from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
+from tensorflow_probability.python.math.psd_kernels import schur_complement as schur_complement_lib
 
 
 __all__ = [
@@ -102,7 +103,7 @@ def _validate_observation_data(
               index_point_count, observation_count))
 
 
-class DampedSchurComplement(tfpk.PositiveSemidefiniteKernel):
+class DampedSchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
   """Schur complement kernel, damped by scalar factors.
 
   This kernel is the same as the SchurComplement kernel, except we multiply by
@@ -398,7 +399,7 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
         if _conditional_kernel is None:
           _conditional_kernel = DampedSchurComplement(
               df=df,
-              schur_complement=tfpk.SchurComplement(
+              schur_complement=schur_complement_lib.SchurComplement(
                   base_kernel=kernel,
                   fixed_inputs=self._observation_index_points,
                   diag_shift=observation_noise_variance),
@@ -418,8 +419,12 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
               kernel=kernel,
               observation_index_points=observation_index_points,
               observations=observations)
-          n = tf.cast(ps.shape(observations)[-1], dtype=dtype)
-          df = tfp_util.DeferredTensor(df, lambda x: x + n)
+
+          # If `__init__` is called for CompositeTensor/Pytree unflattening,
+          # `df` is already the `DeferredTensor`.
+          if _conditional_mean_fn is None:
+            n = tf.cast(ps.shape(observations)[-1], dtype=dtype)
+            df = tfp_util.DeferredTensor(df, lambda x: x + n)
 
           if _conditional_mean_fn is None:
 
@@ -438,6 +443,10 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
                   chol_linop.solvevec(chol_linop.solvevec(diff), adjoint=True))
             _conditional_mean_fn = conditional_mean_fn
 
+        # Store `_conditional_kernel` and `_conditional_mean_fn` as attributes
+        # for `AutoCompositeTensor`.
+        self._conditional_kernel = _conditional_kernel
+        self._conditional_mean_fn = _conditional_mean_fn
         super(StudentTProcessRegressionModel, self).__init__(
             df=df,
             kernel=_conditional_kernel,
@@ -598,7 +607,7 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
 
       conditional_kernel = DampedSchurComplement(
           df=df,
-          schur_complement=tfpk.SchurComplement(
+          schur_complement=schur_complement_lib.SchurComplement(
               base_kernel=kernel,
               fixed_inputs=observation_index_points,
               diag_shift=observation_noise_variance),

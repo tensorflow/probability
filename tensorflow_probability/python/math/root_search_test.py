@@ -20,11 +20,11 @@ import scipy.optimize as optimize
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import root_search
 
 
 @test_util.test_all_tf_execution_regimes
@@ -38,7 +38,7 @@ class SecantRootSearchTest(test_util.TestCase):
 
     tolerance = 1e-8
     roots, value_at_roots, _ = self.evaluate(
-        tfp.math.find_root_secant(f, guess, position_tolerance=tolerance))
+        root_search.find_root_secant(f, guess, position_tolerance=tolerance))
 
     expected_roots = [optimize.newton(f, x0), optimize.newton(f, x1)]
     zeros = [0., 0.]
@@ -55,7 +55,7 @@ class SecantRootSearchTest(test_util.TestCase):
     tolerance = 1e-8
     # Only the root close to the first starting point will be found.
     roots, value_at_roots, _ = self.evaluate(
-        tfp.math.find_root_secant(
+        root_search.find_root_secant(
             f,
             guess,
             position_tolerance=tolerance,
@@ -79,7 +79,7 @@ class SecantRootSearchTest(test_util.TestCase):
 
     tolerance = 1e-8
     roots, value_at_roots, _ = self.evaluate(
-        tfp.math.find_root_secant(
+        root_search.find_root_secant(
             f, guess, guess_1, position_tolerance=tolerance))
 
     expected_roots = [optimize.newton(f, x0), optimize.newton(f, x1)]
@@ -97,7 +97,7 @@ class SecantRootSearchTest(test_util.TestCase):
 
     tolerance = 1e-8
     roots, value_at_roots, _ = self.evaluate(
-        tfp.math.find_root_secant(
+        root_search.find_root_secant(
             f,
             guess,
             next_guess,
@@ -121,7 +121,7 @@ class SecantRootSearchTest(test_util.TestCase):
 
     tolerance = 1e-8
     roots, value_at_roots, _ = self.evaluate(
-        tfp.math.find_root_secant(f, guess, position_tolerance=tolerance))
+        root_search.find_root_secant(f, guess, position_tolerance=tolerance))
 
     expected_roots = [optimize.newton(f, x0), optimize.newton(f, x1)]
     zeros = [0., 0.]
@@ -137,7 +137,7 @@ class SecantRootSearchTest(test_util.TestCase):
 
     # Skip iteration entirely. This should be a no-op.
     guess, result = self.evaluate(
-        [guess, tfp.math.find_root_secant(f, guess, max_iterations=0)])
+        [guess, root_search.find_root_secant(f, guess, max_iterations=0)])
 
     self.assertAllEqual(result.estimated_root, guess)
 
@@ -148,7 +148,7 @@ class SecantRootSearchTest(test_util.TestCase):
     with self.assertRaisesOpError(
         '`position_tolerance` must be greater than 0.'):
       self.evaluate(
-          tfp.math.find_root_secant(
+          root_search.find_root_secant(
               f, guess, position_tolerance=-1e-8, validate_args=True))
 
   def test_secant_invalid_value_tolerance(self):
@@ -157,7 +157,7 @@ class SecantRootSearchTest(test_util.TestCase):
     guess = tf.constant(-2, dtype=tf.float64)
     with self.assertRaisesOpError('`value_tolerance` must be greater than 0.'):
       self.evaluate(
-          tfp.math.find_root_secant(
+          root_search.find_root_secant(
               f, guess, value_tolerance=-1e-8, validate_args=True))
 
   def test_secant_invalid_max_iterations(self):
@@ -166,7 +166,7 @@ class SecantRootSearchTest(test_util.TestCase):
     guess = tf.constant(-2, dtype=tf.float64)
     with self.assertRaisesOpError('`max_iterations` must be nonnegative.'):
       self.evaluate(
-          tfp.math.find_root_secant(
+          root_search.find_root_secant(
               f, guess, max_iterations=-1, validate_args=True))
 
   def test_secant_non_static_shape(self):
@@ -176,9 +176,8 @@ class SecantRootSearchTest(test_util.TestCase):
     f = lambda x: (x - 1.) * (x + 1)
     initial_position = tf1.placeholder_with_default([1., 1., 1.], shape=None)
     self.assertAllClose(
-        tfp.math.find_root_secant(
-            f, initial_position).objective_at_estimated_root,
-        [0., 0., 0.])
+        root_search.find_root_secant(
+            f, initial_position).objective_at_estimated_root, [0., 0., 0.])
 
 
 @test_util.test_all_tf_execution_regimes
@@ -188,7 +187,7 @@ class ChandrupatlaRootSearchTest(test_util.TestCase):
     true_x = 3.14159
     u = special_math.ndtr(true_x)
 
-    roots, value_at_roots, _ = tfp.math.find_root_chandrupatla(
+    roots, value_at_roots, _ = root_search.find_root_chandrupatla(
         objective_fn=lambda x: special_math.ndtr(x) - u,
         low=-100.,
         high=100.,
@@ -203,7 +202,7 @@ class ChandrupatlaRootSearchTest(test_util.TestCase):
     seed = test_util.test_seed(sampler_type='stateless')
     expected_roots = self.evaluate(samplers.normal(
         [4, 3], seed=seed))
-    roots, value_at_roots, _ = tfp.math.find_root_chandrupatla(
+    roots, value_at_roots, _ = root_search.find_root_chandrupatla(
         objective_fn=lambda x: (x - expected_roots)**15,
         low=-20.,
         high=20.,
@@ -220,7 +219,7 @@ class ChandrupatlaRootSearchTest(test_util.TestCase):
     max_iterations = samplers.uniform(
         [4, 3], minval=1, maxval=6, dtype=tf.int32,
         seed=test_util.test_seed(sampler_type='stateless'))
-    _, _, num_iterations = tfp.math.find_root_chandrupatla(
+    _, _, num_iterations = root_search.find_root_chandrupatla(
         objective_fn=lambda x: (x - expected_roots)**3,
         low=-1000000.,
         high=1000000.,
@@ -236,7 +235,7 @@ class ChandrupatlaRootSearchTest(test_util.TestCase):
     # the property that `0.5 * a + 0.5 * b == a` in float32. The search should
     # detect the fixed point and halt early.
     max_iterations = 50
-    _, _, num_iterations = tfp.math.find_root_chandrupatla(
+    _, _, num_iterations = root_search.find_root_chandrupatla(
         lambda ux: tf.math.igamma(2., tf.nn.softplus(ux)) - 0.5,
         low=-100.,
         high=100.,
@@ -250,7 +249,7 @@ class ChandrupatlaRootSearchTest(test_util.TestCase):
         [4, 3], seed=test_util.test_seed(sampler_type='stateless'),
         dtype=tf.float64)
     tolerance = 1e-12
-    roots, value_at_roots, _ = tfp.math.find_root_chandrupatla(
+    roots, value_at_roots, _ = root_search.find_root_chandrupatla(
         objective_fn=lambda x: (x - expected_roots)**3,
         low=tf.convert_to_tensor(-100., dtype=expected_roots.dtype),
         high=tf.convert_to_tensor(100., dtype=expected_roots.dtype),
@@ -260,18 +259,15 @@ class ChandrupatlaRootSearchTest(test_util.TestCase):
 
   def test_chandrupatla_invalid_bounds(self):
     with self.assertRaisesOpError('must be on different sides of a root'):
-      self.evaluate(tfp.math.find_root_chandrupatla(
-          lambda x: x**2 - 2.,
-          3.,
-          4.,
-          validate_args=True))
+      self.evaluate(
+          root_search.find_root_chandrupatla(
+              lambda x: x**2 - 2., 3., 4., validate_args=True))
 
   def test_chandrupatla_automatically_selects_bounds(self):
     expected_roots = 1e6 * samplers.normal(
         [4, 3], seed=test_util.test_seed(sampler_type='stateless'))
-    _, value_at_roots, _ = tfp.math.find_root_chandrupatla(
-        objective_fn=lambda x: (x - expected_roots)**5,
-        position_tolerance=1e-8)
+    _, value_at_roots, _ = root_search.find_root_chandrupatla(
+        objective_fn=lambda x: (x - expected_roots)**5, position_tolerance=1e-8)
     self.assertAllClose(value_at_roots, tf.zeros_like(value_at_roots))
 
   def test_chandrupatla_non_static_shape(self):
@@ -282,9 +278,8 @@ class ChandrupatlaRootSearchTest(test_util.TestCase):
     low = tf1.placeholder_with_default([-100., -100., -100.], shape=None)
     high = tf1.placeholder_with_default([100., 100., 100.], shape=None)
     self.assertAllClose(
-        tfp.math.find_root_chandrupatla(
-            f, low=low, high=high).objective_at_estimated_root,
-        [0., 0., 0.])
+        root_search.find_root_chandrupatla(
+            f, low=low, high=high).objective_at_estimated_root, [0., 0., 0.])
 
 
 @test_util.test_all_tf_execution_regimes
@@ -301,7 +296,8 @@ class BracketRootTest(test_util.TestCase):
                       tf.where(x > bounds,
                                np.inf,
                                (x - roots)**3))
-    low, high = self.evaluate(tfp.math.bracket_root(objective_fn))
+
+    low, high = self.evaluate(root_search.bracket_root(objective_fn))
     f_low, f_high = self.evaluate((objective_fn(low), objective_fn(high)))
     self.assertAllFinite(f_low)
     self.assertAllFinite(f_high)
@@ -310,13 +306,13 @@ class BracketRootTest(test_util.TestCase):
 
   def test_negative_root(self):
     root = -17.314
-    low, high = self.evaluate(tfp.math.bracket_root(lambda x: (x - root)))
+    low, high = self.evaluate(root_search.bracket_root(lambda x: (x - root)))
     self.assertLess(low, root)
     self.assertGreater(high, root)
 
   def test_root_near_zero(self):
     root = tf.exp(-13.)
-    low, high = self.evaluate(tfp.math.bracket_root(lambda x: (x - root)))
+    low, high = self.evaluate(root_search.bracket_root(lambda x: (x - root)))
     self.assertLess(low, np.exp(-13.))
     self.assertGreater(high, np.exp(-13))
     self.assertAllClose(low, root, atol=1e-4)
@@ -324,20 +320,20 @@ class BracketRootTest(test_util.TestCase):
 
   def test_returns_zero_width_bracket_at_root(self):
     root = tf.exp(-10.)
-    low, high = self.evaluate(tfp.math.bracket_root(lambda x: (x - root)))
+    low, high = self.evaluate(root_search.bracket_root(lambda x: (x - root)))
     self.assertAllClose(low, root)
     self.assertAllClose(high, root)
 
   def test_backs_off_to_trivial_bracket(self):
     dtype_info = np.finfo(np.float32)
-    low, high = self.evaluate(tfp.math.bracket_root(
-        lambda x: np.nan * x, dtype=np.float32))
+    low, high = self.evaluate(
+        root_search.bracket_root(lambda x: np.nan * x, dtype=np.float32))
     self.assertEqual(low, dtype_info.min)
     self.assertEqual(high, dtype_info.max)
 
   def test_float64(self):
-    low, high = self.evaluate(tfp.math.bracket_root(
-        lambda x: (x - np.pi)**3, dtype=np.float64))
+    low, high = self.evaluate(
+        root_search.bracket_root(lambda x: (x - np.pi)**3, dtype=np.float64))
     self.assertEqual(low.dtype, np.float64)
     self.assertEqual(high.dtype, np.float64)
     self.assertLess(low, np.pi)

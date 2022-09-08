@@ -45,7 +45,8 @@ multi_substrate_py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -54,9 +55,10 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["missing_values_util_test.py"],
     deps = [
+        ":missing_values_util",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -78,10 +80,10 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["seasonality_util_test.py"],
     deps = [
+        ":seasonality_util",
         # numpy dep,
         # pandas dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -94,7 +96,10 @@ multi_substrate_py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/distributions:categorical",
+        "//tensorflow_probability/python/distributions:mixture_same_family",
+        "//tensorflow_probability/python/distributions:mvn_diag",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensorshape_util",
@@ -107,11 +112,16 @@ multi_substrate_py_test(
     srcs = ["util_test.py"],
     tags = ["tf1-broken"],
     deps = [
+        ":missing_values_util",
+        ":util",
         # numpy dep,
         # pandas dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:mvn_diag",
+        "//tensorflow_probability/python/distributions:mvn_tril",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/sts/components:local_level",
     ],
 )

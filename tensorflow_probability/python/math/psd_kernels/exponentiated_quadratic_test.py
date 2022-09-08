@@ -19,21 +19,22 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-import tensorflow_probability as tfp
-
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic
 
 
 @test_util.test_all_tf_execution_regimes
 class ExponentiatedQuadraticTest(test_util.TestCase):
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, reason='DType mismatch not caught in numpy.')
   def testMismatchedFloatTypesAreBad(self):
-    tfp.math.psd_kernels.ExponentiatedQuadratic(
+    exponentiated_quadratic.ExponentiatedQuadratic(
         1, 1)  # Should be OK (float32 fallback).
-    tfp.math.psd_kernels.ExponentiatedQuadratic(np.float32(1.),
-                                                1.)  # Should be OK.
+    exponentiated_quadratic.ExponentiatedQuadratic(np.float32(1.),
+                                                   1.)  # Should be OK.
     with self.assertRaises(TypeError):
-      tfp.math.psd_kernels.ExponentiatedQuadratic(
+      exponentiated_quadratic.ExponentiatedQuadratic(
           np.float32(1.), np.float64(1.))
 
   @parameterized.parameters(
@@ -48,10 +49,8 @@ class ExponentiatedQuadraticTest(test_util.TestCase):
     length_scale = .2
 
     np.random.seed(42)
-    k = tfp.math.psd_kernels.ExponentiatedQuadratic(
-        amplitude,
-        length_scale=length_scale,
-        feature_ndims=feature_ndims)
+    k = exponentiated_quadratic.ExponentiatedQuadratic(
+        amplitude, length_scale=length_scale, feature_ndims=feature_ndims)
     shape = [dims] * feature_ndims
     for _ in range(5):
       x = np.random.uniform(-1, 1, size=shape).astype(np.float32)
@@ -62,12 +61,12 @@ class ExponentiatedQuadraticTest(test_util.TestCase):
           self.evaluate(k.apply(x, y)))
 
   def testNoneShapes(self):
-    k = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    k = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude=np.reshape(np.arange(12.), [2, 3, 2]))
     self.assertAllEqual((2, 3, 2), k.batch_shape)
 
   def testShapesAreCorrect(self):
-    k = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    k = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude=1., length_scale=1.)
 
     x = np.ones([4, 3], np.float32)
@@ -78,7 +77,7 @@ class ExponentiatedQuadraticTest(test_util.TestCase):
         [2, 4, 5],
         k.matrix(tf.stack([x]*2), tf.stack([y]*2)).shape)
 
-    k = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    k = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude=np.ones([2, 1, 1], np.float32),
         length_scale=np.ones([1, 3, 1], np.float32))
     self.assertAllEqual(
@@ -94,17 +93,17 @@ class ExponentiatedQuadraticTest(test_util.TestCase):
 
   def testValidateArgs(self):
     with self.assertRaisesOpError('must be positive'):
-      k = tfp.math.psd_kernels.ExponentiatedQuadratic(
+      k = exponentiated_quadratic.ExponentiatedQuadratic(
           -1., 1., validate_args=True)
       self.evaluate(k.apply([1.], [1.]))
 
     with self.assertRaisesOpError('must be positive'):
-      tfp.math.psd_kernels.ExponentiatedQuadratic(
+      exponentiated_quadratic.ExponentiatedQuadratic(
           2., -2., validate_args=True)
       self.evaluate(k.apply([1.], [1.]))
 
     # But `None`'s are ok
-    k = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    k = exponentiated_quadratic.ExponentiatedQuadratic(
         None, None, validate_args=True)
     self.evaluate(k.apply([1.], [1.]))
 
@@ -120,11 +119,11 @@ class ExponentiatedQuadraticTest(test_util.TestCase):
     inverse_length_scale = np.array([2., 3., 1., 0.5], dtype=np.float32)
 
     np.random.seed(42)
-    k = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    k = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude,
         inverse_length_scale=inverse_length_scale,
         feature_ndims=feature_ndims)
-    k_with_ls = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    k_with_ls = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude,
         length_scale=1. / inverse_length_scale,
         feature_ndims=feature_ndims)
@@ -139,8 +138,8 @@ class ExponentiatedQuadraticTest(test_util.TestCase):
   def testValidateVariableArgs(self):
     amplitude = tf.Variable(1.)
     length_scale = tf.Variable(1.)
-    k = tfp.math.psd_kernels.ExponentiatedQuadratic(amplitude, length_scale,
-                                                    validate_args=True)
+    k = exponentiated_quadratic.ExponentiatedQuadratic(
+        amplitude, length_scale, validate_args=True)
     self.evaluate([v.initializer for v in k.variables])
 
     with self.assertRaisesOpError('must be positive'):
@@ -154,10 +153,8 @@ class ExponentiatedQuadraticTest(test_util.TestCase):
 
   def testAtMostOneLengthScale(self):
     with self.assertRaisesRegex(ValueError, 'Must specify at most one of'):
-      tfp.math.psd_kernels.ExponentiatedQuadratic(
-          amplitude=1.,
-          length_scale=1.,
-          inverse_length_scale=2.)
+      exponentiated_quadratic.ExponentiatedQuadratic(
+          amplitude=1., length_scale=1., inverse_length_scale=2.)
 
 
 if __name__ == '__main__':

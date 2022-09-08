@@ -21,12 +21,11 @@ from scipy import stats as sp_stats
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import half_normal
+from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import test_util
-
-
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
 
 
 @test_util.test_all_tf_execution_regimes
@@ -46,18 +45,20 @@ class HalfNormalTest(test_util.TestCase):
     return self.assertRaisesOpError(msg)
 
   def _testParamShapes(self, sample_shape, expected):
-    param_shapes = tfd.HalfNormal.param_shapes(sample_shape)
+    param_shapes = half_normal.HalfNormal.param_shapes(sample_shape)
     scale_shape = param_shapes['scale']
     self.assertAllEqual(expected, self.evaluate(scale_shape))
     scale = tf.ones(scale_shape)
     self.assertAllEqual(
         expected,
         self.evaluate(
-            tf.shape(tfd.HalfNormal(scale, validate_args=True).sample(
-                seed=test_util.test_seed()))))
+            tf.shape(
+                half_normal.HalfNormal(
+                    scale,
+                    validate_args=True).sample(seed=test_util.test_seed()))))
 
   def _testParamStaticShapes(self, sample_shape, expected):
-    param_shapes = tfd.HalfNormal.param_static_shapes(sample_shape)
+    param_shapes = half_normal.HalfNormal.param_static_shapes(sample_shape)
     scale_shape = param_shapes['scale']
     self.assertEqual(expected, scale_shape)
 
@@ -82,7 +83,7 @@ class HalfNormalTest(test_util.TestCase):
 
     x = np.array([-2.5, 2.5, 4.0, 0.0, -1.0, 2.0, 60.], dtype=np.float32)
     scale = tf.constant([3.0] * len(x))
-    halfnorm = tfd.HalfNormal(scale=scale, validate_args=False)
+    halfnorm = half_normal.HalfNormal(scale=scale, validate_args=False)
 
     log_pdf = halfnorm.log_prob(x)
     self._testBatchShapes(halfnorm, log_pdf)
@@ -98,7 +99,7 @@ class HalfNormalTest(test_util.TestCase):
     batch_size = 6
     scale = tf.constant([[3.0, 1.0]] * batch_size)
     x = np.array([[-2.5, 2.5, 4.0, 0.0, -1.0, 2.0]], dtype=np.float32).T
-    halfnorm = tfd.HalfNormal(scale=scale, validate_args=False)
+    halfnorm = half_normal.HalfNormal(scale=scale, validate_args=False)
 
     log_pdf = halfnorm.log_prob(x)
     self._testBatchShapes(halfnorm, log_pdf)
@@ -114,7 +115,7 @@ class HalfNormalTest(test_util.TestCase):
     batch_size = 50
     scale = self._rng.rand(batch_size) + 1.0
     x = np.linspace(-8.0, 8.0, batch_size).astype(np.float64)
-    halfnorm = tfd.HalfNormal(scale=scale, validate_args=False)
+    halfnorm = half_normal.HalfNormal(scale=scale, validate_args=False)
 
     cdf = halfnorm.cdf(x)
     self._testBatchShapes(halfnorm, cdf)
@@ -130,7 +131,7 @@ class HalfNormalTest(test_util.TestCase):
     batch_size = 50
     scale = self._rng.rand(batch_size) + 1.0
     x = np.linspace(-8.0, 8.0, batch_size).astype(np.float64)
-    halfnorm = tfd.HalfNormal(scale=scale, validate_args=False)
+    halfnorm = half_normal.HalfNormal(scale=scale, validate_args=False)
 
     sf = halfnorm.survival_function(x)
     self._testBatchShapes(halfnorm, sf)
@@ -147,7 +148,7 @@ class HalfNormalTest(test_util.TestCase):
     scale = self._rng.rand(batch_size) + 1.0
     p = np.linspace(0., 1.0, batch_size).astype(np.float64)
 
-    halfnorm = tfd.HalfNormal(scale=scale, validate_args=True)
+    halfnorm = half_normal.HalfNormal(scale=scale, validate_args=True)
     x = halfnorm.quantile(p)
     self._testBatchShapes(halfnorm, x)
 
@@ -160,25 +161,28 @@ class HalfNormalTest(test_util.TestCase):
     scale = tf.constant(dtype(3.0))
     x = np.array([0.01, 0.1, 1., 5., 10.]).astype(dtype)
     def half_normal_function(name, x):
-      def half_normal(scale):
-        return getattr(tfd.HalfNormal(scale=scale, validate_args=True), name)(
-            x)
 
-      return half_normal
+      def _half_normal(scale):
+        return getattr(
+            half_normal.HalfNormal(scale=scale, validate_args=True), name)(
+                x)
+
+      return _half_normal
 
     for func_name in [
         'cdf', 'log_cdf', 'survival_function',
         'log_prob', 'prob', 'log_survival_function',
     ]:
       print(func_name)
-      value, grads = self.evaluate(tfp.math.value_and_gradient(
-          half_normal_function(func_name, x), scale))
+      value, grads = self.evaluate(
+          gradient.value_and_gradient(
+              half_normal_function(func_name, x), scale))
       self.assertAllFinite(value)
       self.assertAllFinite(grads)
 
   def testHalfNormalEntropy(self):
     scale = np.array([[1.0, 2.0, 3.0]])
-    halfnorm = tfd.HalfNormal(scale=scale, validate_args=True)
+    halfnorm = half_normal.HalfNormal(scale=scale, validate_args=True)
 
     # See https://en.wikipedia.org/wiki/Half-normal_distribution for the
     # entropy formula used here.
@@ -191,7 +195,7 @@ class HalfNormalTest(test_util.TestCase):
   def testHalfNormalMeanAndMode(self):
     scale = np.array([11., 12., 13.])
 
-    halfnorm = tfd.HalfNormal(scale=scale, validate_args=True)
+    halfnorm = half_normal.HalfNormal(scale=scale, validate_args=True)
     expected_mean = scale * np.sqrt(2.0) / np.sqrt(np.pi)
 
     self.assertAllEqual((3,), self.evaluate(halfnorm.mean()).shape)
@@ -202,7 +206,7 @@ class HalfNormalTest(test_util.TestCase):
 
   def testHalfNormalVariance(self):
     scale = np.array([7., 7., 7.])
-    halfnorm = tfd.HalfNormal(scale=scale, validate_args=True)
+    halfnorm = half_normal.HalfNormal(scale=scale, validate_args=True)
     expected_variance = scale**2.0 * (1.0 - 2.0 / np.pi)
 
     self.assertAllEqual((3,), self.evaluate(halfnorm.variance()).shape)
@@ -210,7 +214,7 @@ class HalfNormalTest(test_util.TestCase):
 
   def testHalfNormalStandardDeviation(self):
     scale = np.array([7., 7., 7.])
-    halfnorm = tfd.HalfNormal(scale=scale, validate_args=True)
+    halfnorm = half_normal.HalfNormal(scale=scale, validate_args=True)
     expected_variance = scale**2.0 * (1.0 - 2.0 / np.pi)
 
     self.assertAllEqual((3,), halfnorm.stddev().shape)
@@ -220,7 +224,7 @@ class HalfNormalTest(test_util.TestCase):
   def testHalfNormalSample(self):
     scale = tf.constant(3.0)
     n = tf.constant(100000)
-    halfnorm = tfd.HalfNormal(scale=scale, validate_args=True)
+    halfnorm = half_normal.HalfNormal(scale=scale, validate_args=True)
 
     sample = halfnorm.sample(n, seed=test_util.test_seed())
 
@@ -244,7 +248,7 @@ class HalfNormalTest(test_util.TestCase):
     batch_size = 2
     scale = tf.constant([[2.0, 3.0]] * batch_size)
     n = tf.constant(100000)
-    halfnorm = tfd.HalfNormal(scale=scale, validate_args=True)
+    halfnorm = half_normal.HalfNormal(scale=scale, validate_args=True)
 
     sample = halfnorm.sample(n, seed=test_util.test_seed())
     self.assertEqual(sample.shape, (100000, batch_size, 2))
@@ -268,23 +272,24 @@ class HalfNormalTest(test_util.TestCase):
     self.assertAllEqual(expected_shape_static, self.evaluate(sample).shape)
 
   def testAssertValidSample(self):
-    d = tfd.HalfNormal(scale=[2., 3.], validate_args=True)
+    d = half_normal.HalfNormal(scale=[2., 3.], validate_args=True)
     with self.assertRaisesOpError('Sample must be non-negative.'):
       d.log_prob(-0.2)
 
   def testPdfAtBoundary(self):
-    d = tfd.HalfNormal(scale=[4., 6., 1.3], validate_args=True)
+    d = half_normal.HalfNormal(scale=[4., 6., 1.3], validate_args=True)
     log_pdf_at_boundary = self.evaluate(d.log_prob(0.))
     self.assertAllFinite(log_pdf_at_boundary)
 
   def testNegativeSigmaFails(self):
     with self.assertRaisesError('Argument `scale` must be positive.'):
-      halfnorm = tfd.HalfNormal(scale=[-5.], validate_args=True, name='G')
+      halfnorm = half_normal.HalfNormal(
+          scale=[-5.], validate_args=True, name='G')
       self.evaluate(halfnorm.mean())
 
   def testHalfNormalShape(self):
     scale = tf.constant([6.0] * 5)
-    halfnorm = tfd.HalfNormal(scale=scale, validate_args=True)
+    halfnorm = half_normal.HalfNormal(scale=scale, validate_args=True)
 
     self.assertEqual(self.evaluate(halfnorm.batch_shape_tensor()), [5])
     self.assertEqual(halfnorm.batch_shape, tf.TensorShape([5]))
@@ -295,7 +300,7 @@ class HalfNormalTest(test_util.TestCase):
     if tf.executing_eagerly():
       return
     scale = tf1.placeholder_with_default([1., 2], shape=None)
-    halfnorm = tfd.HalfNormal(scale=scale, validate_args=True)
+    halfnorm = half_normal.HalfNormal(scale=scale, validate_args=True)
 
     # get_batch_shape should return an '<unknown>' tensor.
     self.assertEqual(halfnorm.batch_shape, tf.TensorShape(None))
@@ -311,22 +316,23 @@ class HalfNormalTest(test_util.TestCase):
     a_scale = a_scale.reshape((len(a_scale), 1))
     b_scale = b_scale.reshape((1, len(b_scale)))
 
-    a = tfd.HalfNormal(scale=a_scale, validate_args=True)
-    b = tfd.HalfNormal(scale=b_scale, validate_args=True)
+    a = half_normal.HalfNormal(scale=a_scale, validate_args=True)
+    b = half_normal.HalfNormal(scale=b_scale, validate_args=True)
 
     true_kl = (np.log(b_scale) - np.log(a_scale) +
                (a_scale ** 2 - b_scale ** 2) / (2 * b_scale ** 2))
 
-    self.assertAllClose(true_kl, tfd.kl_divergence(a, b), atol=2e-15)
+    self.assertAllClose(
+        true_kl, kullback_leibler.kl_divergence(a, b), atol=2e-15)
 
-    zero_kl = tfd.kl_divergence(a, a)
+    zero_kl = kullback_leibler.kl_divergence(a, a)
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(zero_kl), zero_kl])
     self.assertAllEqual(true_zero_kl_, zero_kl_)
 
   @test_util.tf_tape_safety_test
   def testGradientThroughScale(self):
     scale = tf.Variable(2.)
-    d = tfd.HalfNormal(scale=scale, validate_args=True)
+    d = half_normal.HalfNormal(scale=scale, validate_args=True)
     with tf.GradientTape() as tape:
       loss = -d.log_prob([1., 2., 3.])
     grad = tape.gradient(loss, d.trainable_variables)
@@ -336,20 +342,20 @@ class HalfNormalTest(test_util.TestCase):
   def testAssertsPositiveScale(self):
     scale = tf.Variable([1., 2., -3.])
     with self.assertRaisesError('Argument `scale` must be positive.'):
-      d = tfd.HalfNormal(scale=scale, validate_args=True)
+      d = half_normal.HalfNormal(scale=scale, validate_args=True)
       self.evaluate([v.initializer for v in d.variables])
       self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertsPositiveScaleAfterMutation(self):
     scale = tf.Variable([1., 2., 3.])
-    d = tfd.HalfNormal(scale=scale, validate_args=True)
+    d = half_normal.HalfNormal(scale=scale, validate_args=True)
     self.evaluate([v.initializer for v in d.variables])
     with self.assertRaisesError('Argument `scale` must be positive.'):
       with tf.control_dependencies([scale.assign([1., 2., -3.])]):
         self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testSupportBijectorOutsideRange(self):
-    dist = tfd.HalfNormal(scale=[3.1, 2., 5.4], validate_args=True)
+    dist = half_normal.HalfNormal(scale=[3.1, 2., 5.4], validate_args=True)
     x = np.array([-4.2, -1e-6, -1.3])
     bijector_inverse_x = dist.experimental_default_event_space_bijector(
         ).inverse(x)

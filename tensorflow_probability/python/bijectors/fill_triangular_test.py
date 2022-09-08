@@ -19,7 +19,7 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import fill_triangular
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -33,7 +33,7 @@ class FillTriangularBijectorTest(test_util.TestCase):
     y = np.float32(np.array([[3., 0.],
                              [2., 1.]]))
 
-    b = tfb.FillTriangular()
+    b = fill_triangular.FillTriangular()
 
     y_ = self.evaluate(b.forward(x))
     self.assertAllClose(y, y_)
@@ -51,7 +51,7 @@ class FillTriangularBijectorTest(test_util.TestCase):
     x_shape = tf.TensorShape([5, 4, 6])
     y_shape = tf.TensorShape([5, 4, 3, 3])
 
-    b = tfb.FillTriangular(validate_args=True)
+    b = fill_triangular.FillTriangular(validate_args=True)
 
     x = tf.ones(shape=x_shape, dtype=tf.float32)
     y_ = b.forward(x)
@@ -77,7 +77,7 @@ class FillTriangularBijectorTest(test_util.TestCase):
 
   def testShapeError(self):
 
-    b = tfb.FillTriangular(validate_args=True)
+    b = fill_triangular.FillTriangular(validate_args=True)
 
     x_shape_bad = tf.TensorShape([5, 4, 7])
     with self.assertRaisesRegexp(ValueError, 'is not a triangular number'):

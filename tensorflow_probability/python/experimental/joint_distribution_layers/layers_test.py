@@ -16,16 +16,21 @@
 
 from absl.testing import parameterized
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.bijectors import chain
+from tensorflow_probability.python.bijectors import real_nvp
+from tensorflow_probability.python.bijectors import scale
+from tensorflow_probability.python.bijectors import shift
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import joint_distribution_coroutine as jdc
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.experimental.joint_distribution_layers import layers as jdlayers
 from tensorflow_probability.python.internal import custom_gradient
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
 
-tfb = tfp.bijectors
-tfd = tfp.distributions
-jdlayers = tfp.experimental.joint_distribution_layers
-Root = tfd.JointDistributionCoroutine.Root
+Root = jdc.JointDistributionCoroutine.Root
 
 
 @test_util.test_all_tf_execution_regimes
@@ -34,7 +39,7 @@ class _JDLayersTestBase(test_util.TestCase):
   @test_util.numpy_disable_gradient_test
   def testBijectorIntegration(self):
 
-    @tfd.JointDistributionCoroutine
+    @jdc.JointDistributionCoroutine
     def bijector_model():
 
       bijectors = []
@@ -44,18 +49,20 @@ class _JDLayersTestBase(test_util.TestCase):
                 jdlayers.Affine(5, 5),
                 tf.tanh,
                 jdlayers.Affine(10, 5),
-                jdlayers.Lambda(lambda x: tfb.Chain(  # pylint: disable=g-long-lambda
-                    [tfb.Shift(x[..., :5]),
-                     tfb.Scale(log_scale=x[..., 5:])])),
+                jdlayers.Lambda(lambda x: chain.Chain(  # pylint: disable=g-long-lambda
+                    [
+                        shift.Shift(x[..., :5]),
+                        scale.Scale(log_scale=x[..., 5:])
+                    ])),
                 name=f'net{i}',
             ))
 
         bijectors.append(
-            tfb.RealNVP(
+            real_nvp.RealNVP(
                 fraction_masked=0.5 * (-1)**i,
                 bijector_fn=lambda x, _, bn=bijector_net: bn(x)))
 
-      yield jdlayers.Lambda(lambda: tfb.Chain(bijectors))
+      yield jdlayers.Lambda(lambda: chain.Chain(bijectors))
 
     *params, _ = bijector_model.sample(
         2, seed=test_util.test_seed(sampler_type='stateless'))
@@ -65,7 +72,7 @@ class _JDLayersTestBase(test_util.TestCase):
           value=params, seed=test_util.test_seed(sampler_type='stateless'))[-1]
       return bijector_fn().forward_log_det_jacobian(tf.ones([2, 10]), 1)
 
-    ldj, (params_grad,) = tfp.math.value_and_gradient(ldj_fn, (params,))
+    ldj, (params_grad,) = gradient.value_and_gradient(ldj_fn, (params,))
     self.assertEqual([2], ldj.shape)
     self.assertAllAssertsNested(
         lambda x, g: self.assertTrue(x.shape[-1] == 0 or custom_gradient.  # pylint: disable=g-long-lambda
@@ -101,7 +108,7 @@ class _JDLayersTestBase(test_util.TestCase):
     dist = dist_fn(self.dtype)
     if has_conv and test_util.is_numpy_not_jax_mode():
       self.skipTest('tf.nn.conv not implemented in NumPy.')
-    self.assertIsInstance(dist, tfd.Distribution)
+    self.assertIsInstance(dist, distribution.Distribution)
     dtype = dist.dtype
     tf.nest.assert_same_structure(dtype, dist.batch_shape)
     tf.nest.assert_same_structure(dtype, dist.event_shape)
@@ -143,9 +150,10 @@ class _JDLayersTestBase(test_util.TestCase):
 
     def params_model_fn(out_units, in_units, dtype):
       yield Root(
-          tfd.LogNormal(
+          lognormal.LogNormal(
               tf.zeros([out_units, in_units], dtype), 1., name='weights'))
-      yield Root(tfd.LogNormal(tf.zeros([out_units], dtype), 1., name='bias'))
+      yield Root(
+          lognormal.LogNormal(tf.zeros([out_units], dtype), 1., name='bias'))
 
     dist = jdlayers.Affine(
         5, 4, dtype=self.dtype, params_model_fn=params_model_fn)
@@ -203,7 +211,7 @@ class _JDLayersTestBase(test_util.TestCase):
 
     def params_model_fn(out_channels, size, in_channels, dtype):
       yield Root(
-          tfd.LogNormal(
+          lognormal.LogNormal(
               tf.zeros(list(size) + [in_channels, out_channels], dtype),
               1.,
               name='kernel'))

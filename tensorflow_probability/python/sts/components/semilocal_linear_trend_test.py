@@ -19,11 +19,11 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import mvn_diag
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.sts import LocalLinearTrendStateSpaceModel
-from tensorflow_probability.python.sts import SemiLocalLinearTrendStateSpaceModel
+from tensorflow_probability.python.sts.components.local_linear_trend import LocalLinearTrendStateSpaceModel
+from tensorflow_probability.python.sts.components.semilocal_linear_trend import SemiLocalLinearTrendStateSpaceModel
 
 
 @test_util.test_all_tf_execution_regimes
@@ -40,7 +40,7 @@ class _SemiLocalLinearTrendStateSpaceModelTest(object):
         slope_scale=self._build_placeholder(0.5),
         slope_mean=self._build_placeholder(0.2),
         autoregressive_coef=self._build_placeholder(0.3),
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             scale_diag=self._build_placeholder([1., 1.])))
 
     lp = ssm.log_prob(y[:, np.newaxis])
@@ -63,7 +63,7 @@ class _SemiLocalLinearTrendStateSpaceModelTest(object):
         slope_scale=slope_scale,
         slope_mean=self._build_placeholder(0.),
         autoregressive_coef=self._build_placeholder(1.),
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             loc=[initial_level, initial_slope],
             scale_diag=self._build_placeholder([1., 1.])))
 
@@ -71,7 +71,7 @@ class _SemiLocalLinearTrendStateSpaceModelTest(object):
         num_timesteps=num_timesteps,
         level_scale=level_scale,
         slope_scale=slope_scale,
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             loc=[initial_level, initial_slope],
             scale_diag=self._build_placeholder([1., 1.])))
 
@@ -106,7 +106,7 @@ class _SemiLocalLinearTrendStateSpaceModelTest(object):
     stationary_slope_variance = slope_scale**2 / (1. - autoregressive_coef**2)
 
     # Initialize the slope prior at the stationary variance.
-    initial_state_prior = tfd.MultivariateNormalDiag(
+    initial_state_prior = mvn_diag.MultivariateNormalDiag(
         loc=self._build_placeholder([initial_level, initial_slope]),
         scale_diag=self._build_placeholder(
             [1., np.sqrt(stationary_slope_variance)]))
@@ -149,7 +149,7 @@ class _SemiLocalLinearTrendStateSpaceModelTest(object):
         slope_scale=slope_scale,
         autoregressive_coef=autoregressive_coef,
         slope_mean=slope_mean,
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             scale_diag=self._build_placeholder([1., 1.])))
 
     if self.use_static_shape:

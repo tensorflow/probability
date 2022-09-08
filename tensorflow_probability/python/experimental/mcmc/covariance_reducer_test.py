@@ -21,11 +21,10 @@ import collections
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.experimental.mcmc import covariance_reducer
 from tensorflow_probability.python.experimental.mcmc.internal import test_fixtures
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
 
 
 FakeKernelResults = collections.namedtuple(
@@ -42,12 +41,12 @@ class CovarianceReducersTest(test_util.TestCase):
   def test_random_sanity_check(self):
     rng = test_util.test_np_rng()
     x = rng.rand(100)
-    cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
+    cov_reducer = covariance_reducer.CovarianceReducer()
     final_cov = self.evaluate(test_fixtures.reduce(cov_reducer, x))
     self.assertNear(np.var(x, ddof=0), final_cov, err=1e-6)
 
   def test_covariance_shape_and_zero_covariance(self):
-    cov_reducer = tfp.experimental.mcmc.CovarianceReducer(event_ndims=1)
+    cov_reducer = covariance_reducer.CovarianceReducer(event_ndims=1)
     state = cov_reducer.initialize(tf.ones((9, 3)))
     for _ in range(2):
       state = cov_reducer.one_step(tf.zeros((5, 9, 3)), state, axis=0)
@@ -62,8 +61,7 @@ class CovarianceReducersTest(test_util.TestCase):
     self.assertAllEqual(tf.zeros((9, 3, 3)), final_cov)
 
   def test_attributes(self):
-    cov_reducer = tfp.experimental.mcmc.CovarianceReducer(
-        event_ndims=1, ddof=1)
+    cov_reducer = covariance_reducer.CovarianceReducer(event_ndims=1, ddof=1)
     state = cov_reducer.initialize(tf.ones((2, 3), dtype=tf.float64))
 
     # check attributes are correct right after initialization
@@ -77,7 +75,7 @@ class CovarianceReducersTest(test_util.TestCase):
     self.assertEqual(1, cov_reducer.ddof)
 
   def test_nested_with_batching_and_chunking(self):
-    cov_reducer = tfp.experimental.mcmc.CovarianceReducer(event_ndims=1)
+    cov_reducer = covariance_reducer.CovarianceReducer(event_ndims=1)
     chain_state = ({'one': tf.ones((3, 4)), 'zero': tf.zeros((3, 4))},
                    {'two': tf.ones((3, 4)) * 2})
     state = cov_reducer.initialize(chain_state)
@@ -92,11 +90,10 @@ class CovarianceReducersTest(test_util.TestCase):
                     {'two': tf.zeros((3, 4, 4))}))
 
   def test_latent_state_with_multiple_transform_fn(self):
-    cov_reducer = tfp.experimental.mcmc.CovarianceReducer(
+    cov_reducer = covariance_reducer.CovarianceReducer(
         event_ndims=1,
         transform_fn=[
-            lambda _, kr: kr.value,
-            lambda _, kr: kr.inner_results.value
+            lambda _, kr: kr.value, lambda _, kr: kr.inner_results.value
         ])
     latent_state = ({'one': tf.ones((3, 4)), 'zero': tf.zeros((3, 4))},
                     {'two': tf.ones((3, 4)) * 2})
@@ -114,7 +111,7 @@ class CovarianceReducersTest(test_util.TestCase):
     self.assertAllEqualNested(final_cov[1], cov_latent)
 
   def test_transform_fn_with_nested_return(self):
-    cov_red = tfp.experimental.mcmc.CovarianceReducer(
+    cov_red = covariance_reducer.CovarianceReducer(
         transform_fn=lambda sample, _: [sample, sample + 1])
     fake_kr = FakeKernelResults(0., FakeInnerResults(0))
     state = cov_red.initialize(tf.zeros((2,)), fake_kr)
@@ -129,8 +126,8 @@ class CovarianceReducersTest(test_util.TestCase):
 
   @test_util.numpy_disable_test_missing_functionality('composite tensors')
   def test_composite_kernel_results(self):
-    kr = tfd.Normal(0., 1.)
-    cov_red = tfp.experimental.mcmc.CovarianceReducer()
+    kr = normal.Normal(0., 1.)
+    cov_red = covariance_reducer.CovarianceReducer()
     state = cov_red.initialize(tf.zeros((2,)), kr)
     state = cov_red.one_step(tf.ones((2,)), state, kr)
     cov_red.finalize(state)

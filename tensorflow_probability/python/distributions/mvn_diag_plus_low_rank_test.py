@@ -19,7 +19,10 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import mvn_diag_plus_low_rank as mvdpl
+from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.internal import test_util
 
 
@@ -36,7 +39,7 @@ class MultivariateNormalDiagPlusLowRankTest(test_util.TestCase):
     diag_large = [1.0, 5.0]
     v = [[2.0], [3.0]]
     diag_small = [3.0]
-    dist = tfd.MultivariateNormalDiagPlusLowRank(
+    dist = mvdpl.MultivariateNormalDiagPlusLowRank(
         loc=mu,
         scale_diag=diag_large,
         scale_perturb_factor=v,
@@ -47,7 +50,7 @@ class MultivariateNormalDiagPlusLowRankTest(test_util.TestCase):
   @test_util.tf_tape_safety_test
   def testVariableLocation(self):
     loc = tf.Variable([1., 1.])
-    d = tfd.MultivariateNormalDiagPlusLowRank(loc=loc, validate_args=True)
+    d = mvdpl.MultivariateNormalDiagPlusLowRank(loc=loc, validate_args=True)
     self.evaluate(loc.initializer)
     with tf.GradientTape() as tape:
       lp = d.log_prob([0., 0.])
@@ -56,7 +59,7 @@ class MultivariateNormalDiagPlusLowRankTest(test_util.TestCase):
   @test_util.tf_tape_safety_test
   def testVariableScaleDiag(self):
     scale_diag = tf.Variable([1., 1.])
-    d = tfd.MultivariateNormalDiagPlusLowRank(
+    d = mvdpl.MultivariateNormalDiagPlusLowRank(
         scale_diag=scale_diag, validate_args=True)
     self.evaluate(scale_diag.initializer)
     with tf.GradientTape() as tape:
@@ -66,7 +69,7 @@ class MultivariateNormalDiagPlusLowRankTest(test_util.TestCase):
   @test_util.tf_tape_safety_test
   def testVariableScalePerturbFactor(self):
     scale_perturb_factor = tf.Variable([[1.], [2.]])
-    d = tfd.MultivariateNormalDiagPlusLowRank(
+    d = mvdpl.MultivariateNormalDiagPlusLowRank(
         scale_perturb_factor=scale_perturb_factor, validate_args=True)
     self.evaluate(scale_perturb_factor.initializer)
     with tf.GradientTape() as tape:
@@ -77,7 +80,7 @@ class MultivariateNormalDiagPlusLowRankTest(test_util.TestCase):
   def testVariableScalePerturbDiag(self):
     scale_perturb_factor = tf.constant([[1.], [2.]])
     scale_perturb_diag = tf.Variable([3.])
-    d = tfd.MultivariateNormalDiagPlusLowRank(
+    d = mvdpl.MultivariateNormalDiagPlusLowRank(
         scale_perturb_factor=scale_perturb_factor,
         scale_perturb_diag=scale_perturb_diag,
         validate_args=True)
@@ -107,7 +110,7 @@ class MultivariateNormalDiagPlusLowRankTest(test_util.TestCase):
     true_variance = np.diag(true_covariance)
     true_stddev = np.sqrt(true_variance)
 
-    dist = tfd.MultivariateNormalDiagPlusLowRank(
+    dist = mvdpl.MultivariateNormalDiagPlusLowRank(
         loc=mu,
         scale_diag=diag_large,
         scale_perturb_factor=v,
@@ -115,18 +118,18 @@ class MultivariateNormalDiagPlusLowRankTest(test_util.TestCase):
         validate_args=True)
 
     # The following distributions will test the KL divergence calculation.
-    mvn_identity = tfd.MultivariateNormalDiag(
+    mvn_identity = mvn_diag.MultivariateNormalDiag(
         loc=np.array([1., 2, 0.25], dtype=np.float32), validate_args=True)
-    mvn_scaled = tfd.MultivariateNormalDiag(
+    mvn_scaled = mvn_diag.MultivariateNormalDiag(
         loc=mvn_identity.loc, scale_identity_multiplier=2.2, validate_args=True)
-    mvn_diag = tfd.MultivariateNormalDiag(
+    mvd = mvn_diag.MultivariateNormalDiag(
         loc=mvn_identity.loc,
         scale_diag=np.array([0.5, 1.5, 1.], dtype=np.float32),
         validate_args=True)
-    mvn_chol = tfd.MultivariateNormalTriL(
+    mvn_chol = mvn_tril.MultivariateNormalTriL(
         loc=np.array([1., 2, -1], dtype=np.float32),
-        scale_tril=np.array(
-            [[6., 0, 0], [2, 5, 0], [1, 3, 4]], dtype=np.float32) / 10.,
+        scale_tril=np.array([[6., 0, 0], [2, 5, 0], [1, 3, 4]],
+                            dtype=np.float32) / 10.,
         validate_args=True)
 
     scale = dist.scale.to_dense()
@@ -141,22 +144,22 @@ class MultivariateNormalDiagPlusLowRankTest(test_util.TestCase):
     sample_kl_identity = tf.reduce_mean(
         dist.log_prob(samps) - mvn_identity.log_prob(samps),
         axis=0)
-    analytical_kl_identity = tfd.kl_divergence(dist, mvn_identity)
+    analytical_kl_identity = kullback_leibler.kl_divergence(dist, mvn_identity)
 
     sample_kl_scaled = tf.reduce_mean(
         dist.log_prob(samps) - mvn_scaled.log_prob(samps), axis=0)
-    analytical_kl_scaled = tfd.kl_divergence(dist, mvn_scaled)
+    analytical_kl_scaled = kullback_leibler.kl_divergence(dist, mvn_scaled)
 
     sample_kl_diag = tf.reduce_mean(
-        dist.log_prob(samps) - mvn_diag.log_prob(samps), axis=0)
-    analytical_kl_diag = tfd.kl_divergence(dist, mvn_diag)
+        dist.log_prob(samps) - mvd.log_prob(samps), axis=0)
+    analytical_kl_diag = kullback_leibler.kl_divergence(dist, mvd)
 
     sample_kl_chol = tf.reduce_mean(
         dist.log_prob(samps) - mvn_chol.log_prob(samps), axis=0)
-    analytical_kl_chol = tfd.kl_divergence(dist, mvn_chol)
+    analytical_kl_chol = kullback_leibler.kl_divergence(dist, mvn_chol)
 
     n = int(10e3)
-    baseline = tfd.MultivariateNormalDiag(
+    baseline = mvn_diag.MultivariateNormalDiag(
         loc=np.array([-1., 0.25, 1.25], dtype=np.float32),
         scale_diag=np.array([1.5, 0.5, 1.], dtype=np.float32),
         validate_args=True)
@@ -165,23 +168,25 @@ class MultivariateNormalDiagPlusLowRankTest(test_util.TestCase):
     sample_kl_identity_diag_baseline = tf.reduce_mean(
         baseline.log_prob(samps) - mvn_identity.log_prob(samps),
         axis=0)
-    analytical_kl_identity_diag_baseline = tfd.kl_divergence(
+    analytical_kl_identity_diag_baseline = kullback_leibler.kl_divergence(
         baseline, mvn_identity)
 
     sample_kl_scaled_diag_baseline = tf.reduce_mean(
         baseline.log_prob(samps) - mvn_scaled.log_prob(samps),
         axis=0)
-    analytical_kl_scaled_diag_baseline = tfd.kl_divergence(baseline, mvn_scaled)
+    analytical_kl_scaled_diag_baseline = kullback_leibler.kl_divergence(
+        baseline, mvn_scaled)
 
     sample_kl_diag_diag_baseline = tf.reduce_mean(
-        baseline.log_prob(samps) - mvn_diag.log_prob(samps),
-        axis=0)
-    analytical_kl_diag_diag_baseline = tfd.kl_divergence(baseline, mvn_diag)
+        baseline.log_prob(samps) - mvd.log_prob(samps), axis=0)
+    analytical_kl_diag_diag_baseline = kullback_leibler.kl_divergence(
+        baseline, mvd)
 
     sample_kl_chol_diag_baseline = tf.reduce_mean(
         baseline.log_prob(samps) - mvn_chol.log_prob(samps),
         axis=0)
-    analytical_kl_chol_diag_baseline = tfd.kl_divergence(baseline, mvn_chol)
+    analytical_kl_chol_diag_baseline = kullback_leibler.kl_divergence(
+        baseline, mvn_chol)
 
     [
         sample_mean_,
@@ -359,7 +364,7 @@ class MultivariateNormalDiagPlusLowRankTest(test_util.TestCase):
     cov = np.stack([np.matmul(scale[0], scale[0].T),
                     np.matmul(scale[1], scale[1].T)])
     tf1.logging.vlog(2, "expected_cov:\n{}".format(cov))
-    mvn = tfd.MultivariateNormalDiagPlusLowRank(
+    mvn = mvdpl.MultivariateNormalDiagPlusLowRank(
         loc=mu,
         scale_perturb_factor=u,
         scale_perturb_diag=m,

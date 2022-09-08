@@ -19,13 +19,16 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import cauchy
+from tensorflow_probability.python.distributions import exponential
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.sts import LinearRegression
-from tensorflow_probability.python.sts import SparseLinearRegression
-from tensorflow_probability.python.sts import Sum
+from tensorflow_probability.python.sts.components.regression import LinearRegression
+from tensorflow_probability.python.sts.components.regression import SparseLinearRegression
+from tensorflow_probability.python.sts.components.sum import Sum
 
 tfl = tf.linalg
 
@@ -73,11 +76,12 @@ class _LinearRegressionTest(test_util.TestCase):
 
     linear_regression = LinearRegression(
         design_matrix=design_matrix,
-        weights_prior=tfd.Independent(
-            tfd.Cauchy(loc=self._build_placeholder(np.zeros([num_features])),
-                       scale=self._build_placeholder(np.ones([num_features]))),
+        weights_prior=independent.Independent(
+            cauchy.Cauchy(
+                loc=self._build_placeholder(np.zeros([num_features])),
+                scale=self._build_placeholder(np.ones([num_features]))),
             reinterpreted_batch_ndims=1))
-    observation_noise_scale_prior = tfd.LogNormal(
+    observation_noise_scale_prior = lognormal.LogNormal(
         loc=self._build_placeholder(-2), scale=self._build_placeholder(0.1))
     model = Sum(components=[linear_regression],
                 observation_noise_scale_prior=observation_noise_scale_prior)
@@ -118,7 +122,7 @@ class _LinearRegressionTest(test_util.TestCase):
     # Build a model with scalar Exponential(1.) prior.
     linear_regression = LinearRegression(
         design_matrix=design_matrix,
-        weights_prior=tfd.Exponential(
+        weights_prior=exponential.Exponential(
             rate=self._build_placeholder(np.ones(batch_shape))))
 
     # Check that the prior is broadcast to match the shape of the weights.
@@ -129,7 +133,7 @@ class _LinearRegressionTest(test_util.TestCase):
                         self.evaluate(weights.prior.batch_shape_tensor()))
 
     seed = test_util.test_seed(sampler_type="stateless")
-    weights_seed, ssm_seed, shape_seed, sample_seed = tfp.random.split_seed(
+    weights_seed, ssm_seed, shape_seed, sample_seed = samplers.split_seed(
         seed, n=4)
     prior_sampled_weights = weights.prior.sample(seed=weights_seed)
     ssm = linear_regression.make_state_space_model(
@@ -178,7 +182,7 @@ class _SparseLinearRegressionTest(test_util.TestCase):
     design_matrix = self._build_placeholder(
         np.random.randn(*(batch_shape + [num_timesteps, num_features])))
     seed = test_util.test_seed(sampler_type="stateless")
-    prior_seed, ssm_seed = tfp.random.split_seed(seed, n=2)
+    prior_seed, ssm_seed = samplers.split_seed(seed, n=2)
 
     weights_batch_shape = []
     if not self.use_static_shape:

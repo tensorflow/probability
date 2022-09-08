@@ -19,9 +19,9 @@ import collections
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.optimizer.linesearch.hager_zhang import hager_zhang
 
 
 def _is_exact_wolfe(x, f_x, df_x, f_0, df_0, delta, sigma):
@@ -51,7 +51,7 @@ class HagerZhangTest(test_util.TestCase):
     fdf = lambda x: ValueAndGradient(x=x, f=(x-1.3)**2, df=2*(x-1.3))
 
     start = tf.constant(start)
-    results = self.evaluate(tfp.optimizer.linesearch.hager_zhang(
+    results = self.evaluate(hager_zhang(
         fdf, initial_step_size=start))
     self.assertTrue(results.converged)
     self.assertAlmostEqual(results.left.x, results.right.x)
@@ -76,7 +76,7 @@ class HagerZhangTest(test_util.TestCase):
       return ValueAndGradient(x, val, dval)
 
     start = tf.constant(start)
-    results = self.evaluate(tfp.optimizer.linesearch.hager_zhang(
+    results = self.evaluate(hager_zhang(
         fdf, initial_step_size=start))
     self.assertTrue(results.converged)
     self.assertAlmostEqual(results.left.x, results.right.x)
@@ -102,9 +102,9 @@ class HagerZhangTest(test_util.TestCase):
     starts = np.array([0.1, 1.5, 2.0, 4.0])
 
     results_batched = self.evaluate(
-        tfp.optimizer.linesearch.hager_zhang(fdf, initial_step_size=starts))
+        hager_zhang(fdf, initial_step_size=starts))
     results_mapped = [
-        self.evaluate(tfp.optimizer.linesearch.hager_zhang(
+        self.evaluate(hager_zhang(
             fdf, initial_step_size=x)) for x in starts]
     results_mapped_left = np.array([r.left.x for r in results_mapped])
     results_mapped_right = np.array([r.right.x for r in results_mapped])
@@ -132,7 +132,7 @@ class HagerZhangTest(test_util.TestCase):
           df=2*z*tf.math.exp(-z*z) - tf.math.exp(-z))
 
     start = tf.convert_to_tensor([0.01, 0.1, 1.0, 1.5, 2.0, 3.0])
-    results = self.evaluate(tfp.optimizer.linesearch.hager_zhang(
+    results = self.evaluate(hager_zhang(
         _fdf, initial_step_size=start))
 
     # Bracketing will do something like: check `5^0 * start`, `5^1 * start`,
@@ -186,7 +186,7 @@ class HagerZhangTest(test_util.TestCase):
       ft, df = rosenbrock(coord)
       return ValueAndGradient(t, ft, tf.reduce_sum(df * dirn))
 
-    results = self.evaluate(tfp.optimizer.linesearch.hager_zhang(
+    results = self.evaluate(hager_zhang(
         fdf, initial_step_size=1.0))
     self.assertTrue(results.converged)
 
@@ -213,7 +213,7 @@ class HagerZhangTest(test_util.TestCase):
       return _val_and_grad_fn
 
     fdf = get_val_and_grad_fn()
-    results = self.evaluate(tfp.optimizer.linesearch.hager_zhang(
+    results = self.evaluate(hager_zhang(
         fdf, initial_step_size=tf.constant(start)))
     self.assertEqual(fdf.num_calls, results.func_evals)
 
@@ -232,7 +232,7 @@ class HagerZhangTest(test_util.TestCase):
       return _fdf, eval_count
 
     fdf, counter = get_fn()
-    results = tfp.optimizer.linesearch.hager_zhang(
+    results = hager_zhang(
         fdf, initial_step_size=tf.constant(start))
     self.evaluate(counter.initializer)
     results = self.evaluate(results)
@@ -256,7 +256,7 @@ class HagerZhangTest(test_util.TestCase):
 
     start = tf.constant(dtype(1e-8))
     results = self.evaluate(
-        tfp.optimizer.linesearch.hager_zhang(
+        hager_zhang(
             fdf,
             initial_step_size=start,
             sufficient_decrease_param=0.1,
@@ -286,7 +286,7 @@ class HagerZhangTest(test_util.TestCase):
 
     def get_results():
       start = tf.constant(0.9)
-      results = tfp.optimizer.linesearch.hager_zhang(
+      results = hager_zhang(
           fdf,
           initial_step_size=start,
           sufficient_decrease_param=0.1,
@@ -312,7 +312,7 @@ class HagerZhangTest(test_util.TestCase):
 
     start = tf.constant(0.1, dtype=tf.float64)
     results = self.evaluate(
-        tfp.optimizer.linesearch.hager_zhang(
+        hager_zhang(
             rastrigin,
             initial_step_size=start,
             sufficient_decrease_param=0.1,
@@ -342,7 +342,7 @@ class HagerZhangTest(test_util.TestCase):
     # Test the default initial bracketing sequence, which is
     # x=0, x=initial_step_size, x=expansion_param * initial_step_size
     results = self.evaluate(
-        tfp.optimizer.linesearch.hager_zhang(
+        hager_zhang(
             fdf,
             initial_step_size=1.0,
             expansion_param=5.0

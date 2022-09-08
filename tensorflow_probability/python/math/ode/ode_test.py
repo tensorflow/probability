@@ -17,10 +17,12 @@
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import gradient as tfp_gradient
+from tensorflow_probability.python.math.ode import base
+from tensorflow_probability.python.math.ode import bdf
+from tensorflow_probability.python.math.ode import dormand_prince
 from tensorflow.python import tf2  # pylint: disable=g-direct-tensorflow-import
 
 _RTOL = 1e-8
@@ -40,14 +42,14 @@ def _test_cases(bdf_only=False):
   test_cases = []
   if not bdf_only:
     if not JAX_MODE:
-      test_cases.append(('dormand_prince', tfp.math.ode.DormandPrince,
-                         tfp.math.ode.ChosenBySolver))
+      test_cases.append(
+          ('dormand_prince', dormand_prince.DormandPrince, base.ChosenBySolver))
     test_cases.append(
-        ('dormand_prince_fixed', tfp.math.ode.DormandPrince, _fixed_fn))
+        ('dormand_prince_fixed', dormand_prince.DormandPrince, _fixed_fn))
   if not NUMPY_MODE:
     if not JAX_MODE:
-      test_cases.append(('bdf', tfp.math.ode.BDF, tfp.math.ode.ChosenBySolver))
-    test_cases.append(('bdf_fixed', tfp.math.ode.BDF, _fixed_fn))
+      test_cases.append(('bdf', bdf.BDF, base.ChosenBySolver))
+    test_cases.append(('bdf_fixed', bdf.BDF, _fixed_fn))
   if not test_cases:
     # This is here just to appease parameterized.named_parameters, as it needs
     # at least 1 test case. We'll be disabling the entire test manually in this
@@ -57,7 +59,7 @@ def _test_cases(bdf_only=False):
   return test_cases
 
 
-class StepSizeHeuristicAdjointSolver(tfp.math.ode.Solver):
+class StepSizeHeuristicAdjointSolver(base.Solver):
   """Adjoint solver which propagates step size between solves."""
 
   def __init__(self, make_solver_fn, first_step_size):
@@ -439,7 +441,7 @@ class GradientTest(test_util.TestCase):
     solution_times = solution_times_fn(final_time)
     jacobian_fn = lambda time, state: 2. * (state - time)
 
-    if not isinstance(solution_times, tfp.math.ode.ChosenBySolver):
+    if not isinstance(solution_times, base.ChosenBySolver):
       self.skipTest('b/194468619')
 
     # Instrument the adjoint solver for testing. We have to do this because the
@@ -521,9 +523,9 @@ class GradientTest(test_util.TestCase):
 # mode.
 @test_util.numpy_disable_gradient_test
 @test_util.test_graph_mode_only
-@parameterized.named_parameters([
-    ('bdf', tfp.math.ode.BDF),
-    ('dormand_prince', tfp.math.ode.DormandPrince)])
+@parameterized.named_parameters([('bdf', bdf.BDF),
+                                 ('dormand_prince',
+                                  dormand_prince.DormandPrince)])
 class GradientTestPforJacobian(test_util.TestCase):
 
   def test_linear_ode_dense(self, solver):
@@ -648,8 +650,8 @@ class GradientTestPforJacobian(test_util.TestCase):
 
 @test_util.test_all_tf_execution_regimes
 @parameterized.named_parameters(
-    [('dormand_prince', tfp.math.ode.DormandPrince)] +
-    ([] if NUMPY_MODE else [('bdf', tfp.math.ode.BDF)]))
+    [('dormand_prince', dormand_prince.DormandPrince)] +
+    ([] if NUMPY_MODE else [('bdf', bdf.BDF)]))
 class GeneralTest(test_util.TestCase):
 
   def test_bad_initial_state_dtype(self, solver):
@@ -697,12 +699,12 @@ class GeneralTest(test_util.TestCase):
         ode_fn,
         initial_time,
         initial_state,
-        solution_times=tfp.math.ode.ChosenBySolver(intermediate_time))
+        solution_times=base.ChosenBySolver(intermediate_time))
     results = solver_instance.solve(
         ode_fn,
         intermediate_time,
         previous_results.states[-1],
-        solution_times=tfp.math.ode.ChosenBySolver(final_time),
+        solution_times=base.ChosenBySolver(final_time),
         previous_solver_internal_state=previous_results.solver_internal_state)
     times, states = self.evaluate([results.times, results.states])
     states_exact = np.exp(jacobian_diag_part[np.newaxis, :] *

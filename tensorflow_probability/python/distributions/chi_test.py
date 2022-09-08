@@ -20,9 +20,9 @@ from scipy import special
 from scipy import stats
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.distributions import chi
+from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import test_util
-tfd = tfp.distributions
 
 
 @test_util.test_all_tf_execution_regimes
@@ -35,24 +35,24 @@ class ChiTest(test_util.TestCase):
     df = df.reshape((len(df), 1))
     x = x.reshape((1, len(x)))
 
-    chi = tfd.Chi(df=df, validate_args=True)
+    dist = chi.Chi(df=df, validate_args=True)
     expected_log_pdf = stats.chi.logpdf(x, df)
 
-    log_pdf = chi.log_prob(x)
+    log_pdf = dist.log_prob(x)
     self.assertEqual(log_pdf.shape, np.broadcast(df, x).shape)
     self.assertAllClose(self.evaluate(log_pdf), expected_log_pdf)
 
-    pdf = chi.prob(x)
+    pdf = dist.prob(x)
     self.assertEqual(pdf.shape, np.broadcast(df, x).shape)
     self.assertAllClose(self.evaluate(pdf), np.exp(expected_log_pdf))
 
   def testLogPdfAssertsOnInvalidSample(self):
-    d = tfd.Chi(df=13.37, validate_args=True)
+    d = chi.Chi(df=13.37, validate_args=True)
     with self.assertRaisesOpError('Condition x >= 0'):
       self.evaluate(d.log_prob([14.2, -5.3]))
 
   def testPdfOnBoundary(self):
-    d = tfd.Chi(df=[1., 3.], validate_args=True)
+    d = chi.Chi(df=[1., 3.], validate_args=True)
     log_prob_boundary = self.evaluate(d.log_prob(0.))
 
     self.assertAllNegativeInf(log_prob_boundary[1])
@@ -70,33 +70,33 @@ class ChiTest(test_util.TestCase):
     df = df.reshape((len(df), 1))
     x = x.reshape((1, len(x)))
 
-    chi = tfd.Chi(df=df, validate_args=True)
+    dist = chi.Chi(df=df, validate_args=True)
     expected_cdf = stats.chi.cdf(x, df)
 
-    cdf = chi.cdf(x)
+    cdf = dist.cdf(x)
     self.assertEqual(cdf.shape, np.broadcast(df, x).shape)
     self.assertAllClose(self.evaluate(cdf), expected_cdf)
 
   def testChiMean(self):
     df = np.arange(1, 6, dtype=np.float64)
     expected_mean = stats.chi.mean(df)
-    chi = tfd.Chi(df=df, validate_args=True)
-    self.assertEqual(chi.mean().shape, df.shape)
-    self.assertAllClose(self.evaluate(chi.mean()), expected_mean)
+    dist = chi.Chi(df=df, validate_args=True)
+    self.assertEqual(dist.mean().shape, df.shape)
+    self.assertAllClose(self.evaluate(dist.mean()), expected_mean)
 
   def testChiVariance(self):
     df = np.arange(1, 6, dtype=np.float64)
     expected_variances = stats.chi.var(df)
-    chi = tfd.Chi(df=df, validate_args=True)
-    self.assertEqual(chi.variance().shape, df.shape)
-    self.assertAllClose(self.evaluate(chi.variance()), expected_variances)
+    dist = chi.Chi(df=df, validate_args=True)
+    self.assertEqual(dist.variance().shape, df.shape)
+    self.assertAllClose(self.evaluate(dist.variance()), expected_variances)
 
   def testChiEntropy(self):
     df = np.arange(1, 6, dtype=np.float64)
     expected_entropy = stats.chi.entropy(df)
-    chi = tfd.Chi(df=df, validate_args=True)
-    self.assertEqual(chi.entropy().shape, df.shape)
-    self.assertAllClose(self.evaluate(chi.entropy()), expected_entropy)
+    dist = chi.Chi(df=df, validate_args=True)
+    self.assertEqual(dist.entropy().shape, df.shape)
+    self.assertAllClose(self.evaluate(dist.entropy()), expected_entropy)
 
   def testChiChiKL(self):
     # We make sure a_df and b_df don't have any overlap. If this is not done,
@@ -108,13 +108,13 @@ class ChiTest(test_util.TestCase):
     a_df = a_df.reshape((len(a_df), 1))
     b_df = b_df.reshape((1, len(b_df)))
 
-    a = tfd.Chi(df=a_df, validate_args=True)
-    b = tfd.Chi(df=b_df, validate_args=True)
+    a = chi.Chi(df=a_df, validate_args=True)
+    b = chi.Chi(df=b_df, validate_args=True)
 
     true_kl = (0.5 * special.digamma(0.5 * a_df) * (a_df - b_df) +
                special.gammaln(0.5 * b_df) - special.gammaln(0.5 * a_df))
 
-    kl = tfd.kl_divergence(a, b)
+    kl = kullback_leibler.kl_divergence(a, b)
 
     x = a.sample(
         int(8e5),
@@ -125,14 +125,14 @@ class ChiTest(test_util.TestCase):
     self.assertAllClose(kl_, true_kl, atol=0., rtol=1e-12)
     self.assertAllMeansClose(kl_samples_, true_kl, axis=0, atol=0., rtol=5e-2)
 
-    zero_kl = tfd.kl_divergence(a, a)
+    zero_kl = kullback_leibler.kl_divergence(a, a)
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(zero_kl), zero_kl])
     self.assertAllEqual(true_zero_kl_, zero_kl_)
 
   @test_util.tf_tape_safety_test
   def testGradientThroughParams(self):
     df = tf.Variable(19.43, dtype=tf.float64)
-    d = tfd.Chi(df, validate_args=True)
+    d = chi.Chi(df, validate_args=True)
     with tf.GradientTape() as tape:
       loss = -d.log_prob([1., 2., 3.])
     grad = tape.gradient(loss, d.trainable_variables)
@@ -142,13 +142,13 @@ class ChiTest(test_util.TestCase):
   def testAssertsPositiveDf(self):
     df = tf.Variable([1., 2., -3.])
     with self.assertRaisesOpError('Argument `df` must be positive.'):
-      d = tfd.Chi(df, validate_args=True)
+      d = chi.Chi(df, validate_args=True)
       self.evaluate([v.initializer for v in d.variables])
       self.evaluate(d.entropy())
 
   def testAssertsPositiveDfAfterMutation(self):
     df = tf.Variable([1., 2., 3.])
-    d = tfd.Chi(df, validate_args=True)
+    d = chi.Chi(df, validate_args=True)
     self.evaluate([v.initializer for v in d.variables])
     with self.assertRaisesOpError('Argument `df` must be positive.'):
       with tf.control_dependencies([df.assign([1., 2., -3.])]):
@@ -156,7 +156,7 @@ class ChiTest(test_util.TestCase):
 
   def testSupportBijectorOutsideRange(self):
     df = np.array([2., 4., 7.])
-    dist = tfd.Chi(df, validate_args=True)
+    dist = chi.Chi(df, validate_args=True)
     x = np.array([-8.3, -0.4, -1e-6])
     bijector_inverse_x = dist.experimental_default_event_space_bijector(
         ).inverse(x)

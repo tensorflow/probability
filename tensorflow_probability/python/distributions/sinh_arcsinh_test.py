@@ -19,11 +19,12 @@ import numpy as np
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import laplace
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import sinh_arcsinh
 from tensorflow_probability.python.internal import test_util
 
-tfd = tfp.distributions
 rng = np.random.RandomState(123)
 
 
@@ -34,8 +35,8 @@ class SinhArcsinhTest(test_util.TestCase):
     b = 10
     scale = rng.rand(b) + 0.5
     loc = rng.randn(b)
-    norm = tfd.Normal(loc=loc, scale=scale, validate_args=True)
-    sasnorm = tfd.SinhArcsinh(loc=loc, scale=scale, validate_args=True)
+    norm = normal.Normal(loc=loc, scale=scale, validate_args=True)
+    sasnorm = sinh_arcsinh.SinhArcsinh(loc=loc, scale=scale, validate_args=True)
 
     x = rng.randn(5, b)
     norm_pdf, sasnorm_pdf = self.evaluate([norm.prob(x), sasnorm.prob(x)])
@@ -56,7 +57,7 @@ class SinhArcsinhTest(test_util.TestCase):
     scale = tf1.placeholder_with_default(
         np.float64(rng.rand()), shape=None)
     skewness = tf1.placeholder_with_default(rng.rand(5), shape=None)
-    sasnorm = tfd.SinhArcsinh(
+    sasnorm = sinh_arcsinh.SinhArcsinh(
         loc=loc, scale=scale, skewness=skewness, validate_args=True)
 
     samp = self.evaluate(sasnorm.sample(seed=test_util.test_seed()))
@@ -64,7 +65,7 @@ class SinhArcsinhTest(test_util.TestCase):
 
   def testBatchSamplesAreIndependent(self):
     num_samples = 1000
-    sasnorm = tfd.SinhArcsinh(loc=[0., 0.], scale=1.)
+    sasnorm = sinh_arcsinh.SinhArcsinh(loc=[0., 0.], scale=1.)
     xs = sasnorm.sample(num_samples, seed=test_util.test_seed())
     cov = 1. / num_samples * tf.matmul(xs, xs, transpose_a=True)
     self.assertAllClose(cov, tf.eye(2), atol=0.2)
@@ -73,11 +74,11 @@ class SinhArcsinhTest(test_util.TestCase):
     b = 10
     scale = rng.rand(b) + 0.5
     loc = rng.randn(b)
-    lap = tfd.Laplace(loc=loc, scale=scale, validate_args=True)
-    saslap = tfd.SinhArcsinh(
+    lap = laplace.Laplace(loc=loc, scale=scale, validate_args=True)
+    saslap = sinh_arcsinh.SinhArcsinh(
         loc=loc,
         scale=scale,
-        distribution=tfd.Laplace(np.float64(np.zeros(b)), np.float64(1)),
+        distribution=laplace.Laplace(np.float64(np.zeros(b)), np.float64(1)),
         validate_args=True)
 
     x = rng.randn(5, b)
@@ -98,8 +99,8 @@ class SinhArcsinhTest(test_util.TestCase):
     batch_size = 10
     scale = rng.rand(batch_size) + 0.5
     loc = 0.1 * rng.randn(batch_size)
-    norm = tfd.Normal(loc=loc, scale=scale, validate_args=True)
-    sasnorm = tfd.SinhArcsinh(
+    norm = normal.Normal(loc=loc, scale=scale, validate_args=True)
+    sasnorm = sinh_arcsinh.SinhArcsinh(
         loc=loc, scale=scale, tailweight=0.1, validate_args=True)
 
     # sasnorm.pdf(x) is smaller on outliers (+-10 are outliers)
@@ -134,8 +135,8 @@ class SinhArcsinhTest(test_util.TestCase):
     batch_size = 10
     scale = rng.rand(batch_size) + 0.5
     loc = np.float64(0.)
-    norm = tfd.Normal(loc=loc, scale=scale, validate_args=True)
-    sasnorm = tfd.SinhArcsinh(
+    norm = normal.Normal(loc=loc, scale=scale, validate_args=True)
+    sasnorm = sinh_arcsinh.SinhArcsinh(
         loc=loc, scale=scale, tailweight=3., validate_args=True)
 
     # norm.pdf(x) is smaller on outliers (+-10 are outliers)
@@ -170,7 +171,7 @@ class SinhArcsinhTest(test_util.TestCase):
     batch_size = 10
     scale = rng.rand(batch_size) + 0.5
     loc = rng.randn(batch_size)
-    sasnorm = tfd.SinhArcsinh(
+    sasnorm = sinh_arcsinh.SinhArcsinh(
         loc=loc, scale=scale, skewness=3.0, validate_args=True)
 
     sasnorm_samps = self.evaluate(
@@ -178,9 +179,9 @@ class SinhArcsinhTest(test_util.TestCase):
     np.testing.assert_array_less(loc, sasnorm_samps.mean(axis=0))
 
   def testPdfReflectedForNegativeSkewness(self):
-    sas_pos_skew = tfd.SinhArcsinh(
+    sas_pos_skew = sinh_arcsinh.SinhArcsinh(
         loc=0., scale=1., skewness=2., validate_args=True)
-    sas_neg_skew = tfd.SinhArcsinh(
+    sas_neg_skew = sinh_arcsinh.SinhArcsinh(
         loc=0., scale=1., skewness=-2., validate_args=True)
     x = np.linspace(-2, 2, num=5).astype(np.float32)
     self.assertAllClose(*self.evaluate(
@@ -191,7 +192,7 @@ class SinhArcsinhTest(test_util.TestCase):
     b = 10
     scale = tf.Variable(rng.rand(b) + 0.5)
     loc = tf.Variable(rng.randn(b))
-    sasnorm = tfd.SinhArcsinh(loc=loc, scale=scale, validate_args=True)
+    sasnorm = sinh_arcsinh.SinhArcsinh(loc=loc, scale=scale, validate_args=True)
 
     x = rng.randn(5, b)
     with tf.GradientTape() as tape:
@@ -205,7 +206,7 @@ class SinhArcsinhTest(test_util.TestCase):
     b = 10
     scale = tf.convert_to_tensor(rng.rand(b) + 0.5)
     loc = tf.convert_to_tensor(rng.randn(b))
-    sasnorm = tfd.SinhArcsinh(loc=loc, scale=scale, validate_args=True)
+    sasnorm = sinh_arcsinh.SinhArcsinh(loc=loc, scale=scale, validate_args=True)
 
     x = rng.randn(5, b)
     with tf.GradientTape() as tape:

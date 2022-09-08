@@ -18,14 +18,12 @@ import numpy as np
 from scipy import stats as sp_stats
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import beta as beta_lib
 from tensorflow_probability.python.internal import batched_rejection_sampler as brs
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
 
 
 @test_util.test_all_tf_execution_regimes
@@ -96,7 +94,7 @@ class BatchedRejectionSamplerTest(test_util.TestCase):
     upper_bounds = tf.constant([2.5, 1.6], dtype=dtype)
     samples_per_distribution = 10000
 
-    target_fn = tfd.Beta(alpha, beta).prob
+    target_fn = beta_lib.Beta(alpha, beta).prob
 
     def proposal_fn(seed):
       # Test static and dynamic shape of proposed samples.

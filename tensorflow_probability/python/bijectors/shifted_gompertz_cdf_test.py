@@ -18,8 +18,8 @@
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import shifted_gompertz_cdf
 from tensorflow_probability.python.internal import test_util
 
 
@@ -29,11 +29,14 @@ class ShiftedGompertzCDF(test_util.TestCase):
 
   def testScalarCongruency(self):
     bijector_test_util.assert_scalar_congruency(
-        tfb.ShiftedGompertzCDF(concentration=0.1, rate=0.4),
-        lower_x=1., upper_x=10., eval_func=self.evaluate, rtol=0.05)
+        shifted_gompertz_cdf.ShiftedGompertzCDF(concentration=0.1, rate=0.4),
+        lower_x=1.,
+        upper_x=10.,
+        eval_func=self.evaluate,
+        rtol=0.05)
 
   def testBijectiveAndFinite(self):
-    bijector = tfb.ShiftedGompertzCDF(
+    bijector = shifted_gompertz_cdf.ShiftedGompertzCDF(
         concentration=0.2, rate=0.01, validate_args=True)
     x = np.logspace(-10, 2, num=10).astype(np.float32)
     y = np.linspace(0.01, 0.99, num=10).astype(np.float32)
@@ -43,7 +46,8 @@ class ShiftedGompertzCDF(test_util.TestCase):
   @test_util.jax_disable_variable_test
   def testVariableConcentration(self):
     x = tf.Variable(1.)
-    b = tfb.ShiftedGompertzCDF(concentration=x, rate=1., validate_args=True)
+    b = shifted_gompertz_cdf.ShiftedGompertzCDF(
+        concentration=x, rate=1., validate_args=True)
     self.evaluate(x.initializer)
     self.assertIs(x, b.concentration)
     self.assertEqual((), self.evaluate(b.forward(1.)).shape)
@@ -54,7 +58,8 @@ class ShiftedGompertzCDF(test_util.TestCase):
   @test_util.jax_disable_variable_test
   def testVariableRate(self):
     x = tf.Variable(1.)
-    b = tfb.ShiftedGompertzCDF(concentration=1., rate=x, validate_args=True)
+    b = shifted_gompertz_cdf.ShiftedGompertzCDF(
+        concentration=1., rate=x, validate_args=True)
     self.evaluate(x.initializer)
     self.assertIs(x, b.rate)
     self.assertEqual((), self.evaluate(b.forward(1.)).shape)

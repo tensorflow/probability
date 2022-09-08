@@ -16,8 +16,9 @@
 
 # Dependency imports
 
-import tensorflow_probability as tfp
+from tensorflow_probability.python.experimental.mcmc import progress_bar_reducer
 from tensorflow_probability.python.experimental.mcmc.internal import test_fixtures
+from tensorflow_probability.python.experimental.mcmc.sample_fold import sample_fold
 from tensorflow_probability.python.internal import test_util
 
 
@@ -30,8 +31,8 @@ class ProgressBarReducerTest(test_util.TestCase):
 
   def test_noop(self):
     num_results = 10
-    pbar = tfp.experimental.mcmc.ProgressBarReducer(
-        num_results, test_progress_bar_fn)
+    pbar = progress_bar_reducer.ProgressBarReducer(num_results,
+                                                   test_progress_bar_fn)
     self.assertEqual(pbar.num_results, num_results)
     pbar.initialize(None)
     for _ in range(num_results):
@@ -39,8 +40,8 @@ class ProgressBarReducerTest(test_util.TestCase):
 
   def test_too_many_steps_is_ok(self):
     num_results = 10
-    pbar = tfp.experimental.mcmc.ProgressBarReducer(
-        num_results, test_progress_bar_fn)
+    pbar = progress_bar_reducer.ProgressBarReducer(num_results,
+                                                   test_progress_bar_fn)
     pbar.initialize(None)
     for _ in range(num_results):
       pbar.one_step(None, None, None)
@@ -48,10 +49,10 @@ class ProgressBarReducerTest(test_util.TestCase):
 
   def test_sample_fold(self):
     num_results = 3
-    pbar = tfp.experimental.mcmc.ProgressBarReducer(
-        num_results, test_progress_bar_fn)
+    pbar = progress_bar_reducer.ProgressBarReducer(num_results,
+                                                   test_progress_bar_fn)
     fake_kernel = test_fixtures.TestTransitionKernel()
-    reductions, final_state, kernel_results = tfp.experimental.mcmc.sample_fold(
+    reductions, final_state, kernel_results = sample_fold(
         num_steps=num_results,
         current_state=0.,
         kernel=fake_kernel,

@@ -19,8 +19,8 @@
 import numpy as np
 from scipy import stats as scipy_stats
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import rayleigh_cdf
 from tensorflow_probability.python.internal import test_util
 
 
@@ -30,7 +30,7 @@ class RayleighCDFBijectorTest(test_util.TestCase):
 
   def testBijector(self):
     scale = 50.
-    bijector = tfb.RayleighCDF(scale=scale, validate_args=True)
+    bijector = rayleigh_cdf.RayleighCDF(scale=scale, validate_args=True)
     self.assertStartsWith(bijector.name, 'rayleigh')
     test_cdf_func = scipy_stats.rayleigh.cdf
     x = np.array([[[.1], [1.], [14.], [20.], [100.]]], dtype=np.float32)
@@ -48,20 +48,20 @@ class RayleighCDFBijectorTest(test_util.TestCase):
 
   def testBijectorLogDetJacobianZeroAtZero(self):
     scale = np.logspace(0.1, 10., num=20).astype(np.float32)
-    bijector = tfb.RayleighCDF(scale)
+    bijector = rayleigh_cdf.RayleighCDF(scale)
     fldj = self.evaluate(bijector.forward_log_det_jacobian(0., event_ndims=0))
     self.assertAllNegativeInf(fldj)
 
   def testScalarCongruency(self):
     bijector_test_util.assert_scalar_congruency(
-        tfb.RayleighCDF(scale=50.),
+        rayleigh_cdf.RayleighCDF(scale=50.),
         lower_x=1.,
         upper_x=100.,
         eval_func=self.evaluate,
         rtol=0.05)
 
   def testBijectiveAndFinite(self):
-    bijector = tfb.RayleighCDF(scale=20., validate_args=True)
+    bijector = rayleigh_cdf.RayleighCDF(scale=20., validate_args=True)
     x = np.linspace(1., 8., num=10).astype(np.float32)
     y = np.linspace(
         -np.expm1(-1 / 400.),
@@ -71,13 +71,13 @@ class RayleighCDFBijectorTest(test_util.TestCase):
 
   def testAsserts(self):
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
-      b = tfb.RayleighCDF(scale=-1., validate_args=True)
+      b = rayleigh_cdf.RayleighCDF(scale=-1., validate_args=True)
       self.evaluate(b.forward(3.))
 
   @test_util.jax_disable_variable_test
   def testVariableAssertsScale(self):
     scale = tf.Variable(1.)
-    b = tfb.RayleighCDF(scale=scale, validate_args=True)
+    b = rayleigh_cdf.RayleighCDF(scale=scale, validate_args=True)
     self.evaluate([scale.initializer])
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
       with tf.control_dependencies([scale.assign(-1.)]):

@@ -17,8 +17,14 @@
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import chain
+from tensorflow_probability.python.bijectors import scale
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.distributions import linear_gaussian_ssm
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.distributions import normal
 
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import docstring_util
@@ -64,7 +70,8 @@ seasonal_init_args = """
     """
 
 
-class SeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
+class SeasonalStateSpaceModel(linear_gaussian_ssm.LinearGaussianStateSpaceModel
+                             ):
   """State space model for a seasonal effect.
 
     A state space model (SSM) posits a set of latent (unobserved) variables that
@@ -243,7 +250,7 @@ class SeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           transition_matrix=seasonal_transition_matrix,
           transition_noise=seasonal_transition_noise,
           observation_matrix=observation_matrix,
-          observation_noise=tfd.MultivariateNormalDiag(
+          observation_noise=mvn_diag.MultivariateNormalDiag(
               scale_diag=observation_noise_scale[..., tf.newaxis]),
           initial_state_prior=initial_state_prior,
           name=name,
@@ -271,7 +278,8 @@ class SeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
     return self._num_steps_per_season
 
 
-class ConstrainedSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
+class ConstrainedSeasonalStateSpaceModel(
+    linear_gaussian_ssm.LinearGaussianStateSpaceModel):
   """Seasonal state space model with effects constrained to sum to zero.
 
     See `SeasonalStateSpaceModel` for background.
@@ -463,7 +471,7 @@ class ConstrainedSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           transition_matrix=seasonal_transition_matrix,
           transition_noise=seasonal_transition_noise,
           observation_matrix=observation_matrix,
-          observation_noise=tfd.MultivariateNormalDiag(
+          observation_noise=mvn_diag.MultivariateNormalDiag(
               scale_diag=observation_noise_scale[..., tf.newaxis]),
           initial_state_prior=initial_state_prior,
           name=name,
@@ -599,7 +607,7 @@ def build_seasonal_transition_noise(
         is_last_day_of_season(t),
         drift_scale_diag,
         tf.zeros_like(drift_scale_diag))
-    return tfd.MultivariateNormalDiag(
+    return mvn_diag.MultivariateNormalDiag(
         loc=tf.zeros(num_seasons, dtype=drift_scale.dtype),
         scale_diag=noise_scale_diag)
   return seasonal_transition_noise
@@ -665,8 +673,8 @@ def build_constrained_seasonal_transition_noise(
         is_last_day_of_season(t),
         drift_scale_tril,
         tf.zeros_like(drift_scale_tril))
-    return tfd.MultivariateNormalTriL(
-        loc=tf.zeros(num_seasons-1, dtype=drift_scale.dtype),
+    return mvn_tril.MultivariateNormalTriL(
+        loc=tf.zeros(num_seasons - 1, dtype=drift_scale.dtype),
         scale_tril=noise_scale_tril)
   return seasonal_transition_noise
 
@@ -820,21 +828,20 @@ class Seasonal(StructuralTimeSeries):
       # Heuristic default priors. Overriding these may dramatically
       # change inference performance and results.
       if initial_effect_prior is None:
-        initial_effect_prior = tfd.Normal(
+        initial_effect_prior = normal.Normal(
             loc=observed_initial,
             scale=tf.abs(observed_initial) + observed_stddev)
       dtype = initial_effect_prior.dtype
       if drift_scale_prior is None:
         scale_factor = tf.convert_to_tensor(.01, dtype=dtype)
-        drift_scale_prior = tfd.LogNormal(
-            loc=tf.math.log(scale_factor * observed_stddev),
-            scale=3.)
+        drift_scale_prior = lognormal.LogNormal(
+            loc=tf.math.log(scale_factor * observed_stddev), scale=3.)
 
-      if isinstance(initial_effect_prior, tfd.Normal):
-        initial_state_prior = tfd.MultivariateNormalDiag(
+      if isinstance(initial_effect_prior, normal.Normal):
+        initial_state_prior = mvn_diag.MultivariateNormalDiag(
             loc=tf.stack([initial_effect_prior.mean()] * num_seasons, axis=-1),
-            scale_diag=tf.stack([initial_effect_prior.stddev()] * num_seasons,
-                                axis=-1))
+            scale_diag=tf.stack(
+                [initial_effect_prior.stddev()] * num_seasons, axis=-1))
       else:
         initial_state_prior = initial_effect_prior
 
@@ -851,7 +858,7 @@ class Seasonal(StructuralTimeSeries):
             initial_state_prior.mean())
         scale_linop = effects_to_residuals_linop.matmul(
             initial_state_prior.scale)  # returns LinearOperator
-        initial_state_prior = tfd.MultivariateNormalTriL(
+        initial_state_prior = mvn_tril.MultivariateNormalTriL(
             loc=initial_state_prior_loc,
             scale_tril=tf.linalg.cholesky(
                 scale_linop.matmul(scale_linop.to_dense(), adjoint_arg=True)))
@@ -863,10 +870,13 @@ class Seasonal(StructuralTimeSeries):
 
       parameters = []
       if allow_drift:
-        parameters.append(Parameter(
-            'drift_scale', drift_scale_prior,
-            tfb.Chain([tfb.Scale(scale=observed_stddev),
-                       tfb.Softplus(low=dtype_util.eps(dtype))])))
+        parameters.append(
+            Parameter(
+                'drift_scale', drift_scale_prior,
+                chain.Chain([
+                    scale.Scale(scale=observed_stddev),
+                    softplus.Softplus(low=dtype_util.eps(dtype))
+                ])))
       self._allow_drift = allow_drift
 
       super(Seasonal, self).__init__(

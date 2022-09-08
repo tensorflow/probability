@@ -91,6 +91,7 @@ GEN_FILENAMES = [
     "gen/linear_operator_kronecker",
     "gen/linear_operator_lower_triangular",
     "gen/linear_operator_low_rank_update",
+    "gen/linear_operator_permutation",
     "gen/linear_operator",
     "gen/linear_operator_toeplitz",
     "gen/linear_operator_util",
@@ -150,7 +151,6 @@ py_test(
         # hypothesis dep,
         # jax dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -168,9 +168,9 @@ py_test(
         # hypothesis dep,
         # jax dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient.jax",
     ],
 )
 

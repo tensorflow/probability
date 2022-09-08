@@ -18,8 +18,14 @@
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import bernoulli
+from tensorflow_probability.python.distributions import binomial
+from tensorflow_probability.python.distributions import gamma
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import negative_binomial
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import poisson
+from tensorflow_probability.python.glm import family
 from tensorflow_probability.python.internal import test_util
 
 
@@ -33,9 +39,7 @@ class _GLMTestHarness(object):
         expected_mean,
         expected_variance,
         expected_grad_mean,
-    ) = tfp.glm.ExponentialFamily.__call__(
-        self.model,
-        predicted_linear_response)
+    ) = family.ExponentialFamily.__call__(self.model, predicted_linear_response)
     actual_mean, actual_variance, actual_grad_mean = self.model(
         predicted_linear_response)
     [
@@ -120,9 +124,9 @@ class BernoulliTest(test_util.TestCase, _GLMTestHarness):
   def setUp(self):
     super(BernoulliTest, self).setUp()
     self.dtype = np.float32
-    self.model = tfp.glm.Bernoulli()
-    self.expected = tfp.glm.CustomExponentialFamily(
-        lambda mean: tfd.Bernoulli(probs=mean), tf.nn.sigmoid)
+    self.model = family.Bernoulli()
+    self.expected = family.CustomExponentialFamily(
+        lambda mean: bernoulli.Bernoulli(probs=mean), tf.nn.sigmoid)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -131,14 +135,16 @@ class BernoulliNormalCDFTest(test_util.TestCase, _GLMTestHarness):
   def setUp(self):
     super(BernoulliNormalCDFTest, self).setUp()
     self.dtype = np.float32
-    self.model = tfp.glm.BernoulliNormalCDF()
+    self.model = family.BernoulliNormalCDF()
     def normal_cdf(r):
       r = tf.convert_to_tensor(value=r, name='r')
-      n = tfd.Normal(loc=tf.zeros([], r.dtype.base_dtype),
-                     scale=tf.ones([], r.dtype.base_dtype))
+      n = normal.Normal(
+          loc=tf.zeros([], r.dtype.base_dtype),
+          scale=tf.ones([], r.dtype.base_dtype))
       return n.cdf(r)
-    self.expected = tfp.glm.CustomExponentialFamily(
-        lambda mean: tfd.Bernoulli(probs=mean), normal_cdf)
+
+    self.expected = family.CustomExponentialFamily(
+        lambda mean: bernoulli.Bernoulli(probs=mean), normal_cdf)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -148,9 +154,9 @@ class BinomialTest(test_util.TestCase, _GLMTestHarness):
     super(BinomialTest, self).setUp()
     self.dtype = np.float32
     n = 2.
-    self.model = tfp.glm.Binomial(n)
-    self.expected = tfp.glm.CustomExponentialFamily(
-        lambda mu: tfd.Binomial(n, probs=mu / n),
+    self.model = family.Binomial(n)
+    self.expected = family.CustomExponentialFamily(
+        lambda mu: binomial.Binomial(n, probs=mu / n),
         lambda r: n * tf.nn.sigmoid(r))
 
 
@@ -161,10 +167,9 @@ class GammaExpTest(test_util.TestCase, _GLMTestHarness):
     super(GammaExpTest, self).setUp()
     self.dtype = np.float32
     c = 2.
-    self.model = tfp.glm.GammaExp(c)
-    self.expected = tfp.glm.CustomExponentialFamily(
-        lambda mean: tfd.Gamma(concentration=c, rate=1. / mean),
-        tf.math.exp)
+    self.model = family.GammaExp(c)
+    self.expected = family.CustomExponentialFamily(
+        lambda mean: gamma.Gamma(concentration=c, rate=1. / mean), tf.math.exp)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -174,9 +179,9 @@ class GammaSoftplusTest(test_util.TestCase, _GLMTestHarness):
     super(GammaSoftplusTest, self).setUp()
     self.dtype = np.float32
     c = 2.1
-    self.model = tfp.glm.GammaSoftplus(c)
-    self.expected = tfp.glm.CustomExponentialFamily(
-        lambda mean: tfd.Gamma(concentration=c, rate=1. / mean),
+    self.model = family.GammaSoftplus(c)
+    self.expected = family.CustomExponentialFamily(
+        lambda mean: gamma.Gamma(concentration=c, rate=1. / mean),
         tf.nn.softplus)
 
 
@@ -187,9 +192,9 @@ class LogNormalTest(test_util.TestCase, _GLMTestHarness):
     super(LogNormalTest, self).setUp()
     self.dtype = np.float32
     s = 0.6
-    self.model = tfp.glm.LogNormal(s)
-    self.expected = tfp.glm.CustomExponentialFamily(
-        lambda mean: tfd.LogNormal(tf.math.log(mean) - 0.5 * s**2, s),
+    self.model = family.LogNormal(s)
+    self.expected = family.CustomExponentialFamily(
+        lambda mean: lognormal.LogNormal(tf.math.log(mean) - 0.5 * s**2, s),
         tf.math.exp)
 
 
@@ -200,9 +205,9 @@ class LogNormalSoftplusTest(test_util.TestCase, _GLMTestHarness):
     super(LogNormalSoftplusTest, self).setUp()
     self.dtype = np.float32
     s = 0.75
-    self.model = tfp.glm.LogNormalSoftplus(s)
-    self.expected = tfp.glm.CustomExponentialFamily(
-        lambda mean: tfd.LogNormal(tf.math.log(mean) - 0.5 * s**2, s),
+    self.model = family.LogNormalSoftplus(s)
+    self.expected = family.CustomExponentialFamily(
+        lambda mean: lognormal.LogNormal(tf.math.log(mean) - 0.5 * s**2, s),
         tf.nn.softplus)
 
 
@@ -213,9 +218,9 @@ class NormalTest(test_util.TestCase, _GLMTestHarness):
     super(NormalTest, self).setUp()
     self.dtype = np.float32
     s = 0.9
-    self.model = tfp.glm.Normal(s)
-    self.expected = tfp.glm.CustomExponentialFamily(
-        lambda mean: tfd.Normal(mean, s), tf.identity)
+    self.model = family.Normal(s)
+    self.expected = family.CustomExponentialFamily(
+        lambda mean: normal.Normal(mean, s), tf.identity)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -225,9 +230,9 @@ class NormalReciprocalTest(test_util.TestCase, _GLMTestHarness):
     super(NormalReciprocalTest, self).setUp()
     self.dtype = np.float32
     s = 0.85
-    self.model = tfp.glm.NormalReciprocal(s)
-    self.expected = tfp.glm.CustomExponentialFamily(
-        lambda mean: tfd.Normal(mean, s), tf.math.reciprocal)
+    self.model = family.NormalReciprocal(s)
+    self.expected = family.CustomExponentialFamily(
+        lambda mean: normal.Normal(mean, s), tf.math.reciprocal)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -236,9 +241,9 @@ class PoissonTest(test_util.TestCase, _GLMTestHarness):
   def setUp(self):
     super(PoissonTest, self).setUp()
     self.dtype = np.float32
-    self.model = tfp.glm.Poisson()
-    self.expected = tfp.glm.CustomExponentialFamily(
-        lambda mean: tfd.Poisson(rate=mean), tf.math.exp)
+    self.model = family.Poisson()
+    self.expected = family.CustomExponentialFamily(
+        lambda mean: poisson.Poisson(rate=mean), tf.math.exp)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -247,9 +252,9 @@ class PoissonSoftplusTest(test_util.TestCase, _GLMTestHarness):
   def setUp(self):
     super(PoissonSoftplusTest, self).setUp()
     self.dtype = np.float32
-    self.model = tfp.glm.PoissonSoftplus()
-    self.expected = tfp.glm.CustomExponentialFamily(
-        lambda mean: tfd.Poisson(rate=mean), tf.nn.softplus)
+    self.model = family.PoissonSoftplus()
+    self.expected = family.CustomExponentialFamily(
+        lambda mean: poisson.Poisson(rate=mean), tf.nn.softplus)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -259,9 +264,9 @@ class NegativeBinomialTest(test_util.TestCase, _GLMTestHarness):
     super(NegativeBinomialTest, self).setUp()
     self.dtype = np.float32
     n = 2.
-    self.model = tfp.glm.NegativeBinomial(n)
-    self.expected = tfp.glm.CustomExponentialFamily(
-        lambda mean: tfd.NegativeBinomial(  # pylint: disable=g-long-lambda
+    self.model = family.NegativeBinomial(n)
+    self.expected = family.CustomExponentialFamily(
+        lambda mean: negative_binomial.NegativeBinomial(  # pylint: disable=g-long-lambda
             total_count=n,
             logits=tf.math.log(mean) - tf.math.log(n)),
         tf.math.exp)
@@ -274,9 +279,9 @@ class NegativeBinomialSoftplusTest(test_util.TestCase, _GLMTestHarness):
     super(NegativeBinomialSoftplusTest, self).setUp()
     self.dtype = np.float32
     n = 2.1
-    self.model = tfp.glm.NegativeBinomialSoftplus(n)
-    self.expected = tfp.glm.CustomExponentialFamily(
-        lambda mean: tfd.NegativeBinomial(  # pylint: disable=g-long-lambda
+    self.model = family.NegativeBinomialSoftplus(n)
+    self.expected = family.CustomExponentialFamily(
+        lambda mean: negative_binomial.NegativeBinomial(  # pylint: disable=g-long-lambda
             total_count=n,
             logits=tf.math.log(mean) - tf.math.log(n)),
         tf.math.softplus)

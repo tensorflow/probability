@@ -18,14 +18,14 @@ import functools
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.bijectors import softmax_centered
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.experimental import nn as tfn
 from tensorflow_probability.python.internal import test_util
-
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
-tfn = tfp.experimental.nn
+from tensorflow_probability.python.util import deferred_tensor
 
 
 class BnnEndToEnd(object):
@@ -50,17 +50,24 @@ class BnnEndToEnd(object):
 
     # 2  Specify Model
 
-    scale = tfp.util.TransformedVariable(1., tfb.Softplus())
-    bnn = tfn.Sequential([
-        make_conv(  # [b, 14, 14, 32]
-            evidence_shape[-1], 32, filter_shape=7, strides=2),
-        tfn.util.flatten_rightmost(ndims=3),    # [b, 14 * 14 * 32]
-        tfn.AffineVariationalReparameterization(
-            14 * 14 * 32, np.prod(target_shape) - 1),   # [b, 9]
-        lambda loc: tfb.SoftmaxCentered()(  # pylint: disable=g-long-lambda
-            tfd.Independent(tfd.Normal(loc, scale),
-                            reinterpreted_batch_ndims=1)),  # [b, 10]
-    ], name='bayesian_autoencoder')
+    scale = deferred_tensor.TransformedVariable(1., softplus.Softplus())
+    bnn = tfn.Sequential(
+        [
+            make_conv(  # [b, 14, 14, 32]
+                evidence_shape[-1],
+                32,
+                filter_shape=7,
+                strides=2),
+            tfn.util.flatten_rightmost(ndims=3),  # [b, 14 * 14 * 32]
+            tfn.AffineVariationalReparameterization(
+                14 * 14 * 32,
+                np.prod(target_shape) - 1),  # [b, 9]
+            lambda loc: softmax_centered.SoftmaxCentered()(  # pylint: disable=g-long-lambda
+                independent.Independent(
+                    normal.Normal(loc, scale), reinterpreted_batch_ndims=1)
+            ),  # [b, 10]
+        ],
+        name='bayesian_autoencoder')
 
     self.evaluate([v.initializer for v in bnn.trainable_variables])
 
@@ -102,8 +109,8 @@ class ConvolutionTest(test_util.TestCase):
                bias_prior_scale=None,  # pylint: disable=unused-argument
                bias_scale_init_value=None,  # pylint: disable=unused-argument
                kernel_prior=None):  # pylint: disable=unused-argument
-      k = tfd.Normal(0., 1.).sample(kernel_shape)
-      b = tfd.Normal(0., 1.).sample(bias_shape)
+      k = normal.Normal(0., 1.).sample(kernel_shape)
+      b = normal.Normal(0., 1.).sample(bias_shape)
       return k, b
     def tile_for_batch(x, batch_shape):
       x_shape = tf.shape(x)

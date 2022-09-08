@@ -41,6 +41,10 @@ multi_substrate_py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:mvn_tril",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/math:scan_associative",
     ],
 )
 
@@ -53,8 +57,11 @@ multi_substrate_py_test(
         ":parallel_kalman_filter_lib",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:linear_gaussian_ssm",
+        "//tensorflow_probability/python/distributions:mvn_tril",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
+        "//tensorflow_probability/python/stats:sample_stats",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )

@@ -19,25 +19,29 @@
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.experimental.mcmc import potential_scale_reduction_reducer as psrr
+from tensorflow_probability.python.experimental.mcmc import tracing_reducer
 from tensorflow_probability.python.experimental.mcmc.internal import test_fixtures
+from tensorflow_probability.python.experimental.mcmc.sample_fold import sample_fold
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.mcmc import diagnostic
+from tensorflow_probability.python.mcmc import hmc
 
 
 @test_util.test_all_tf_execution_regimes
 class PotentialScaleReductionReducerTest(test_util.TestCase):
 
   def test_int_samples(self):
-    rhat_reducer = tfp.experimental.mcmc.PotentialScaleReductionReducer(
+    rhat_reducer = psrr.PotentialScaleReductionReducer(
         independent_chain_ndims=1)
     state = rhat_reducer.initialize(tf.zeros((5, 3), dtype=tf.int64))
     chain_state = np.arange(60).reshape((4, 5, 3))
     for sample in chain_state:
       state = rhat_reducer.one_step(sample, state)
     rhat = rhat_reducer.finalize(state)
-    true_rhat = tfp.mcmc.potential_scale_reduction(
-        chains_states=chain_state,
-        independent_chain_ndims=1)
+    true_rhat = diagnostic.potential_scale_reduction(
+        chains_states=chain_state, independent_chain_ndims=1)
     self.assertEqual(tf.float64, rhat.dtype)
     rhat, true_rhat = self.evaluate([rhat, true_rhat])
     self.assertAllClose(true_rhat, rhat, rtol=1e-6)
@@ -47,7 +51,7 @@ class PotentialScaleReductionReducerTest(test_util.TestCase):
     # five scalar chains taken from iid Normal(0, 1)
     rng = test_util.test_np_rng()
     iid_normal_samples = rng.randn(n_samples, 5)
-    rhat_reducer = tfp.experimental.mcmc.PotentialScaleReductionReducer(
+    rhat_reducer = psrr.PotentialScaleReductionReducer(
         independent_chain_ndims=1)
     rhat = self.evaluate(test_fixtures.reduce(rhat_reducer, iid_normal_samples))
     self.assertAllEqual((), rhat.shape)
@@ -61,7 +65,7 @@ class PotentialScaleReductionReducerTest(test_util.TestCase):
     offset = np.array([1., -1., 2.]).reshape(3, 1)
     rng = test_util.test_np_rng()
     offset_samples = rng.randn(n_samples, 3, 4) + offset
-    rhat_reducer = tfp.experimental.mcmc.PotentialScaleReductionReducer(
+    rhat_reducer = psrr.PotentialScaleReductionReducer(
         independent_chain_ndims=1)
     rhat = self.evaluate(test_fixtures.reduce(rhat_reducer, offset_samples))
     self.assertAllEqual((4,), rhat.shape)
@@ -69,30 +73,29 @@ class PotentialScaleReductionReducerTest(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test
   def test_with_hmc(self):
-    target_dist = tfp.distributions.Normal(loc=0., scale=1.)
-    hmc_kernel = tfp.mcmc.HamiltonianMonteCarlo(
+    target_dist = normal.Normal(loc=0., scale=1.)
+    hmc_kernel = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=target_dist.log_prob,
         num_leapfrog_steps=27,
         step_size=0.33)
-    reduced_stats, _, _ = tfp.experimental.mcmc.sample_fold(
+    reduced_stats, _, _ = sample_fold(
         num_steps=50,
         current_state=tf.zeros((2,)),
         kernel=hmc_kernel,
         reducer=[
-            tfp.experimental.mcmc.TracingReducer(size=50),
-            tfp.experimental.mcmc.PotentialScaleReductionReducer()
+            tracing_reducer.TracingReducer(size=50),
+            psrr.PotentialScaleReductionReducer()
         ],
         seed=test_util.test_seed())
     rhat = reduced_stats[1]
-    true_rhat = tfp.mcmc.potential_scale_reduction(
-        chains_states=reduced_stats[0][0],
-        independent_chain_ndims=1)
+    true_rhat = diagnostic.potential_scale_reduction(
+        chains_states=reduced_stats[0][0], independent_chain_ndims=1)
     true_rhat, rhat = self.evaluate([true_rhat, rhat])
     self.assertAllClose(true_rhat, rhat, rtol=1e-6)
 
   def test_multiple_latent_states_and_independent_chain_ndims(self):
     rng = test_util.test_np_rng()
-    rhat_reducer = tfp.experimental.mcmc.PotentialScaleReductionReducer(
+    rhat_reducer = psrr.PotentialScaleReductionReducer(
         independent_chain_ndims=2)
     state = rhat_reducer.initialize([tf.zeros((2, 5, 3)), tf.zeros((7, 2, 8))])
     chain_state = rng.randn(4, 2, 5, 3)
@@ -100,7 +103,7 @@ class PotentialScaleReductionReducerTest(test_util.TestCase):
     for latent in zip(chain_state, second_chain_state):
       state = rhat_reducer.one_step(latent, state)
     rhat = rhat_reducer.finalize(state)
-    true_rhat = tfp.mcmc.potential_scale_reduction(
+    true_rhat = diagnostic.potential_scale_reduction(
         chains_states=[chain_state, second_chain_state],
         independent_chain_ndims=2)
     rhat, true_rhat = self.evaluate([rhat, true_rhat])

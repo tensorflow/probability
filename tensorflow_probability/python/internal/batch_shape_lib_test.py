@@ -21,8 +21,15 @@ from absl.testing import parameterized
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability import bijectors as tfb
-from tensorflow_probability import distributions as tfd
+from tensorflow_probability.python.bijectors import exp
+from tensorflow_probability.python.bijectors import joint_map
+from tensorflow_probability.python.bijectors import sigmoid
+from tensorflow_probability.python.distributions import categorical
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import mixture_same_family
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import test_util
@@ -31,7 +38,7 @@ from tensorflow.python.platform import test as tf_test  # pylint: disable=g-dire
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
-class _MVNTriLWithDynamicParamNdims(tfd.MultivariateNormalTriL):
+class _MVNTriLWithDynamicParamNdims(mvn_tril.MultivariateNormalTriL):
 
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):
@@ -50,53 +57,93 @@ class _MVNTriLWithDynamicParamNdims(tfd.MultivariateNormalTriL):
 class BatchShapeInferenceTests(test_util.TestCase):
 
   @parameterized.named_parameters(
-      {'testcase_name': '_trivial',
-       'value_fn': lambda: tfd.Normal(loc=0., scale=1.),
-       'expected_batch_shape_parts': {'loc': [], 'scale': []},
-       'expected_batch_shape': []},
-      {'testcase_name': '_simple_tensor_broadcasting',
-       'value_fn': lambda: tfd.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
-           loc=[0., 0.], scale_diag=tf.convert_to_tensor([[1., 1.], [1., 1.]])),
-       'expected_batch_shape_parts': {'loc': [], 'scale_diag': [2]},
-       'expected_batch_shape': [2]},
-      {'testcase_name': '_rank_deficient_tensor_broadcasting',
-       'value_fn': lambda: tfd.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
-           loc=0., scale_diag=tf.convert_to_tensor([[1., 1.], [1., 1.]])),
-       'expected_batch_shape_parts': {'loc': [], 'scale_diag': [2]},
-       'expected_batch_shape': [2]},
-      {'testcase_name': '_dynamic_event_ndims',
-       'value_fn': lambda: _MVNTriLWithDynamicParamNdims(  # pylint: disable=g-long-lambda
-           loc=[[0., 0.], [1., 1.], [2., 2.]],
-           scale_tril=[[1., 0.], [-1., 1.]]),
-       'expected_batch_shape_parts': {'loc': [3], 'scale_tril': []},
-       'expected_batch_shape': [3]},
-      {'testcase_name': '_mixture_same_family',
-       'value_fn': lambda: tfd.MixtureSameFamily(  # pylint: disable=g-long-lambda
-           mixture_distribution=tfd.Categorical(
-               logits=[[[1., 2., 3.],
-                        [4., 5., 6.]]]),
-           components_distribution=tfd.Normal(loc=0.,
-                                              scale=[[[1., 2., 3.],
-                                                      [4., 5., 6.]]])),
-       'expected_batch_shape_parts': {'mixture_distribution': [1, 2],
-                                      'components_distribution': [1, 2]},
-       'expected_batch_shape': [1, 2]},
-      {'testcase_name': '_deeply_nested',
-       'value_fn': lambda: tfd.Independent(  # pylint: disable=g-long-lambda
-           tfd.Independent(
-               tfd.Independent(
-                   tfd.Independent(
-                       tfd.Normal(loc=0., scale=[[[[[[[[1.]]]]]]]]),
-                       reinterpreted_batch_ndims=2),
-                   reinterpreted_batch_ndims=0),
-               reinterpreted_batch_ndims=1),
-           reinterpreted_batch_ndims=1),
-       'expected_batch_shape_parts': {'distribution': [1, 1, 1, 1]},
-       'expected_batch_shape': [1, 1, 1, 1]},
-      {'testcase_name': 'noparams',
-       'value_fn': tfb.Exp,
-       'expected_batch_shape_parts': {},
-       'expected_batch_shape': []})
+      {
+          'testcase_name': '_trivial',
+          'value_fn': lambda: normal.Normal(loc=0., scale=1.),
+          'expected_batch_shape_parts': {
+              'loc': [],
+              'scale': []
+          },
+          'expected_batch_shape': []
+      },
+      {
+          'testcase_name':
+              '_simple_tensor_broadcasting',
+          'value_fn':
+              lambda: mvn_diag.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
+                  loc=[0., 0.],
+                  scale_diag=tf.convert_to_tensor([[1., 1.], [1., 1.]])),
+          'expected_batch_shape_parts': {
+              'loc': [],
+              'scale_diag': [2]
+          },
+          'expected_batch_shape': [2]
+      },
+      {
+          'testcase_name':
+              '_rank_deficient_tensor_broadcasting',
+          'value_fn':
+              lambda: mvn_diag.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
+                  loc=0.,
+                  scale_diag=tf.convert_to_tensor([[1., 1.], [1., 1.]])),
+          'expected_batch_shape_parts': {
+              'loc': [],
+              'scale_diag': [2]
+          },
+          'expected_batch_shape': [2]
+      },
+      {
+          'testcase_name':
+              '_dynamic_event_ndims',
+          'value_fn':
+              lambda: _MVNTriLWithDynamicParamNdims(  # pylint: disable=g-long-lambda
+                  loc=[[0., 0.], [1., 1.], [2., 2.]],
+                  scale_tril=[[1., 0.], [-1., 1.]]),
+          'expected_batch_shape_parts': {
+              'loc': [3],
+              'scale_tril': []
+          },
+          'expected_batch_shape': [3]
+      },
+      {
+          'testcase_name':
+              '_mixture_same_family',
+          'value_fn':
+              lambda: mixture_same_family.MixtureSameFamily(  # pylint: disable=g-long-lambda
+                  mixture_distribution=categorical.Categorical(
+                      logits=[[[1., 2., 3.], [4., 5., 6.]]]),
+                  components_distribution=normal.Normal(
+                      loc=0., scale=[[[1., 2., 3.], [4., 5., 6.]]])),
+          'expected_batch_shape_parts': {
+              'mixture_distribution': [1, 2],
+              'components_distribution': [1, 2]
+          },
+          'expected_batch_shape': [1, 2]
+      },
+      {
+          'testcase_name':
+              '_deeply_nested',
+          'value_fn':
+              lambda: independent.Independent(  # pylint: disable=g-long-lambda
+                  independent.Independent(
+                      independent.Independent(
+                          independent.Independent(
+                              normal.Normal(loc=0., scale=[[[[[[[[1.]]]]]]]]),
+                              reinterpreted_batch_ndims=2),
+                          reinterpreted_batch_ndims=0),
+                      reinterpreted_batch_ndims=1),
+                  reinterpreted_batch_ndims=1),
+          'expected_batch_shape_parts': {
+              'distribution': [1, 1, 1, 1]
+          },
+          'expected_batch_shape': [1, 1, 1, 1]
+      },
+      {
+          'testcase_name': 'noparams',
+          'value_fn': exp.Exp,
+          'expected_batch_shape_parts': {},
+          'expected_batch_shape': []
+      })
   @test_util.numpy_disable_test_missing_functionality('b/188002189')
   def test_batch_shape_inference_is_correct(
       self, value_fn, expected_batch_shape_parts, expected_batch_shape):
@@ -116,7 +163,7 @@ class BatchShapeInferenceTests(test_util.TestCase):
     self.assertTrue(batch_shape.is_compatible_with(expected_batch_shape))
 
   def test_bijector_event_ndims(self):
-    bij = tfb.Sigmoid(low=tf.zeros([2]), high=tf.ones([3, 2]))
+    bij = sigmoid.Sigmoid(low=tf.zeros([2]), high=tf.ones([3, 2]))
     self.assertAllEqual(batch_shape_lib.inferred_batch_shape(bij), [3, 2])
     self.assertAllEqual(batch_shape_lib.inferred_batch_shape_tensor(bij),
                         [3, 2])
@@ -131,7 +178,7 @@ class BatchShapeInferenceTests(test_util.TestCase):
     # Verify that we don't pass Nones through to component
     # `experimental_batch_shape(x_event_ndims=None)` calls, where they'd be
     # incorrectly interpreted as `x_event_ndims=forward_min_event_ndims`.
-    joint_bij = tfb.JointMap([bij, bij])
+    joint_bij = joint_map.JointMap([bij, bij])
     self.assertAllEqual(
         batch_shape_lib.inferred_batch_shape(
             joint_bij, bijector_x_event_ndims=[None, None]),
@@ -147,7 +194,7 @@ class ParametersAsKwargsTest(test_util.TestCase):
   @test_util.jax_disable_test_missing_functionality('tf_logging')
   @tf_test.mock.patch.object(logging, 'warning', autospec=True)
   def test_parameters_as_kwargs(self, mock_warning):
-    dist = tfd.Normal(loc=tf.zeros([2]), scale=tf.ones([5, 1]))
+    dist = normal.Normal(loc=tf.zeros([2]), scale=tf.ones([5, 1]))
     self.assertAllEqual(
         batch_shape_lib.inferred_batch_shape_tensor(dist), [5, 2])
     self.assertAllEqual(

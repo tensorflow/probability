@@ -224,7 +224,10 @@ class WeightNormTest(test_util.TestCase):
 
   @parameterized.parameters(['sequential', 'sequential_no_input', 'functional'])
   def testTrainableVariableInitializationInModelFit(self, model_type):
-    sgd = tf.keras.optimizers.SGD(lr=0.)
+    if tf.__internal__.tf2.enabled() and tf.executing_eagerly():
+      sgd = tf.keras.optimizers.SGD(lr=0.)
+    else:
+      sgd = tf.keras.optimizers.legacy.SGD(lr=0.)
     model = self._define_model(model_type, self.data_dim, self.num_hidden)
     model.compile(optimizer=sgd, loss='mse')
     model.fit(
@@ -263,8 +266,7 @@ class WeightNormTest(test_util.TestCase):
     self.assertAllClose(true_init_bias, self.evaluate(norm_layer.layer.bias))
 
     # Ensure variables are updated when learning rate is nonzero
-    sgd = tf.keras.optimizers.SGD(lr=0.01)
-    model.compile(optimizer=sgd, loss='mse')
+    model.compile(optimizer='sgd', loss='mse')
     model.fit(
         x=self.random_input,
         y=self.random_targets,

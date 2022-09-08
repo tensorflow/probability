@@ -19,8 +19,8 @@ import weakref
 # Dependency imports
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import identity
 from tensorflow_probability.python.internal import test_util
 
 
@@ -29,7 +29,7 @@ class IdentityTest(test_util.TestCase):
   """Tests correctness of the Y = g(X) = X transformation."""
 
   def testBijector(self):
-    bijector = tfb.Identity(validate_args=True)
+    bijector = identity.Identity(validate_args=True)
     self.assertStartsWith(bijector.name, "identity")
     x = [[[0.], [1.]]]
     self.assertAllEqual(x, self.evaluate(bijector.forward(x)))
@@ -40,7 +40,7 @@ class IdentityTest(test_util.TestCase):
         0., self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=3)))
 
   def testScalarCongruency(self):
-    bijector = tfb.Identity()
+    bijector = identity.Identity()
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate)
 
@@ -48,7 +48,7 @@ class IdentityTest(test_util.TestCase):
     if not tf.executing_eagerly(): return
     # Verifies the fix for a memory leak caused by the mapped value being
     # strongly ref'ed, and the weak key being the same as the value, `x is y`.
-    bijector = tfb.Identity()
+    bijector = identity.Identity()
     x = tf.constant(123)
     y = bijector.forward(x)
     self.assertIs(y, x)

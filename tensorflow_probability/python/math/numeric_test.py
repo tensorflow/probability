@@ -19,9 +19,10 @@ from absl.testing import parameterized
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
+from tensorflow_probability.python.math import numeric
 
 
 NUMPY_MODE = False
@@ -52,10 +53,10 @@ class Log1pSquareTest32(test_util.TestCase):
   def test_log1psquare(self, x, expected_y, expected_dydx):
     x = tf.convert_to_tensor(x, dtype=self.dtype)
     if NUMPY_MODE:
-      y = tfp.math.log1psquare(x)
+      y = numeric.log1psquare(x)
       dydx, expected_dydx = np.zeros([]), np.zeros([])
     else:
-      y, dydx = tfp.math.value_and_gradient(tfp.math.log1psquare, x)
+      y, dydx = gradient.value_and_gradient(numeric.log1psquare, x)
     y_, dydx_ = self.evaluate([y, dydx])
     self.assertAllClose(expected_y, y_)
     self.assertAllClose(expected_dydx, dydx_)
@@ -86,8 +87,8 @@ class ClipByValuePreserveGrad32(test_util.TestCase):
   def test_clip_by_value_preserve_grad(self, x, lo, hi, expected_y):
     expected_dydx = np.ones_like(x)
     x = tf.convert_to_tensor(x, dtype=self.dtype)
-    y, dydx = tfp.math.value_and_gradient(
-        lambda x_: tfp.math.clip_by_value_preserve_gradient(x_, lo, hi), x)
+    y, dydx = gradient.value_and_gradient(
+        lambda x_: numeric.clip_by_value_preserve_gradient(x_, lo, hi), x)
     y_, dydx_ = self.evaluate([y, dydx])
     self.assertAllClose(expected_y, y_)
     self.assertAllClose(expected_dydx, dydx_)

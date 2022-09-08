@@ -18,9 +18,9 @@ from absl.testing import parameterized
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.optimizer.convergence_criteria import loss_not_decreasing
 
 
 @test_util.test_all_tf_execution_regimes
@@ -38,10 +38,10 @@ class LossNotDecreasingTests(test_util.TestCase):
                               pass_inputs_as_tensors):
 
     with self.assertRaisesRegexp(ValueError, 'Must specify at least one of'):
-      tfp.optimizer.convergence_criteria.LossNotDecreasing()
+      loss_not_decreasing.LossNotDecreasing()
 
     window_size = 2
-    criterion = tfp.optimizer.convergence_criteria.LossNotDecreasing(
+    criterion = loss_not_decreasing.LossNotDecreasing(
         window_size=window_size,
         atol=atol, rtol=rtol, min_num_steps=4)
 
@@ -92,14 +92,14 @@ class LossNotDecreasingTests(test_util.TestCase):
     atols = [0.1, 15.0, 40.0]
     rtols = [0.4, 1e-2, 1e-6]
     min_num_steps = [6, num_timesteps-1, 10]
-    batch_criterion = tfp.optimizer.convergence_criteria.LossNotDecreasing(
+    batch_criterion = loss_not_decreasing.LossNotDecreasing(
         window_size=window_sizes,
         atol=atols,
         rtol=rtols,
         min_num_steps=min_num_steps)
 
     component_criteria = [
-        tfp.optimizer.convergence_criteria.LossNotDecreasing(
+        loss_not_decreasing.LossNotDecreasing(
             window_size=ws, atol=at, rtol=rt, min_num_steps=mns)
         for (ws, at, rt, mns) in zip(window_sizes, atols, rtols, min_num_steps)
     ]

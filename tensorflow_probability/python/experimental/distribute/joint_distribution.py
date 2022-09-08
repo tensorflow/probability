@@ -17,9 +17,9 @@
 import functools
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import distributions as distribution_lib
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import joint_distribution as jd_lib
+from tensorflow_probability.python.distributions import joint_distribution_coroutine as jdc
 from tensorflow_probability.python.distributions import joint_distribution_named as jdn_lib
 from tensorflow_probability.python.distributions import joint_distribution_sequential as jds_lib
 from tensorflow_probability.python.distributions import log_prob_ratio as lp_ratio
@@ -113,21 +113,21 @@ class JointDistributionDistributedMixin(object):
 
 
 class JointDistributionSequential(JointDistributionDistributedMixin,
-                                  distribution_lib.JointDistributionSequential):
+                                  jds_lib.JointDistributionSequential):
   """A sharding-aware JointDistributionSequential."""
 
   _composite_tensor_nonshape_params = ('model',)
 
 
 class JointDistributionNamed(JointDistributionDistributedMixin,
-                             distribution_lib.JointDistributionNamed):
+                             jdn_lib.JointDistributionNamed):
   """A sharding-aware JointDistributionNamed."""
 
   _composite_tensor_nonshape_params = ('model',)
 
 
 class JointDistributionCoroutine(JointDistributionDistributedMixin,
-                                 distribution_lib.JointDistributionCoroutine):
+                                 jdc.JointDistributionCoroutine):
   """A sharding-aware JointDistributionCoroutine."""
 
 

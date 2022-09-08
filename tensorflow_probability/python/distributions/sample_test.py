@@ -22,12 +22,23 @@ import os
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.bijectors import exp as exp_lib
+from tensorflow_probability.python.bijectors import scale as scale_lib
+from tensorflow_probability.python.bijectors import scale_matvec_tril
+from tensorflow_probability.python.distributions import cholesky_lkj
+from tensorflow_probability.python.distributions import exponential
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import log_prob_ratio
+from tensorflow_probability.python.distributions import logistic
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import poisson
+from tensorflow_probability.python.distributions import sample
+from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import test_util
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
-
 
 JAX_MODE = False
 
@@ -36,7 +47,7 @@ JAX_MODE = False
 class SampleDistributionTest(test_util.TestCase):
 
   def test_everything_scalar(self):
-    s = tfd.Sample(tfd.Normal(loc=0, scale=1), 5, validate_args=True)
+    s = sample.Sample(normal.Normal(loc=0, scale=1), 5, validate_args=True)
     x = s.sample(seed=test_util.test_seed())
     actual_lp = s.log_prob(x)
     # Sample.log_prob will reduce over event space, ie, dims [0, 2]
@@ -48,8 +59,9 @@ class SampleDistributionTest(test_util.TestCase):
     self.assertAllClose(expected_lp_, actual_lp_, atol=0, rtol=1e-3)
 
   def test_everything_nonscalar(self):
-    s = tfd.Sample(
-        tfd.Independent(tfd.Normal(loc=tf.zeros([3, 2]), scale=1), 1), [5, 4],
+    s = sample.Sample(
+        independent.Independent(
+            normal.Normal(loc=tf.zeros([3, 2]), scale=1), 1), [5, 4],
         validate_args=True)
     x = s.sample([6, 1], seed=test_util.test_seed())
     actual_lp = s.log_prob(x)
@@ -64,16 +76,19 @@ class SampleDistributionTest(test_util.TestCase):
     self.assertAllClose(expected_lp_, actual_lp_, atol=0, rtol=1e-3)
 
   def test_sample_and_log_prob(self):
-    s = tfd.Sample(
-        tfd.Independent(tfd.Normal(loc=tf.zeros([3, 2]), scale=1), 1), [5, 4],
+    s = sample.Sample(
+        independent.Independent(
+            normal.Normal(loc=tf.zeros([3, 2]), scale=1), 1), [5, 4],
         validate_args=True)
     x, lp = s.experimental_sample_and_log_prob([6, 1],
                                                seed=test_util.test_seed())
     self.assertAllClose(lp, s.log_prob(x))
 
   def test_mixed_scalar(self):
-    s = tfd.Sample(tfd.Independent(tfd.Normal(loc=[0., 0], scale=1), 1),
-                   3, validate_args=False)
+    s = sample.Sample(
+        independent.Independent(normal.Normal(loc=[0., 0], scale=1), 1),
+        3,
+        validate_args=False)
     x = s.sample(4, seed=test_util.test_seed())
     lp = s.log_prob(x)
     self.assertEqual((4, 3, 2), x.shape)
@@ -81,13 +96,15 @@ class SampleDistributionTest(test_util.TestCase):
 
   def test_kl_divergence(self):
     q_scale = 2.
-    p = tfd.Sample(
-        tfd.Independent(tfd.Normal(loc=tf.zeros([3, 2]), scale=1), 1), [5, 4],
+    p = sample.Sample(
+        independent.Independent(
+            normal.Normal(loc=tf.zeros([3, 2]), scale=1), 1), [5, 4],
         validate_args=True)
-    q = tfd.Sample(
-        tfd.Independent(tfd.Normal(loc=tf.zeros([3, 2]), scale=2.), 1), [5, 4],
+    q = sample.Sample(
+        independent.Independent(
+            normal.Normal(loc=tf.zeros([3, 2]), scale=2.), 1), [5, 4],
         validate_args=True)
-    actual_kl = tfd.kl_divergence(p, q)
+    actual_kl = kullback_leibler.kl_divergence(p, q)
     expected_kl = ((5 * 4) *
                    (0.5 * q_scale**-2. - 0.5 + np.log(q_scale)) *  # Actual KL.
                    np.ones([3]) * 2)  # Batch, events.
@@ -95,8 +112,9 @@ class SampleDistributionTest(test_util.TestCase):
 
   def test_transformed_affine(self):
     sample_shape = 3
-    mvn = tfd.Independent(tfd.Normal(loc=[0., 0], scale=1), 1)
-    aff = tfb.ScaleMatvecTriL(scale_tril=[[0.75, 0.], [0.05, 0.5]])
+    mvn = independent.Independent(normal.Normal(loc=[0., 0], scale=1), 1)
+    aff = scale_matvec_tril.ScaleMatvecTriL(
+        scale_tril=[[0.75, 0.], [0.05, 0.5]])
 
     def expected_lp(y):
       x = aff.inverse(y)  # Ie, tf.random.normal([4, 3, 2])
@@ -104,9 +122,8 @@ class SampleDistributionTest(test_util.TestCase):
       return tf.reduce_sum(mvn.log_prob(x) - fldj, axis=1)
 
     # Transform a Sample.
-    d = tfd.TransformedDistribution(
-        tfd.Sample(mvn, sample_shape, validate_args=True),
-        bijector=aff)
+    d = transformed_distribution.TransformedDistribution(
+        sample.Sample(mvn, sample_shape, validate_args=True), bijector=aff)
     y = d.sample(4, seed=test_util.test_seed())
     actual_lp = d.log_prob(y)
     self.assertAllEqual((4,) + (sample_shape,) + (2,), y.shape)
@@ -116,8 +133,8 @@ class SampleDistributionTest(test_util.TestCase):
         atol=0., rtol=1e-3)
 
     # Sample a Transform.
-    d = tfd.Sample(
-        tfd.TransformedDistribution(mvn, bijector=aff),
+    d = sample.Sample(
+        transformed_distribution.TransformedDistribution(mvn, bijector=aff),
         sample_shape,
         validate_args=True)
     y = d.sample(4, seed=test_util.test_seed())
@@ -130,8 +147,8 @@ class SampleDistributionTest(test_util.TestCase):
 
   def test_transformed_exp(self):
     sample_shape = 3
-    mvn = tfd.Independent(tfd.Normal(loc=[0., 0], scale=1), 1)
-    exp = tfb.Exp()
+    mvn = independent.Independent(normal.Normal(loc=[0., 0], scale=1), 1)
+    exp = exp_lib.Exp()
 
     def expected_lp(y):
       x = exp.inverse(y)  # Ie, tf.random.normal([4, 3, 2])
@@ -139,9 +156,8 @@ class SampleDistributionTest(test_util.TestCase):
       return tf.reduce_sum(mvn.log_prob(x) - fldj, axis=1)
 
     # Transform a Sample.
-    d = tfd.TransformedDistribution(
-        tfd.Sample(mvn, sample_shape, validate_args=True),
-        bijector=exp)
+    d = transformed_distribution.TransformedDistribution(
+        sample.Sample(mvn, sample_shape, validate_args=True), bijector=exp)
     y = d.sample(4, seed=test_util.test_seed())
     actual_lp = d.log_prob(y)
     self.assertAllEqual((4,) + (sample_shape,) + (2,), y.shape)
@@ -153,8 +169,8 @@ class SampleDistributionTest(test_util.TestCase):
         atol=0., rtol=1e-3)
 
     # Sample a Transform.
-    d = tfd.Sample(
-        tfd.TransformedDistribution(mvn, bijector=exp),
+    d = sample.Sample(
+        transformed_distribution.TransformedDistribution(mvn, bijector=exp),
         sample_shape,
         validate_args=True)
     y = d.sample(4, seed=test_util.test_seed())
@@ -175,8 +191,9 @@ class SampleDistributionTest(test_util.TestCase):
   )
   def test_summary_statistic(self, attr):
     sample_shape = [5, 4]
-    mvn = tfd.Independent(tfd.Normal(loc=tf.zeros([3, 2]), scale=1), 1)
-    d = tfd.Sample(mvn, sample_shape, validate_args=True)
+    mvn = independent.Independent(
+        normal.Normal(loc=tf.zeros([3, 2]), scale=1), 1)
+    d = sample.Sample(mvn, sample_shape, validate_args=True)
     self.assertEqual((3,), d.batch_shape)
     expected_stat = (
         getattr(mvn, attr)()[:, tf.newaxis, tf.newaxis, :] *
@@ -186,8 +203,8 @@ class SampleDistributionTest(test_util.TestCase):
 
   def test_entropy(self):
     sample_shape = [3, 4]
-    mvn = tfd.Independent(tfd.Normal(loc=0, scale=[[0.25, 0.5]]), 1)
-    d = tfd.Sample(mvn, sample_shape, validate_args=True)
+    mvn = independent.Independent(normal.Normal(loc=0, scale=[[0.25, 0.5]]), 1)
+    d = sample.Sample(mvn, sample_shape, validate_args=True)
     expected_entropy = 12 * tf.reduce_sum(mvn.distribution.entropy(), axis=-1)
     actual_entropy = d.entropy()
     self.assertAllEqual(*self.evaluate([expected_entropy, actual_entropy]))
@@ -199,9 +216,10 @@ class SampleDistributionTest(test_util.TestCase):
     # In real life, you'd really always want `sample_shape` to be
     # `trainable=False`.
     sample_shape = tf.Variable([1, 2], shape=tf.TensorShape(None))
-    dist = tfd.Sample(
-        tfd.Independent(tfd.Logistic(loc=loc, scale=scale),
-                        reinterpreted_batch_ndims=1),
+    dist = sample.Sample(
+        independent.Independent(
+            logistic.Logistic(loc=loc, scale=scale),
+            reinterpreted_batch_ndims=1),
         sample_shape=sample_shape,
         validate_args=True)
     with tf.GradientTape() as tape:
@@ -218,9 +236,10 @@ class SampleDistributionTest(test_util.TestCase):
     # In real life, you'd really always want `sample_shape` to be
     # `trainable=False`.
     sample_shape = tf.Variable([1, 2], shape=tf.TensorShape(None))
-    dist = tfd.Sample(
-        tfd.Independent(tfd.Logistic(loc=loc, scale=scale),
-                        reinterpreted_batch_ndims=1),
+    dist = sample.Sample(
+        independent.Independent(
+            logistic.Logistic(loc=loc, scale=scale),
+            reinterpreted_batch_ndims=1),
         sample_shape=sample_shape,
         validate_args=True)
     self.evaluate([v.initializer for v in dist.trainable_variables])
@@ -269,16 +288,18 @@ class SampleDistributionTest(test_util.TestCase):
     with self.assertRaisesWithPredicateMatch(
         Exception,
         'Argument `sample_shape` must be either a scalar or a vector.'):
-      dist = tfd.Sample(
-          tfd.Independent(tfd.Logistic(loc=loc, scale=scale),
-                          reinterpreted_batch_ndims=1),
+      dist = sample.Sample(
+          independent.Independent(
+              logistic.Logistic(loc=loc, scale=scale),
+              reinterpreted_batch_ndims=1),
           sample_shape=sample_shape,
           validate_args=True)
       self.evaluate([v.initializer for v in dist.trainable_variables])
       self.evaluate(dist.mean())
 
   def test_broadcast_event(self):
-    d = tfd.Sample(tfd.Normal(0, 1, validate_args=True), 4, validate_args=True)
+    d = sample.Sample(
+        normal.Normal(0, 1, validate_args=True), 4, validate_args=True)
     # Batch of 2 events: works.
     two_batch = d.log_prob(tf.zeros([2, 4]))
     self.assertEqual((2,), self.evaluate(two_batch).shape)
@@ -286,13 +307,14 @@ class SampleDistributionTest(test_util.TestCase):
     self.assertAllEqual(two_batch, d.log_prob(tf.zeros([2, 1])))
 
   def test_misshapen_event(self):
-    d = tfd.Sample(tfd.Normal(0, 1, validate_args=True), 4, validate_args=True)
+    d = sample.Sample(
+        normal.Normal(0, 1, validate_args=True), 4, validate_args=True)
     with self.assertRaisesRegexp(ValueError,
                                  r'Incompatible shapes for broadcasting'):
       self.evaluate(d.log_prob(tf.zeros([3])))
 
   def test_bijector_shapes(self):
-    d = tfd.Sample(tfd.Uniform(tf.zeros([5]), 1.), 2)
+    d = sample.Sample(uniform.Uniform(tf.zeros([5]), 1.), 2)
     b = d.experimental_default_event_space_bijector()
     self.assertEqual((2,), d.event_shape)
     self.assertEqual((2,), b.inverse_event_shape((2,)))
@@ -302,7 +324,8 @@ class SampleDistributionTest(test_util.TestCase):
     self.assertEqual((3, 5, 2), b.inverse_event_shape((3, 5, 2)))
     self.assertEqual((3, 5, 2), b.forward_event_shape((3, 5, 2)))
 
-    d = tfd.Sample(tfd.CholeskyLKJ(4, concentration=tf.ones([5])), 2)
+    d = sample.Sample(
+        cholesky_lkj.CholeskyLKJ(4, concentration=tf.ones([5])), 2)
     b = d.experimental_default_event_space_bijector()
     self.assertEqual((2, 4, 4), d.event_shape)
     dim = (4 * 3) // 2
@@ -312,7 +335,7 @@ class SampleDistributionTest(test_util.TestCase):
     self.assertEqual((3, 5, 2, 4, 4), b.forward_event_shape((3, 5, 2, dim)))
 
   def test_bijector_uniform(self):
-    d = tfd.Sample(tfd.Uniform(tf.zeros([5]), 1.), 2)
+    d = sample.Sample(uniform.Uniform(tf.zeros([5]), 1.), 2)
     b = d.experimental_default_event_space_bijector()
     # This line used to raise:
     # InvalidArgumentError: Incompatible shapes: [5] vs. [5,2] [Op:Mul]
@@ -338,7 +361,8 @@ class SampleDistributionTest(test_util.TestCase):
 
   def test_bijector_cholesky_lkj(self):
     # Let's try with a shape-shifting underlying bijector vec=>mat.
-    d = tfd.Sample(tfd.CholeskyLKJ(4, concentration=tf.ones([5])), 2)
+    d = sample.Sample(
+        cholesky_lkj.CholeskyLKJ(4, concentration=tf.ones([5])), 2)
     b = d.experimental_default_event_space_bijector()
     y = self.evaluate(d.sample(seed=test_util.test_seed()))
     x = b.inverse(y) + 0
@@ -346,8 +370,9 @@ class SampleDistributionTest(test_util.TestCase):
     y = self.evaluate(d.sample(7, seed=test_util.test_seed()))
     x = b.inverse(y) + 0
     self.assertAllClose(y, b.forward(x))
-    d2 = tfd.Independent(tfd.CholeskyLKJ(4, concentration=tf.ones([5, 2])),
-                         reinterpreted_batch_ndims=1)
+    d2 = independent.Independent(
+        cholesky_lkj.CholeskyLKJ(4, concentration=tf.ones([5, 2])),
+        reinterpreted_batch_ndims=1)
     b2 = d2.experimental_default_event_space_bijector()
     self.assertAllClose(
         b2.forward_log_det_jacobian(x, event_ndims=len([2, 6])),
@@ -381,13 +406,15 @@ class SampleDistributionTest(test_util.TestCase):
         rtol=1e-5)
 
     # Now, with another sample shape.
-    d = tfd.Sample(tfd.CholeskyLKJ(4, concentration=tf.ones([5])), [2, 7])
+    d = sample.Sample(
+        cholesky_lkj.CholeskyLKJ(4, concentration=tf.ones([5])), [2, 7])
     b = d.experimental_default_event_space_bijector()
     y = self.evaluate(d.sample(11, seed=test_util.test_seed()))
     x = b.inverse(y) + 0
     self.assertAllClose(y, b.forward(x))
-    d2 = tfd.Independent(tfd.CholeskyLKJ(4, concentration=tf.ones([5, 2, 7])),
-                         reinterpreted_batch_ndims=2)
+    d2 = independent.Independent(
+        cholesky_lkj.CholeskyLKJ(4, concentration=tf.ones([5, 2, 7])),
+        reinterpreted_batch_ndims=2)
     b2 = d2.experimental_default_event_space_bijector()
     self.assertAllClose(
         b2.forward_log_det_jacobian(x, event_ndims=len([2, 7, 6])),
@@ -397,7 +424,8 @@ class SampleDistributionTest(test_util.TestCase):
         b.inverse_log_det_jacobian(y, event_ndims=len([2, 7, 4, 4])))
 
     # Now, with another batch shape.
-    d = tfd.Sample(tfd.CholeskyLKJ(4, concentration=tf.ones([5, 7])), 2)
+    d = sample.Sample(
+        cholesky_lkj.CholeskyLKJ(4, concentration=tf.ones([5, 7])), 2)
     b = d.experimental_default_event_space_bijector()
     y = self.evaluate(d.sample(11, seed=test_util.test_seed()))
     x = b.inverse(y) + 0
@@ -418,16 +446,16 @@ class SampleDistributionTest(test_util.TestCase):
         b.inverse_log_det_jacobian(y, event_ndims=len([5, 2, 7, 4, 4])))
 
   def test_bijector_scalar_underlying_ildj(self):
-    d = tfd.Normal(0., 1.)  # Uses Identity bijector, ildj=0.
-    bij = tfd.Sample(d, [1]).experimental_default_event_space_bijector()
+    d = normal.Normal(0., 1.)  # Uses Identity bijector, ildj=0.
+    bij = sample.Sample(d, [1]).experimental_default_event_space_bijector()
     ildj = bij.inverse_log_det_jacobian(tf.zeros([1, 1]), event_ndims=1)
     self.assertAllEqual(0., ildj)
     ildj = bij.inverse_log_det_jacobian(tf.zeros([1, 1]), event_ndims=2)
     self.assertAllEqual(0., ildj)
 
   def test_bijector_constant_underlying_ildj(self):
-    d = tfb.Scale([2., 3.])(tfd.Normal([0., 0.], 1.))
-    bij = tfd.Sample(d, [3]).experimental_default_event_space_bijector()
+    d = scale_lib.Scale([2., 3.])(normal.Normal([0., 0.], 1.))
+    bij = sample.Sample(d, [3]).experimental_default_event_space_bijector()
     ildj = bij.inverse_log_det_jacobian(tf.zeros([2, 3]), event_ndims=1)
     self.assertAllClose(-np.log([2., 3.]) * 3, ildj)
     ildj = bij.inverse_log_det_jacobian(tf.zeros([2, 3]), event_ndims=2)
@@ -442,13 +470,14 @@ class SampleDistributionTest(test_util.TestCase):
       maybe_jit = tf.function(jit_compile=True)
     stream = test_util.test_seed_stream()
     n = 20_000
-    samps = tfd.Poisson(rate=1.).sample(n, seed=stream())
-    log_rate = tfd.Normal(0, .2).sample(seed=stream())
-    pois = tfd.Poisson(log_rate=log_rate)
+    samps = poisson.Poisson(rate=1.).sample(n, seed=stream())
+    log_rate = normal.Normal(0, .2).sample(seed=stream())
+    pois = poisson.Poisson(log_rate=log_rate)
     lp = maybe_jit(
-        tfd.Sample(pois, n, experimental_use_kahan_sum=True).log_prob)(samps)
-    pois64 = tfd.Poisson(log_rate=tf.cast(log_rate, tf.float64))
-    lp64 = tfd.Sample(pois64, n).log_prob(tf.cast(samps, tf.float64))
+        sample.Sample(pois, n, experimental_use_kahan_sum=True).log_prob)(
+            samps)
+    pois64 = poisson.Poisson(log_rate=tf.cast(log_rate, tf.float64))
+    lp64 = sample.Sample(pois64, n).log_prob(tf.cast(samps, tf.float64))
     # Evaluate together to ensure we use the same samples.
     lp, lp64 = self.evaluate((tf.cast(lp, tf.float64), lp64))
     # Fails 75% CPU, 0-80% GPU --vary_seed runs w/o experimental_use_kahan_sum.
@@ -471,48 +500,46 @@ class SampleDistributionTest(test_util.TestCase):
 
     stream = test_util.test_seed_stream()
     n = 20_000
-    samps = tfd.Exponential(rate=1.).sample(n, seed=stream())
-    rate = tfd.LogNormal(0, .2).sample(seed=stream())
-    exp = tfd.Exponential(rate=rate)
+    samps = exponential.Exponential(rate=1.).sample(n, seed=stream())
+    rate = lognormal.LogNormal(0, .2).sample(seed=stream())
+    exp = exponential.Exponential(rate=rate)
     ldj32_fn = maybe_jit(
         functools.partial(
             ldj_fn,
-            dist=tfd.Sample(
-                exp,
-                n,
-                experimental_use_kahan_sum=True),
+            dist=sample.Sample(exp, n, experimental_use_kahan_sum=True),
         ))
     ldj32 = ldj32_fn(samps)
-    exp64 = tfd.Exponential(rate=tf.cast(rate, tf.float64))
-    ldj64 = ldj_fn(
-        tf.cast(samps, tf.float64),
-        dist=tfd.Sample(exp64, n))
+    exp64 = exponential.Exponential(rate=tf.cast(rate, tf.float64))
+    ldj64 = ldj_fn(tf.cast(samps, tf.float64), dist=sample.Sample(exp64, n))
     # Evaluate together to ensure we use the same samples.
     ldj32, ldj64 = self.evaluate((ldj32, ldj64))
     self.assertAllCloseNested(ldj64, ldj32, rtol=0., atol=.002)
 
   def testLargeLogProbDiffScalarUnderlying(self):
     shp = [25, 200]
-    d0 = tfd.Sample(tfd.Normal(0., .1), shp)
-    d1 = tfd.Sample(tfd.Normal(1e-5, .1), shp)
+    d0 = sample.Sample(normal.Normal(0., .1), shp)
+    d1 = sample.Sample(normal.Normal(1e-5, .1), shp)
     strm = test_util.test_seed_stream()
     x0 = self.evaluate(  # overdispersed
-        tfd.Normal(0, 2).sample(shp, seed=strm()))
+        normal.Normal(0, 2).sample(shp, seed=strm()))
     x1 = self.evaluate(  # overdispersed, perturbed
-        x0 + tfd.Normal(0, 1e-6).sample(x0.shape, seed=strm()))
-    d0_64 = d0.copy(distribution=tfd.Normal(
-        tf.cast(d0.distribution.loc, tf.float64),
-        tf.cast(d0.distribution.scale, tf.float64)))
-    d1_64 = d1.copy(distribution=tfd.Normal(
-        tf.cast(d1.distribution.loc, tf.float64),
-        tf.cast(d1.distribution.scale, tf.float64)))
+        x0 + normal.Normal(0, 1e-6).sample(x0.shape, seed=strm()))
+    d0_64 = d0.copy(
+        distribution=normal.Normal(
+            tf.cast(d0.distribution.loc, tf.float64),
+            tf.cast(d0.distribution.scale, tf.float64)))
+    d1_64 = d1.copy(
+        distribution=normal.Normal(
+            tf.cast(d1.distribution.loc, tf.float64),
+            tf.cast(d1.distribution.scale, tf.float64)))
     oracle_64 = tf.reduce_sum(
         d0_64.distribution.log_prob(tf.cast(x0, tf.float64)) -
         d1_64.distribution.log_prob(tf.cast(x1, tf.float64)))
     self.assertAllClose(
         oracle_64,
-        tfp.experimental.distributions.log_prob_ratio(d0, x0, d1, x1),
-        rtol=0., atol=0.007)
+        log_prob_ratio.log_prob_ratio(d0, x0, d1, x1),
+        rtol=0.,
+        atol=0.007)
     # In contrast: below fails with errors of ~0.07 - 0.15
     # self.assertAllClose(
     #     oracle_64, d0.log_prob(x0) - d1.log_prob(x1), rtol=0., atol=0.007)
@@ -522,31 +549,36 @@ class SampleDistributionTest(test_util.TestCase):
     nbatch = 3
     nevt = 250
     dim = 500
-    d0 = tfd.Sample(tfd.MultivariateNormalDiag(tf.fill([nbatch, dim], 0.),
-                                               tf.fill([dim], .1)),
-                    sample_shape=nevt)
+    d0 = sample.Sample(
+        mvn_diag.MultivariateNormalDiag(
+            tf.fill([nbatch, dim], 0.), tf.fill([dim], .1)),
+        sample_shape=nevt)
     self.assertEqual(tf.float32, d0.dtype)
-    d1 = tfd.Sample(tfd.MultivariateNormalDiag(tf.fill([nbatch, dim], 1e-5),
-                                               d0.distribution.scale.diag),
-                    sample_shape=nevt)
+    d1 = sample.Sample(
+        mvn_diag.MultivariateNormalDiag(
+            tf.fill([nbatch, dim], 1e-5), d0.distribution.scale.diag),
+        sample_shape=nevt)
     strm = test_util.test_seed_stream()
     x0 = self.evaluate(  # overdispersed
-        tfd.Normal(0, 2).sample([nsamp, nbatch, nevt, dim], seed=strm()))
+        normal.Normal(0, 2).sample([nsamp, nbatch, nevt, dim], seed=strm()))
     x1 = self.evaluate(  # overdispersed + perturbed
-        x0 + tfd.Normal(0, 1e-6).sample(x0.shape, seed=strm()))
-    d0_64 = d0.copy(distribution=tfd.MultivariateNormalDiag(
-        tf.cast(d0.distribution.loc, tf.float64),
-        tf.cast(d0.distribution.scale.diag, tf.float64)))
-    d1_64 = d1.copy(distribution=tfd.MultivariateNormalDiag(
-        tf.cast(d1.distribution.loc, tf.float64),
-        tf.cast(d1.distribution.scale.diag, tf.float64)))
+        x0 + normal.Normal(0, 1e-6).sample(x0.shape, seed=strm()))
+    d0_64 = d0.copy(
+        distribution=mvn_diag.MultivariateNormalDiag(
+            tf.cast(d0.distribution.loc, tf.float64),
+            tf.cast(d0.distribution.scale.diag, tf.float64)))
+    d1_64 = d1.copy(
+        distribution=mvn_diag.MultivariateNormalDiag(
+            tf.cast(d1.distribution.loc, tf.float64),
+            tf.cast(d1.distribution.scale.diag, tf.float64)))
     oracle_64 = (d0_64.log_prob(tf.cast(x0, tf.float64)) -
                  d1_64.log_prob(tf.cast(x1, tf.float64)))
     self.assertNotAllZero(d0.log_prob(x0) < -10_000_000)
     self.assertAllClose(
         oracle_64,
-        tfp.experimental.distributions.log_prob_ratio(d0, x0, d1, x1),
-        rtol=0., atol=0.045)
+        log_prob_ratio.log_prob_ratio(d0, x0, d1, x1),
+        rtol=0.,
+        atol=0.045)
     # In contrast, the following fails w/ abs errors of ~5. to 10.
     # self.assertAllClose(
     #     oracle_64, d0.log_prob(x0) - d1.log_prob(x1), rtol=0., atol=0.045)

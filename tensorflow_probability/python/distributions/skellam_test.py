@@ -16,10 +16,10 @@
 import numpy as np
 from scipy import stats
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import skellam
 from tensorflow_probability.python.internal import test_util
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
 
 
 @test_util.test_all_tf_execution_regimes
@@ -30,7 +30,7 @@ class _SkellamTest(object):
                     rate2,
                     validate_args=True,
                     force_probs_to_zero_outside_support=False):
-    return tfd.Skellam(
+    return skellam.Skellam(
         rate1=rate1,
         rate2=rate2,
         validate_args=validate_args,
@@ -39,32 +39,32 @@ class _SkellamTest(object):
   def testSkellamShape(self):
     rate1 = tf.constant([3.0] * 5, dtype=self.dtype)
     rate2 = tf.constant([3.0] * 4, dtype=self.dtype)[..., tf.newaxis]
-    skellam = self._make_skellam(rate1=rate1, rate2=rate2)
+    dist = self._make_skellam(rate1=rate1, rate2=rate2)
 
-    self.assertAllEqual(self.evaluate(skellam.batch_shape_tensor()), (4, 5))
-    self.assertEqual(skellam.batch_shape, tf.TensorShape([4, 5]))
-    self.assertAllEqual(self.evaluate(skellam.event_shape_tensor()), [])
-    self.assertEqual(skellam.event_shape, tf.TensorShape([]))
+    self.assertAllEqual(self.evaluate(dist.batch_shape_tensor()), (4, 5))
+    self.assertEqual(dist.batch_shape, tf.TensorShape([4, 5]))
+    self.assertAllEqual(self.evaluate(dist.event_shape_tensor()), [])
+    self.assertEqual(dist.event_shape, tf.TensorShape([]))
 
   def testInvalidLam(self):
     invalid_rate = self.dtype([-.01, 1., 2.])
     valid_rate = self.dtype([1., 2., 3.])
     with self.assertRaisesOpError('Argument `rate1` must be non-negative.'):
-      skellam = self._make_skellam(rate1=invalid_rate, rate2=valid_rate)
-      self.evaluate(skellam.rate1_parameter())
+      dist = self._make_skellam(rate1=invalid_rate, rate2=valid_rate)
+      self.evaluate(dist.rate1_parameter())
 
     with self.assertRaisesOpError('Argument `rate2` must be non-negative.'):
-      skellam = self._make_skellam(rate1=valid_rate, rate2=invalid_rate)
-      self.evaluate(skellam.rate2_parameter())
+      dist = self._make_skellam(rate1=valid_rate, rate2=invalid_rate)
+      self.evaluate(dist.rate2_parameter())
 
   def testZeroRate(self):
     lam = self.dtype(0.)
-    skellam = tfd.Skellam(rate1=lam, rate2=lam, validate_args=True)
-    self.assertAllClose(lam, self.evaluate(skellam.rate1))
-    self.assertAllClose(lam, self.evaluate(skellam.rate2))
-    self.assertAllClose(0., skellam.prob(3.))
-    self.assertAllClose(1., skellam.prob(0.))
-    self.assertAllClose(0., skellam.log_prob(0.))
+    dist = skellam.Skellam(rate1=lam, rate2=lam, validate_args=True)
+    self.assertAllClose(lam, self.evaluate(dist.rate1))
+    self.assertAllClose(lam, self.evaluate(dist.rate2))
+    self.assertAllClose(0., dist.prob(3.))
+    self.assertAllClose(1., dist.prob(0.))
+    self.assertAllClose(0., dist.log_prob(0.))
 
   def testSkellamLogPmfDiscreteMatchesScipy(self):
     batch_size = 12
@@ -72,16 +72,18 @@ class _SkellamTest(object):
     rate2 = np.array([[1.2], [2.3]]).astype(self.dtype)
     x = np.array([-3., -1., 0., 2., 4., 3., 7., 4., 8., 9., 6., 7.],
                  dtype=self.dtype)
-    skellam = self._make_skellam(
-        rate1=rate1, rate2=rate2,
-        force_probs_to_zero_outside_support=True, validate_args=False)
-    log_pmf = skellam.log_prob(x)
+    dist = self._make_skellam(
+        rate1=rate1,
+        rate2=rate2,
+        force_probs_to_zero_outside_support=True,
+        validate_args=False)
+    log_pmf = dist.log_prob(x)
     self.assertEqual(log_pmf.shape, (2, batch_size))
     self.assertAllClose(
         self.evaluate(log_pmf),
         stats.skellam.logpmf(x, rate1, rate2))
 
-    pmf = skellam.prob(x)
+    pmf = dist.prob(x)
     self.assertEqual(pmf.shape, (2, batch_size,))
     self.assertAllClose(
         self.evaluate(pmf),
@@ -120,14 +122,15 @@ class _SkellamTest(object):
             force_probs_to_zero_outside_support=True,
             validate_args=False).log_prob(x)
       return skellam_log_prob
-    _, dlog_pmf_dlam = self.evaluate(tfp.math.value_and_gradient(
-        make_skellam_log_prob(), rate1))
+
+    _, dlog_pmf_dlam = self.evaluate(
+        gradient.value_and_gradient(make_skellam_log_prob(), rate1))
 
     self.assertEqual(dlog_pmf_dlam.shape, (batch_size,))
     self.assertAllClose(dlog_pmf_dlam, np.zeros([batch_size]))
 
-    _, dlog_pmf_dlam = self.evaluate(tfp.math.value_and_gradient(
-        make_skellam_log_prob(True), rate2))
+    _, dlog_pmf_dlam = self.evaluate(
+        gradient.value_and_gradient(make_skellam_log_prob(True), rate2))
 
     self.assertEqual(dlog_pmf_dlam.shape, (batch_size,))
     self.assertAllClose(dlog_pmf_dlam, np.zeros([batch_size]))
@@ -135,36 +138,36 @@ class _SkellamTest(object):
   def testSkellamMean(self):
     rate1 = np.array([1.0, 3.0, 2.5], dtype=self.dtype)
     rate2 = np.array([5.0, 7.13, 2.56, 41.], dtype=self.dtype)[..., np.newaxis]
-    skellam = self._make_skellam(rate1=rate1, rate2=rate2)
-    self.assertEqual(skellam.mean().shape, (4, 3))
+    dist = self._make_skellam(rate1=rate1, rate2=rate2)
+    self.assertEqual(dist.mean().shape, (4, 3))
     self.assertAllClose(
-        self.evaluate(skellam.mean()), stats.skellam.mean(rate1, rate2))
-    self.assertAllClose(self.evaluate(skellam.mean()), rate1 - rate2)
+        self.evaluate(dist.mean()), stats.skellam.mean(rate1, rate2))
+    self.assertAllClose(self.evaluate(dist.mean()), rate1 - rate2)
 
   def testSkellamVariance(self):
     rate1 = np.array([1.0, 3.0, 2.5], dtype=self.dtype)
     rate2 = np.array([5.0, 7.13, 2.56, 41.], dtype=self.dtype)[..., np.newaxis]
-    skellam = self._make_skellam(rate1=rate1, rate2=rate2)
-    self.assertEqual(skellam.variance().shape, (4, 3))
+    dist = self._make_skellam(rate1=rate1, rate2=rate2)
+    self.assertEqual(dist.variance().shape, (4, 3))
     self.assertAllClose(
-        self.evaluate(skellam.variance()), stats.skellam.var(rate1, rate2))
-    self.assertAllClose(self.evaluate(skellam.variance()), rate1 + rate2)
+        self.evaluate(dist.variance()), stats.skellam.var(rate1, rate2))
+    self.assertAllClose(self.evaluate(dist.variance()), rate1 + rate2)
 
   def testSkellamStd(self):
     rate1 = np.array([1.0, 3.0, 2.5], dtype=self.dtype)
     rate2 = np.array([5.0, 7.13, 2.56, 41.], dtype=self.dtype)[..., np.newaxis]
-    skellam = self._make_skellam(rate1=rate1, rate2=rate2)
-    self.assertEqual(skellam.stddev().shape, (4, 3))
+    dist = self._make_skellam(rate1=rate1, rate2=rate2)
+    self.assertEqual(dist.stddev().shape, (4, 3))
     self.assertAllClose(
-        self.evaluate(skellam.stddev()), stats.skellam.std(rate1, rate2))
-    self.assertAllClose(self.evaluate(skellam.stddev()), np.sqrt(rate1 + rate2))
+        self.evaluate(dist.stddev()), stats.skellam.std(rate1, rate2))
+    self.assertAllClose(self.evaluate(dist.stddev()), np.sqrt(rate1 + rate2))
 
   def testSkellamSample(self):
     rate1 = self.dtype([2., 3., 4.])
     rate2 = self.dtype([7.1, 3.2])[..., np.newaxis]
     n = int(2e5)
-    skellam = self._make_skellam(rate1=rate1, rate2=rate2)
-    samples = skellam.sample(n, seed=test_util.test_seed())
+    dist = self._make_skellam(rate1=rate1, rate2=rate2)
+    samples = dist.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n, 2, 3))
     self.assertEqual(sample_values.shape, (n, 2, 3))
@@ -176,16 +179,16 @@ class _SkellamTest(object):
   def testAssertValidSample(self):
     rate1 = np.array([1.0, 3.0, 2.5], dtype=self.dtype)
     rate2 = np.array([2.1, 7.0, 42.5], dtype=self.dtype)
-    skellam = self._make_skellam(rate1=rate1, rate2=rate2)
+    dist = self._make_skellam(rate1=rate1, rate2=rate2)
     with self.assertRaisesOpError('has non-integer components'):
-      self.evaluate(skellam.prob([-1.2, 3., 4.2]))
+      self.evaluate(dist.prob([-1.2, 3., 4.2]))
 
   def testSkellamSampleMultidimensionalMean(self):
     rate1 = self.dtype([2., 3., 4., 5., 6.])
     rate2 = self.dtype([7.1, 3.2, 10., 9.])[..., np.newaxis]
-    skellam = self._make_skellam(rate1=rate1, rate2=rate2)
+    dist = self._make_skellam(rate1=rate1, rate2=rate2)
     n = int(2e5)
-    samples = skellam.sample(n, seed=test_util.test_seed())
+    samples = dist.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n, 4, 5))
     self.assertEqual(sample_values.shape, (n, 4, 5))
@@ -196,9 +199,9 @@ class _SkellamTest(object):
   def testSkellamSampleMultidimensionalVariance(self):
     rate1 = self.dtype([2., 3., 4., 5., 6.])
     rate2 = self.dtype([7.1, 3.2, 10., 9.])[..., np.newaxis]
-    skellam = self._make_skellam(rate1=rate1, rate2=rate2)
+    dist = self._make_skellam(rate1=rate1, rate2=rate2)
     n = int(1e5)
-    samples = skellam.sample(n, seed=test_util.test_seed())
+    samples = dist.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n, 4, 5))
     self.assertEqual(sample_values.shape, (n, 4, 5))
@@ -277,7 +280,7 @@ class SkellamLogRateTest(_SkellamTest):
                     rate2,
                     validate_args=True,
                     force_probs_to_zero_outside_support=False):
-    return tfd.Skellam(
+    return skellam.Skellam(
         log_rate1=tf.math.log(rate1),
         log_rate2=tf.math.log(rate2),
         validate_args=validate_args,
@@ -300,7 +303,7 @@ class SkellamLogRateTest(_SkellamTest):
   def testGradientThroughRate(self):
     log_rate1 = tf.Variable(3.)
     log_rate2 = tf.Variable(4.)
-    dist = tfd.Skellam(
+    dist = skellam.Skellam(
         log_rate1=log_rate1, log_rate2=log_rate2, validate_args=True)
     with tf.GradientTape() as tape:
       loss = -dist.log_prob([1., 2., 4.])

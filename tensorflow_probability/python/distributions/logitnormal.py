@@ -18,7 +18,6 @@ import numpy as onp
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -27,6 +26,7 @@ from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
+from tensorflow_probability.python.math import special
 
 
 __all__ = [
@@ -512,7 +512,7 @@ def approx_variance_sigmoid(
         c2s2_[..., tf.newaxis, :] +
         c2s2_[..., :, tf.newaxis])
     m_over_rho_ = m_over_rho[..., tf.newaxis]
-    b = 0.5 * cdf(m_over_rho_) - tfp_math.owens_t(m_over_rho_, c2_over_big_rho_)
+    b = 0.5 * cdf(m_over_rho_) - special.owens_t(m_over_rho_, c2_over_big_rho_)
     bt = tf.linalg.matrix_transpose(b)
     mom2 = tf.math.reduce_sum(
         alpha[tf.newaxis, :] * alpha[:, tf.newaxis] * (b + bt),

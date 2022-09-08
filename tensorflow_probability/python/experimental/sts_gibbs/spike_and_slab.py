@@ -18,19 +18,19 @@ import collections
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import bernoulli
 from tensorflow_probability.python.distributions import inverse_gamma
 from tensorflow_probability.python.distributions import joint_distribution_auto_batched
 from tensorflow_probability.python.distributions import sample as sample_dist
-from tensorflow_probability.python.experimental.distributions import MultivariateNormalPrecisionFactorLinearOperator
+from tensorflow_probability.python.experimental.distributions.mvn_precision_factor_linop import MultivariateNormalPrecisionFactorLinearOperator
 from tensorflow_probability.python.internal import broadcast_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import vectorization_util
+from tensorflow_probability.python.math import linalg
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 __all__ = ['SpikeSlabSampler']
@@ -777,9 +777,9 @@ def _symmetric_increment_chol(chol, idx, increment):
     #  [0, z, 0]]
     a = (increment[..., idx] + 1.) / 2.
     b = (increment[..., idx] - 1.) / 2.
-    chol = tfp_math.cholesky_update(
+    chol = linalg.cholesky_update(
         chol, update_vector=_set_vector_index(increment, idx, a), multiplier=1)
-    chol = tfp_math.cholesky_update(
+    chol = linalg.cholesky_update(
         chol, update_vector=_set_vector_index(increment, idx, b), multiplier=-1)
 
     # There Cholesky decomposition should be unchanged in rows/cols before idx.

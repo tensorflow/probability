@@ -25,12 +25,19 @@ import itertools
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import bernoulli
+from tensorflow_probability.python.distributions import categorical
+from tensorflow_probability.python.distributions import deterministic
+from tensorflow_probability.python.distributions import hidden_markov_model
+from tensorflow_probability.python.distributions import joint_distribution_coroutine as jdc
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import poisson
+from tensorflow_probability.python.distributions import sample as sample_dist_lib
 import tensorflow_probability.python.experimental.marginalize as marginalize
 from tensorflow_probability.python.internal import test_util
 
 
-Root = tfd.JointDistributionCoroutine.Root
+Root = jdc.JointDistributionCoroutine.Root
 
 
 def _conform(ts):
@@ -106,9 +113,9 @@ class _MarginalizeTest(
     probs = probs / np.sum(probs)
 
     def model():
-      i = yield Root(tfd.Categorical(probs=probs, dtype=tf.int32))
-      j = yield tfd.Categorical(probs=probs, dtype=tf.int32)
-      k = yield tfd.Categorical(probs=probs, dtype=tf.int32)
+      i = yield Root(categorical.Categorical(probs=probs, dtype=tf.int32))
+      j = yield categorical.Categorical(probs=probs, dtype=tf.int32)
+      k = yield categorical.Categorical(probs=probs, dtype=tf.int32)
 
     dist = marginalize.MarginalizableJointDistributionCoroutine(model)
 
@@ -130,9 +137,9 @@ class _MarginalizeTest(
     probs = probs / np.sum(probs)
 
     def model():
-      i = yield Root(tfd.Categorical(probs=probs, dtype=tf.int32))
-      j = yield tfd.Categorical(probs=probs, dtype=tf.int32)
-      k = yield tfd.Categorical(probs=probs, dtype=tf.int32)
+      i = yield Root(categorical.Categorical(probs=probs, dtype=tf.int32))
+      j = yield categorical.Categorical(probs=probs, dtype=tf.int32)
+      k = yield categorical.Categorical(probs=probs, dtype=tf.int32)
 
     dist = marginalize.MarginalizableJointDistributionCoroutine(model)
 
@@ -152,14 +159,16 @@ class _MarginalizeTest(
   def test_simple_network(self):
     # From https://en.wikipedia.org/wiki/Bayesian_network#Example
     def model():
-      raining = yield Root(tfd.Bernoulli(probs=0.2, dtype=tf.int32))
+      raining = yield Root(bernoulli.Bernoulli(probs=0.2, dtype=tf.int32))
       sprinkler_prob = [0.4, 0.01]
       sprinkler_prob = tf.gather(sprinkler_prob, raining)
-      sprinkler = yield tfd.Bernoulli(probs=sprinkler_prob, dtype=tf.int32)
+      sprinkler = yield bernoulli.Bernoulli(
+          probs=sprinkler_prob, dtype=tf.int32)
       grass_wet_prob = [[0.0, 0.8],
                         [0.9, 0.99]]
       grass_wet_prob = tf.gather_nd(grass_wet_prob, _stack(sprinkler, raining))
-      grass_wet = yield tfd.Bernoulli(probs=grass_wet_prob, dtype=tf.int32)
+      grass_wet = yield bernoulli.Bernoulli(
+          probs=grass_wet_prob, dtype=tf.int32)
 
     d = marginalize.MarginalizableJointDistributionCoroutine(model)
     # We want to know the probability that it was raining
@@ -177,12 +186,13 @@ class _MarginalizeTest(
 
     def model():
       i = yield Root(
-          tfd.Sample(
-              tfd.Categorical(probs=probs, dtype=tf.int32), sample_shape=[2]))
+          sample_dist_lib.Sample(
+              categorical.Categorical(probs=probs, dtype=tf.int32),
+              sample_shape=[2]))
       # Note use of scalar `sample_shape` to test expansion of shape
       # to vector.
-      j = yield tfd.Sample(
-          tfd.Categorical(probs=probs, dtype=tf.int32), sample_shape=2)
+      j = yield sample_dist_lib.Sample(
+          categorical.Categorical(probs=probs, dtype=tf.int32), sample_shape=2)
 
     dist = marginalize.MarginalizableJointDistributionCoroutine(model)
 
@@ -207,25 +217,25 @@ class _MarginalizeTest(
     observation_locs = tf.constant([0.0, 1.0], dtype=tf.float32)
     observation_scale = tf.constant(0.5, dtype=tf.float32)
 
-    dist1 = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
-                                  tfd.Categorical(probs=transition_matrix),
-                                  tfd.Normal(loc=observation_locs,
-                                             scale=observation_scale),
-                                  num_steps=n_steps)
+    dist1 = hidden_markov_model.HiddenMarkovModel(
+        categorical.Categorical(probs=initial_prob),
+        categorical.Categorical(probs=transition_matrix),
+        normal.Normal(loc=observation_locs, scale=observation_scale),
+        num_steps=n_steps)
 
     p = dist1.posterior_marginals(observations).probs_parameter()[infer_step]
 
     def model():
-      i = yield Root(tfd.Categorical(probs=initial_prob,
-                                     dtype=tf.int32))
-      z = yield tfd.Normal(loc=tf.gather(observation_locs, i),
-                           scale=observation_scale)
+      i = yield Root(
+          categorical.Categorical(probs=initial_prob, dtype=tf.int32))
+      z = yield normal.Normal(
+          loc=tf.gather(observation_locs, i), scale=observation_scale)
 
       for t in range(n_steps - 1):
-        i = yield tfd.Categorical(probs=tf.gather(transition_matrix, i),
-                                  dtype=tf.int32)
-        yield tfd.Normal(loc=tf.gather(observation_locs, i),
-                         scale=observation_scale)
+        i = yield categorical.Categorical(
+            probs=tf.gather(transition_matrix, i), dtype=tf.int32)
+        yield normal.Normal(
+            loc=tf.gather(observation_locs, i), scale=observation_scale)
 
     dist2 = marginalize.MarginalizableJointDistributionCoroutine(model)
     full_observations = list(
@@ -245,14 +255,14 @@ class _MarginalizeTest(
                                      [0.3, 0.7]], dtype=tf.float64)
 
     def model():
-      i = yield Root(tfd.Categorical(probs=initial_prob,
-                                     dtype=tf.int32))
+      i = yield Root(
+          categorical.Categorical(probs=initial_prob, dtype=tf.int32))
 
       for t in range(n_steps - 1):
-        i = yield tfd.Categorical(probs=tf.gather(transition_matrix, i),
-                                  dtype=tf.int32)
+        i = yield categorical.Categorical(
+            probs=tf.gather(transition_matrix, i), dtype=tf.int32)
 
-      yield tfd.Deterministic(i)
+      yield deterministic.Deterministic(i)
 
     dist = marginalize.MarginalizableJointDistributionCoroutine(model)
     # Compute probability of ending in state 1 by marginalizing out
@@ -275,10 +285,10 @@ class _MarginalizeTest(
 
     def model():
       # Shared birthplace
-      x_start = yield Root(tfd.Categorical(probs=tf.ones(n) / n,
-                                           dtype=tf.int32))
-      y_start = yield tfd.Categorical(probs=tf.ones(n) / n,
-                                      dtype=tf.int32)
+      x_start = yield Root(
+          categorical.Categorical(probs=tf.ones(n) / n, dtype=tf.int32))
+      y_start = yield categorical.Categorical(
+          probs=tf.ones(n) / n, dtype=tf.int32)
 
       x = m * [x_start]
       y = m * [y_start]
@@ -300,14 +310,14 @@ class _MarginalizeTest(
 
           # Reshape just last two dimensions.
           p = tf.reshape(p, _cat(p.shape[:-2], [-1]))
-          xy = yield tfd.Categorical(probs=p, dtype=tf.int32)
+          xy = yield categorical.Categorical(probs=p, dtype=tf.int32)
           x[i] = xy // n
           y[i] = xy % n
 
       # 2 * m noisy 2D observations at end
       for i in range(m):
-        yield tfd.Normal(tf.cast(x[i], dtype=tf.float32), scale=2.0)
-        yield tfd.Normal(tf.cast(y[i], dtype=tf.float32), scale=2.0)
+        yield normal.Normal(tf.cast(x[i], dtype=tf.float32), scale=2.0)
+        yield normal.Normal(tf.cast(y[i], dtype=tf.float32), scale=2.0)
 
     d = marginalize.MarginalizableJointDistributionCoroutine(model)
     final_observations = [0.0, 0.0, 4.0, 4.0, 0.0, 4.0]
@@ -339,11 +349,11 @@ class _MarginalizeTest(
     mu2 = tf.Variable(3.)
 
     def model():
-      change_year = yield Root(tfd.Categorical(probs=tf.ones(n) / n))
+      change_year = yield Root(categorical.Categorical(probs=tf.ones(n) / n))
       for year in range(n):
         post_change_year = tf.cast(year >= change_year, dtype=tf.int32)
         mu = tf.gather([mu1, mu2], post_change_year)
-        accidents = yield tfd.Poisson(mu)
+        accidents = yield poisson.Poisson(mu)
 
     counts = np.ones([n], dtype=np.float32)
     dist = marginalize.MarginalizableJointDistributionCoroutine(model)

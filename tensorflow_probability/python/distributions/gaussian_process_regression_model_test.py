@@ -17,10 +17,12 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import gaussian_process
+from tensorflow_probability.python.distributions import gaussian_process_regression_model as gprm
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.math import psd_kernels
+from tensorflow_probability.python.math.psd_kernels import exp_sin_squared
+from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic
 
 
 def _np_kernel_matrix_fn(amp, len_scale, x, y):
@@ -73,9 +75,10 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
           observation_index_points, shape=None)
       observations = tf1.placeholder_with_default(observations, shape=None)
 
-    kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(
+        amplitude, length_scale)
 
-    gprm = tfd.GaussianProcessRegressionModel(
+    dist = gprm.GaussianProcessRegressionModel(
         kernel,
         batched_index_points,
         observation_index_points,
@@ -89,29 +92,29 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
     event_shape = [25]
     sample_shape = [9, 3]
 
-    samples = gprm.sample(sample_shape, seed=test_util.test_seed())
+    samples = dist.sample(sample_shape, seed=test_util.test_seed())
 
-    self.assertIs(cholesky_fn, gprm.cholesky_fn)
+    self.assertIs(cholesky_fn, dist.cholesky_fn)
 
     if self.is_static or tf.executing_eagerly():
-      self.assertAllEqual(gprm.batch_shape_tensor(), batch_shape)
-      self.assertAllEqual(gprm.event_shape_tensor(), event_shape)
+      self.assertAllEqual(dist.batch_shape_tensor(), batch_shape)
+      self.assertAllEqual(dist.event_shape_tensor(), event_shape)
       self.assertAllEqual(samples.shape,
                           sample_shape + batch_shape + event_shape)
-      self.assertAllEqual(gprm.batch_shape, batch_shape)
-      self.assertAllEqual(gprm.event_shape, event_shape)
+      self.assertAllEqual(dist.batch_shape, batch_shape)
+      self.assertAllEqual(dist.event_shape, event_shape)
       self.assertAllEqual(samples.shape,
                           sample_shape + batch_shape + event_shape)
     else:
-      self.assertAllEqual(self.evaluate(gprm.batch_shape_tensor()), batch_shape)
-      self.assertAllEqual(self.evaluate(gprm.event_shape_tensor()), event_shape)
+      self.assertAllEqual(self.evaluate(dist.batch_shape_tensor()), batch_shape)
+      self.assertAllEqual(self.evaluate(dist.event_shape_tensor()), event_shape)
       self.assertAllEqual(self.evaluate(samples).shape,
                           sample_shape + batch_shape + event_shape)
       self.assertIsNone(tensorshape_util.rank(samples.shape))
-      self.assertIsNone(tensorshape_util.rank(gprm.batch_shape))
-      self.assertEqual(tensorshape_util.rank(gprm.event_shape), 1)
+      self.assertIsNone(tensorshape_util.rank(dist.batch_shape))
+      self.assertEqual(tensorshape_util.rank(dist.event_shape), 1)
       self.assertIsNone(
-          tf.compat.dimension_value(tensorshape_util.dims(gprm.event_shape)[0]))
+          tf.compat.dimension_value(tensorshape_util.dims(dist.event_shape)[0]))
 
   def testMeanVarianceAndCovariance(self):
     amp = np.float64(.5)
@@ -147,8 +150,8 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         np.dot(k_xn_,
                np.linalg.solve(k_nn_plus_noise_, observations - prior_mean)))
 
-    kernel = psd_kernels.ExponentiatedQuadratic(amp, len_scale)
-    gprm = tfd.GaussianProcessRegressionModel(
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(amp, len_scale)
+    dist = gprm.GaussianProcessRegressionModel(
         kernel=kernel,
         index_points=index_points,
         observation_index_points=observation_index_points,
@@ -159,13 +162,20 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         validate_args=True)
 
     self.assertAllClose(expected_predictive_covariance_with_noise,
-                        self.evaluate(gprm.covariance()))
-    self.assertAllClose(np.diag(expected_predictive_covariance_with_noise),
-                        self.evaluate(gprm.variance()))
-    self.assertAllClose(expected_mean,
-                        self.evaluate(gprm.mean()))
+                        self.evaluate(dist.covariance()))
+    self.assertAllClose(
+        np.diag(expected_predictive_covariance_with_noise),
+        self.evaluate(dist.variance()))
+    self.assertAllClose(expected_mean, self.evaluate(dist.mean()))
 
-    gprm_no_predictive_noise = tfd.GaussianProcessRegressionModel(
+    flat = tf.nest.flatten(dist, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
+
+    x = self.evaluate(dist.sample(3, seed=test_util.test_seed()))
+    actual = self.evaluate(dist.log_prob(x))
+    self.assertAllClose(self.evaluate(unflat.log_prob(x)), actual)
+
+    dist_no_predictive_noise = gprm.GaussianProcessRegressionModel(
         kernel=kernel,
         index_points=index_points,
         observation_index_points=observation_index_points,
@@ -177,11 +187,12 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         validate_args=True)
 
     self.assertAllClose(expected_predictive_covariance_no_noise,
-                        self.evaluate(gprm_no_predictive_noise.covariance()))
-    self.assertAllClose(np.diag(expected_predictive_covariance_no_noise),
-                        self.evaluate(gprm_no_predictive_noise.variance()))
+                        self.evaluate(dist_no_predictive_noise.covariance()))
+    self.assertAllClose(
+        np.diag(expected_predictive_covariance_no_noise),
+        self.evaluate(dist_no_predictive_noise.variance()))
     self.assertAllClose(expected_mean,
-                        self.evaluate(gprm_no_predictive_noise.mean()))
+                        self.evaluate(dist_no_predictive_noise.mean()))
 
   def testMeanVarianceAndCovariancePrecomputed(self):
     amplitude = np.array([1., 2.], np.float64).reshape([2, 1])
@@ -195,8 +206,9 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
 
     index_points = np.random.uniform(-1., 1., (6, 2)).astype(np.float64)
 
-    kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
-    gprm = tfd.GaussianProcessRegressionModel(
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(
+        amplitude, length_scale)
+    dist = gprm.GaussianProcessRegressionModel(
         kernel=kernel,
         index_points=index_points,
         observation_index_points=observation_index_points,
@@ -205,7 +217,7 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         jitter=jitter,
         validate_args=True)
 
-    precomputed_gprm = tfd.GaussianProcessRegressionModel.precompute_regression_model(
+    precomputed_dist = gprm.GaussianProcessRegressionModel.precompute_regression_model(
         kernel=kernel,
         index_points=index_points,
         observation_index_points=observation_index_points,
@@ -214,12 +226,14 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         jitter=jitter,
         validate_args=True)
 
-    self.assertAllClose(self.evaluate(precomputed_gprm.covariance()),
-                        self.evaluate(gprm.covariance()))
-    self.assertAllClose(self.evaluate(precomputed_gprm.variance()),
-                        self.evaluate(gprm.variance()))
-    self.assertAllClose(self.evaluate(precomputed_gprm.mean()),
-                        self.evaluate(gprm.mean()))
+    self.assertAllClose(
+        self.evaluate(precomputed_dist.covariance()),
+        self.evaluate(dist.covariance()))
+    self.assertAllClose(
+        self.evaluate(precomputed_dist.variance()),
+        self.evaluate(dist.variance()))
+    self.assertAllClose(
+        self.evaluate(precomputed_dist.mean()), self.evaluate(dist.mean()))
 
   def testPrecomputedWithMasking(self):
     amplitude = np.array([1., 2.], np.float64)
@@ -243,8 +257,9 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
 
     index_points = rng.uniform(-1., 1., (5, 2)).astype(np.float64)
 
-    kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
-    gprm = tfd.GaussianProcessRegressionModel.precompute_regression_model(
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(
+        amplitude, length_scale)
+    dist = gprm.GaussianProcessRegressionModel.precompute_regression_model(
         kernel=kernel,
         index_points=index_points,
         observation_index_points=observation_index_points,
@@ -253,21 +268,21 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         observation_noise_variance=observation_noise_variance,
         validate_args=True)
 
-    self.assertAllNotNan(gprm.mean())
-    self.assertAllNotNan(gprm.variance())
-    self.assertAllNotNan(gprm.covariance())
+    self.assertAllNotNan(dist.mean())
+    self.assertAllNotNan(dist.variance())
+    self.assertAllNotNan(dist.covariance())
 
     # For each batch member of `gprm`, check that the distribution is the same
     # as a GaussianProcessRegressionModel with no masking but conditioned on
     # only the not-masked-out index points.
-    x = gprm.sample(seed=test_util.test_seed())
+    x = dist.sample(seed=test_util.test_seed())
     for i in range(3):
       observation_index_points_i = tf.gather(
           observation_index_points[i, 0],
           (~observations_is_missing[i, 0]).nonzero()[0])
       observations_i = tf.gather(
           observations[i, 0], (~observations_is_missing[i, 0]).nonzero()[0])
-      gprm_i = tfd.GaussianProcessRegressionModel.precompute_regression_model(
+      dist_i = gprm.GaussianProcessRegressionModel.precompute_regression_model(
           kernel=kernel[i],
           index_points=index_points,
           observation_index_points=observation_index_points_i,
@@ -275,10 +290,10 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
           observation_noise_variance=observation_noise_variance[i, 0],
           validate_args=True)
 
-      self.assertAllClose(gprm.mean()[i], gprm_i.mean())
-      self.assertAllClose(gprm.variance()[i], gprm_i.variance())
-      self.assertAllClose(gprm.covariance()[i], gprm_i.covariance())
-      self.assertAllClose(gprm.log_prob(x)[i], gprm_i.log_prob(x[i]))
+      self.assertAllClose(dist.mean()[i], dist_i.mean())
+      self.assertAllClose(dist.variance()[i], dist_i.variance())
+      self.assertAllClose(dist.covariance()[i], dist_i.covariance())
+      self.assertAllClose(dist.log_prob(x)[i], dist_i.log_prob(x[i]))
 
   @test_util.disable_test_for_backend(
       disable_numpy=True,
@@ -295,9 +310,10 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
 
     index_points = np.random.uniform(-1., 1., (6, 2)).astype(np.float64)
 
-    kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(
+        amplitude, length_scale)
 
-    precomputed_gprm = tfd.GaussianProcessRegressionModel.precompute_regression_model(
+    precomputed_dist = gprm.GaussianProcessRegressionModel.precompute_regression_model(
         kernel=kernel,
         index_points=index_points,
         observation_index_points=observation_index_points,
@@ -306,14 +322,18 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         jitter=jitter,
         validate_args=True)
 
-    flat = tf.nest.flatten(precomputed_gprm, expand_composites=True)
+    flat = tf.nest.flatten(precomputed_dist, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(
-        precomputed_gprm, flat, expand_composites=True)
-    self.assertIsInstance(unflat, tfd.GaussianProcessRegressionModel)
+        precomputed_dist, flat, expand_composites=True)
+    self.assertIsInstance(unflat, gprm.GaussianProcessRegressionModel)
     # Check that we don't recompute the divisor matrix on flattening /
     # unflattening.
-    self.assertIs(precomputed_gprm.kernel._precomputed_divisor_matrix_cholesky,
+    self.assertIs(precomputed_dist.kernel._precomputed_divisor_matrix_cholesky,
                   unflat.kernel._precomputed_divisor_matrix_cholesky)
+
+    x = self.evaluate(precomputed_dist.sample(3, seed=test_util.test_seed()))
+    actual = self.evaluate(precomputed_dist.log_prob(x))
+    self.assertAllClose(self.evaluate(unflat.log_prob(x)), actual)
 
     # TODO(b/196219597): Enable this test once GPRM works across TF function
     # boundaries.
@@ -336,22 +356,22 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
     # k_xx - k_xn @ (k_nn + sigma^2) @ k_nx + sigma^2
     mean_fn = lambda x: x[:, 0]**2
 
-    kernel = psd_kernels.ExponentiatedQuadratic(amp, len_scale)
-    gp = tfd.GaussianProcess(
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(amp, len_scale)
+    gp = gaussian_process.GaussianProcess(
         kernel,
         index_points,
         mean_fn=mean_fn,
         jitter=jitter,
         validate_args=True)
 
-    gprm_nones = tfd.GaussianProcessRegressionModel(
+    dist_nones = gprm.GaussianProcessRegressionModel(
         kernel,
         index_points,
         mean_fn=mean_fn,
         jitter=jitter,
         validate_args=True)
 
-    gprm_zero_shapes = tfd.GaussianProcessRegressionModel(
+    dist_zero_shapes = gprm.GaussianProcessRegressionModel(
         kernel,
         index_points,
         observation_index_points=tf.ones([0, 1], tf.float64),
@@ -360,19 +380,20 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         jitter=jitter,
         validate_args=True)
 
-    for gprm in [gprm_nones, gprm_zero_shapes]:
-      self.assertAllClose(self.evaluate(gp.mean()), self.evaluate(gprm.mean()))
-      self.assertAllClose(self.evaluate(gp.covariance()),
-                          self.evaluate(gprm.covariance()))
-      self.assertAllClose(self.evaluate(gp.variance()),
-                          self.evaluate(gprm.variance()))
+    for dist in [dist_nones, dist_zero_shapes]:
+      self.assertAllClose(self.evaluate(gp.mean()), self.evaluate(dist.mean()))
+      self.assertAllClose(
+          self.evaluate(gp.covariance()), self.evaluate(dist.covariance()))
+      self.assertAllClose(
+          self.evaluate(gp.variance()), self.evaluate(dist.variance()))
 
       observations = np.random.uniform(-1., 1., 10).astype(np.float64)
-      self.assertAllClose(self.evaluate(gp.log_prob(observations)),
-                          self.evaluate(gprm.log_prob(observations)))
+      self.assertAllClose(
+          self.evaluate(gp.log_prob(observations)),
+          self.evaluate(dist.log_prob(observations)))
 
   def testErrorCases(self):
-    kernel = psd_kernels.ExponentiatedQuadratic()
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic()
     index_points = np.random.uniform(-1., 1., (10, 1)).astype(np.float64)
     observation_index_points = (
         np.random.uniform(-1., 1., (5, 1)).astype(np.float64))
@@ -381,14 +402,14 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
     # Both or neither of `observation_index_points` and `observations` must be
     # specified.
     with self.assertRaises(ValueError):
-      tfd.GaussianProcessRegressionModel(
+      gprm.GaussianProcessRegressionModel(
           kernel,
           index_points,
           observation_index_points=None,
           observations=observations,
           validate_args=True)
     with self.assertRaises(ValueError):
-      tfd.GaussianProcessRegressionModel(
+      gprm.GaussianProcessRegressionModel(
           kernel,
           index_points,
           observation_index_points,
@@ -397,7 +418,7 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
 
     # If specified, mean_fn must be a callable.
     with self.assertRaises(ValueError):
-      tfd.GaussianProcessRegressionModel(
+      gprm.GaussianProcessRegressionModel(
           kernel, index_points, mean_fn=0., validate_args=True)
 
     # Observation index point and observation counts must be broadcastable.
@@ -405,7 +426,7 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
     # caught, so we only check this error case in static shape or eager mode.
     if self.is_static or tf.executing_eagerly():
       with self.assertRaises(ValueError):
-        tfd.GaussianProcessRegressionModel(
+        gprm.GaussianProcessRegressionModel(
             kernel,
             index_points,
             observation_index_points=np.ones([2, 2, 2]),
@@ -438,10 +459,10 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
       observations_2 = tf1.placeholder_with_default(observations_2, shape=None)
 
     mean_fn = lambda x: np.array([0.], np.float32)
-    kernel_1 = psd_kernels.ExponentiatedQuadratic()
-    kernel_2 = psd_kernels.ExpSinSquared()
+    kernel_1 = exponentiated_quadratic.ExponentiatedQuadratic()
+    kernel_2 = exp_sin_squared.ExpSinSquared()
 
-    gprm1 = tfd.GaussianProcessRegressionModel(
+    dist1 = gprm.GaussianProcessRegressionModel(
         kernel=kernel_1,
         index_points=index_points_1,
         observation_index_points=observation_index_points_1,
@@ -449,14 +470,14 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         mean_fn=mean_fn,
         jitter=1e-5,
         validate_args=True)
-    gprm2 = gprm1.copy(
+    dist2 = dist1.copy(
         kernel=kernel_2,
         index_points=index_points_2,
         observation_index_points=observation_index_points_2,
         observations=observations_2)
 
-    precomputed_gprm1 = (
-        tfd.GaussianProcessRegressionModel.precompute_regression_model(
+    precomputed_dist1 = (
+        gprm.GaussianProcessRegressionModel.precompute_regression_model(
             kernel=kernel_1,
             index_points=index_points_1,
             observation_index_points=observation_index_points_1,
@@ -464,35 +485,37 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
             mean_fn=mean_fn,
             jitter=1e-5,
             validate_args=True))
-    precomputed_gprm2 = precomputed_gprm1.copy(index_points=index_points_2)
-    self.assertIs(precomputed_gprm1.mean_fn, precomputed_gprm2.mean_fn)
-    self.assertIs(precomputed_gprm1.kernel, precomputed_gprm2.kernel)
+    precomputed_dist2 = precomputed_dist1.copy(index_points=index_points_2)
+    self.assertIs(precomputed_dist1.mean_fn, precomputed_dist2.mean_fn)
+    self.assertIs(precomputed_dist1.kernel, precomputed_dist2.kernel)
 
     event_shape_1 = [5]
     event_shape_2 = [10]
 
-    self.assertIsInstance(gprm1.kernel.base_kernel,
-                          psd_kernels.ExponentiatedQuadratic)
-    self.assertIsInstance(gprm2.kernel.base_kernel, psd_kernels.ExpSinSquared)
+    self.assertIsInstance(dist1.kernel.base_kernel,
+                          exponentiated_quadratic.ExponentiatedQuadratic)
+    self.assertIsInstance(dist2.kernel.base_kernel,
+                          exp_sin_squared.ExpSinSquared)
 
     if self.is_static or tf.executing_eagerly():
-      self.assertAllEqual(gprm1.batch_shape, gprm2.batch_shape)
-      self.assertAllEqual(gprm1.event_shape, event_shape_1)
-      self.assertAllEqual(gprm2.event_shape, event_shape_2)
-      self.assertAllEqual(gprm1.index_points, index_points_1)
-      self.assertAllEqual(gprm2.index_points, index_points_2)
+      self.assertAllEqual(dist1.batch_shape, dist2.batch_shape)
+      self.assertAllEqual(dist1.event_shape, event_shape_1)
+      self.assertAllEqual(dist2.event_shape, event_shape_2)
+      self.assertAllEqual(dist1.index_points, index_points_1)
+      self.assertAllEqual(dist2.index_points, index_points_2)
       self.assertAllEqual(
-          tf.get_static_value(gprm1.jitter), tf.get_static_value(gprm2.jitter))
+          tf.get_static_value(dist1.jitter), tf.get_static_value(dist2.jitter))
     else:
-      self.assertAllEqual(self.evaluate(gprm1.batch_shape_tensor()),
-                          self.evaluate(gprm2.batch_shape_tensor()))
-      self.assertAllEqual(self.evaluate(gprm1.event_shape_tensor()),
-                          event_shape_1)
-      self.assertAllEqual(self.evaluate(gprm2.event_shape_tensor()),
-                          event_shape_2)
-      self.assertEqual(self.evaluate(gprm1.jitter), self.evaluate(gprm2.jitter))
-      self.assertAllEqual(self.evaluate(gprm1.index_points), index_points_1)
-      self.assertAllEqual(self.evaluate(gprm2.index_points), index_points_2)
+      self.assertAllEqual(
+          self.evaluate(dist1.batch_shape_tensor()),
+          self.evaluate(dist2.batch_shape_tensor()))
+      self.assertAllEqual(
+          self.evaluate(dist1.event_shape_tensor()), event_shape_1)
+      self.assertAllEqual(
+          self.evaluate(dist2.event_shape_tensor()), event_shape_2)
+      self.assertEqual(self.evaluate(dist1.jitter), self.evaluate(dist2.jitter))
+      self.assertAllEqual(self.evaluate(dist1.index_points), index_points_1)
+      self.assertAllEqual(self.evaluate(dist2.index_points), index_points_2)
 
   # What is the behavior?
   #   - observation_noise_variance defaults to 0
@@ -543,13 +566,13 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
   def testInitParameterVariations(self, noise_kwargs, implied_values):
     num_test_points = 3
     num_obs_points = 4
-    kernel = psd_kernels.ExponentiatedQuadratic()
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic()
     index_points = np.random.uniform(-1., 1., (num_test_points, 1))
     observation_index_points = np.random.uniform(-1., 1., (num_obs_points, 1))
     observations = np.random.uniform(-1., 1., num_obs_points)
     jitter = 1e-6
 
-    gprm = tfd.GaussianProcessRegressionModel(
+    dist = gprm.GaussianProcessRegressionModel(
         kernel=kernel,
         index_points=index_points,
         observation_index_points=observation_index_points,
@@ -576,18 +599,18 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         implied_pnv_param * np.eye(num_test_points))
 
     # Assertion 1: predictive covariance is correct.
-    self.assertAllClose(self.evaluate(gprm.covariance()),
-                        expected_predictive_covariance)
+    self.assertAllClose(
+        self.evaluate(dist.covariance()), expected_predictive_covariance)
 
     # Assertion 2: predictive_noise_variance property is correct
-    self.assertIsInstance(gprm.predictive_noise_variance, tf.Tensor)
+    self.assertIsInstance(dist.predictive_noise_variance, tf.Tensor)
     self.assertAllClose(
-        self.evaluate(gprm.predictive_noise_variance), implied_pnv_param)
+        self.evaluate(dist.predictive_noise_variance), implied_pnv_param)
 
     # Assertion 3: observation_noise_variance property is correct.
-    self.assertIsInstance(gprm.observation_noise_variance, tf.Tensor)
+    self.assertIsInstance(dist.observation_noise_variance, tf.Tensor)
     self.assertAllClose(
-        self.evaluate(gprm.observation_noise_variance),
+        self.evaluate(dist.observation_noise_variance),
         # Note that this is, somewhat unintuitively, expceted to equal the
         # predictive_noise_variance. This is because of 1) the inheritance
         # structure of GPRM as a subclass of GaussianProcess and 2) the poor

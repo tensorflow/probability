@@ -16,7 +16,6 @@
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
@@ -30,6 +29,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import special
 
 
 _binomial_sample_note = """
@@ -62,7 +62,7 @@ def _bdtr(k, n, p):
   #   where(unsafe, safe_output, betainc(where(unsafe, safe_input, input)))
   ones = tf.ones_like(n - k)
   safe_dn = tf.where(tf.logical_or(k < 0, k >= n), ones, n - k)
-  dk = tfp_math.betainc(a=safe_dn, b=k + 1, x=1 - p)
+  dk = special.betainc(a=safe_dn, b=k + 1, x=1 - p)
   return distribution_util.extend_cdf_outside_support(k, dk, low=0, high=n)
 
 
@@ -578,7 +578,7 @@ def _log_unnormalized_prob_probs(probs, counts, total_count):
 
 
 def _log_normalization(counts, total_count):
-  return (tfp_math.lbeta(1. + counts, 1. + total_count - counts) +
+  return (special.lbeta(1. + counts, 1. + total_count - counts) +
           tf.math.log(1. + total_count))
 
 

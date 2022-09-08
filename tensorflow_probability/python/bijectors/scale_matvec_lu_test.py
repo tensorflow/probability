@@ -18,8 +18,8 @@
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import scale_matvec_lu
 from tensorflow_probability.python.internal import test_util
 
 
@@ -53,7 +53,8 @@ class ScaleMatvecLUTest(test_util.TestCase):
   def test_invertible_from_trainable_lu_factorization(self):
     channels = 3
     lower_upper, permutation = trainable_lu_factorization(channels, seed=42)
-    conv1x1 = tfb.ScaleMatvecLU(lower_upper, permutation, validate_args=True)
+    conv1x1 = scale_matvec_lu.ScaleMatvecLU(
+        lower_upper, permutation, validate_args=True)
 
     self.assertIs(lower_upper, conv1x1.lower_upper)
     self.evaluate([v.initializer for v in conv1x1.variables])
@@ -88,7 +89,8 @@ class ScaleMatvecLUTest(test_util.TestCase):
     """Initial LU factorization parameters do not change per execution."""
     channels = 8
     lower_upper, permutation = trainable_lu_factorization(channels, seed=42)
-    conv1x1 = tfb.ScaleMatvecLU(lower_upper, permutation, validate_args=True)
+    conv1x1 = scale_matvec_lu.ScaleMatvecLU(
+        lower_upper, permutation, validate_args=True)
 
     self.evaluate([v.initializer for v in conv1x1.variables])
 
@@ -104,9 +106,8 @@ class ScaleMatvecLUTest(test_util.TestCase):
          [4, 5, 6],
          [0.5, 0., 0.25]])
 
-    conv1x1 = tfb.ScaleMatvecLU(lower_upper=lower_upper,
-                                permutation=permutation,
-                                validate_args=True)
+    conv1x1 = scale_matvec_lu.ScaleMatvecLU(
+        lower_upper=lower_upper, permutation=permutation, validate_args=True)
 
     channels = tf.compat.dimension_value(lower_upper.shape[-1])
     x_ = np.random.uniform(size=[2, 28, 28, channels]).astype(np.float32)
@@ -142,7 +143,7 @@ class ScaleMatvecLUTest(test_util.TestCase):
     batch_mats = raw_mat * tf.range(1., nbatch + 1.)[:, tf.newaxis, tf.newaxis]
     lower_upper, permutation = tf.linalg.lu(tf.cast(batch_mats, tf.float64))
 
-    bijector = tfb.ScaleMatvecLU(
+    bijector = scale_matvec_lu.ScaleMatvecLU(
         lower_upper=lower_upper, permutation=permutation, validate_args=True)
     self.assertEqual(tf.float64, bijector.dtype)
 
@@ -173,7 +174,7 @@ class ScaleMatvecLUTest(test_util.TestCase):
         tf.linalg.lu([[1., 2, 3], [4, 5, 6], [0.5, 0., 0.25]]))
     np.fill_diagonal(lower_upper, 0.)
     with self.assertRaisesOpError('`lower_upper` must have nonzero diagonal'):
-      bijector = tfb.ScaleMatvecLU(
+      bijector = scale_matvec_lu.ScaleMatvecLU(
           lower_upper=lower_upper, permutation=permutation, validate_args=True)
       self.evaluate(bijector.forward([1., 2, 3]))
 
@@ -184,7 +185,7 @@ class ScaleMatvecLUTest(test_util.TestCase):
         tf.linalg.lu([[1., 2, 3], [4, 5, 6], [0.5, 0., 0.25]]))
     lower_upper = tf.Variable(lower_upper)
     self.evaluate(lower_upper.initializer)
-    bijector = tfb.ScaleMatvecLU(
+    bijector = scale_matvec_lu.ScaleMatvecLU(
         lower_upper=lower_upper, permutation=permutation, validate_args=True)
 
     self.evaluate(bijector.forward([1., 2, 3]))

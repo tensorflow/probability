@@ -18,8 +18,8 @@
 import numpy as np
 from scipy import stats
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import frechet_cdf
 from tensorflow_probability.python.internal import test_util
 
 
@@ -32,8 +32,8 @@ class FrechetCDFTest(test_util.TestCase):
     loc = np.array(0.3, dtype=np.float64)
     scale = np.array(5., dtype=np.float64)
     concentration = np.array(2., dtype=np.float64)
-    bijector = tfb.FrechetCDF(loc=loc, scale=scale, concentration=concentration,
-                              validate_args=True)
+    bijector = frechet_cdf.FrechetCDF(
+        loc=loc, scale=scale, concentration=concentration, validate_args=True)
     self.assertStartsWith(bijector.name, 'frechet')
     # Frechet distribution
     frechet_dist = stats.invweibull(c=concentration, loc=loc, scale=scale)
@@ -62,13 +62,16 @@ class FrechetCDFTest(test_util.TestCase):
   def testScalarCongruency(self):
     loc = np.array(-1., np.float64)
     bijector_test_util.assert_scalar_congruency(
-        tfb.FrechetCDF(loc=loc, scale=20., concentration=0.5), lower_x=1.,
-        upper_x=100., eval_func=self.evaluate, rtol=0.05)
+        frechet_cdf.FrechetCDF(loc=loc, scale=20., concentration=0.5),
+        lower_x=1.,
+        upper_x=100.,
+        eval_func=self.evaluate,
+        rtol=0.05)
 
   def testBijectiveAndFinite(self):
     loc = np.array(-1., np.float64)
-    bijector = tfb.FrechetCDF(loc=loc, scale=3.0, concentration=2.,
-                              validate_args=True)
+    bijector = frechet_cdf.FrechetCDF(
+        loc=loc, scale=3.0, concentration=2., validate_args=True)
     x = np.linspace(loc+0.25, 10., num=10).astype(np.float64)
     y = np.linspace(0.01, 0.99, num=10).astype(np.float64)
     bijector_test_util.assert_bijective_and_finite(
@@ -78,7 +81,8 @@ class FrechetCDFTest(test_util.TestCase):
   def testVariablesScaleAndconcentration(self):
     x = tf.Variable(1.)
     y = tf.Variable(1.)
-    b = tfb.FrechetCDF(loc=0., scale=x, concentration=y, validate_args=True)
+    b = frechet_cdf.FrechetCDF(
+        loc=0., scale=x, concentration=y, validate_args=True)
     self.evaluate(x.initializer)
     self.evaluate(y.initializer)
     self.assertIs(x, b.scale)

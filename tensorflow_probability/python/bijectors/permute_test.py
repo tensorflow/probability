@@ -19,8 +19,8 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import permute
 from tensorflow_probability.python.internal import test_util
 
 
@@ -41,7 +41,7 @@ class PermuteBijectorTest(test_util.TestCase):
 
     permutation_ph = tf1.placeholder_with_default(
         expected_permutation, shape=None)
-    bijector = tfb.Permute(permutation=permutation_ph, validate_args=True)
+    bijector = permute.Permute(permutation=permutation_ph, validate_args=True)
     [
         permutation_,
         x_,
@@ -66,7 +66,7 @@ class PermuteBijectorTest(test_util.TestCase):
     permutation = np.int32([2, 0, 1])
     x = np.random.randn(4, 2, 3)
     y = x[..., permutation]
-    bijector = tfb.Permute(permutation=permutation, validate_args=True)
+    bijector = permute.Permute(permutation=permutation, validate_args=True)
     bijector_test_util.assert_bijective_and_finite(
         bijector, x, y, eval_func=self.evaluate, event_ndims=1, rtol=1e-6,
         atol=0)
@@ -75,10 +75,8 @@ class PermuteBijectorTest(test_util.TestCase):
     permutation = np.int32([1, 0])
     x = np.random.randn(4, 2, 3)
     y = x[..., permutation, :]
-    bijector = tfb.Permute(
-        permutation=permutation,
-        axis=-2,
-        validate_args=True)
+    bijector = permute.Permute(
+        permutation=permutation, axis=-2, validate_args=True)
     bijector_test_util.assert_bijective_and_finite(
         bijector, x, y, eval_func=self.evaluate, event_ndims=2, rtol=1e-6,
         atol=0)
@@ -91,7 +89,8 @@ class PermuteBijectorTest(test_util.TestCase):
     # deleting when underlying issue with constant eager tensors is fixed.
     permutation = [2, 1, 0]
     x = tf.keras.Input((3,), batch_size=None)
-    bijector = tfb.Permute(permutation=permutation, axis=-1, validate_args=True)
+    bijector = permute.Permute(
+        permutation=permutation, axis=-1, validate_args=True)
 
     y = bijector.forward(x)
     self.assertAllEqual(y.shape.as_list(), [None, 3])
@@ -103,7 +102,7 @@ class PermuteBijectorTest(test_util.TestCase):
     message = 'must contain exactly one of each of'
     with self.assertRaisesRegexp(Exception, message):
       permutation = np.int32([1, 0, 1])
-      bijector = tfb.Permute(permutation=permutation, validate_args=True)
+      bijector = permute.Permute(permutation=permutation, validate_args=True)
       x = np.random.randn(4, 2, 3)
       _ = self.evaluate(bijector.forward(x))
 
@@ -112,7 +111,7 @@ class PermuteBijectorTest(test_util.TestCase):
     permutation = tf.Variable(np.int32([1, 0, 1]))
     self.evaluate(permutation.initializer)
     with self.assertRaisesRegexp(Exception, message):
-      bijector = tfb.Permute(permutation=permutation, validate_args=True)
+      bijector = permute.Permute(permutation=permutation, validate_args=True)
       x = np.random.randn(4, 2, 3)
       _ = self.evaluate(bijector.forward(x))
 
@@ -120,7 +119,7 @@ class PermuteBijectorTest(test_util.TestCase):
     message = 'must contain exactly one of each of'
     permutation = tf.Variable(np.int32([1, 0, 2]))
     self.evaluate(permutation.initializer)
-    bijector = tfb.Permute(permutation=permutation, validate_args=True)
+    bijector = permute.Permute(permutation=permutation, validate_args=True)
     with self.assertRaisesRegexp(Exception, message):
       with tf.control_dependencies([permutation.assign([1, 0, 1])]):
         x = np.random.randn(4, 2, 3)
@@ -130,7 +129,7 @@ class PermuteBijectorTest(test_util.TestCase):
     message = 'should be `int`-like'
     with self.assertRaisesRegexp(Exception, message):
       permutation = np.float32([2, 0, 1])
-      bijector = tfb.Permute(permutation=permutation, validate_args=True)
+      bijector = permute.Permute(permutation=permutation, validate_args=True)
       x = np.random.randn(4, 2, 3)
       _ = self.evaluate(bijector.forward(x))
 

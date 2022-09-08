@@ -16,7 +16,6 @@
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import chi2 as chi2_lib
@@ -30,6 +29,8 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import numeric
+from tensorflow_probability.python.math import special
 
 __all__ = [
     'MultivariateStudentTLinearOperator',
@@ -252,7 +253,7 @@ class MultivariateStudentTLinearOperator(
   def _log_normalization(self):
     df = tf.convert_to_tensor(self.df)
     num_dims = tf.cast(self.event_shape_tensor()[0], self.dtype)
-    return (tfp_math.log_gamma_difference(num_dims / 2., df / 2.) +
+    return (special.log_gamma_difference(num_dims / 2., df / 2.) +
             num_dims / 2. * (tf.math.log(df) + np.log(np.pi)) +
             self.scale.log_abs_determinant())
 
@@ -263,7 +264,7 @@ class MultivariateStudentTLinearOperator(
 
     num_dims = tf.cast(self.event_shape_tensor()[0], self.dtype)
     mahalanobis = tf.norm(value, axis=[-1, -2])
-    return -(num_dims + df) / 2. * tfp_math.log1psquare(
+    return -(num_dims + df) / 2. * numeric.log1psquare(
         mahalanobis / tf.sqrt(df))
 
   def _log_prob(self, value):
@@ -397,7 +398,7 @@ class MultivariateStudentTLinearOperator(
 
     shape_factor = self._scale.log_abs_determinant()
     beta_factor = (num_dims / 2. * (tf.math.log(df) + np.log(np.pi)) +
-                   tfp_math.log_gamma_difference(num_dims / 2., df / 2.))
+                   special.log_gamma_difference(num_dims / 2., df / 2.))
     digamma_factor = (num_dims + df) / 2. * (
         tf.math.digamma((num_dims + df) / 2.) - tf.math.digamma(df / 2.))
     return shape_factor + beta_factor + digamma_factor

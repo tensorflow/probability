@@ -20,15 +20,14 @@ from scipy import special as sp_special
 from scipy import stats as sp_stats
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.bijectors import exp as tfb
 from tensorflow_probability.python.distributions import gamma as gamma_lib
+from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import implementation_selection
 from tensorflow_probability.python.internal import test_util
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
 
 
 @test_util.test_all_tf_execution_regimes
@@ -37,7 +36,7 @@ class GammaTest(test_util.TestCase):
   def testGammaShape(self):
     concentration = tf.constant([3.0] * 5)
     rate = tf.constant(11.0)
-    gamma = tfd.Gamma(
+    gamma = gamma_lib.Gamma(
         concentration=concentration, rate=rate, validate_args=True)
 
     self.assertEqual(self.evaluate(gamma.batch_shape_tensor()), (5,))
@@ -52,7 +51,7 @@ class GammaTest(test_util.TestCase):
     concentration_v = 2.0
     rate_v = 3.0
     x = np.array([2.5, 2.5, 4.0, 0.1, 1.0, 2.0], dtype=np.float32)
-    gamma = tfd.Gamma(
+    gamma = gamma_lib.Gamma(
         concentration=concentration, rate=rate, validate_args=True)
     log_pdf = gamma.log_prob(x)
     self.assertEqual(log_pdf.shape, (6,))
@@ -67,11 +66,12 @@ class GammaTest(test_util.TestCase):
     # When concentration = 1, we have an exponential distribution. Check that at
     # 0 we have finite log prob.
     rate = np.array([0.1, 0.5, 1., 2., 5., 10.], dtype=np.float32)
-    gamma = tfd.Gamma(concentration=1., rate=rate, validate_args=True)
+    gamma = gamma_lib.Gamma(concentration=1., rate=rate, validate_args=True)
     log_pdf = gamma.log_prob(0.)
     self.assertAllClose(np.log(rate), self.evaluate(log_pdf))
 
-    gamma = tfd.Gamma(concentration=[2., 4., 0.5], rate=6., validate_args=True)
+    gamma = gamma_lib.Gamma(
+        concentration=[2., 4., 0.5], rate=6., validate_args=True)
     log_pdf = self.evaluate(gamma.log_prob(0.))
     self.assertAllNegativeInf(log_pdf[:2])
     self.assertAllPositiveInf(log_pdf[2])
@@ -81,7 +81,7 @@ class GammaTest(test_util.TestCase):
     self.assertAllFinite(pdf[:2])
 
   def testAssertsValidSample(self):
-    g = tfd.Gamma(concentration=2., rate=3., validate_args=True)
+    g = gamma_lib.Gamma(concentration=2., rate=3., validate_args=True)
     with self.assertRaisesOpError('Sample must be non-negative.'):
       self.evaluate(g.log_prob(-.1))
 
@@ -90,10 +90,11 @@ class GammaTest(test_util.TestCase):
                         shape=tf.TensorShape([None, 16, 16, 1]))
     self.evaluate(param.initializer)
     samples = self.evaluate(
-        tfd.Gamma(param, rate=param).sample(seed=test_util.test_seed()))
+        gamma_lib.Gamma(param, rate=param).sample(seed=test_util.test_seed()))
     self.assertEqual(samples.shape, (8, 16, 16, 1))
     samples = self.evaluate(
-        tfd.Gamma(param, log_rate=param).sample(seed=test_util.test_seed()))
+        gamma_lib.Gamma(param,
+                        log_rate=param).sample(seed=test_util.test_seed()))
     self.assertEqual(samples.shape, (8, 16, 16, 1))
 
   def testGammaLogPDFMultidimensional(self):
@@ -103,10 +104,11 @@ class GammaTest(test_util.TestCase):
     concentration_v = np.array([2.0, 4.0])
     rate_v = np.array([3.0, 4.0])
     x = np.array([[2.5, 2.5, 4.0, 0.1, 1.0, 2.0]], dtype=np.float32).T
-    gamma = tfd.Gamma(
+    gamma = gamma_lib.Gamma(
         concentration=concentration, rate=rate, validate_args=True)
-    gamma_lr = tfd.Gamma(
-        concentration=concentration, log_rate=tf.math.log(rate),
+    gamma_lr = gamma_lib.Gamma(
+        concentration=concentration,
+        log_rate=tf.math.log(rate),
         validate_args=True)
     log_pdf = gamma.log_prob(x)
     log_pdf_values = self.evaluate(log_pdf)
@@ -128,7 +130,7 @@ class GammaTest(test_util.TestCase):
     concentration_v = np.array([2.0, 4.0])
     rate_v = 3.0
     x = np.array([[2.5, 2.5, 4.0, 0.1, 1.0, 2.0]], dtype=np.float32).T
-    gamma = tfd.Gamma(
+    gamma = gamma_lib.Gamma(
         concentration=concentration, rate=rate, validate_args=True)
     log_pdf = gamma.log_prob(x)
     log_pdf_values = self.evaluate(log_pdf)
@@ -150,10 +152,11 @@ class GammaTest(test_util.TestCase):
     rate_v = 3.0
     x = np.array([2.5, 2.5, 4.0, 0.1, 1.0, 2.0], dtype=np.float32)
 
-    gamma = tfd.Gamma(
+    gamma = gamma_lib.Gamma(
         concentration=concentration, rate=rate, validate_args=True)
-    gamma_lr = tfd.Gamma(
-        concentration=concentration, log_rate=tf.math.log(rate),
+    gamma_lr = gamma_lib.Gamma(
+        concentration=concentration,
+        log_rate=tf.math.log(rate),
         validate_args=True)
     cdf = gamma.cdf(x)
     self.assertEqual(cdf.shape, (6,))
@@ -168,10 +171,11 @@ class GammaTest(test_util.TestCase):
     rate = np.linspace(3., 7., batch_size).astype(np.float32)[..., np.newaxis]
     x = np.array([0.1, 0.2, 0.3, 0.9, 0.8, 0.5, 0.7], dtype=np.float32)
 
-    gamma = tfd.Gamma(
+    gamma = gamma_lib.Gamma(
         concentration=concentration, rate=rate, validate_args=True)
-    gamma_lr = tfd.Gamma(
-        concentration=concentration, log_rate=tf.math.log(rate),
+    gamma_lr = gamma_lib.Gamma(
+        concentration=concentration,
+        log_rate=tf.math.log(rate),
         validate_args=True)
     quantile = gamma.quantile(x)
     self.assertEqual(quantile.shape, (6, 7))
@@ -182,10 +186,11 @@ class GammaTest(test_util.TestCase):
   def testGammaMean(self):
     concentration_v = np.array([1.0, 3.0, 2.5])
     rate_v = np.array([1.0, 4.0, 5.0])
-    gamma = tfd.Gamma(
+    gamma = gamma_lib.Gamma(
         concentration=concentration_v, rate=rate_v, validate_args=True)
-    gamma_lr = tfd.Gamma(
-        concentration=concentration_v, log_rate=np.log(rate_v),
+    gamma_lr = gamma_lib.Gamma(
+        concentration=concentration_v,
+        log_rate=np.log(rate_v),
         validate_args=True)
     self.assertEqual(gamma.mean().shape, (3,))
     expected_means = sp_stats.gamma.mean(concentration_v, scale=1 / rate_v)
@@ -195,10 +200,11 @@ class GammaTest(test_util.TestCase):
   def testGammaModeAllowNanStatsIsFalseWorksWhenAllBatchMembersAreDefined(self):
     concentration_v = np.array([5.5, 3.0, 2.5])
     rate_v = np.array([1.0, 4.0, 5.0])
-    gamma = tfd.Gamma(
+    gamma = gamma_lib.Gamma(
         concentration=concentration_v, rate=rate_v, validate_args=True)
-    gamma_lr = tfd.Gamma(
-        concentration=concentration_v, log_rate=np.log(rate_v),
+    gamma_lr = gamma_lib.Gamma(
+        concentration=concentration_v,
+        log_rate=np.log(rate_v),
         validate_args=True)
     expected_modes = (concentration_v - 1) / rate_v
     self.assertEqual(gamma.mode().shape, (3,))
@@ -209,10 +215,16 @@ class GammaTest(test_util.TestCase):
     # Mode will not be defined for the first entry.
     concentration_v = np.array([0.5, 3.0, 2.5])
     rate_v = np.array([1.0, 4.0, 5.0])
-    gamma = tfd.Gamma(concentration=concentration_v, rate=rate_v,
-                      allow_nan_stats=False, validate_args=True)
-    gamma_lr = tfd.Gamma(concentration=concentration_v, log_rate=np.log(rate_v),
-                         allow_nan_stats=False, validate_args=True)
+    gamma = gamma_lib.Gamma(
+        concentration=concentration_v,
+        rate=rate_v,
+        allow_nan_stats=False,
+        validate_args=True)
+    gamma_lr = gamma_lib.Gamma(
+        concentration=concentration_v,
+        log_rate=np.log(rate_v),
+        allow_nan_stats=False,
+        validate_args=True)
     with self.assertRaisesOpError(
         'Mode not defined when any concentration <= 1.'):
       self.evaluate(gamma.mode())
@@ -224,10 +236,16 @@ class GammaTest(test_util.TestCase):
     # Mode will not be defined for the first entry.
     concentration_v = np.array([0.5, 3.0, 2.5])
     rate_v = np.array([1.0, 4.0, 5.0])
-    gamma = tfd.Gamma(concentration=concentration_v, rate=rate_v,
-                      allow_nan_stats=True, validate_args=True)
-    gamma_lr = tfd.Gamma(concentration=concentration_v, log_rate=np.log(rate_v),
-                         allow_nan_stats=True, validate_args=True)
+    gamma = gamma_lib.Gamma(
+        concentration=concentration_v,
+        rate=rate_v,
+        allow_nan_stats=True,
+        validate_args=True)
+    gamma_lr = gamma_lib.Gamma(
+        concentration=concentration_v,
+        log_rate=np.log(rate_v),
+        allow_nan_stats=True,
+        validate_args=True)
     expected_modes = (concentration_v - 1) / rate_v
     expected_modes[0] = np.nan
     self.assertEqual(gamma.mode().shape, (3,))
@@ -237,10 +255,11 @@ class GammaTest(test_util.TestCase):
   def testGammaVariance(self):
     concentration_v = np.array([1.0, 3.0, 2.5])
     rate_v = np.array([1.0, 4.0, 5.0])
-    gamma = tfd.Gamma(
+    gamma = gamma_lib.Gamma(
         concentration=concentration_v, rate=rate_v, validate_args=True)
-    gamma_lr = tfd.Gamma(
-        concentration=concentration_v, log_rate=np.log(rate_v),
+    gamma_lr = gamma_lib.Gamma(
+        concentration=concentration_v,
+        log_rate=np.log(rate_v),
         validate_args=True)
     self.assertEqual(gamma.variance().shape, (3,))
     expected_variances = sp_stats.gamma.var(concentration_v, scale=1 / rate_v)
@@ -250,10 +269,11 @@ class GammaTest(test_util.TestCase):
   def testGammaStd(self):
     concentration_v = np.array([1.0, 3.0, 2.5])
     rate_v = np.array([1.0, 4.0, 5.0])
-    gamma = tfd.Gamma(
+    gamma = gamma_lib.Gamma(
         concentration=concentration_v, rate=rate_v, validate_args=True)
-    gamma_lr = tfd.Gamma(
-        concentration=concentration_v, log_rate=np.log(rate_v),
+    gamma_lr = gamma_lib.Gamma(
+        concentration=concentration_v,
+        log_rate=np.log(rate_v),
         validate_args=True)
     self.assertEqual(gamma.stddev().shape, (3,))
     expected_stddev = sp_stats.gamma.std(concentration_v, scale=1. / rate_v)
@@ -263,10 +283,11 @@ class GammaTest(test_util.TestCase):
   def testGammaEntropy(self):
     concentration_v = np.array([1.0, 3.0, 2.5])
     rate_v = np.array([1.0, 4.0, 5.0])
-    gamma = tfd.Gamma(
+    gamma = gamma_lib.Gamma(
         concentration=concentration_v, rate=rate_v, validate_args=True)
-    gamma_lr = tfd.Gamma(
-        concentration=concentration_v, log_rate=np.log(rate_v),
+    gamma_lr = gamma_lib.Gamma(
+        concentration=concentration_v,
+        log_rate=np.log(rate_v),
         validate_args=True)
     self.assertEqual(gamma.entropy().shape, (3,))
     expected_entropy = sp_stats.gamma.entropy(concentration_v, scale=1 / rate_v)
@@ -279,7 +300,7 @@ class GammaTest(test_util.TestCase):
     concentration = tf.constant(concentration_v)
     rate = tf.constant(rate_v)
     n = 100000
-    gamma = tfd.Gamma(
+    gamma = gamma_lib.Gamma(
         concentration=concentration, rate=rate, validate_args=True)
     samples = gamma.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
@@ -301,7 +322,7 @@ class GammaTest(test_util.TestCase):
     concentration = tf.constant(concentration_v)
     rate = tf.constant(rate_v)
     n = 100000
-    gamma = tfd.Gamma(
+    gamma = gamma_lib.Gamma(
         concentration=concentration, rate=rate, validate_args=True)
     samples = gamma.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
@@ -318,34 +339,34 @@ class GammaTest(test_util.TestCase):
         atol=.15)
 
   def testGammaSampleZeroAndNegativeParameters(self):
-    gamma = tfd.Gamma([1., 2.], 1., validate_args=False)
+    gamma = gamma_lib.Gamma([1., 2.], 1., validate_args=False)
     seed_stream = test_util.test_seed_stream()
     samples = self.evaluate(gamma.sample(seed=seed_stream()))
     self.assertEqual(samples.shape, (2,))
     self.assertAllFinite(samples)
 
-    gamma = tfd.Gamma([0., 2.], 1., validate_args=False)
+    gamma = gamma_lib.Gamma([0., 2.], 1., validate_args=False)
     samples = self.evaluate(gamma.sample(seed=seed_stream()))
     self.assertEqual(samples.shape, (2,))
     self.assertAllEqual([s in [0, np.finfo(np.float32).tiny]
                          for s in samples], [True, False])
 
-    gamma = tfd.Gamma([-0.001, 2.], 1., validate_args=False)
+    gamma = gamma_lib.Gamma([-0.001, 2.], 1., validate_args=False)
     samples = self.evaluate(gamma.sample(seed=seed_stream()))
     self.assertEqual(samples.shape, (2,))
     self.assertAllEqual([np.isnan(s) for s in samples], [True, False])
 
-    gamma = tfd.Gamma([1., -1.], 1., validate_args=False)
+    gamma = gamma_lib.Gamma([1., -1.], 1., validate_args=False)
     samples = self.evaluate(gamma.sample(seed=seed_stream()))
     self.assertEqual(samples.shape, (2,))
     self.assertAllEqual([np.isnan(s) for s in samples], [False, True])
 
-    gamma = tfd.Gamma([1., 2.], 0., validate_args=False)
+    gamma = gamma_lib.Gamma([1., 2.], 0., validate_args=False)
     samples = self.evaluate(gamma.sample(seed=seed_stream()))
     self.assertEqual(samples.shape, (2,))
     self.assertAllPositiveInf(samples)
 
-    gamma = tfd.Gamma([1., 2.], -1., validate_args=False)
+    gamma = gamma_lib.Gamma([1., 2.], -1., validate_args=False)
     samples = self.evaluate(gamma.sample(seed=seed_stream()))
     self.assertEqual(samples.shape, (2,))
     self.assertAllNan(samples)
@@ -354,9 +375,11 @@ class GammaTest(test_util.TestCase):
   def testGammaFullyReparameterized(self):
     concentration = tf.constant(4.0)
     rate = tf.constant(3.0)
-    _, [grad_concentration, grad_rate] = tfp.math.value_and_gradient(
-        lambda a, b: tfd.Gamma(concentration=a, rate=b, validate_args=True).  # pylint: disable=g-long-lambda
-        sample(100, seed=test_util.test_seed()), [concentration, rate])
+    _, [grad_concentration, grad_rate] = gradient.value_and_gradient(
+        lambda a, b: gamma_lib.Gamma(  # pylint: disable=g-long-lambda
+            concentration=a, rate=b, validate_args=True).
+        sample(100, seed=test_util.test_seed()),
+        [concentration, rate])
     self.assertIsNotNone(grad_concentration)
     self.assertIsNotNone(grad_rate)
 
@@ -371,18 +394,19 @@ class GammaTest(test_util.TestCase):
     num_samples = int(1e5)
 
     def tfp_gamma(a, b):
-      return tfd.Gamma(concentration=a, rate=b, validate_args=True).sample(
-          num_samples, seed=test_util.test_seed())
+      return gamma_lib.Gamma(
+          concentration=a, rate=b, validate_args=True).sample(
+              num_samples, seed=test_util.test_seed())
 
     _, [grad_concentration, grad_rate] = self.evaluate(
-        tfp.math.value_and_gradient(tfp_gamma, [concentration_v, rate_v]))
+        gradient.value_and_gradient(tfp_gamma, [concentration_v, rate_v]))
 
     def tf_gamma(a, b):
       return tf.random.gamma(
           shape=[num_samples], alpha=a, beta=b, seed=test_util.test_seed())
 
     _, [grad_concentration_tf, grad_rate_tf] = self.evaluate(
-        tfp.math.value_and_gradient(tf_gamma, [concentration_v, rate_v]))
+        gradient.value_and_gradient(tf_gamma, [concentration_v, rate_v]))
 
     self.assertEqual(grad_concentration.shape, grad_concentration_tf.shape)
     self.assertEqual(grad_rate.shape, grad_rate_tf.shape)
@@ -403,11 +427,11 @@ class GammaTest(test_util.TestCase):
 
     def tfp_gamma(a, b):
       return tf.math.square(
-          tfd.Gamma(concentration=a, rate=b, validate_args=True).sample(
+          gamma_lib.Gamma(concentration=a, rate=b, validate_args=True).sample(
               num_samples, seed=test_util.test_seed()))
 
     _, [grad_concentration, grad_rate] = self.evaluate(
-        tfp.math.value_and_gradient(tfp_gamma, [concentration_v, rate_v]))
+        gradient.value_and_gradient(tfp_gamma, [concentration_v, rate_v]))
 
     def tf_gamma(a, b):
       return tf.math.square(tf.random.gamma(
@@ -417,7 +441,7 @@ class GammaTest(test_util.TestCase):
           seed=test_util.test_seed()))
 
     _, [grad_concentration_tf, grad_rate_tf] = self.evaluate(
-        tfp.math.value_and_gradient(tf_gamma, [concentration_v, rate_v]))
+        gradient.value_and_gradient(tf_gamma, [concentration_v, rate_v]))
 
     self.assertEqual(grad_concentration.shape, grad_concentration_tf.shape)
     self.assertEqual(grad_rate.shape, grad_rate_tf.shape)
@@ -430,7 +454,7 @@ class GammaTest(test_util.TestCase):
         [np.arange(1, n_concentration+1, dtype=np.float32)])  # 1 x 50
     n_rate = 10
     rate_v = np.array([np.arange(1, n_rate+1, dtype=np.float32)]).T  # 10 x 1
-    gamma = tfd.Gamma(
+    gamma = gamma_lib.Gamma(
         concentration=concentration_v, rate=rate_v, validate_args=True)
 
     n = 10000
@@ -470,7 +494,7 @@ class GammaTest(test_util.TestCase):
     return ks < 0.02
 
   def testGammaPdfOfSampleMultiDims(self):
-    gamma = tfd.Gamma(
+    gamma = gamma_lib.Gamma(
         concentration=[7., 11.], rate=[[5.], [6.]], validate_args=True)
     num = 50000
     samples = gamma.sample(num, seed=test_util.test_seed())
@@ -507,13 +531,13 @@ class GammaTest(test_util.TestCase):
     concentration_v = tf.constant(0.0, name='concentration')
     rate_v = tf.constant(1.0, name='rate')
     with self.assertRaisesOpError('Argument `concentration` must be positive.'):
-      gamma = tfd.Gamma(
+      gamma = gamma_lib.Gamma(
           concentration=concentration_v, rate=rate_v, validate_args=True)
       self.evaluate(gamma.mean())
     concentration_v = tf.constant(1.0, name='concentration')
     rate_v = tf.constant(0.0, name='rate')
     with self.assertRaisesOpError('Argument `rate` must be positive.'):
-      gamma = tfd.Gamma(
+      gamma = gamma_lib.Gamma(
           concentration=concentration_v, rate=rate_v, validate_args=True)
       self.evaluate(gamma.mean())
 
@@ -525,17 +549,23 @@ class GammaTest(test_util.TestCase):
     rate1 = np.array([0.5, 1., 1.5, 2., 2.5, 3.])
 
     # Build graph.
-    g0 = tfd.Gamma(concentration=concentration0, rate=rate0, validate_args=True)
-    g0lr = tfd.Gamma(concentration=concentration0, log_rate=np.log(rate0),
-                     validate_args=True)
-    g1 = tfd.Gamma(concentration=concentration1, rate=rate1, validate_args=True)
-    g1lr = tfd.Gamma(concentration=concentration1, log_rate=np.log(rate1),
-                     validate_args=True)
+    g0 = gamma_lib.Gamma(
+        concentration=concentration0, rate=rate0, validate_args=True)
+    g0lr = gamma_lib.Gamma(
+        concentration=concentration0,
+        log_rate=np.log(rate0),
+        validate_args=True)
+    g1 = gamma_lib.Gamma(
+        concentration=concentration1, rate=rate1, validate_args=True)
+    g1lr = gamma_lib.Gamma(
+        concentration=concentration1,
+        log_rate=np.log(rate1),
+        validate_args=True)
 
     for d0, d1 in (g0, g1), (g0lr, g1), (g0, g1lr), (g0lr, g1lr):
       x = d0.sample(int(1e4), seed=test_util.test_seed())
       kl_samples = d0.log_prob(x) - d1.log_prob(x)
-      kl_actual = tfd.kl_divergence(d0, d1)
+      kl_actual = kullback_leibler.kl_divergence(d0, d1)
 
       # Execute graph.
       [kl_samples_, kl_actual_] = self.evaluate([kl_samples, kl_actual])
@@ -557,7 +587,8 @@ class GammaTest(test_util.TestCase):
   @test_util.tf_tape_safety_test
   def testGradientThroughConcentration(self):
     concentration = tf.Variable(3.)
-    d = tfd.Gamma(concentration=concentration, rate=5., validate_args=True)
+    d = gamma_lib.Gamma(
+        concentration=concentration, rate=5., validate_args=True)
     with tf.GradientTape() as tape:
       loss = -d.log_prob([1., 2., 4.])
     grad = tape.gradient(loss, d.trainable_variables)
@@ -569,13 +600,15 @@ class GammaTest(test_util.TestCase):
     concentration = tf.Variable([1., 2., -3.])
     self.evaluate(concentration.initializer)
     with self.assertRaisesOpError('Argument `concentration` must be positive.'):
-      d = tfd.Gamma(concentration=concentration, rate=[5.], validate_args=True)
+      d = gamma_lib.Gamma(
+          concentration=concentration, rate=[5.], validate_args=True)
       self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertsPositiveConcentrationAfterMutation(self):
     concentration = tf.Variable([1., 2., 3.])
     self.evaluate(concentration.initializer)
-    d = tfd.Gamma(concentration=concentration, rate=[5.], validate_args=True)
+    d = gamma_lib.Gamma(
+        concentration=concentration, rate=[5.], validate_args=True)
     self.evaluate(d.sample(seed=test_util.test_seed()))
     with self.assertRaisesOpError('Argument `concentration` must be positive.'):
       with tf.control_dependencies([concentration.assign([1., 2., -3.])]):
@@ -584,7 +617,7 @@ class GammaTest(test_util.TestCase):
   @test_util.tf_tape_safety_test
   def testGradientThroughRate(self):
     rate = tf.Variable(3.)
-    d = tfd.Gamma(concentration=1., rate=rate, validate_args=True)
+    d = gamma_lib.Gamma(concentration=1., rate=rate, validate_args=True)
     with tf.GradientTape() as tape:
       loss = -d.log_prob([1., 2., 4.])
     grad = tape.gradient(loss, d.trainable_variables)
@@ -595,20 +628,20 @@ class GammaTest(test_util.TestCase):
     rate = tf.Variable([1., 2., -3.])
     self.evaluate(rate.initializer)
     with self.assertRaisesOpError('Argument `rate` must be positive.'):
-      d = tfd.Gamma(concentration=[5.], rate=rate, validate_args=True)
+      d = gamma_lib.Gamma(concentration=[5.], rate=rate, validate_args=True)
       self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertsPositiveRateAfterMutation(self):
     rate = tf.Variable([1., 2., 3.])
     self.evaluate(rate.initializer)
-    d = tfd.Gamma(concentration=[3.], rate=rate, validate_args=True)
+    d = gamma_lib.Gamma(concentration=[3.], rate=rate, validate_args=True)
     self.evaluate(d.sample(seed=test_util.test_seed()))
     with self.assertRaisesOpError('Argument `rate` must be positive.'):
       with tf.control_dependencies([rate.assign([1., 2., -3.])]):
         self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testSupportBijectorOutsideRange(self):
-    dist = tfd.Gamma(
+    dist = gamma_lib.Gamma(
         concentration=[3.], rate=[3., 2., 5.4], validate_args=True)
     x = np.array([-4.2, -0.3, -1e-6])
     bijector_inverse_x = dist.experimental_default_event_space_bijector(
@@ -622,7 +655,7 @@ class GammaTest(test_util.TestCase):
     x = np.array([0.1, 7., 4.], dtype=np.float32)
     mean = sp_stats.gamma.mean(a=concentration, scale=scale)
     var = sp_stats.gamma.var(a=concentration, scale=scale)
-    gamma_mean_var = tfd.Gamma.experimental_from_mean_variance(
+    gamma_mean_var = gamma_lib.Gamma.experimental_from_mean_variance(
         mean, variance=var, validate_args=True)
     expected_log_pdf = sp_stats.gamma.logpdf(x, a=concentration, scale=scale)
     log_pdf = gamma_mean_var.log_prob(x)
@@ -641,7 +674,7 @@ class GammaTest(test_util.TestCase):
     variance = tf.convert_to_tensor(
         sp_stats.gamma.var(a=concentration, scale=scale).astype(np.float32))
 
-    dist = tfd.Gamma.experimental_from_mean_variance(
+    dist = gamma_lib.Gamma.experimental_from_mean_variance(
         mean, variance, validate_args=True)
     with tf.GradientTape() as tape:
       tape.watch((mean, variance))
@@ -679,7 +712,8 @@ class GammaSamplingTest(test_util.TestCase):
     if not tf.executing_eagerly(): return  # jit_compile is eager-only.
     concentration = np.exp(np.random.rand(4, 3).astype(np.float32))
     rate = np.exp(np.random.rand(4, 3).astype(np.float32))
-    dist = tfd.Gamma(concentration=concentration, rate=rate, validate_args=True)
+    dist = gamma_lib.Gamma(
+        concentration=concentration, rate=rate, validate_args=True)
     # Verify the compile succeeds going all the way through the distribution.
     self.evaluate(
         tf.function(lambda: dist.sample(5, seed=test_util.test_seed()),
@@ -715,7 +749,7 @@ class GammaSamplingTest(test_util.TestCase):
         rate=rate,
         seed=test_util.test_seed())
 
-    gamma = tfd.Gamma(
+    gamma = gamma_lib.Gamma(
         concentration=concentration, rate=rate, validate_args=True)
     self.evaluate(
         st.assert_true_cdf_equal_by_dkwm(
@@ -749,7 +783,7 @@ class GammaSamplingTest(test_util.TestCase):
         rate=rate,
         seed=test_util.test_seed())
 
-    gamma = tfd.Gamma(
+    gamma = gamma_lib.Gamma(
         concentration=concentration, rate=rate, validate_args=True)
     self.evaluate(
         st.assert_true_cdf_equal_by_dkwm(
@@ -795,7 +829,7 @@ class GammaSamplingTest(test_util.TestCase):
       # Take samples without the nonlinearity.
       samps.append(fn(conc, rate))
       # We compute gradient through a nonlinearity to catch a class of errors.
-      _, (dc_i, dr_i) = tfp.math.value_and_gradient(
+      _, (dc_i, dr_i) = gradient.value_and_gradient(
           lambda c, r: tf.reduce_mean(tf.square(fn(c, r))), (conc, rate))  # pylint: disable=cell-var-from-loop
       dconc.append(dc_i)
       drate.append(dr_i)
@@ -813,7 +847,7 @@ class GammaSamplingTest(test_util.TestCase):
             st.min_num_samples_for_dkwm_cdf_test(
                 discrepancy=0.04, false_fail_rate=1e-9, false_pass_rate=1e-9)),
         n)
-    equiv_dist = tfb.Log()(tfd.Gamma(conc, rate))
+    equiv_dist = tfb.Log()(gamma_lib.Gamma(conc, rate))
     self.evaluate(st.assert_true_cdf_equal_by_dkwm(
         samps[0], equiv_dist.cdf, false_fail_rate=1e-9))
     self.evaluate(st.assert_true_cdf_equal_by_dkwm(
@@ -847,8 +881,9 @@ class GammaSamplingTest(test_util.TestCase):
         seed=test_util.test_seed(),
         log_space=True)
 
-    exp_gamma = tfb.Log()(tfd.Gamma(
-        concentration=concentration, rate=rate, validate_args=True))
+    exp_gamma = tfb.Log()(
+        gamma_lib.Gamma(
+            concentration=concentration, rate=rate, validate_args=True))
     self.evaluate(
         st.assert_true_cdf_equal_by_dkwm(
             samples,
@@ -898,11 +933,11 @@ class GammaSamplingTest(test_util.TestCase):
     num_samples = 2
 
     def gen_samples(concentration, rate):
-      return tfd.Gamma(concentration, rate).sample(
+      return gamma_lib.Gamma(concentration, rate).sample(
           num_samples, seed=test_util.test_seed())
 
     samples, [concentration_grad, rate_grad] = self.evaluate(
-        tfp.math.value_and_gradient(gen_samples, [concentration, rate]))
+        gradient.value_and_gradient(gen_samples, [concentration, rate]))
     self.assertEqual(samples.shape, (num_samples, concentration_n, rate_n))
     self.assertEqual(concentration_grad.shape, concentration.shape)
     self.assertEqual(rate_grad.shape, rate.shape)
@@ -925,7 +960,7 @@ class GammaSamplingTest(test_util.TestCase):
 
   def testPdfOutsideSupport(self):
     def mk_gamma(c):
-      return tfd.Gamma(c, 1, force_probs_to_zero_outside_support=True)
+      return gamma_lib.Gamma(c, 1, force_probs_to_zero_outside_support=True)
     self.assertAllEqual(mk_gamma(.99).log_prob(-.1), -float('inf'))
     self.assertAllEqual(mk_gamma(.99).log_prob(0), float('inf'))
     self.assertAllGreater(mk_gamma(.99).log_prob(0.1), -float('inf'))

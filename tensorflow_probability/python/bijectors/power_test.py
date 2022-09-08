@@ -18,8 +18,10 @@
 from absl.testing import parameterized
 
 import numpy as np
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import power as power_lib
+from tensorflow_probability.python.bijectors import reciprocal
+from tensorflow_probability.python.bijectors import square
 from tensorflow_probability.python.internal import test_util
 
 
@@ -29,7 +31,7 @@ class RaiseBijectorTest(test_util.TestCase):
 
   def testBijectorScalar(self):
     power = np.array([2.6, 0.3, -1.1])
-    bijector = tfb.Power(power=power, validate_args=True)
+    bijector = power_lib.Power(power=power, validate_args=True)
     self.assertStartsWith(bijector.name, 'power')
     x = np.array([[[1., 5., 3.],
                    [2., 1., 7.]],
@@ -50,17 +52,24 @@ class RaiseBijectorTest(test_util.TestCase):
         rtol=1e-7)
 
   def testScalarCongruency(self):
-    bijector = tfb.Power(power=2.6, validate_args=True)
+    bijector = power_lib.Power(power=2.6, validate_args=True)
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=1e-3, upper_x=1.5, eval_func=self.evaluate,
         n=1e5,
         rtol=0.08)
 
   @parameterized.named_parameters(
-      {'testcase_name': 'Square', 'power': 2., 'cls': tfb.Square},
-      {'testcase_name': 'Reciprocal', 'power': -1., 'cls': tfb.Reciprocal})
+      {
+          'testcase_name': 'Square',
+          'power': 2.,
+          'cls': square.Square
+      }, {
+          'testcase_name': 'Reciprocal',
+          'power': -1.,
+          'cls': reciprocal.Reciprocal
+      })
   def testSpecialCases(self, power, cls):
-    b = tfb.Power(power=power)
+    b = power_lib.Power(power=power)
     b_other = cls()
     x = [[[1., 5],
           [2, 1]],
@@ -80,7 +89,7 @@ class RaiseBijectorTest(test_util.TestCase):
 
   def testPowerOddInteger(self):
     power = np.array([3., -5., 5., -7.]).reshape((4, 1))
-    bijector = tfb.Power(power=power, validate_args=True)
+    bijector = power_lib.Power(power=power, validate_args=True)
     self.assertStartsWith(bijector.name, 'power')
     x = np.linspace(-10., 10., 20)
     y = np.power(x, power)
@@ -99,15 +108,15 @@ class RaiseBijectorTest(test_util.TestCase):
 
   def testZeroPowerRaisesError(self):
     with self.assertRaisesRegexp(Exception, 'must be non-zero'):
-      b = tfb.Power(power=0., validate_args=True)
+      b = power_lib.Power(power=0., validate_args=True)
       b.forward(1.)
 
   def testPowerNegativeInputRaisesError(self):
     with self.assertRaisesOpError('must be non-negative'):
-      b = tfb.Power(power=2.5, validate_args=True)
+      b = power_lib.Power(power=2.5, validate_args=True)
       self.evaluate(b.inverse(-1.))
 
-    b = tfb.Power(power=3., validate_args=True)
+    b = power_lib.Power(power=3., validate_args=True)
     self.evaluate(b.inverse(-1.))
 
 if __name__ == '__main__':

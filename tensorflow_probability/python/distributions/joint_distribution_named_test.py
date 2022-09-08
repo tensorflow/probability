@@ -21,35 +21,57 @@ import collections
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import scale
+from tensorflow_probability.python.distributions import bernoulli
+from tensorflow_probability.python.distributions import beta
+from tensorflow_probability.python.distributions import exponential
+from tensorflow_probability.python.distributions import gamma
+from tensorflow_probability.python.distributions import half_normal
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import joint_distribution_named as jdn
+from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import sample as sample_lib
+from tensorflow_probability.python.distributions import student_t
+from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import test_util
 
 
 # Defer creating test dists (by hiding them in functions) until we know what
 # execution regime (eager/graph/tf-function) the test will run under.
 def basic_ordered_model_fn():
-  return collections.OrderedDict(
-      (('a', tfd.Normal(0., 1.)),
-       ('e',
-        tfd.Independent(tfd.Exponential(rate=[100, 120]),
-                        reinterpreted_batch_ndims=1)),
-       ('x', lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1])),
-      ))
+  return collections.OrderedDict((
+      ('a', normal.Normal(0., 1.)),
+      ('e',
+       independent.Independent(
+           exponential.Exponential(rate=[100, 120]),
+           reinterpreted_batch_ndims=1)),
+      ('x', lambda e: gamma.Gamma(concentration=e[..., 0], rate=e[..., 1])),
+  ))
 
 
 def nested_lists_model_fn():
   return collections.OrderedDict((
-      ('abc', tfd.JointDistributionSequential([
-          tfd.MultivariateNormalDiag([0., 0.], [1., 1.]),
-          tfd.JointDistributionSequential(
-              [tfd.StudentT(3., -2., 5.),
-               tfd.Exponential(4.)])])),
-      ('de', lambda abc: tfd.JointDistributionSequential([  # pylint: disable=g-long-lambda
-          tfd.Independent(tfd.Normal(abc[0] * abc[1][0], abc[1][1]),
-                          reinterpreted_batch_ndims=1),
-          tfd.Independent(tfd.Normal(abc[0] + abc[1][0], abc[1][1]),
-                          reinterpreted_batch_ndims=1)]))))
+      ('abc',
+       jds.JointDistributionSequential([
+           mvn_diag.MultivariateNormalDiag([0., 0.], [1., 1.]),
+           jds.JointDistributionSequential(
+               [student_t.StudentT(3., -2., 5.),
+                exponential.Exponential(4.)])
+       ])),
+      (
+          'de',
+          lambda abc: jds.JointDistributionSequential([  # pylint: disable=g-long-lambda
+              independent.Independent(
+                  normal.Normal(abc[0] * abc[1][0], abc[1][1]),
+                  reinterpreted_batch_ndims=1),
+              independent.Independent(
+                  normal.Normal(abc[0] + abc[1][0], abc[1][1]),
+                  reinterpreted_batch_ndims=1)
+          ]))))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -57,13 +79,16 @@ class JointDistributionNamedTest(test_util.TestCase):
 
   def test_dict_sample_log_prob(self):
     # pylint: disable=bad-whitespace
-    d = tfd.JointDistributionNamed(dict(
-        e    =          tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
-        scale=lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
-        loc  =          tfd.Normal(loc=0, scale=2.),
-        m    =          tfd.Normal,
-        x    =lambda m: tfd.Sample(tfd.Bernoulli(logits=m), 12)),
-                                   validate_args=True)
+    d = jdn.JointDistributionNamed(
+        dict(
+            e=independent.Independent(
+                exponential.Exponential(rate=[100, 120]), 1),
+            scale=lambda e: gamma.Gamma(  # pylint: disable=g-long-lambda
+                concentration=e[..., 0], rate=e[..., 1]),
+            loc=normal.Normal(loc=0, scale=2.),
+            m=normal.Normal,
+            x=lambda m: sample_lib.Sample(bernoulli.Bernoulli(logits=m), 12)),
+        validate_args=True)
     # pylint: enable=bad-whitespace
 
     self.assertEqual(
@@ -83,11 +108,11 @@ class JointDistributionNamedTest(test_util.TestCase):
 
     ds, _ = d.sample_distributions(value=xs, seed=test_util.test_seed())
     self.assertLen(ds, 5)
-    self.assertIsInstance(ds['e'], tfd.Independent)
-    self.assertIsInstance(ds['scale'], tfd.Gamma)
-    self.assertIsInstance(ds['loc'], tfd.Normal)
-    self.assertIsInstance(ds['m'], tfd.Normal)
-    self.assertIsInstance(ds['x'], tfd.Sample)
+    self.assertIsInstance(ds['e'], independent.Independent)
+    self.assertIsInstance(ds['scale'], gamma.Gamma)
+    self.assertIsInstance(ds['loc'], normal.Normal)
+    self.assertIsInstance(ds['m'], normal.Normal)
+    self.assertIsInstance(ds['x'], sample_lib.Sample)
 
     # Static properties.
     self.assertAllEqual(
@@ -121,13 +146,13 @@ class JointDistributionNamedTest(test_util.TestCase):
     Model = collections.namedtuple('Model', ['e', 'scale', 'loc', 'm', 'x'])  # pylint: disable=invalid-name
     # pylint: disable=bad-whitespace
     model = Model(
-        e    =          tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
-        scale=lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
-        loc  =          tfd.Normal(loc=0, scale=2.),
-        m    =          tfd.Normal,
-        x    =lambda m: tfd.Sample(tfd.Bernoulli(logits=m), 12))
+        e=independent.Independent(exponential.Exponential(rate=[100, 120]), 1),
+        scale=lambda e: gamma.Gamma(concentration=e[..., 0], rate=e[..., 1]),
+        loc=normal.Normal(loc=0, scale=2.),
+        m=normal.Normal,
+        x=lambda m: sample_lib.Sample(bernoulli.Bernoulli(logits=m), 12))
     # pylint: enable=bad-whitespace
-    d = tfd.JointDistributionNamed(model, validate_args=True)
+    d = jdn.JointDistributionNamed(model, validate_args=True)
 
     self.assertEqual(
         (
@@ -146,11 +171,11 @@ class JointDistributionNamedTest(test_util.TestCase):
 
     ds, _ = d.sample_distributions(value=xs, seed=test_util.test_seed())
     self.assertLen(ds, 5)
-    self.assertIsInstance(ds.e, tfd.Independent)
-    self.assertIsInstance(ds.scale, tfd.Gamma)
-    self.assertIsInstance(ds.loc, tfd.Normal)
-    self.assertIsInstance(ds.m, tfd.Normal)
-    self.assertIsInstance(ds.x, tfd.Sample)
+    self.assertIsInstance(ds.e, independent.Independent)
+    self.assertIsInstance(ds.scale, gamma.Gamma)
+    self.assertIsInstance(ds.loc, normal.Normal)
+    self.assertIsInstance(ds.m, normal.Normal)
+    self.assertIsInstance(ds.x, sample_lib.Sample)
 
     # Static properties.
     self.assertAllEqual(Model(e=tf.float32, scale=tf.float32, loc=tf.float32,
@@ -183,13 +208,13 @@ class JointDistributionNamedTest(test_util.TestCase):
 
     # pylint: disable=bad-whitespace
     model = build_ordereddict(
-        e    =          tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
-        scale=lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
-        loc  =          tfd.Normal(loc=0, scale=2.),
-        m    =          tfd.Normal,
-        x    =lambda m: tfd.Sample(tfd.Bernoulli(logits=m), 12))
+        e=independent.Independent(exponential.Exponential(rate=[100, 120]), 1),
+        scale=lambda e: gamma.Gamma(concentration=e[..., 0], rate=e[..., 1]),
+        loc=normal.Normal(loc=0, scale=2.),
+        m=normal.Normal,
+        x=lambda m: sample_lib.Sample(bernoulli.Bernoulli(logits=m), 12))
     # pylint: enable=bad-whitespace
-    d = tfd.JointDistributionNamed(model, validate_args=True)
+    d = jdn.JointDistributionNamed(model, validate_args=True)
 
     self.assertEqual(
         (
@@ -209,11 +234,11 @@ class JointDistributionNamedTest(test_util.TestCase):
     ds, _ = d.sample_distributions(value=xs, seed=test_util.test_seed())
     self.assertLen(ds, 5)
     values = tuple(ds.values())
-    self.assertIsInstance(values[0], tfd.Independent)
-    self.assertIsInstance(values[1], tfd.Gamma)
-    self.assertIsInstance(values[2], tfd.Normal)
-    self.assertIsInstance(values[3], tfd.Normal)
-    self.assertIsInstance(values[4], tfd.Sample)
+    self.assertIsInstance(values[0], independent.Independent)
+    self.assertIsInstance(values[1], gamma.Gamma)
+    self.assertIsInstance(values[2], normal.Normal)
+    self.assertIsInstance(values[3], normal.Normal)
+    self.assertIsInstance(values[4], sample_lib.Sample)
 
     # Static properties.
     self.assertAllEqual(build_ordereddict(
@@ -243,13 +268,18 @@ class JointDistributionNamedTest(test_util.TestCase):
 
   def test_can_call_log_prob_with_kwargs(self):
 
-    d = tfd.JointDistributionNamed({
-        'e': tfd.Normal(0., 1.),
-        'a': tfd.Independent(
-            tfd.Exponential(rate=[100, 120]),
-            reinterpreted_batch_ndims=1),
-        'x': lambda a: tfd.Gamma(concentration=a[..., 0], rate=a[..., 1])
-    }, validate_args=True)
+    d = jdn.JointDistributionNamed(
+        {
+            'e':
+                normal.Normal(0., 1.),
+            'a':
+                independent.Independent(
+                    exponential.Exponential(rate=[100, 120]),
+                    reinterpreted_batch_ndims=1),
+            'x':
+                lambda a: gamma.Gamma(concentration=a[..., 0], rate=a[..., 1])
+        },
+        validate_args=True)
 
     sample = self.evaluate(d.sample([2, 3], seed=test_util.test_seed()))
     e, a, x = sample['e'], sample['a'], sample['x']
@@ -274,18 +304,18 @@ class JointDistributionNamedTest(test_util.TestCase):
        lambda d, **kwargs: d.experimental_sample_and_log_prob(**kwargs)[0]),
   )
   def test_nested_partial_value(self, sample_fn):
-    innermost = tfd.JointDistributionNamed({
-        'a': tfd.Exponential(1.),
-        'b': lambda a: tfd.Sample(tfd.LogNormal(a, a), [5]),
+    innermost = jdn.JointDistributionNamed({
+        'a': exponential.Exponential(1.),
+        'b': lambda a: sample_lib.Sample(lognormal.LogNormal(a, a), [5]),
     })
 
-    inner = tfd.JointDistributionNamed({
-        'c': tfd.Exponential(1.),
+    inner = jdn.JointDistributionNamed({
+        'c': exponential.Exponential(1.),
         'd': innermost,
     })
 
-    outer = tfd.JointDistributionNamed({
-        'e': tfd.Exponential(1.),
+    outer = jdn.JointDistributionNamed({
+        'e': exponential.Exponential(1.),
         'f': inner,
     })
 
@@ -320,7 +350,7 @@ class JointDistributionNamedTest(test_util.TestCase):
       ('nested_lists', nested_lists_model_fn))
   def test_can_call_ordereddict_log_prob_with_args_and_kwargs(self, model_fn):
     # With an OrderedDict, we can pass keyword and/or positional args.
-    d = tfd.JointDistributionNamed(model_fn(), validate_args=True)
+    d = jdn.JointDistributionNamed(model_fn(), validate_args=True)
 
     # Destructure vector-valued Tensors into Python lists, to mimic the values
     # a user might type.
@@ -350,12 +380,13 @@ class JointDistributionNamedTest(test_util.TestCase):
   def test_can_call_namedtuple_log_prob_with_args_and_kwargs(self):
     # With an namedtuple, we can pass keyword and/or positional args.
     Model = collections.namedtuple('Model', ['e', 'a', 'x'])  # pylint: disable=invalid-name
-    d = tfd.JointDistributionNamed(
-        Model(e=tfd.Normal(0., 1.),
-              a=tfd.Independent(
-                  tfd.Exponential(rate=[100, 120]),
-                  reinterpreted_batch_ndims=1),
-              x=lambda a: tfd.Gamma(concentration=a[..., 0], rate=a[..., 1])),
+    d = jdn.JointDistributionNamed(
+        Model(
+            e=normal.Normal(0., 1.),
+            a=independent.Independent(
+                exponential.Exponential(rate=[100, 120]),
+                reinterpreted_batch_ndims=1),
+            x=lambda a: gamma.Gamma(concentration=a[..., 0], rate=a[..., 1])),
         validate_args=True)
 
     sample = self.evaluate(d.sample([2, 3], seed=test_util.test_seed()))
@@ -375,18 +406,23 @@ class JointDistributionNamedTest(test_util.TestCase):
     self.assertAllClose(lp_value_positional, lp_args_then_kwargs)
 
   def test_kl_divergence(self):
-    d0 = tfd.JointDistributionNamed(
-        dict(e=tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
-             x=tfd.Normal(loc=0, scale=2.)),
+    d0 = jdn.JointDistributionNamed(
+        dict(
+            e=independent.Independent(
+                exponential.Exponential(rate=[100, 120]), 1),
+            x=normal.Normal(loc=0, scale=2.)),
         validate_args=True)
-    d1 = tfd.JointDistributionNamed(
-        dict(e=tfd.Independent(tfd.Exponential(rate=[10, 12]), 1),
-             x=tfd.Normal(loc=1, scale=1.)),
+    d1 = jdn.JointDistributionNamed(
+        dict(
+            e=independent.Independent(
+                exponential.Exponential(rate=[10, 12]), 1),
+            x=normal.Normal(loc=1, scale=1.)),
         validate_args=True)
     self.assertEqual(d0.model.keys(), d1.model.keys())
-    expected_kl = sum(tfd.kl_divergence(d0.model[k], d1.model[k])
-                      for k in d0.model.keys())
-    actual_kl = tfd.kl_divergence(d0, d1)
+    expected_kl = sum(
+        kullback_leibler.kl_divergence(d0.model[k], d1.model[k])
+        for k in d0.model.keys())
+    actual_kl = kullback_leibler.kl_divergence(d0, d1)
     other_actual_kl = d0.kl_divergence(d1)
     expected_kl_, actual_kl_, other_actual_kl_ = self.evaluate([
         expected_kl, actual_kl, other_actual_kl])
@@ -394,13 +430,17 @@ class JointDistributionNamedTest(test_util.TestCase):
     self.assertNear(expected_kl_, other_actual_kl_, err=1e-5)
 
   def test_cross_entropy(self):
-    d0 = tfd.JointDistributionNamed(
-        dict(e=tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
-             x=tfd.Normal(loc=0, scale=2.)),
+    d0 = jdn.JointDistributionNamed(
+        dict(
+            e=independent.Independent(
+                exponential.Exponential(rate=[100, 120]), 1),
+            x=normal.Normal(loc=0, scale=2.)),
         validate_args=True)
-    d1 = tfd.JointDistributionNamed(
-        dict(e=tfd.Independent(tfd.Exponential(rate=[10, 12]), 1),
-             x=tfd.Normal(loc=1, scale=1.)),
+    d1 = jdn.JointDistributionNamed(
+        dict(
+            e=independent.Independent(
+                exponential.Exponential(rate=[10, 12]), 1),
+            x=normal.Normal(loc=1, scale=1.)),
         validate_args=True)
     self.assertEqual(d0.model.keys(), d1.model.keys())
     expected_xent = sum(d0.model[k].cross_entropy(d1.model[k])
@@ -413,34 +453,45 @@ class JointDistributionNamedTest(test_util.TestCase):
     """Test that only non-default args are passed through."""
     with self.assertRaisesWithPredicateMatch(
         ValueError, 'Must pass probs or logits, but not both.'):
-      tfd.JointDistributionNamed(dict(logits=tfd.Normal(0., 1.),
-                                      x=tfd.Bernoulli))
+      jdn.JointDistributionNamed(
+          dict(logits=normal.Normal(0., 1.), x=bernoulli.Bernoulli))
 
   def test_dist_fn_takes_kwargs(self):
-    dist = tfd.JointDistributionNamed(
-        {'positive': tfd.Exponential(rate=1.),
-         'negative': tfb.Scale(-1.)(tfd.Exponential(rate=1.)),
-         'b': lambda **kwargs: tfd.Normal(loc=kwargs['negative'],  # pylint: disable=g-long-lambda
-                                          scale=kwargs['positive'],
-                                          validate_args=True),
-         'a': lambda **kwargs: tfb.Scale(kwargs['b'])(  # pylint: disable=g-long-lambda
-             tfd.Gamma(concentration=-kwargs['negative'],
-                       rate=kwargs['positive'],
-                       validate_args=True))
-         }, validate_args=True)
+    dist = jdn.JointDistributionNamed(
+        {
+            'positive':
+                exponential.Exponential(rate=1.),
+            'negative':
+                scale.Scale(-1.)(exponential.Exponential(rate=1.)),
+            'b':
+                lambda **kwargs: normal.Normal(  # pylint: disable=g-long-lambda
+                    loc=kwargs['negative'],
+                    scale=kwargs['positive'],
+                    validate_args=True),
+            'a':
+                lambda **kwargs: scale.Scale(kwargs['b'])(  # pylint: disable=g-long-lambda
+                    gamma.Gamma(
+                        concentration=-kwargs['negative'],
+                        rate=kwargs['positive'],
+                        validate_args=True))
+        },
+        validate_args=True)
     lp = dist.log_prob(dist.sample(5, seed=test_util.test_seed()))
     self.assertAllEqual(lp.shape, [5])
 
   def test_graph_resolution(self):
     # pylint: disable=bad-whitespace
-    d = tfd.JointDistributionNamed(dict(
-        e    =          tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
-        scale=lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
-        s    =          tfd.HalfNormal(2.5),
-        loc  =lambda s: tfd.Normal(loc=0, scale=s),
-        df   =          tfd.Exponential(2),
-        x    =          tfd.StudentT),
-                                   validate_args=True)
+    d = jdn.JointDistributionNamed(
+        dict(
+            e=independent.Independent(
+                exponential.Exponential(rate=[100, 120]), 1),
+            scale=lambda e: gamma.Gamma(  # pylint: disable=g-long-lambda
+                concentration=e[..., 0], rate=e[..., 1]),
+            s=half_normal.HalfNormal(2.5),
+            loc=lambda s: normal.Normal(loc=0, scale=s),
+            df=exponential.Exponential(2),
+            x=student_t.StudentT),
+        validate_args=True)
     # pylint: enable=bad-whitespace
     self.assertEqual(
         (
@@ -455,18 +506,18 @@ class JointDistributionNamedTest(test_util.TestCase):
 
   @parameterized.parameters('mean', 'mode', 'stddev', 'variance')
   def test_summary_statistic(self, attr):
-    d = tfd.JointDistributionNamed(dict(logits=tfd.Normal(0., 1.),
-                                        x=tfd.Bernoulli(logits=0.)),
-                                   validate_args=True)
+    d = jdn.JointDistributionNamed(
+        dict(logits=normal.Normal(0., 1.), x=bernoulli.Bernoulli(logits=0.)),
+        validate_args=True)
     expected = {k: getattr(d.model[k], attr)() for k in d.model.keys()}
     actual = getattr(d, attr)()
     self.assertAllEqual(*self.evaluate([expected, actual]))
 
   @parameterized.parameters(('covariance',))
   def test_notimplemented_summary_statistic(self, attr):
-    d = tfd.JointDistributionNamed(dict(logits=tfd.Normal(0., 1.),
-                                        x=tfd.Bernoulli(probs=0.5)),
-                                   validate_args=True)
+    d = jdn.JointDistributionNamed(
+        dict(logits=normal.Normal(0., 1.), x=bernoulli.Bernoulli(probs=0.5)),
+        validate_args=True)
     with self.assertRaisesWithPredicateMatch(
         NotImplementedError,
         attr + ' is not implemented: JointDistributionNamed'):
@@ -475,26 +526,27 @@ class JointDistributionNamedTest(test_util.TestCase):
   @parameterized.parameters(
       'log_cdf', 'cdf', 'log_survival_function', 'survival_function')
   def test_notimplemented_evaluative_statistic(self, attr):
-    d = tfd.JointDistributionNamed(dict(logits=tfd.Normal(0., 1.),
-                                        x=tfd.Bernoulli(probs=0.5)),
-                                   validate_args=True)
+    d = jdn.JointDistributionNamed(
+        dict(logits=normal.Normal(0., 1.), x=bernoulli.Bernoulli(probs=0.5)),
+        validate_args=True)
     with self.assertRaisesWithPredicateMatch(
         NotImplementedError,
         attr + ' is not implemented: JointDistributionNamed'):
       getattr(d, attr)(dict(logits=0., x=0.5))
 
   def test_notimplemented_quantile(self):
-    d = tfd.JointDistributionNamed(dict(logits=tfd.Normal(0., 1.),
-                                        x=tfd.Bernoulli(probs=0.5)),
-                                   validate_args=True)
+    d = jdn.JointDistributionNamed(
+        dict(logits=normal.Normal(0., 1.), x=bernoulli.Bernoulli(probs=0.5)),
+        validate_args=True)
     with self.assertRaisesWithPredicateMatch(
         NotImplementedError,
         'quantile is not implemented: JointDistributionNamed'):
       d.quantile(0.5)
 
   def test_copy(self):
-    pgm = dict(logits=tfd.Normal(0., 1.), probs=tfd.Bernoulli(logits=0.5))
-    d = tfd.JointDistributionNamed(pgm, validate_args=True)
+    pgm = dict(
+        logits=normal.Normal(0., 1.), probs=bernoulli.Bernoulli(logits=0.5))
+    d = jdn.JointDistributionNamed(pgm, validate_args=True)
     d_copy = d.copy()
     self.assertEqual(d_copy.parameters['model'], pgm)
     self.assertEqual(d_copy.parameters['validate_args'], True)
@@ -502,10 +554,11 @@ class JointDistributionNamedTest(test_util.TestCase):
 
   def test_batch_slicing(self):
     # pylint: disable=bad-whitespace
-    d = tfd.JointDistributionNamed(
-        dict(s=          tfd.Exponential(rate=[10, 12, 14]),
-             n=lambda s: tfd.Normal(loc=0, scale=s),
-             x=lambda:   tfd.Beta(concentration0=[3, 2, 1], concentration1=1)),
+    d = jdn.JointDistributionNamed(
+        dict(
+            s=exponential.Exponential(rate=[10, 12, 14]),
+            n=lambda s: normal.Normal(loc=0, scale=s),
+            x=lambda: beta.Beta(concentration0=[3, 2, 1], concentration1=1)),
         validate_args=True)
     # pylint: enable=bad-whitespace
 
@@ -525,14 +578,17 @@ class JointDistributionNamedTest(test_util.TestCase):
 
   def test_sample_shape_propagation_default_behavior(self):
     # pylint: disable=bad-whitespace
-    d = tfd.JointDistributionNamed(dict(
-        e    =          tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
-        scale=lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
-        s    =          tfd.HalfNormal(2.5),
-        loc  =lambda s: tfd.Normal(loc=0, scale=s),
-        df   =          tfd.Exponential(2),
-        x    =          tfd.StudentT),
-                                   validate_args=False)
+    d = jdn.JointDistributionNamed(
+        dict(
+            e=independent.Independent(
+                exponential.Exponential(rate=[100, 120]), 1),
+            scale=lambda e: gamma.Gamma(  # pylint: disable=g-long-lambda
+                concentration=e[..., 0], rate=e[..., 1]),
+            s=half_normal.HalfNormal(2.5),
+            loc=lambda s: normal.Normal(loc=0, scale=s),
+            df=exponential.Exponential(2),
+            x=student_t.StudentT),
+        validate_args=False)
     # pylint: enable=bad-whitespace
     x = d.sample([2, 3], seed=test_util.test_seed())
     self.assertLen(x, 6)
@@ -547,16 +603,17 @@ class JointDistributionNamedTest(test_util.TestCase):
 
   def test_sample_complex_dependency(self):
     # pylint: disable=bad-whitespace
-    d = tfd.JointDistributionNamed(
+    d = jdn.JointDistributionNamed(
         dict(
-            y    =          tfd.StudentT,
-            x    =          tfd.StudentT,
-            df   =          tfd.Exponential(2),
-            loc  =lambda s: tfd.Normal(loc=0, scale=s),
-            s    =          tfd.HalfNormal(2.5),
-            scale=lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
-            e    =          tfd.Independent(tfd.Exponential(rate=[100, 120]), 1)
-        ),
+            y=student_t.StudentT,
+            x=student_t.StudentT,
+            df=exponential.Exponential(2),
+            loc=lambda s: normal.Normal(loc=0, scale=s),
+            s=half_normal.HalfNormal(2.5),
+            scale=lambda e: gamma.Gamma(  # pylint: disable=g-long-lambda
+                concentration=e[..., 0], rate=e[..., 1]),
+            e=independent.Independent(
+                exponential.Exponential(rate=[100, 120]), 1)),
         validate_args=False)
 
     # pylint: enable=bad-whitespace
@@ -586,14 +643,17 @@ class JointDistributionNamedTest(test_util.TestCase):
 
   def test_default_event_space_bijector(self):
     # pylint: disable=bad-whitespace
-    d = tfd.JointDistributionNamed(dict(
-        e    =          tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
-        scale=lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
-        s    =          tfd.HalfNormal(2.5),
-        loc  =lambda s: tfd.Normal(loc=0, scale=s),
-        df   =          tfd.Exponential(2),
-        x    =          tfd.StudentT),
-                                   validate_args=True)
+    d = jdn.JointDistributionNamed(
+        dict(
+            e=independent.Independent(
+                exponential.Exponential(rate=[100, 120]), 1),
+            scale=lambda e: gamma.Gamma(  # pylint: disable=g-long-lambda
+                concentration=e[..., 0], rate=e[..., 1]),
+            s=half_normal.HalfNormal(2.5),
+            loc=lambda s: normal.Normal(loc=0, scale=s),
+            df=exponential.Exponential(2),
+            x=student_t.StudentT),
+        validate_args=True)
     # pylint: enable=bad-whitespace
 
     # The event space bijector is inherited from `JointDistributionSequential`
@@ -619,11 +679,11 @@ class JointDistributionNamedTest(test_util.TestCase):
       self.assertSetEqual(set(self.evaluate(item).keys()), set(d.model.keys()))
 
   def test_sample_kwargs(self):
-    joint = tfd.JointDistributionNamed(
+    joint = jdn.JointDistributionNamed(
         dict(
-            a=tfd.Normal(0., 1.),
-            b=lambda a: tfd.Normal(a, 1.),
-            c=lambda a, b: tfd.Normal(a + b, 1.)))
+            a=normal.Normal(0., 1.),
+            b=lambda a: normal.Normal(a, 1.),
+            c=lambda a, b: normal.Normal(a + b, 1.)))
 
     seed = test_util.test_seed()
     tf.random.set_seed(seed)
@@ -656,18 +716,21 @@ class JointDistributionNamedTest(test_util.TestCase):
       disable_numpy=True,
       reason='Numpy has no notion of CompositeTensor/Pytree.')
   def testCompositeTensorOrPytree(self):
-    d = tfd.JointDistributionNamed(dict(
-        e    =          tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
-        scale=lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
-        loc  =          tfd.Normal(loc=0, scale=2.),
-        m    =          tfd.Normal,
-        x    =lambda m: tfd.Sample(tfd.Bernoulli(logits=m), 12)),
-                                   validate_args=True)
+    d = jdn.JointDistributionNamed(
+        dict(
+            e=independent.Independent(
+                exponential.Exponential(rate=[100, 120]), 1),
+            scale=lambda e: gamma.Gamma(  # pylint: disable=g-long-lambda
+                concentration=e[..., 0], rate=e[..., 1]),
+            loc=normal.Normal(loc=0, scale=2.),
+            m=normal.Normal,
+            x=lambda m: sample_lib.Sample(bernoulli.Bernoulli(logits=m), 12)),
+        validate_args=True)
 
     flat = tf.nest.flatten(d, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(
         d, flat, expand_composites=True)
-    self.assertIsInstance(unflat, tfd.JointDistributionNamed)
+    self.assertIsInstance(unflat, jdn.JointDistributionNamed)
     self.assertIs(type(d.model), type(unflat.model))
 
     x = self.evaluate(d.sample(3, seed=test_util.test_seed()))
@@ -685,11 +748,12 @@ class JointDistributionNamedTest(test_util.TestCase):
       disable_numpy=True, disable_jax=True,
       reason='Numpy and JAX do not have type spec serialization.')
   def testCompositeTensorSerialization(self):
-    encodable_jd = tfd.JointDistributionNamed(  # No lambdas.
+    encodable_jd = jdn.JointDistributionNamed(  # No lambdas.
         dict(
-            e    =          tfd.Independent(tfd.Exponential(rate=[10, 12]), 1),
-            loc  =          tfd.Normal(loc=0, scale=2.),
-            m    =          tfd.Normal(loc=-1., scale=1.)),
+            e=independent.Independent(
+                exponential.Exponential(rate=[10, 12]), 1),
+            loc=normal.Normal(loc=0, scale=2.),
+            m=normal.Normal(loc=-1., scale=1.)),
         validate_args=True)
 
     enc = tf.__internal__.saved_model.encode_structure(encodable_jd._type_spec)
@@ -703,17 +767,16 @@ class JointDistributionNamedTest(test_util.TestCase):
     self.assertEqual(dec, encodable_jd._type_spec)
     self.assertAllEqualNested(
         flat, tf.nest.flatten(deserialized_flat, expand_composites=True))
-    self.assertIsInstance(deserialized_unflat, tfd.JointDistributionNamed)
+    self.assertIsInstance(deserialized_unflat, jdn.JointDistributionNamed)
     self.assertIs(type(unflat.model), type(deserialized_unflat.model))
 
-    non_ct_jd = tfd.JointDistributionNamed(
+    non_ct_jd = jdn.JointDistributionNamed(
         dict(
-            e    =          tfd.Normal(loc=0, scale=2.),
-            m    =          tfd.TransformedDistribution(
-                                tfd.Normal(loc=-1., scale=1.),
-                                test_util.NonCompositeTensorExp()),
-        )
-    )
+            e=normal.Normal(loc=0, scale=2.),
+            m=transformed_distribution.TransformedDistribution(
+                normal.Normal(loc=-1., scale=1.),
+                test_util.NonCompositeTensorExp()),
+        ))
     self.assertNotIsInstance(non_ct_jd, tf.__internal__.CompositeTensor)
 
 

@@ -19,8 +19,8 @@
 import numpy as np
 from scipy import stats
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import gev_cdf
 from tensorflow_probability.python.internal import test_util
 
 
@@ -32,7 +32,7 @@ class GeneralizedExtremeValueCDFTest(test_util.TestCase):
     loc = 0.3
     scale = 5.
     concentration = np.array([[[-5.5], [-20], [0.], [1.]]], dtype=np.float32)
-    bijector = tfb.GeneralizedExtremeValueCDF(
+    bijector = gev_cdf.GeneralizedExtremeValueCDF(
         loc=loc, scale=scale, concentration=concentration, validate_args=True)
     self.assertStartsWith(bijector.name, "generalizedextremevalue")
     x = np.array([[[0.], [-3.], [0.], [4.2]]], dtype=np.float32)
@@ -52,14 +52,15 @@ class GeneralizedExtremeValueCDFTest(test_util.TestCase):
 
   def testScalarCongruency(self):
     bijector_test_util.assert_scalar_congruency(
-        tfb.GeneralizedExtremeValueCDF(loc=0.3, scale=20., concentration=0.2),
+        gev_cdf.GeneralizedExtremeValueCDF(
+            loc=0.3, scale=20., concentration=0.2),
         lower_x=1.,
         upper_x=100.,
         eval_func=self.evaluate,
         rtol=0.05)
 
   def testBijectiveAndFinite(self):
-    bijector = tfb.GeneralizedExtremeValueCDF(
+    bijector = gev_cdf.GeneralizedExtremeValueCDF(
         loc=0., scale=3.0, concentration=2.0, validate_args=True)
     x = np.linspace(-1.4, 10., num=10).astype(np.float32)
     y = np.linspace(0.01, 0.99, num=10).astype(np.float32)
@@ -69,7 +70,7 @@ class GeneralizedExtremeValueCDFTest(test_util.TestCase):
   @test_util.jax_disable_variable_test
   def testVariableScale(self):
     x = tf.Variable(1.)
-    b = tfb.GeneralizedExtremeValueCDF(
+    b = gev_cdf.GeneralizedExtremeValueCDF(
         loc=0., scale=x, concentration=0.6, validate_args=True)
     self.evaluate(x.initializer)
     self.assertIs(x, b.scale)

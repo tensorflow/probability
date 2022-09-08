@@ -16,15 +16,15 @@
 
 import tensorflow.compat.v2 as tf
 
-import tensorflow_probability as tfp
-from tensorflow_probability import bijectors as tfb
-from tensorflow_probability import distributions as tfd
+from tensorflow_probability.python.bijectors import chain
+from tensorflow_probability.python.bijectors import cumsum
+from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.bijectors import reshape
+from tensorflow_probability.python.distributions import linear_gaussian_ssm
+from tensorflow_probability.python.distributions import mvn_diag
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.sts import AutoregressiveMovingAverageStateSpaceModel
-from tensorflow_probability.python.sts import IntegratedStateSpaceModel
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
+from tensorflow_probability.python.sts.components.autoregressive_integrated_moving_average import AutoregressiveMovingAverageStateSpaceModel
+from tensorflow_probability.python.sts.components.autoregressive_integrated_moving_average import IntegratedStateSpaceModel
 
 
 @test_util.test_graph_and_eager_modes
@@ -34,26 +34,26 @@ class IntegratedStateSpaceModelTest(test_util.TestCase):
     num_timesteps = 20
     level_scale = 0.6
     noise_scale = 0.3
-    random_walk_ssm = tfd.LinearGaussianStateSpaceModel(
+    random_walk_ssm = linear_gaussian_ssm.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
         transition_matrix=[[1.]],
-        transition_noise=tfd.MultivariateNormalDiag(
+        transition_noise=mvn_diag.MultivariateNormalDiag(
             loc=[0.], scale_diag=[level_scale]),
         observation_matrix=[[1.]],
-        observation_noise=tfd.MultivariateNormalDiag(
+        observation_noise=mvn_diag.MultivariateNormalDiag(
             loc=[0.], scale_diag=[noise_scale]),
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             loc=[0.], scale_diag=[level_scale]))
 
-    white_noise_ssm = tfd.LinearGaussianStateSpaceModel(
+    white_noise_ssm = linear_gaussian_ssm.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
         transition_matrix=[[0.]],
-        transition_noise=tfd.MultivariateNormalDiag(
+        transition_noise=mvn_diag.MultivariateNormalDiag(
             loc=[0.], scale_diag=[level_scale]),
         observation_matrix=[[1.]],
-        observation_noise=tfd.MultivariateNormalDiag(
+        observation_noise=mvn_diag.MultivariateNormalDiag(
             loc=[0.], scale_diag=[noise_scale]),
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             loc=[0.], scale_diag=[level_scale]))
     cumsum_white_noise_ssm = IntegratedStateSpaceModel(white_noise_ssm)
     x, lp = cumsum_white_noise_ssm.experimental_sample_and_log_prob(
@@ -69,17 +69,18 @@ class IntegratedStateSpaceModelTest(test_util.TestCase):
         level_scale=0.6,
         level_drift=-0.3,
         observation_noise_scale=0.,
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             loc=tf.zeros([3]), scale_diag=tf.ones([3])))
     cumsum_ssm = IntegratedStateSpaceModel(ssm)
     x, lp = cumsum_ssm.experimental_sample_and_log_prob(
         [2], seed=test_util.test_seed())
 
-    flatten_event = tfb.Reshape([num_timesteps],
-                                event_shape_in=[num_timesteps, 1])
-    cumsum_dist = tfb.Chain([tfb.Invert(flatten_event),
-                             tfb.Cumsum(),
-                             flatten_event])(ssm)
+    flatten_event = reshape.Reshape([num_timesteps],
+                                    event_shape_in=[num_timesteps, 1])
+    cumsum_dist = chain.Chain(
+        [invert.Invert(flatten_event),
+         cumsum.Cumsum(), flatten_event])(
+             ssm)
     self.assertAllClose(lp, cumsum_dist.log_prob(x), atol=1e-5)
 
 

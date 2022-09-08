@@ -18,8 +18,9 @@
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import exp
+from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.internal import test_util
 
 
@@ -28,7 +29,7 @@ class ExpBijectorTest(test_util.TestCase):
   """Tests correctness of the Y = g(X) = exp(X) transformation."""
 
   def testBijector(self):
-    bijector = tfb.Exp()
+    bijector = exp.Exp()
     self.assertStartsWith(bijector.name, 'exp')
     x = [[[1.], [2.]]]
     y = np.exp(x)
@@ -45,13 +46,13 @@ class ExpBijectorTest(test_util.TestCase):
             x, event_ndims=1)))
 
   def testScalarCongruency(self):
-    bijector = tfb.Exp()
+    bijector = exp.Exp()
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=-2., upper_x=1.5, eval_func=self.evaluate,
         rtol=0.05)
 
   def testBijectiveAndFinite(self):
-    bijector = tfb.Exp()
+    bijector = exp.Exp()
     x = np.linspace(-10, 10, num=10).astype(np.float32)
     y = np.logspace(-10, 10, num=10).astype(np.float32)
     bijector_test_util.assert_bijective_and_finite(
@@ -59,7 +60,7 @@ class ExpBijectorTest(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test
   def testJacobian(self):
-    bijector = tfb.Exp()
+    bijector = exp.Exp()
     x = tf.constant([22.])
     fldj = bijector.forward_log_det_jacobian(x, event_ndims=0)
     fldj_theoretical = bijector_test_util.get_fldj_theoretical(
@@ -80,8 +81,8 @@ class LogBijectorTest(test_util.TestCase):
 
   def testBijectorIsInvertExp(self):
     x = np.linspace(1., 10., num=200)
-    log = tfb.Log()
-    invert_exp = tfb.Invert(tfb.Exp())
+    log = exp.Log()
+    invert_exp = invert.Invert(exp.Exp())
     self.assertAllClose(
         self.evaluate(log.forward(x)),
         self.evaluate(invert_exp.forward(x)))

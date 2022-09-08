@@ -16,13 +16,13 @@
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
-from tensorflow_probability import bijectors as tfb
-from tensorflow_probability import distributions as tfd
-
-
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.optimizer.convergence_criteria import successive_gradients_are_uncorrelated as sgau
+from tensorflow_probability.python.util import deferred_tensor
+from tensorflow_probability.python.vi import csiszar_divergence
 
 
 class SuccessiveGradientsAreUncorrelatedTests(test_util.TestCase):
@@ -38,17 +38,17 @@ class SuccessiveGradientsAreUncorrelatedTests(test_util.TestCase):
     # Example of fitting one normal to another using a
     # Monte Carlo variational loss.
     locs = tf.Variable(tf.random.normal([10], seed=seed()))
-    scales = tfp.util.TransformedVariable(
+    scales = deferred_tensor.TransformedVariable(
         tf.nn.softplus(tf.random.normal([10], seed=seed())),
-        tfb.Softplus())
-    trained_dist = tfd.Normal(locs, scales)
-    target_dist = tfd.Normal(loc=-0.4, scale=1.2)
+        softplus.Softplus())
+    trained_dist = normal.Normal(locs, scales)
+    target_dist = normal.Normal(loc=-0.4, scale=1.2)
 
     optimizer = tf.optimizers.Adam(learning_rate=0.1)
     @tf.function(autograph=False)
     def optimization_step():
       with tf.GradientTape() as tape:
-        loss = tfp.vi.monte_carlo_variational_loss(
+        loss = csiszar_divergence.monte_carlo_variational_loss(
             target_log_prob_fn=target_dist.log_prob,
             surrogate_posterior=trained_dist,
             sample_size=20,
@@ -58,7 +58,7 @@ class SuccessiveGradientsAreUncorrelatedTests(test_util.TestCase):
       return loss, grads
 
     criterion = (
-        tfp.optimizer.convergence_criteria.SuccessiveGradientsAreUncorrelated(
+        sgau.SuccessiveGradientsAreUncorrelated(
             window_size=10, min_num_steps=20))
 
     loss, grads = optimization_step()

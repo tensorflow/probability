@@ -20,27 +20,41 @@ import os
 import numpy as np
 import six
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.bijectors import chain
+from tensorflow_probability.python.bijectors import exp
+from tensorflow_probability.python.bijectors import scale as scale_lib
+from tensorflow_probability.python.bijectors import shift
+from tensorflow_probability.python.bijectors import sigmoid
+from tensorflow_probability.python.distributions import categorical
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import finite_discrete
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import mixture_same_family
+from tensorflow_probability.python.distributions import mvn_linear_operator
+from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import onehot_categorical
+from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.experimental.util import composite_tensor
 from tensorflow_probability.python.experimental.util.composite_tensor import _registry as clsid_registry
 from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.layers import distribution_layer
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
 
 
 def normal_composite(*args, **kwargs):
-  return tfp.experimental.as_composite(tfd.Normal(*args, **kwargs))
+  return composite_tensor.as_composite(normal.Normal(*args, **kwargs))
 
 
 def sigmoid_normal_composite(*args, **kwargs):
-  return tfp.experimental.as_composite(tfb.Sigmoid()(tfd.Normal(
+  return composite_tensor.as_composite(sigmoid.Sigmoid()(normal.Normal(
       *args, **kwargs)))
 
 
 def onehot_cat_composite(*args, **kwargs):
-  return tfp.experimental.as_composite(tfd.OneHotCategorical(*args, **kwargs))
+  return composite_tensor.as_composite(
+      onehot_categorical.OneHotCategorical(*args, **kwargs))
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -185,10 +199,11 @@ class CompositeTensorTest(tfp_test_util.TestCase):
   def test_import_unrecognized_class(self):
     path = self.create_tempdir().full_path
 
-    class Normal(tfd.Distribution):  # Same name as tfd.Normal, but diff type.
+    class Normal(distribution.Distribution
+                ):  # Same name as tfd.Normal, but diff type.
 
       def __init__(self, loc, scale):
-        self.dist = tfd.Normal(loc, scale)
+        self.dist = normal.Normal(loc, scale)
         super(Normal, self).__init__(
             dtype=None, reparameterization_type=None,
             validate_args=False, allow_nan_stats=False)
@@ -200,7 +215,7 @@ class CompositeTensorTest(tfp_test_util.TestCase):
 
       @tf.function(input_signature=())
       def make_dist(self):
-        return tfp.experimental.as_composite(Normal(0, 1))
+        return composite_tensor.as_composite(Normal(0, 1))
 
     m1 = Model()
     tf.saved_model.save(m1, os.path.join(path, 'saved_model1'))
@@ -210,7 +225,7 @@ class CompositeTensorTest(tfp_test_util.TestCase):
         ValueError, r'For user-defined.*decorated.*register_composite'):
       tf.saved_model.load(os.path.join(path, 'saved_model1'))
 
-    tfp.experimental.as_composite(Normal(0, 1))
+    composite_tensor.as_composite(Normal(0, 1))
     # Now warmed-up, loading should work.
     m2 = tf.saved_model.load(os.path.join(path, 'saved_model1'))
     self.evaluate(m2.make_dist().sample())
@@ -218,7 +233,7 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     # Eliminate cached classes again, but now register Normal as if it had been
     # decorated from the beginning.
     clsid_registry.clear()
-    self.assertEqual(Normal, tfp.experimental.register_composite(Normal))
+    self.assertEqual(Normal, composite_tensor.register_composite(Normal))
 
     # Loading should work again.
     m3 = tf.saved_model.load(os.path.join(path, 'saved_model1'))
@@ -229,8 +244,8 @@ class CompositeTensorTest(tfp_test_util.TestCase):
       self.skipTest(
           'PY3-only test because we do not support the callable argument '
           'kwargs_split_fn of TransformedDistribution in PY2.')
-    sn = tfb.Sigmoid()(tfd.Normal(0, 1))
-    dist = tfp.experimental.as_composite(sn)
+    sn = sigmoid.Sigmoid()(normal.Normal(0, 1))
+    dist = composite_tensor.as_composite(sn)
     flat = tf.nest.flatten(dist, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
     self.evaluate(unflat.sample())
@@ -263,10 +278,10 @@ class CompositeTensorTest(tfp_test_util.TestCase):
       self.skipTest(
           'PY3-only test because we do not support the callable argument '
           'kwargs_split_fn of TransformedDistribution in PY2.')
-    sn = tfb.Sigmoid(
+    sn = sigmoid.Sigmoid(
         low=[2.0, 3.0], high=[4.0, 5.0])(
-            tfd.Normal([6.0, 7.0], 1))
-    dist = tfp.experimental.as_composite(sn)
+            normal.Normal([6.0, 7.0], 1))
+    dist = composite_tensor.as_composite(sn)
     flat = tf.nest.flatten(dist, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
     self.evaluate(unflat.sample())
@@ -275,9 +290,10 @@ class CompositeTensorTest(tfp_test_util.TestCase):
   def test_finite_discrete(self):
     outcomes = tf.Variable([1., 2., 4.])
     self.evaluate(outcomes.initializer)
-    fd = tfd.FiniteDiscrete(outcomes, logits=tf.math.log([0.1, 0.4, 0.3]))
+    fd = finite_discrete.FiniteDiscrete(
+        outcomes, logits=tf.math.log([0.1, 0.4, 0.3]))
     log_prob_before = self.evaluate(fd.log_prob(2.))
-    dist = tfp.experimental.as_composite(fd)
+    dist = composite_tensor.as_composite(fd)
     flat = tf.nest.flatten(dist, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
     self.evaluate(unflat.sample())
@@ -286,10 +302,10 @@ class CompositeTensorTest(tfp_test_util.TestCase):
 
   def test_multivariate_normal_linear_operator(self):
     linop = tf.linalg.LinearOperatorIdentity(2)
-    d = tfd.MultivariateNormalLinearOperator(scale=linop)
+    d = mvn_linear_operator.MultivariateNormalLinearOperator(scale=linop)
     sample = [-2.0, 3.0]
     log_prob_before = self.evaluate(d.log_prob(sample))
-    dist = tfp.experimental.as_composite(d)
+    dist = composite_tensor.as_composite(d)
     flat = tf.nest.flatten(dist, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
     self.evaluate(unflat.sample())
@@ -298,10 +314,10 @@ class CompositeTensorTest(tfp_test_util.TestCase):
 
   def test_multivariate_normal_linear_operator_diag(self):
     linop = tf.linalg.LinearOperatorDiag([5.0, -6.0])
-    d = tfd.MultivariateNormalLinearOperator(scale=linop)
+    d = mvn_linear_operator.MultivariateNormalLinearOperator(scale=linop)
     sample = [-2.0, 3.0]
     log_prob_before = self.evaluate(d.log_prob(sample))
-    dist = tfp.experimental.as_composite(d)
+    dist = composite_tensor.as_composite(d)
     flat = tf.nest.flatten(dist, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
     self.evaluate(unflat.sample())
@@ -318,10 +334,10 @@ class CompositeTensorTest(tfp_test_util.TestCase):
         u=[[1., 2.], [-1., 3.], [0., 0.]],
         diag_update=[11., 12.],
         v=[[1., 2.], [-1., 3.], [10., 10.]])
-    d = tfd.MultivariateNormalLinearOperator(scale=operator)
+    d = mvn_linear_operator.MultivariateNormalLinearOperator(scale=operator)
     sample = [-2.0, 3.0, -4.0]
     log_prob_before = self.evaluate(d.log_prob(sample))
-    dist = tfp.experimental.as_composite(d)
+    dist = composite_tensor.as_composite(d)
     flat = tf.nest.flatten(dist, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
     self.evaluate(unflat.sample())
@@ -331,10 +347,10 @@ class CompositeTensorTest(tfp_test_util.TestCase):
   def test_multivariate_normal_linear_operator_inversion(self):
     operator = tf.linalg.LinearOperatorFullMatrix([[1., -2.], [-3., 4.]])
     operator_inv = tf.linalg.LinearOperatorInversion(operator)
-    d = tfd.MultivariateNormalLinearOperator(scale=operator_inv)
+    d = mvn_linear_operator.MultivariateNormalLinearOperator(scale=operator_inv)
     sample = [-2.0, 3.0]
     log_prob_before = self.evaluate(d.log_prob(sample))
-    dist = tfp.experimental.as_composite(d)
+    dist = composite_tensor.as_composite(d)
     flat = tf.nest.flatten(dist, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
     self.evaluate(unflat.sample())
@@ -345,10 +361,10 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     mu = [1., 2, 3]
     cov = [[0.36, 0.12, 0.06], [0.12, 0.29, -0.13], [0.06, -0.13, 0.26]]
     scale = tf.linalg.cholesky(cov)
-    d = tfd.MultivariateNormalTriL(loc=mu, scale_tril=scale)
+    d = mvn_tril.MultivariateNormalTriL(loc=mu, scale_tril=scale)
     sample = [-2.0, 3.0, -4.0]
     log_prob_before = self.evaluate(d.log_prob(sample))
-    dist = tfp.experimental.as_composite(d)
+    dist = composite_tensor.as_composite(d)
     flat = tf.nest.flatten(dist, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
     self.evaluate(unflat.sample())
@@ -356,12 +372,12 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     self.assertAllEqual(log_prob_before, log_prob_after)
 
   def test_independent(self):
-    fd = tfd.Independent(
-        distribution=tfd.Normal(loc=[-1., 1], scale=[0.1, 0.5]),
+    fd = independent.Independent(
+        distribution=normal.Normal(loc=[-1., 1], scale=[0.1, 0.5]),
         reinterpreted_batch_ndims=1)
     sample = [-2.0, 3.0]
     log_prob_before = self.evaluate(fd.log_prob(sample))
-    dist = tfp.experimental.as_composite(fd)
+    dist = composite_tensor.as_composite(fd)
     flat = tf.nest.flatten(dist, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
     self.evaluate(unflat.sample())
@@ -369,12 +385,13 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     self.assertEqual(log_prob_before, log_prob_after)
 
   def test_shift_bijector(self):
-    d = tfd.Normal([0., 1.], [2., 3.])
-    bij = tfb.Shift(4.)
-    td = tfd.TransformedDistribution(distribution=d, bijector=bij)
+    d = normal.Normal([0., 1.], [2., 3.])
+    bij = shift.Shift(4.)
+    td = transformed_distribution.TransformedDistribution(
+        distribution=d, bijector=bij)
     sample = [-2.0, 3.0]
     log_prob_before = self.evaluate(td.log_prob(sample))
-    dist = tfp.experimental.as_composite(td)
+    dist = composite_tensor.as_composite(td)
     flat = tf.nest.flatten(dist, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
     self.evaluate(unflat.sample())
@@ -382,12 +399,13 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     self.assertAllEqual(log_prob_before, log_prob_after)
 
   def test_chain_bijector(self):
-    d = tfd.Normal([1., 2.], [3., 4.])
-    bij = tfb.Chain([tfb.Shift(5.), tfb.Scale(6.)])
-    td = tfd.TransformedDistribution(distribution=d, bijector=bij)
+    d = normal.Normal([1., 2.], [3., 4.])
+    bij = chain.Chain([shift.Shift(5.), scale_lib.Scale(6.)])
+    td = transformed_distribution.TransformedDistribution(
+        distribution=d, bijector=bij)
     sample = [[7., 8.], [9., -1.]]
     log_prob_before = self.evaluate(td.log_prob(sample))
-    dist = tfp.experimental.as_composite(td)
+    dist = composite_tensor.as_composite(td)
     flat = tf.nest.flatten(dist, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
     self.evaluate(unflat.sample())
@@ -399,19 +417,19 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     def layer_helper(x):
       loc = tf.split(x, 2, axis=-1)[0]
       scale = tf.math.exp(tf.split(x, 2, axis=-1)[1])
-      d = tfd.Normal(loc, scale)
-      cd = tfp.experimental.as_composite(d)
+      d = normal.Normal(loc, scale)
+      cd = composite_tensor.as_composite(d)
       return cd
 
     model1 = tf.keras.models.Sequential([
         tf.keras.layers.Dense(10),
         tf.keras.layers.Lambda(layer_helper),
-        tf.keras.layers.Lambda(tfd.Distribution.mean),
+        tf.keras.layers.Lambda(distribution.Distribution.mean),
         tf.keras.layers.Dense(10),
     ])
     model2 = tf.keras.models.Sequential([
         tf.keras.layers.Dense(10),
-        tfp.layers.DistributionLambda(layer_helper),
+        distribution_layer.DistributionLambda(layer_helper),
         tf.keras.layers.Dense(10),
     ])
 
@@ -426,12 +444,11 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     model2.predict(x_test, steps=1)
 
   def test_transformed_distribution(self):
-    fd = tfd.TransformedDistribution(
-        distribution=tfd.Normal(loc=0., scale=1.),
-        bijector=tfb.Exp())
+    fd = transformed_distribution.TransformedDistribution(
+        distribution=normal.Normal(loc=0., scale=1.), bijector=exp.Exp())
     sample = 2.
     log_prob_before = self.evaluate(fd.log_prob(sample))
-    dist = tfp.experimental.as_composite(fd)
+    dist = composite_tensor.as_composite(fd)
     flat = tf.nest.flatten(dist, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
     self.evaluate(unflat.sample())
@@ -440,7 +457,7 @@ class CompositeTensorTest(tfp_test_util.TestCase):
 
   def test_multi_calls(self):
 
-    class TrivialMetaDist(tfd.Distribution):
+    class TrivialMetaDist(distribution.Distribution):
 
       def __init__(self, dist):
         self.dist = dist
@@ -448,28 +465,26 @@ class CompositeTensorTest(tfp_test_util.TestCase):
             dtype=None, reparameterization_type=None,
             validate_args=False, allow_nan_stats=False)
 
-    n = tfd.Normal(0, 1)
+    n = normal.Normal(0, 1)
     d = TrivialMetaDist(n)
-    d1 = tfp.experimental.as_composite(d)
-    d2 = tfp.experimental.as_composite(d1)
+    d1 = composite_tensor.as_composite(d)
+    d2 = composite_tensor.as_composite(d1)
     self.assertIsNot(d, d1)
     self.assertIs(d1, d2)
 
   def test_basics_mixture_same_family(self):
-    gm = tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(probs=[0.3, 0.7]),
-        components_distribution=tfd.Normal(
-            loc=[-1., 1],
-            scale=[0.1, 0.5]))
-    dist = tfp.experimental.as_composite(gm)
+    gm = mixture_same_family.MixtureSameFamily(
+        mixture_distribution=categorical.Categorical(probs=[0.3, 0.7]),
+        components_distribution=normal.Normal(loc=[-1., 1], scale=[0.1, 0.5]))
+    dist = composite_tensor.as_composite(gm)
     flat = tf.nest.flatten(dist, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
     self.evaluate(unflat.sample())
     self.evaluate(unflat.log_prob(.5))
 
   def test_already_composite_tensor(self):
-    b = tfb.Scale(2.)
-    b2 = tfp.experimental.as_composite(b)
+    b = scale_lib.Scale(2.)
+    b2 = composite_tensor.as_composite(b)
     self.assertIsInstance(b, tf.__internal__.CompositeTensor)
     self.assertIs(b, b2)
 

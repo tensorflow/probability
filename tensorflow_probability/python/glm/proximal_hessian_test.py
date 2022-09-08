@@ -19,10 +19,13 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.distributions import bernoulli
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import uniform
+from tensorflow_probability.python.glm import family
+from tensorflow_probability.python.glm import proximal_hessian
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
+from tensorflow_probability.python.math import sparse
 
 
 @test_util.test_graph_and_eager_modes
@@ -47,12 +50,13 @@ class _ProximalHessianTest(object):
                     batch_shape=None,
                     dtype=np.float32,
                     seed=42):
-    seed = tfp.util.SeedStream(seed=seed, salt='tfp.glm.proximal_hessian_test')
+    seed = test_util.test_seed_stream(
+        hardcoded_seed=seed, salt='tfp.glm.proximal_hessian_test')
 
     if batch_shape is None:
       batch_shape = []
 
-    model_coefficients = tfd.Uniform(
+    model_coefficients = uniform.Uniform(
         low=np.array(-1, dtype), high=np.array(1, dtype)).sample(
             batch_shape + [d], seed=seed())
 
@@ -61,10 +65,11 @@ class _ProximalHessianTest(object):
         radius /
         tf.linalg.norm(tensor=model_coefficients, axis=-1)[..., tf.newaxis])
 
-    mask = tfd.Bernoulli(probs=0.5, dtype=tf.bool).sample(batch_shape + [d])
+    mask = bernoulli.Bernoulli(
+        probs=0.5, dtype=tf.bool).sample(batch_shape + [d])
     model_coefficients = tf.where(
         mask, model_coefficients, tf.zeros_like(model_coefficients))
-    model_matrix = tfd.Normal(
+    model_matrix = normal.Normal(
         loc=np.array(0, dtype), scale=np.array(1, dtype)).sample(
             batch_shape + [n, d], seed=seed())
     scale = tf.convert_to_tensor(value=scale, dtype=dtype)
@@ -72,14 +77,14 @@ class _ProximalHessianTest(object):
                                 model_coefficients[..., tf.newaxis])[..., 0]
 
     if link == 'linear':
-      response = tfd.Normal(
+      response = normal.Normal(
           loc=linear_response, scale=scale).sample(seed=seed())
     elif link == 'probit':
       response = tf.cast(
-          tfd.Normal(loc=linear_response, scale=scale).sample(seed=seed()) > 0,
-          dtype)
+          normal.Normal(loc=linear_response, scale=scale).sample(seed=seed()) >
+          0, dtype)
     elif link == 'logit':
-      response = tfd.Bernoulli(logits=linear_response).sample(seed=seed())
+      response = bernoulli.Bernoulli(logits=linear_response).sample(seed=seed())
     else:
       raise ValueError('unrecognized true link: {}'.format(link))
     return self.evaluate([model_matrix, response, model_coefficients, mask])
@@ -116,7 +121,7 @@ class _ProximalHessianTest(object):
       model_coefficients_start = np.zeros(model_matrix.shape[:-2] +
                                           model_matrix.shape[-1:])
     if convert_to_sparse_tensor:
-      model_matrix = tfp.math.dense_to_sparse(model_matrix)
+      model_matrix = sparse.dense_to_sparse(model_matrix)
 
     model_matrix = self._adjust_dtype_and_shape_hints(model_matrix)
     response = self._adjust_dtype_and_shape_hints(response)
@@ -132,13 +137,13 @@ class _ProximalHessianTest(object):
     # in every case.)
     x_, y_, _, _ = self._make_dataset(n=int(1e5), d=100, link='logit')
 
-    model = tfp.glm.BernoulliNormalCDF()
+    model = family.BernoulliNormalCDF()
     model_coefficients_0 = tf.zeros(x_.shape[-1], self.dtype)
 
     x_ = self._adjust_dtype_and_shape_hints(x_)
     y_ = self._adjust_dtype_and_shape_hints(y_)
 
-    model_coefficients_1, is_converged, _ = tfp.glm.fit_sparse_one_step(
+    model_coefficients_1, is_converged, _ = proximal_hessian.fit_sparse_one_step(
         model_matrix=x_,
         response=y_,
         model=model,
@@ -152,7 +157,7 @@ class _ProximalHessianTest(object):
 
     self.assertAllEqual(False, is_converged)
 
-    model_coefficients_2, _, _ = tfp.glm.fit_sparse_one_step(
+    model_coefficients_2, _, _ = proximal_hessian.fit_sparse_one_step(
         model_matrix=x_,
         response=y_,
         model=model,
@@ -208,7 +213,7 @@ class _ProximalHessianTest(object):
     compile_with_xla = has_xla() and not use_sparse_tensor
     @tf.function(autograph=False, jit_compile=compile_with_xla)
     def run():
-      model_coefficients, is_converged, _ = tfp.glm.fit_sparse(
+      model_coefficients, is_converged, _ = proximal_hessian.fit_sparse(
           model_matrix,
           response,
           model,
@@ -237,7 +242,7 @@ class _ProximalHessianTest(object):
         n=int(1e5),
         d=100,
         link='probit',
-        model=tfp.glm.Bernoulli(),
+        model=family.Bernoulli(),
         batch_shape=None)
 
   def testFitGLMFromData_SingleBatch(self):
@@ -246,7 +251,7 @@ class _ProximalHessianTest(object):
         n=int(1e4),
         d=100,
         link='linear',
-        model=tfp.glm.Normal(),
+        model=family.Normal(),
         batch_shape=batch_shape)
 
   def testFitGLMFromData_BatchOfRank1(self):
@@ -255,7 +260,7 @@ class _ProximalHessianTest(object):
         n=int(1e4),
         d=25,
         link='linear',
-        model=tfp.glm.Normal(),
+        model=family.Normal(),
         batch_shape=batch_shape)
 
   def testFitGLMFromData_BatchOfRank2(self):
@@ -264,7 +269,7 @@ class _ProximalHessianTest(object):
         n=int(1e4),
         d=25,
         link='linear',
-        model=tfp.glm.Normal(),
+        model=family.Normal(),
         batch_shape=batch_shape)
 
   def testFitGLMFromData_SparseTensorSingleBatch(self):
@@ -273,7 +278,7 @@ class _ProximalHessianTest(object):
         n=int(1e4),
         d=25,
         link='linear',
-        model=tfp.glm.Normal(),
+        model=family.Normal(),
         batch_shape=batch_shape,
         use_sparse_tensor=True)
 
@@ -283,7 +288,7 @@ class _ProximalHessianTest(object):
         n=int(1e4),
         d=25,
         link='linear',
-        model=tfp.glm.Normal(),
+        model=family.Normal(),
         batch_shape=batch_shape,
         use_sparse_tensor=True)
 
@@ -293,7 +298,7 @@ class _ProximalHessianTest(object):
         n=int(1e4),
         d=25,
         link='linear',
-        model=tfp.glm.Normal(),
+        model=family.Normal(),
         batch_shape=batch_shape,
         use_sparse_tensor=True)
 
@@ -303,7 +308,7 @@ class _ProximalHessianTest(object):
         n=int(1e4),
         d=25,
         link='linear',
-        model=tfp.glm.Normal(),
+        model=family.Normal(),
         batch_shape=batch_shape,
         use_sparse_tensor=True)
 
@@ -311,7 +316,7 @@ class _ProximalHessianTest(object):
     n = int(1e4)
     d = 25
     link = 'linear'
-    model = tfp.glm.Normal()
+    model = family.Normal()
 
     # Create two sets of synthetic data according to the given `link` function.
     model_matrix_1_, response_1_, _, _ = self._make_dataset(
@@ -327,7 +332,7 @@ class _ProximalHessianTest(object):
             convert_to_sparse_tensor=use_sparse_tensor))
 
     model_coefficients_1_, _, _ = self.evaluate(
-        tfp.glm.fit_sparse(
+        proximal_hessian.fit_sparse(
             model_matrix_1,
             response_1,
             model,
@@ -346,7 +351,7 @@ class _ProximalHessianTest(object):
             convert_to_sparse_tensor=use_sparse_tensor))
 
     model_coefficients_2_, _, _ = self.evaluate(
-        tfp.glm.fit_sparse(
+        proximal_hessian.fit_sparse(
             model_matrix_2,
             response_2,
             model,
@@ -369,7 +374,7 @@ class _ProximalHessianTest(object):
             convert_to_sparse_tensor=use_sparse_tensor))
 
     model_coefficients_, _, _ = self.evaluate(
-        tfp.glm.fit_sparse(
+        proximal_hessian.fit_sparse(
             model_matrix,
             response,
             model,

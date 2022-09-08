@@ -23,28 +23,30 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-import tensorflow_probability as tfp
-
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math.psd_kernels import changepoint
+from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic
+from tensorflow_probability.python.math.psd_kernels import matern
 
 
 @test_util.test_all_tf_execution_regimes
 class ChangePointTest(test_util.TestCase):
 
   def testShape(self):
-    k1 = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    k1 = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude=np.ones([3]), length_scale=np.ones([2, 1]))
-    k2 = tfp.math.psd_kernels.MaternFiveHalves(
-        amplitude=np.ones([5, 1, 1]),
-        length_scale=np.ones([2, 1, 1, 1]))
-    k3 = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    k2 = matern.MaternFiveHalves(
+        amplitude=np.ones([5, 1, 1]), length_scale=np.ones([2, 1, 1, 1]))
+    k3 = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude=np.ones([3, 1, 1, 1, 1]),
         length_scale=np.ones([2, 1, 1, 1, 1, 1]))
     locs = np.ones([2, 1, 2])
     slopes = np.ones([1, 3, 2])
     weight_fn = lambda x, f: tf.linalg.norm(x, axis=-1)
-    k = tfp.math.psd_kernels.ChangePoint(
-        [k1, k2, k3], locs=locs, slopes=slopes, weight_fn=weight_fn)
+    k = changepoint.ChangePoint([k1, k2, k3],
+                                locs=locs,
+                                slopes=slopes,
+                                weight_fn=weight_fn)
 
     batch_shape = [2, 3, 2, 5, 2, 3]
 
@@ -65,17 +67,15 @@ class ChangePointTest(test_util.TestCase):
     amplitude = 5.
     length_scale = .2
 
-    k1 = tfp.math.psd_kernels.ExponentiatedQuadratic(
-        amplitude, length_scale)
-    k2 = tfp.math.psd_kernels.MaternThreeHalves(
-        amplitude, length_scale)
+    k1 = exponentiated_quadratic.ExponentiatedQuadratic(amplitude, length_scale)
+    k2 = matern.MaternThreeHalves(amplitude, length_scale)
 
     x = np.random.uniform(-1, 1, size=[30, 1]).astype(np.float32)
     y = np.random.uniform(-1, 1, size=[30, 1]).astype(np.float32)
 
     locs = np.array([0.], dtype=np.float32)
     slopes = np.array([3.], dtype=np.float32)
-    k = tfp.math.psd_kernels.ChangePoint([k1, k2], slopes=slopes, locs=locs)
+    k = changepoint.ChangePoint([k1, k2], slopes=slopes, locs=locs)
 
     weights_x = tf.math.sigmoid(slopes * (x - locs))[..., 0]
     weights_y = tf.math.sigmoid(slopes * (y - locs))[..., 0]
@@ -105,11 +105,11 @@ class ChangePointTest(test_util.TestCase):
     amplitude = 5.
     length_scale = 2.
 
-    k1 = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    k1 = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude, length_scale, feature_ndims=feature_ndims)
-    k2 = tfp.math.psd_kernels.MaternThreeHalves(
+    k2 = matern.MaternThreeHalves(
         amplitude, length_scale, feature_ndims=feature_ndims)
-    k3 = tfp.math.psd_kernels.MaternOneHalf(
+    k3 = matern.MaternOneHalf(
         amplitude, length_scale, feature_ndims=feature_ndims)
 
     # Default weight function is to sum over the dimensions.
@@ -117,21 +117,19 @@ class ChangePointTest(test_util.TestCase):
     # Use a large slope to ensure that we switch between the kernels.
     slopes = np.array([30.], dtype=np.float32)
 
-    changepoint = tfp.math.psd_kernels.ChangePoint(
-        [k1, k2, k3], locs=locs, slopes=slopes)
+    c = changepoint.ChangePoint([k1, k2, k3], locs=locs, slopes=slopes)
 
     shape = [dims] * feature_ndims
     for k, lims in [(k1, [-20., -10.]), (k2, [-2., 2.]), (k3, [10., 20.])]:
       x = np.random.uniform(*lims, size=shape).astype(np.float32)
       y = np.random.uniform(*lims, size=shape).astype(np.float32)
       self.assertAllClose(
-          self.evaluate(k.apply(x, y)), self.evaluate(changepoint.apply(x, y)))
+          self.evaluate(k.apply(x, y)), self.evaluate(c.apply(x, y)))
 
       x = np.random.uniform(*lims, size=[3] + shape).astype(np.float32)
       y = np.random.uniform(*lims, size=[4] + shape).astype(np.float32)
       self.assertAllClose(
-          self.evaluate(k.matrix(x, y)),
-          self.evaluate(changepoint.matrix(x, y)))
+          self.evaluate(k.matrix(x, y)), self.evaluate(c.matrix(x, y)))
 
 
 if __name__ == '__main__':

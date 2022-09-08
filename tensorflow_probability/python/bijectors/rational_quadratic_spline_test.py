@@ -22,9 +22,11 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.bijectors import rational_quadratic_spline
+from tensorflow_probability.python.bijectors import real_nvp
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
@@ -58,7 +60,7 @@ def rq_splines(draw, batch_shape=None, dtype=tf.float32):
           params_event_ndims=dict(bin_widths=1, bin_heights=1, knot_slopes=1),
           constraint_fn_for=constraints.get))
   hp.note('params: {!r}'.format(params))
-  return tfb.RationalQuadraticSpline(
+  return rational_quadratic_spline.RationalQuadraticSpline(
       range_min=lo, validate_args=draw(hps.booleans()), **params)
 
 
@@ -102,7 +104,7 @@ class RationalQuadraticSplineTest(test_util.TestCase):
               nunits * (self._nbins - 1), activation=_slopes, name='s')
           self._built = True
 
-        return tfb.RationalQuadraticSpline(
+        return rational_quadratic_spline.RationalQuadraticSpline(
             bin_widths=self._bin_widths(x),
             bin_heights=self._bin_heights(x),
             knot_slopes=self._knot_slopes(x))
@@ -111,9 +113,9 @@ class RationalQuadraticSplineTest(test_util.TestCase):
     splines = [SplineParams() for _ in range(nsplits)]
 
     def spline_flow():
-      stack = tfb.Identity()
+      stack = identity.Identity()
       for i in range(nsplits):
-        stack = tfb.RealNVP(5 * i, bijector_fn=splines[i])(stack)
+        stack = real_nvp.RealNVP(5 * i, bijector_fn=splines[i])(stack)
       return stack
 
     ys = spline_flow().forward(xs)
@@ -126,7 +128,8 @@ class RationalQuadraticSplineTest(test_util.TestCase):
     self.assertAllClose(xs, self.evaluate(ys_inv))
 
   def testDegenerateSplines(self):
-    bijector = tfb.RationalQuadraticSpline([], [], 1, validate_args=True)
+    bijector = rational_quadratic_spline.RationalQuadraticSpline(
+        [], [], 1, validate_args=True)
     xs = np.linspace(-2, 2, 20, dtype=np.float32)
     self.assertAllClose(xs, self.evaluate(bijector.forward(xs)))
     self.assertAllClose(
@@ -135,7 +138,8 @@ class RationalQuadraticSplineTest(test_util.TestCase):
         np.zeros_like(xs),
         self.evaluate(bijector.forward_log_det_jacobian(xs, event_ndims=0)))
 
-    bijector = tfb.RationalQuadraticSpline([2.], [2.], [], validate_args=True)
+    bijector = rational_quadratic_spline.RationalQuadraticSpline(
+        [2.], [2.], [], validate_args=True)
     xs = np.linspace(-2, 2, 20, dtype=np.float32)
     self.assertAllClose(xs, self.evaluate(bijector.forward(xs)))
     self.assertAllClose(
@@ -146,7 +150,7 @@ class RationalQuadraticSplineTest(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test
   def testTheoreticalFldjSimple(self):
-    bijector = tfb.RationalQuadraticSpline(
+    bijector = rational_quadratic_spline.RationalQuadraticSpline(
         bin_widths=[1., 1],
         bin_heights=[np.sqrt(.5), 2 - np.sqrt(.5)],
         knot_slopes=1)
@@ -220,11 +224,14 @@ class RationalQuadraticSplineTest(test_util.TestCase):
 
   def testVerifiesBroadcastingStatic(self):
     with self.assertRaisesRegex(ValueError, '`bin_heights` must broadcast'):
-      tfb.RationalQuadraticSpline([[2, 1, .5]] * 2, [[.5, 2, 1]] * 3, [.3, 2])
+      rational_quadratic_spline.RationalQuadraticSpline([[2, 1, .5]] * 2,
+                                                        [[.5, 2, 1]] * 3,
+                                                        [.3, 2])
 
     with self.assertRaisesRegex(ValueError,
                                 'non-scalar `knot_slopes` must broadcast'):
-      tfb.RationalQuadraticSpline([2, 1, .5], [.5, 2, 1], [.3, 2, .5])
+      rational_quadratic_spline.RationalQuadraticSpline([2, 1, .5], [.5, 2, 1],
+                                                        [.3, 2, .5])
 
   @test_util.disable_test_for_backend(
       disable_numpy=True, disable_jax=True,
@@ -233,7 +240,7 @@ class RationalQuadraticSplineTest(test_util.TestCase):
 
     @tf.function
     def f(bin_sizes, slopes):
-      return tfb.RationalQuadraticSpline(
+      return rational_quadratic_spline.RationalQuadraticSpline(
           bin_sizes, bin_sizes, slopes, validate_args=True).forward(bin_sizes)
 
     f = f.get_concrete_function(
@@ -246,7 +253,7 @@ class RationalQuadraticSplineTest(test_util.TestCase):
   def testAssertsMismatchedSums(self):
     with self.assertRaisesOpError(r'`sum\(bin_widths, axis=-1\)` must equal '
                                   r'`sum\(bin_heights, axis=-1\)`'):
-      bijector = tfb.RationalQuadraticSpline(
+      bijector = rational_quadratic_spline.RationalQuadraticSpline(
           bin_widths=[.2, .1, .5],
           bin_heights=[.1, .3, 5.4],
           knot_slopes=[.3, .5],
@@ -255,7 +262,7 @@ class RationalQuadraticSplineTest(test_util.TestCase):
 
   def testAssertsNonPositiveBinSizes(self):
     with self.assertRaisesOpError('`bin_widths` must be positive'):
-      bijector = tfb.RationalQuadraticSpline(
+      bijector = rational_quadratic_spline.RationalQuadraticSpline(
           bin_widths=[.3, .2, -.1],
           bin_heights=[.1, .2, .1],
           knot_slopes=[.4, .5],
@@ -263,7 +270,7 @@ class RationalQuadraticSplineTest(test_util.TestCase):
       self.evaluate(bijector.forward([.3]))
 
     with self.assertRaisesOpError('`bin_heights` must be positive'):
-      bijector = tfb.RationalQuadraticSpline(
+      bijector = rational_quadratic_spline.RationalQuadraticSpline(
           bin_widths=[.3, .2, .1],
           bin_heights=[.5, 0, .1],
           knot_slopes=[.3, .7],
@@ -272,7 +279,7 @@ class RationalQuadraticSplineTest(test_util.TestCase):
 
   def testAssertsNonPositiveSlope(self):
     with self.assertRaisesOpError('`knot_slopes` must be positive'):
-      bijector = tfb.RationalQuadraticSpline(
+      bijector = rational_quadratic_spline.RationalQuadraticSpline(
           bin_widths=[.1, .2, 1],
           bin_heights=[1, .2, .1],
           knot_slopes=[-.5, 1],
@@ -280,7 +287,7 @@ class RationalQuadraticSplineTest(test_util.TestCase):
       self.evaluate(bijector.forward([.3]))
 
     with self.assertRaisesOpError('`knot_slopes` must be positive'):
-      bijector = tfb.RationalQuadraticSpline(
+      bijector = rational_quadratic_spline.RationalQuadraticSpline(
           bin_widths=[.1, .2, 1],
           bin_heights=[1, .2, .1],
           knot_slopes=[1, 0.],

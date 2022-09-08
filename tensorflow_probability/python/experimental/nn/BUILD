@@ -59,12 +59,17 @@ py_test(
     size = "medium",
     srcs = ["affine_layers_test.py"],
     deps = [
+        ":nn",
         # absl/testing:parameterized dep,
         # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
+        # tensorflow:tensorflow_no_contrib dep,
+        "//tensorflow_probability/python/bijectors:softmax_centered",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/util:deferred_tensor",
     ],
 )
 
@@ -87,10 +92,15 @@ py_test(
     size = "medium",
     srcs = ["convolutional_layers_test.py"],
     deps = [
+        ":nn",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/bijectors:softmax_centered",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/util:deferred_tensor",
     ],
 )
 
@@ -114,11 +124,16 @@ py_test(
     srcs = ["convolutional_layers_v2_test.py"],
     shard_count = 2,
     deps = [
+        ":nn",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/bijectors:softmax_centered",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/util:deferred_tensor",
     ],
 )
 
@@ -132,6 +147,7 @@ py_library(
         "//tensorflow_probability/python/distributions:distribution",
         "//tensorflow_probability/python/experimental/nn/util:utils",
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/util:deferred_tensor",
     ],
 )
 
@@ -140,8 +156,12 @@ py_test(
     size = "medium",
     srcs = ["convolutional_transpose_layers_test.py"],
     deps = [
+        ":nn",
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/bijectors:sigmoid",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -161,8 +181,10 @@ py_test(
     size = "small",
     srcs = ["layers_test.py"],
     deps = [
+        ":nn",
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

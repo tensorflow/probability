@@ -19,19 +19,38 @@ import numpy as np
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.bijectors import exp
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.distributions import beta as beta_lib
+from tensorflow_probability.python.distributions import deterministic
+from tensorflow_probability.python.distributions import exponential
+from tensorflow_probability.python.distributions import gaussian_process
+from tensorflow_probability.python.distributions import half_cauchy
+from tensorflow_probability.python.distributions import inverse_gamma
+from tensorflow_probability.python.distributions import joint_distribution_coroutine as jdc
+from tensorflow_probability.python.distributions import joint_distribution_named as jdn
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import sample as sample_dist_lib
+from tensorflow_probability.python.experimental.distribute import joint_distribution
+from tensorflow_probability.python.experimental.distribute import sharded as sharded_dist
+from tensorflow_probability.python.experimental.mcmc import potential_scale_reduction_reducer
+from tensorflow_probability.python.experimental.mcmc import reducer
+from tensorflow_probability.python.experimental.mcmc import sharded
+from tensorflow_probability.python.experimental.mcmc import snaper_hmc
 from tensorflow_probability.python.internal import distribute_test_lib
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.internal import unnest
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
+from tensorflow_probability.python.math.psd_kernels import matern
+from tensorflow_probability.python.mcmc import dual_averaging_step_size_adaptation as dassa
+from tensorflow_probability.python.mcmc import sample
 
 JAX_MODE = False
 
 
-class CountingReducer(tfp.experimental.mcmc.Reducer):
+class CountingReducer(reducer.Reducer):
 
   def initialize(self, *_, **__):
     return 0
@@ -69,18 +88,18 @@ class _SNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
     _, eigs = np.linalg.eigh(covariance)
     principal_component = eigs[:, -1]
 
-    gaussian = tfd.MultivariateNormalTriL(
+    gaussian = mvn_tril.MultivariateNormalTriL(
         loc=tf.zeros(num_dims, self.dtype),
         scale_tril=tf.linalg.cholesky(covariance),
     )
 
-    kernel = tfp.experimental.mcmc.SNAPERHamiltonianMonteCarlo(
+    kernel = snaper_hmc.SNAPERHamiltonianMonteCarlo(
         gaussian.log_prob,
         step_size=step_size,
         num_adaptation_steps=num_adaptation_steps,
         num_mala_steps=num_mala_steps,
     )
-    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+    kernel = dassa.DualAveragingStepSizeAdaptation(
         kernel, num_adaptation_steps=num_adaptation_steps)
 
     def trace_fn(_, pkr):
@@ -101,7 +120,7 @@ class _SNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
 
     chain, trace = self.evaluate(
         tf.function(
-            lambda seed: tfp.mcmc.sample_chain(  # pylint: disable=g-long-lambda
+            lambda seed: sample.sample_chain(  # pylint: disable=g-long-lambda
                 num_results=num_burnin_steps + num_results,
                 num_burnin_steps=0,
                 current_state=init_x,
@@ -155,7 +174,7 @@ class _SNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
   )
   def testStateStructure(self, init_x, batch_ndims):
     """Tests that one_step preserves structure/shape/dtype."""
-    kernel = tfp.experimental.mcmc.SNAPERHamiltonianMonteCarlo(
+    kernel = snaper_hmc.SNAPERHamiltonianMonteCarlo(
         lambda *x: sum([  # pylint: disable=g-long-lambda
             tf.reduce_sum(part, list(range(batch_ndims, len(part.shape))))
             for part in x
@@ -191,9 +210,9 @@ class _SNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
 
   @test_util.jax_disable_test_missing_functionality('No stateful PRNGs')
   def testStatefulSeed(self):
-    kernel = tfp.experimental.mcmc.SNAPERHamiltonianMonteCarlo(
-        tfd.Normal(0., 1.).log_prob, step_size=0.1, num_adaptation_steps=1)
-    _, kr = tfp.mcmc.sample_chain(
+    kernel = snaper_hmc.SNAPERHamiltonianMonteCarlo(
+        normal.Normal(0., 1.).log_prob, step_size=0.1, num_adaptation_steps=1)
+    _, kr = sample.sample_chain(
         current_state=tf.zeros(2),
         kernel=kernel,
         num_results=1,
@@ -218,32 +237,35 @@ del _SNAPERHMCTest
 
 def _make_joint_model(dtype):
 
-  @tfd.JointDistributionCoroutine
+  @jdc.JointDistributionCoroutine
   def model():
-    x = yield tfd.Normal(tf.zeros([], dtype), 1.)
-    yield tfd.Sample(tfd.Exponential(tf.exp(x)), 2)
+    x = yield normal.Normal(tf.zeros([], dtype), 1.)
+    yield sample_dist_lib.Sample(exponential.Exponential(tf.exp(x)), 2)
 
   return model
 
 
 def _make_joint_named_model(dtype):
 
-  return tfd.JointDistributionNamed({
-      'x': tfd.Normal(tf.zeros([], dtype), 1.),
-      'y': lambda x: tfd.Sample(tfd.Exponential(tf.exp(x)), 2),
+  return jdn.JointDistributionNamed({
+      'x':
+          normal.Normal(tf.zeros([], dtype), 1.),
+      'y':
+          lambda x: sample_dist_lib.Sample(  # pylint:disable=g-long-lambda
+              exponential.Exponential(tf.exp(x)), 2),
   })
 
 
 def _make_joint_nested_model(dtype):
 
-  @tfd.JointDistributionCoroutine
+  @jdc.JointDistributionCoroutine
   def inner_model():
-    yield tfd.Normal(tf.zeros([], dtype), 1., name='x')
+    yield normal.Normal(tf.zeros([], dtype), 1., name='x')
 
-  @tfd.JointDistributionCoroutine
+  @jdc.JointDistributionCoroutine
   def model():
     x = yield inner_model
-    yield tfd.Sample(tfd.Exponential(tf.exp(x.x)), 2)
+    yield sample_dist_lib.Sample(exponential.Exponential(tf.exp(x.x)), 2)
 
   return model
 
@@ -262,17 +284,18 @@ class _SampleSNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
     q *= np.sign(np.diag(r))
     covariance = (q * eigenvalues).dot(q.T).astype(self.dtype)
 
-    gaussian = tfd.MultivariateNormalTriL(
+    gaussian = mvn_tril.MultivariateNormalTriL(
         loc=tf.zeros(num_dims, self.dtype),
         scale_tril=tf.linalg.cholesky(covariance),
     )
 
     @tf.function(jit_compile=True)
     def run(seed):
-      results = tfp.experimental.mcmc.sample_snaper_hmc(
+      results = snaper_hmc.sample_snaper_hmc(
           model=gaussian,
           num_results=500,
-          reducer=tfp.experimental.mcmc.PotentialScaleReductionReducer(),
+          reducer=potential_scale_reduction_reducer
+          .PotentialScaleReductionReducer(),
           seed=seed,
       )
 
@@ -289,11 +312,11 @@ class _SampleSNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
         np.ones(num_dims, self.dtype), reduction_results, atol=0.1)
 
   @parameterized.named_parameters(
-      ('_scalar', lambda dtype: tfd.Normal(tf.zeros([], dtype), 1.)),
+      ('_scalar', lambda dtype: normal.Normal(tf.zeros([], dtype), 1.)),
       ('_scalar_constrained',
-       lambda dtype: tfd.LogNormal(tf.zeros([], dtype), 1.)),
-      ('_vector',
-       lambda dtype: tfd.Sample(tfd.LogNormal(tf.zeros([], dtype), 1.), 2)),
+       lambda dtype: lognormal.LogNormal(tf.zeros([], dtype), 1.)),
+      ('_vector', lambda dtype: sample_dist_lib.Sample(  # pylint:disable=g-long-lambda
+          lognormal.LogNormal(tf.zeros([], dtype), 1.), 2)),
       ('_joint', _make_joint_model),
       ('_joint_nested', _make_joint_nested_model),
       ('_joint_named', _make_joint_named_model),
@@ -301,7 +324,7 @@ class _SampleSNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
   def testWithDistribution(self, model_fn):
     model = model_fn(self.dtype)
     seed = test_util.test_seed(sampler_type='stateless')
-    results = tfp.experimental.mcmc.sample_snaper_hmc(
+    results = snaper_hmc.sample_snaper_hmc(
         model, 2, num_burnin_steps=2, seed=seed)
     trace = self.evaluate(results.trace)
     states = trace[0]
@@ -371,10 +394,13 @@ class _SampleSNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
             },
         )
     if use_bijector:
-      kwargs.update(event_space_bijector={'x': tfb.Exp(), 'y': tfb.Identity()})
+      kwargs.update(event_space_bijector={
+          'x': exp.Exp(),
+          'y': identity.Identity()
+      })
 
     seed = test_util.test_seed(sampler_type='stateless')
-    results = tfp.experimental.mcmc.sample_snaper_hmc(
+    results = snaper_hmc.sample_snaper_hmc(
         target_log_prob_fn, 2, num_burnin_steps=2, seed=seed, **kwargs)
     trace = self.evaluate(results.trace)
     states = trace[0]
@@ -391,10 +417,10 @@ class _SampleSNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
   def testOutputControl(self, discard_burnin_steps, num_steps_between_results,
                         expected_num_results, expected_num_reductions,
                         expected_steps):
-    model = tfd.Normal(tf.zeros([], self.dtype), 1.)
+    model = normal.Normal(tf.zeros([], self.dtype), 1.)
     seed = test_util.test_seed(sampler_type='stateless')
 
-    results = tfp.experimental.mcmc.sample_snaper_hmc(
+    results = snaper_hmc.sample_snaper_hmc(
         model,
         16,
         num_burnin_steps=8,
@@ -415,26 +441,28 @@ class _SampleSNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
 
   def testInitState(self):
 
-    root = tfd.JointDistributionCoroutine.Root
+    root = jdc.JointDistributionCoroutine.Root
 
-    @tfd.JointDistributionCoroutine
+    @jdc.JointDistributionCoroutine
     def model():
       beta = yield root(
-          tfd.Normal(tf.constant(0., self.dtype), 1.7, name='beta'))
+          normal.Normal(tf.constant(0., self.dtype), 1.7, name='beta'))
       sigma = yield root(
-          tfd.HalfCauchy(tf.constant(0., self.dtype), 5., name='sigma'))
+          half_cauchy.HalfCauchy(tf.constant(0., self.dtype), 5., name='sigma'))
       pct_sill = yield root(
-          tfd.Beta(tf.constant(1., self.dtype), 1., name='pct_sill'))
+          beta_lib.Beta(tf.constant(1., self.dtype), 1., name='pct_sill'))
       rho = yield root(
-          tfd.InverseGamma(tf.constant(10, self.dtype), 5, name='rho'))
+          inverse_gamma.InverseGamma(
+              tf.constant(10, self.dtype), 5, name='rho'))
 
-      tau = yield tfd.Deterministic(sigma * (1 / pct_sill - 1), name='tau')
+      tau = yield deterministic.Deterministic(
+          sigma * (1 / pct_sill - 1), name='tau')
 
       def mean_fn(_):
         return beta[..., tf.newaxis]
 
-      kernel = tfp.math.psd_kernels.MaternOneHalf(sigma, rho)
-      yield tfd.GaussianProcess(
+      kernel = matern.MaternOneHalf(sigma, rho)
+      yield gaussian_process.GaussianProcess(
           kernel=kernel,
           index_points=x,
           mean_fn=mean_fn,
@@ -452,7 +480,7 @@ class _SampleSNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
 
     @tf.function(jit_compile=True, autograph=False)
     def run(init_state):
-      return tfp.experimental.mcmc.sample_snaper_hmc(
+      return snaper_hmc.sample_snaper_hmc(
           pinned_model,
           16,
           discard_burnin_steps=False,
@@ -494,7 +522,7 @@ class DistributedSampleSNAPERHMCTest(distribute_test_lib.DistributedTest):
     q *= np.sign(np.diag(r))
     covariance = (q * eigenvalues).dot(q.T).astype(np.float32)
 
-    gaussian = tfd.MultivariateNormalTriL(
+    gaussian = mvn_tril.MultivariateNormalTriL(
         loc=tf.zeros(num_dims),
         scale_tril=tf.linalg.cholesky(covariance),
     )
@@ -503,7 +531,7 @@ class DistributedSampleSNAPERHMCTest(distribute_test_lib.DistributedTest):
 
     @tf.function(autograph=False)
     def run(_):
-      results = tfp.experimental.mcmc.sample_snaper_hmc(
+      results = snaper_hmc.sample_snaper_hmc(
           model=gaussian,
           num_results=500,
           experimental_reduce_chain_axis_names=self.axis_name,
@@ -541,15 +569,15 @@ class DistributedSampleSNAPERHMCTest(distribute_test_lib.DistributedTest):
     @tf.function(autograph=False)
     def run(local_scale):
 
-      @tfp.experimental.distribute.JointDistributionCoroutine
+      @joint_distribution.JointDistributionCoroutine
       def model():
-        yield tfd.Normal(0., 1., name='x')
-        yield tfp.experimental.distribute.Sharded(
-            tfd.Normal(0., local_scale),
+        yield normal.Normal(0., 1., name='x')
+        yield sharded_dist.Sharded(
+            normal.Normal(0., local_scale),
             shard_axis_name=self.axis_name,
             name='y')
 
-      results = tfp.experimental.mcmc.sample_snaper_hmc(
+      results = snaper_hmc.sample_snaper_hmc(
           model=model,
           num_results=500,
           experimental_shard_axis_names=model.experimental_shard_axis_names,
@@ -582,8 +610,8 @@ class DistributedSampleSNAPERHMCTest(distribute_test_lib.DistributedTest):
 class DistributedSNAPERHMCTest(distribute_test_lib.DistributedTest):
 
   def testAxisNameTracking(self):
-    kernel = tfp.experimental.mcmc.SNAPERHamiltonianMonteCarlo(
-        tfd.Normal(0., 1.).log_prob, step_size=0.1, num_adaptation_steps=1)
+    kernel = snaper_hmc.SNAPERHamiltonianMonteCarlo(
+        normal.Normal(0., 1.).log_prob, step_size=0.1, num_adaptation_steps=1)
     self.assertIsNone(kernel.experimental_shard_axis_names)
     kernel = kernel.experimental_with_shard_axes(['a'])
     self.assertListEqual(kernel.experimental_shard_axis_names, ['a'])
@@ -612,25 +640,24 @@ class DistributedSNAPERHMCTest(distribute_test_lib.DistributedTest):
     _, eigs = np.linalg.eigh(covariance)
     principal_component = eigs[:, -1]
 
-    gaussian = tfd.MultivariateNormalTriL(
+    gaussian = mvn_tril.MultivariateNormalTriL(
         loc=tf.zeros(num_dims),
         scale_tril=tf.linalg.cholesky(covariance),
     )
 
-    kernel = tfp.experimental.mcmc.SNAPERHamiltonianMonteCarlo(
+    kernel = snaper_hmc.SNAPERHamiltonianMonteCarlo(
         gaussian.log_prob,
         step_size=step_size,
         num_adaptation_steps=num_adaptation_steps,
         num_mala_steps=num_mala_steps,
         experimental_reduce_chain_axis_names=self.axis_name,
     )
-    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+    kernel = dassa.DualAveragingStepSizeAdaptation(
         kernel,
         num_adaptation_steps=num_adaptation_steps,
         experimental_reduce_chain_axis_names=self.axis_name,
     )
-    kernel = tfp.experimental.mcmc.Sharded(
-        kernel, chain_axis_names=self.axis_name)
+    kernel = sharded.Sharded(kernel, chain_axis_names=self.axis_name)
 
     def trace_fn(_, pkr):
       return {
@@ -655,7 +682,7 @@ class DistributedSNAPERHMCTest(distribute_test_lib.DistributedTest):
 
     @tf.function(autograph=False)
     def run(init_x):
-      return tfp.mcmc.sample_chain(
+      return sample.sample_chain(
           num_results=num_burnin_steps + num_results,
           num_burnin_steps=0,
           current_state=init_x,
@@ -729,13 +756,13 @@ class DistributedSNAPERHMCTest(distribute_test_lib.DistributedTest):
     @tf.function(autograph=False)
     def run(init_x, local_scale):
 
-      @tfp.experimental.distribute.JointDistributionCoroutine
+      @joint_distribution.JointDistributionCoroutine
       def model():
-        yield tfd.Normal(0., 1.)
-        yield tfp.experimental.distribute.Sharded(
-            tfd.Normal(0., local_scale), shard_axis_name=self.axis_name)
+        yield normal.Normal(0., 1.)
+        yield sharded_dist.Sharded(
+            normal.Normal(0., local_scale), shard_axis_name=self.axis_name)
 
-      kernel = tfp.experimental.mcmc.SNAPERHamiltonianMonteCarlo(
+      kernel = snaper_hmc.SNAPERHamiltonianMonteCarlo(
           model.log_prob,
           step_size=step_size,
           num_adaptation_steps=num_adaptation_steps,
@@ -743,12 +770,12 @@ class DistributedSNAPERHMCTest(distribute_test_lib.DistributedTest):
           experimental_shard_axis_names=list(
               model.experimental_shard_axis_names),
       )
-      kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+      kernel = dassa.DualAveragingStepSizeAdaptation(
           kernel,
           num_adaptation_steps=num_adaptation_steps,
       )
 
-      return tfp.mcmc.sample_chain(
+      return sample.sample_chain(
           num_results=num_burnin_steps + num_results,
           num_burnin_steps=0,
           current_state=init_x,
@@ -799,7 +826,7 @@ class GenericSNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
       return tf1.placeholder_with_default(
           tf.reduce_sum(x, -1), shape=[1] if use_static_shape else [None])
 
-    kernel = tfp.experimental.mcmc.SNAPERHamiltonianMonteCarlo(
+    kernel = snaper_hmc.SNAPERHamiltonianMonteCarlo(
         tlp_fn,
         step_size=0.1,
         num_adaptation_steps=2,
@@ -823,7 +850,7 @@ class GenericSNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
       # Note how this is shape None rather than [None].
       return tf1.placeholder_with_default(tf.reduce_sum(x, -1), shape=None)
 
-    kernel = tfp.experimental.mcmc.SNAPERHamiltonianMonteCarlo(
+    kernel = snaper_hmc.SNAPERHamiltonianMonteCarlo(
         tlp_fn,
         step_size=0.1,
         num_adaptation_steps=2,

@@ -20,11 +20,10 @@ from absl.testing import parameterized
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.distributions import truncated_normal
 from tensorflow_probability.python.internal import test_util
-
-
-tfd = tfp.distributions
+from tensorflow_probability.python.stats import quantiles
+from tensorflow_probability.python.stats import ranking
 
 
 @test_util.test_all_tf_execution_regimes
@@ -43,9 +42,9 @@ class AurocAuprcTest(test_util.TestCase):
     num_positive_quantiles = 445
     num_negative_quantiles = 393
 
-    dist_positive = tfd.TruncatedNormal(
+    dist_positive = truncated_normal.TruncatedNormal(
         positive_means, scale=0.2, low=0., high=1.)
-    dist_negative = tfd.TruncatedNormal(
+    dist_negative = truncated_normal.TruncatedNormal(
         negative_means, scale=0.2, low=0., high=1.)
 
     positive_trials = dist_positive.sample(
@@ -55,8 +54,8 @@ class AurocAuprcTest(test_util.TestCase):
 
     positive_trials_, negative_trials_ = self.evaluate(
         [positive_trials, negative_trials])
-    q1 = tfp.stats.quantiles(positive_trials_, num_positive_quantiles, axis=0)
-    q0 = tfp.stats.quantiles(negative_trials_, num_negative_quantiles, axis=0)
+    q1 = quantiles.quantiles(positive_trials_, num_positive_quantiles, axis=0)
+    q0 = quantiles.quantiles(negative_trials_, num_negative_quantiles, axis=0)
 
     y_true = np.array([1] * num_positive_trials + [0] * num_negative_trials)
     y_pred = np.concatenate([positive_trials_, negative_trials_])
@@ -87,7 +86,7 @@ class AurocAuprcTest(test_util.TestCase):
 
     true_auc = np.apply_along_axis(auc_fn, 0, y_pred)
 
-    auc = tfp.stats.quantile_auc(
+    auc = ranking.quantile_auc(
         q0, num_negative_trials, q1, num_positive_trials, curve=curve)
     auc_ = self.evaluate(auc)
 

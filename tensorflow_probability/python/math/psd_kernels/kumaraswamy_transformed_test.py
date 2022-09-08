@@ -18,9 +18,9 @@
 from absl.testing import parameterized
 import numpy as np
 
-import tensorflow_probability as tfp
-
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic
+from tensorflow_probability.python.math.psd_kernels import kumaraswamy_transformed
 
 
 def _kumaraswamy_warp(x, c1, c0):
@@ -56,7 +56,7 @@ class _KumaraswamyTransformedTest(test_util.TestCase):
     amplitude = np.random.uniform(
         low=1., high=10., size=[10, 2]).astype(self.dtype)
     inner_length_scale = self.dtype(1.)
-    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude, inner_length_scale, feature_ndims=feature_ndims)
     input_shape = [dims] * feature_ndims
 
@@ -64,7 +64,7 @@ class _KumaraswamyTransformedTest(test_util.TestCase):
     concentration1 = self.dtype(1.)
     concentration0 = self.dtype(1.)
 
-    kum_kernel = tfp.math.psd_kernels.KumaraswamyTransformed(
+    kum_kernel = kumaraswamy_transformed.KumaraswamyTransformed(
         kernel, concentration1, concentration0)
 
     x = np.random.uniform(size=input_shape).astype(self.dtype)
@@ -96,7 +96,7 @@ class _KumaraswamyTransformedTest(test_util.TestCase):
     amplitude = np.random.uniform(
         low=1., high=10., size=[10, 2]).astype(self.dtype)
     inner_length_scale = self.dtype(1.)
-    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude, inner_length_scale, feature_ndims=feature_ndims)
     input_shape = [dims] * feature_ndims
 
@@ -107,7 +107,7 @@ class _KumaraswamyTransformedTest(test_util.TestCase):
     concentration0 = np.random.uniform(
         2, 5, size=([3, 1, 2] + input_shape)).astype(self.dtype)
 
-    kum_kernel = tfp.math.psd_kernels.KumaraswamyTransformed(
+    kum_kernel = kumaraswamy_transformed.KumaraswamyTransformed(
         kernel, concentration1, concentration0)
 
     x = np.random.uniform(size=input_shape).astype(self.dtype)

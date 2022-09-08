@@ -22,10 +22,10 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python import stats as tfps
 from tensorflow_probability.python.distributions import mvn_low_rank_update_linear_operator_covariance
+from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.stats import sample_stats
 
 MultivariateNormalLowRankUpdateLinearOperatorCovariance = (
     mvn_low_rank_update_linear_operator_covariance
@@ -201,7 +201,7 @@ class MultivariateNormalLowRankUpdateLinearOperatorCovarianceTest(
 
   def _mvn_pair(self, loc, cov_operator):
     """Construct a pair of MVNs."""
-    tril = tfd.MultivariateNormalTriL(
+    tril = mvn_tril.MultivariateNormalTriL(
         loc=loc, scale_tril=cov_operator.cholesky().to_dense())
     low_rank_update = (
         MultivariateNormalLowRankUpdateLinearOperatorCovariance(
@@ -282,8 +282,8 @@ class MultivariateNormalLowRankUpdateLinearOperatorCovarianceTest(
       samples, sample_mean, sample_var, sample_cov = self.evaluate([
           samples,
           tf.reduce_mean(samples, axis=0),
-          tfps.variance(samples, sample_axis=0),
-          tfps.covariance(samples, sample_axis=0),
+          sample_stats.variance(samples, sample_axis=0),
+          sample_stats.covariance(samples, sample_axis=0),
       ])
 
       ref_samples = tril.sample(n, seed=test_util.test_seed())

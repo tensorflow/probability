@@ -22,15 +22,17 @@ from scipy.stats import special_ortho_group
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
+from tensorflow_probability.python.optimizer import bfgs_utils
+from tensorflow_probability.python.optimizer import lbfgs
 
 
 def _make_val_and_grad_fn(value_fn):
   @functools.wraps(value_fn)
   def val_and_grad(x):
-    return tfp.math.value_and_gradient(value_fn, x)
+    return gradient.value_and_gradient(value_fn, x)
   return val_and_grad
 
 
@@ -52,8 +54,8 @@ class LBfgsTest(test_util.TestCase):
       return tf.reduce_sum(scales * tf.math.squared_difference(x, minimum))
 
     start = tf.constant([0.6, 0.8])
-    results = self.evaluate(tfp.optimizer.lbfgs_minimize(
-        quadratic, initial_position=start, tolerance=1e-8))
+    results = self.evaluate(
+        lbfgs.minimize(quadratic, initial_position=start, tolerance=1e-8))
     self.assertTrue(results.converged)
     self.assertLessEqual(_norm(results.objective_gradient), 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
@@ -69,7 +71,7 @@ class LBfgsTest(test_util.TestCase):
 
     start = tf.constant([0.1, 0.8, 0.9])
     results_with_tolerance = self.evaluate(
-        tfp.optimizer.lbfgs_minimize(
+        lbfgs.minimize(
             quadratic,
             initial_position=start,
             max_iterations=50,
@@ -77,8 +79,7 @@ class LBfgsTest(test_util.TestCase):
     self.assertTrue(results_with_tolerance.converged)
 
     results_without_tolerance = self.evaluate(
-        tfp.optimizer.lbfgs_minimize(
-            quadratic, initial_position=start, max_iterations=50))
+        lbfgs.minimize(quadratic, initial_position=start, max_iterations=50))
     self.assertTrue(results_without_tolerance.converged)
     self.assertLess(results_with_tolerance.num_iterations,
                     results_without_tolerance.num_iterations)
@@ -94,8 +95,8 @@ class LBfgsTest(test_util.TestCase):
       return tf.reduce_sum(scales * tf.math.squared_difference(x, minimum))
 
     start = np.zeros([ndims], dtype='float64')
-    results = self.evaluate(tfp.optimizer.lbfgs_minimize(
-        quadratic, initial_position=start, tolerance=1e-8))
+    results = self.evaluate(
+        lbfgs.minimize(quadratic, initial_position=start, tolerance=1e-8))
     self.assertTrue(results.converged)
     self.assertEqual(results.num_iterations, 1)  # Solved by first line search.
     self.assertLessEqual(_norm(results.objective_gradient), 1e-8)
@@ -113,8 +114,8 @@ class LBfgsTest(test_util.TestCase):
       return tf.reduce_sum(scales * tf.math.squared_difference(x, minimum))
 
     start = tf.ones_like(minimum)
-    results = self.evaluate(tfp.optimizer.lbfgs_minimize(
-        quadratic, initial_position=start, tolerance=1e-8))
+    results = self.evaluate(
+        lbfgs.minimize(quadratic, initial_position=start, tolerance=1e-8))
     self.assertTrue(results.converged)
     self.assertLessEqual(_norm(results.objective_gradient), 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
@@ -135,8 +136,8 @@ class LBfgsTest(test_util.TestCase):
       return tf.reduce_sum(y * yp) / 2
 
     start = tf.ones_like(minimum)
-    results = self.evaluate(tfp.optimizer.lbfgs_minimize(
-        quadratic, initial_position=start, tolerance=1e-8))
+    results = self.evaluate(
+        lbfgs.minimize(quadratic, initial_position=start, tolerance=1e-8))
     self.assertTrue(results.converged)
     self.assertLessEqual(_norm(results.objective_gradient), 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
@@ -156,8 +157,8 @@ class LBfgsTest(test_util.TestCase):
       return tf.reduce_sum(y * yp) / 2
 
     start = tf.ones_like(minimum)
-    results = self.evaluate(tfp.optimizer.lbfgs_minimize(
-        quadratic, initial_position=start, tolerance=1e-8))
+    results = self.evaluate(
+        lbfgs.minimize(quadratic, initial_position=start, tolerance=1e-8))
     self.assertTrue(results.converged)
     self.assertLessEqual(_norm(results.objective_gradient), 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
@@ -191,8 +192,8 @@ class LBfgsTest(test_util.TestCase):
       return fv, tf.stack([dfx, dfy])
 
     start = tf.constant([-1.2, 1.0])
-    results = self.evaluate(tfp.optimizer.lbfgs_minimize(
-        rosenbrock, initial_position=start, tolerance=1e-5))
+    results = self.evaluate(
+        lbfgs.minimize(rosenbrock, initial_position=start, tolerance=1e-5))
     self.assertTrue(results.converged)
     self.assertLessEqual(_norm(results.objective_gradient), 1e-5)
     self.assertArrayNear(results.position, np.array([1.0, 1.0]), 1e-5)
@@ -226,8 +227,8 @@ class LBfgsTest(test_util.TestCase):
     dtype = 'float64'
     for start, expected_minima, expected_evals in starts_and_targets:
       start = tf.constant(start, dtype=dtype)
-      results = self.evaluate(tfp.optimizer.lbfgs_minimize(
-          himmelblau, initial_position=start, tolerance=1e-8))
+      results = self.evaluate(
+          lbfgs.minimize(himmelblau, initial_position=start, tolerance=1e-8))
       self.assertTrue(results.converged)
       self.assertArrayNear(results.position,
                            np.array(expected_minima, dtype=dtype),
@@ -246,9 +247,12 @@ class LBfgsTest(test_util.TestCase):
     expected_minima = np.array([
         [[3, 2], [-2.805118, 3.131312]],
         [[-3.779310, -3.283186], [3.584428, -1.848126]]], dtype=dtype)
-    batch_results = self.evaluate(tfp.optimizer.lbfgs_minimize(
-        himmelblau, initial_position=starts,
-        stopping_condition=tfp.optimizer.converged_all, tolerance=1e-8))
+    batch_results = self.evaluate(
+        lbfgs.minimize(
+            himmelblau,
+            initial_position=starts,
+            stopping_condition=bfgs_utils.converged_all,
+            tolerance=1e-8))
 
     self.assertFalse(np.any(batch_results.failed))  # None have failed.
     self.assertTrue(np.all(batch_results.converged))  # All converged.
@@ -276,9 +280,12 @@ class LBfgsTest(test_util.TestCase):
 
     # Run with `converged_any` stopping condition, to stop as soon as any of
     # the batch members have converged.
-    batch_results = self.evaluate(tfp.optimizer.lbfgs_minimize(
-        himmelblau, initial_position=starts,
-        stopping_condition=tfp.optimizer.converged_any, tolerance=1e-8))
+    batch_results = self.evaluate(
+        lbfgs.minimize(
+            himmelblau,
+            initial_position=starts,
+            stopping_condition=bfgs_utils.converged_any,
+            tolerance=1e-8))
 
     self.assertFalse(np.any(batch_results.failed))  # None have failed.
     self.assertTrue(np.any(batch_results.converged))  # At least one converged.
@@ -308,9 +315,11 @@ class LBfgsTest(test_util.TestCase):
 
     # Run with `converged_any` stopping condition, to stop as soon as any of
     # the batch members have converged.
-    raw_batch_results = tfp.optimizer.lbfgs_minimize(
-        himmelblau, initial_position=starts,
-        stopping_condition=tfp.optimizer.converged_any, tolerance=1e-8)
+    raw_batch_results = lbfgs.minimize(
+        himmelblau,
+        initial_position=starts,
+        stopping_condition=bfgs_utils.converged_any,
+        tolerance=1e-8)
     batch_results = self.evaluate(raw_batch_results)
 
     self.assertFalse(np.any(batch_results.failed))  # None have failed.
@@ -324,10 +333,13 @@ class LBfgsTest(test_util.TestCase):
     self.assertEqual(batch_results.num_objective_evaluations, 28)
 
     # Run with `converged_all`, starting from previous state.
-    batch_results = self.evaluate(tfp.optimizer.lbfgs_minimize(
-        himmelblau, initial_position=None,
-        previous_optimizer_results=raw_batch_results,
-        stopping_condition=tfp.optimizer.converged_all, tolerance=1e-8))
+    batch_results = self.evaluate(
+        lbfgs.minimize(
+            himmelblau,
+            initial_position=None,
+            previous_optimizer_results=raw_batch_results,
+            stopping_condition=bfgs_utils.converged_all,
+            tolerance=1e-8))
 
     # All converged points are near expected minima and the nunmber of
     # evaluaitons is as if we never stopped.
@@ -346,9 +358,11 @@ class LBfgsTest(test_util.TestCase):
     start = tf.constant([0.6, 0.8])
 
     def run(position, state):
-      raw_results = tfp.optimizer.lbfgs_minimize(
-          quadratic, initial_position=position,
-          previous_optimizer_results=state, tolerance=1e-8)
+      raw_results = lbfgs.minimize(
+          quadratic,
+          initial_position=position,
+          previous_optimizer_results=state,
+          tolerance=1e-8)
       self.evaluate(raw_results)
       return raw_results
 
@@ -385,8 +399,9 @@ class LBfgsTest(test_util.TestCase):
 
     start = tf.ones(shape=[dim], dtype=dtype)
 
-    results = self.evaluate(tfp.optimizer.lbfgs_minimize(
-        neg_log_likelihood, initial_position=start, tolerance=1e-6))
+    results = self.evaluate(
+        lbfgs.minimize(
+            neg_log_likelihood, initial_position=start, tolerance=1e-6))
     self.assertTrue(results.converged)
 
   def test_determinism(self):
@@ -419,8 +434,8 @@ class LBfgsTest(test_util.TestCase):
 
     def get_results():
       start = tf.constant(start_position)
-      return self.evaluate(tfp.optimizer.lbfgs_minimize(
-          rastrigin, initial_position=start, tolerance=1e-5))
+      return self.evaluate(
+          lbfgs.minimize(rastrigin, initial_position=start, tolerance=1e-5))
 
     res1, res2 = get_results(), get_results()
 
@@ -468,10 +483,11 @@ class LBfgsTest(test_util.TestCase):
 
     start_position = np.random.rand(dim) * 2.0 * 5.12 - 5.12
 
-    res = tf.function(tfp.optimizer.lbfgs_minimize, jit_compile=True)(
-        rastrigin,
-        initial_position=tf.constant(start_position),
-        tolerance=1e-5)
+    res = tf.function(
+        lbfgs.minimize, jit_compile=True)(
+            rastrigin,
+            initial_position=tf.constant(start_position),
+            tolerance=1e-5)
 
     # We simply verify execution & convergence.
     self.assertTrue(self.evaluate(res.converged))
@@ -491,7 +507,7 @@ class LBfgsTest(test_util.TestCase):
     # Test with a vector of unknown dimension, and a fully unknown shape.
     for shape in ([None], None):
       start = tf1.placeholder(tf.float32, shape=shape)
-      lbfgs_op = tfp.optimizer.lbfgs_minimize(
+      lbfgs_op = lbfgs.minimize(
           quadratic, initial_position=start, tolerance=1e-8)
       self.assertFalse(lbfgs_op.position.shape.is_fully_defined())
 
@@ -522,8 +538,9 @@ class LBfgsTest(test_util.TestCase):
       return answer
 
     start = tf.constant(start)
-    results = self.evaluate(tfp.optimizer.lbfgs_minimize(
-        quadratic_with_hole, initial_position=start, tolerance=1e-8))
+    results = self.evaluate(
+        lbfgs.minimize(
+            quadratic_with_hole, initial_position=start, tolerance=1e-8))
     self.assertAllTrue(results.converged)
     self.assertAllFalse(results.failed)
     self.assertAllNegativeInf(results.objective_value)
@@ -561,8 +578,9 @@ class LBfgsTest(test_util.TestCase):
       return answer
 
     start = tf.constant(start)
-    results = self.evaluate(tfp.optimizer.lbfgs_minimize(
-        quadratic_with_spike, initial_position=start, tolerance=1e-8))
+    results = self.evaluate(
+        lbfgs.minimize(
+            quadratic_with_spike, initial_position=start, tolerance=1e-8))
     self.assertAllFalse(results.converged)
     self.assertAllTrue(results.failed)
     self.assertAllFinite(results.position)

@@ -22,12 +22,22 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import chain
+from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.bijectors import scale_matvec_tril
+from tensorflow_probability.python.bijectors import shift
+from tensorflow_probability.python.bijectors import sigmoid
+from tensorflow_probability.python.distributions import beta as beta_lib
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.distributions import wishart as wishart_lib
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.experimental.auto_batching import instructions as inst
+from tensorflow_probability.python.experimental.mcmc import nuts_autobatching
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.mcmc import sample
 
 
 def run_nuts_chain(
@@ -37,9 +47,8 @@ def run_nuts_chain(
     seed = 1
   def target_log_prob_fn(event):
     with tf1.name_scope('nuts_test_target_log_prob', values=[event]):
-      return tfd.MultivariateNormalDiag(
-          tf.zeros(event_size),
-          scale_identity_multiplier=1.).log_prob(event)
+      return mvn_diag.MultivariateNormalDiag(
+          tf.zeros(event_size), scale_identity_multiplier=1.).log_prob(event)
 
   if initial_state is not None:
     state = initial_state
@@ -50,7 +59,7 @@ def run_nuts_chain(
   #     num_leapfrog_steps=3,
   #     step_size=0.3,
   #     seed=seed)
-  kernel = tfp.experimental.mcmc.NoUTurnSampler(
+  kernel = nuts_autobatching.NoUTurnSampler(
       target_log_prob_fn,
       step_size=[0.3],
       use_auto_batching=not dry_run,
@@ -58,7 +67,7 @@ def run_nuts_chain(
       unrolled_leapfrog_steps=2,
       max_tree_depth=4,
       seed=seed)
-  chain_state, extra = tfp.mcmc.sample_chain(
+  chain_state, extra = sample.sample_chain(
       num_results=num_steps,
       num_burnin_steps=0,
       # Intentionally pass a list argument to test that singleton lists are
@@ -79,7 +88,8 @@ def assert_univariate_target_conservation(
   num_samples = int(5e4)
   num_steps = 1
   target_d = mk_target()
-  strm = tfp.util.SeedStream(salt='univariate_nuts_test', seed=1)
+  strm = test_util.test_seed_stream(
+      salt='univariate_nuts_test', hardcoded_seed=1)
   # We wrap the initial values in `tf.identity` to avoid broken gradients
   # resulting from a bijector cache hit, since bijectors of the same
   # type/parameterization now share a cache.
@@ -92,7 +102,8 @@ def assert_univariate_target_conservation(
     # target_d.log_prob; that was blocked by b/122414321, but maybe tfp's port
     # of value_and_gradients_function fixed that bug.
     return mk_target().log_prob(*args)
-  operator = tfp.experimental.mcmc.NoUTurnSampler(
+
+  operator = nuts_autobatching.NoUTurnSampler(
       target,
       step_size=step_size,
       max_tree_depth=3,
@@ -100,7 +111,7 @@ def assert_univariate_target_conservation(
       stackless=stackless,
       unrolled_leapfrog_steps=2,
       seed=strm())
-  result, extra = tfp.mcmc.sample_chain(
+  result, extra = sample.sample_chain(
       num_results=num_steps,
       num_burnin_steps=0,
       current_state=initialization,
@@ -132,9 +143,8 @@ def assert_univariate_target_conservation(
 
 
 def assert_mvn_target_conservation(event_size, batch_size, **kwargs):
-  initialization = tfd.MultivariateNormalFullCovariance(
-      loc=tf.zeros(event_size),
-      covariance_matrix=tf.eye(event_size)).sample(
+  initialization = mvn_diag.MultivariateNormalDiag(
+      loc=tf.zeros(event_size)).sample(
           batch_size, seed=4)
   samples, leapfrogs = run_nuts_chain(
       event_size, batch_size, num_steps=1,
@@ -170,7 +180,8 @@ class NutsTest(test_util.TestCase):
   def testLeapfrogStepCounter(self, tree_depth, unrolled_leapfrog_steps):
     def never_u_turns_log_prob(x):
       return 1e-6 * x
-    kernel = tfp.experimental.mcmc.NoUTurnSampler(
+
+    kernel = nuts_autobatching.NoUTurnSampler(
         never_u_turns_log_prob,
         step_size=[0.3],
         use_auto_batching=True,
@@ -178,7 +189,7 @@ class NutsTest(test_util.TestCase):
         unrolled_leapfrog_steps=unrolled_leapfrog_steps,
         max_tree_depth=tree_depth,
         seed=1)
-    _, extra = tfp.mcmc.sample_chain(
+    _, extra = sample.sample_chain(
         num_results=1,
         num_burnin_steps=0,
         current_state=[tf.ones([1])],
@@ -197,23 +208,23 @@ class NutsTest(test_util.TestCase):
 
   def testUnivariateNormalTargetConservation(self):
     def mk_normal():
-      return tfd.Normal(loc=1., scale=2.)
+      return normal.Normal(loc=1., scale=2.)
     self.evaluate(assert_univariate_target_conservation(
         self, mk_normal, step_size=0.2, stackless=False))
 
   def testLogitBetaTargetConservation(self):
     def mk_logit_beta():
-      beta = tfd.Beta(concentration0=1., concentration1=2.)
-      return tfb.Invert(tfb.Sigmoid())(beta)
+      beta = beta_lib.Beta(concentration0=1., concentration1=2.)
+      return invert.Invert(sigmoid.Sigmoid())(beta)
     self.evaluate(assert_univariate_target_conservation(
         self, mk_logit_beta, step_size=0.2, stackless=False))
 
   def testSigmoidBetaTargetConservation(self):
     def mk_sigmoid_beta():
-      beta = tfd.Beta(concentration0=1., concentration1=2.)
+      beta = beta_lib.Beta(concentration0=1., concentration1=2.)
       # Not inverting the sigmoid bijector makes a kooky distribution, but nuts
       # should still conserve it (with a smaller step size).
-      return tfb.Sigmoid()(beta)
+      return sigmoid.Sigmoid()(beta)
     self.evaluate(assert_univariate_target_conservation(
         self, mk_sigmoid_beta, step_size=1e-4, stackless=False))
 
@@ -231,7 +242,8 @@ class NutsTest(test_util.TestCase):
       pt1 = tf.reduce_sum(input_tensor=x, axis=[-1, -2])
       pt2 = tf.reduce_sum(input_tensor=y, axis=-1)
       return pt1 + pt2
-    kernel = tfp.experimental.mcmc.NoUTurnSampler(
+
+    kernel = nuts_autobatching.NoUTurnSampler(
         batched_synthetic_log_prob,
         step_size=0.3,
         use_auto_batching=True,
@@ -239,7 +251,7 @@ class NutsTest(test_util.TestCase):
         unrolled_leapfrog_steps=2,
         max_tree_depth=4,
         seed=1)
-    results, extra = tfp.mcmc.sample_chain(
+    results, extra = sample.sample_chain(
         num_results=1,
         num_burnin_steps=0,
         current_state=init,
@@ -262,25 +274,25 @@ class NutsTest(test_util.TestCase):
   def testStacklessUnivariateNormalTargetConservation(self):
     if not tf.executing_eagerly(): return
     def mk_normal():
-      return tfd.Normal(loc=1., scale=2.)
+      return normal.Normal(loc=1., scale=2.)
     self.evaluate(assert_univariate_target_conservation(
         self, mk_normal, step_size=0.2, stackless=True))
 
   def testStacklessLogitBetaTargetConservation(self):
     if not tf.executing_eagerly(): return
     def mk_logit_beta():
-      beta = tfd.Beta(concentration0=1., concentration1=2.)
-      return tfb.Invert(tfb.Sigmoid())(beta)
+      beta = beta_lib.Beta(concentration0=1., concentration1=2.)
+      return invert.Invert(sigmoid.Sigmoid())(beta)
     self.evaluate(assert_univariate_target_conservation(
         self, mk_logit_beta, step_size=0.02, stackless=True))
 
   def testStacklessSigmoidBetaTargetConservation(self):
     if not tf.executing_eagerly(): return
     def mk_sigmoid_beta():
-      beta = tfd.Beta(concentration0=1., concentration1=2.)
+      beta = beta_lib.Beta(concentration0=1., concentration1=2.)
       # Not inverting the sigmoid bijector makes a kooky distribution, but
       # nuts should still conserve it (with a smaller step size).
-      return tfb.Sigmoid()(beta)
+      return sigmoid.Sigmoid()(beta)
     self.evaluate(assert_univariate_target_conservation(
         self, mk_sigmoid_beta, step_size=1e-4, stackless=True))
 
@@ -290,28 +302,30 @@ class NutsTest(test_util.TestCase):
     # This implementation in terms of MVNCholPrecisionTril follows
     # tfp/examples/jupyter_notebooks/Bayesian_Gaussian_Mixture_Model.ipynb
 
-    class MVNCholPrecisionTriL(tfd.TransformedDistribution):
+    class MVNCholPrecisionTriL(transformed_distribution.TransformedDistribution
+                              ):
       """MVN from loc and (Cholesky) precision matrix."""
 
       def __init__(self, loc, chol_precision_tril, name=None):
         super(MVNCholPrecisionTriL, self).__init__(
-            distribution=tfd.Independent(tfd.Normal(tf.zeros_like(loc),
-                                                    scale=tf.ones_like(loc)),
-                                         reinterpreted_batch_ndims=1),
-            bijector=tfb.Chain([
-                tfb.Shift(shift=loc),
-                tfb.Invert(tfb.ScaleMatvecTriL(scale_tril=chol_precision_tril,
-                                               adjoint=True)),
+            distribution=independent.Independent(
+                normal.Normal(tf.zeros_like(loc), scale=tf.ones_like(loc)),
+                reinterpreted_batch_ndims=1),
+            bijector=chain.Chain([
+                shift.Shift(shift=loc),
+                invert.Invert(
+                    scale_matvec_tril.ScaleMatvecTriL(
+                        scale_tril=chol_precision_tril, adjoint=True)),
             ]),
             name=name)
 
     strm = test_util.test_seed_stream()
-    wishart = tfd.WishartTriL(
+    wishart = wishart_lib.WishartTriL(
         dim, scale_tril=tf.eye(dim), input_output_cholesky=True)
     chol_precision = wishart.sample(seed=strm())
     mvn = MVNCholPrecisionTriL(
         loc=tf.zeros(dim), chol_precision_tril=chol_precision)
-    kernel = tfp.experimental.mcmc.NoUTurnSampler(
+    kernel = nuts_autobatching.NoUTurnSampler(
         mvn.log_prob,
         step_size=[step_size],
         num_trajectories_per_step=num_steps,
@@ -324,7 +338,7 @@ class NutsTest(test_util.TestCase):
   def testCorrelatedMVNOneStep(self):
     # Assert that we get a diversity of leapfrogs taken after one step
     kernel = self._correlated_mvn_nuts(dim=10, step_size=0.1, num_steps=1)
-    _, extra_ = tfp.mcmc.sample_chain(
+    _, extra_ = sample.sample_chain(
         num_results=1,
         num_burnin_steps=0,
         current_state=[tf.zeros([30, 10])],
@@ -340,7 +354,7 @@ class NutsTest(test_util.TestCase):
   def testCorrelatedMVNChain(self):
     # Assert that naive sample_chain gets bad batch utilization.
     kernel = self._correlated_mvn_nuts(dim=10, step_size=0.4, num_steps=1)
-    _, extra_ = tfp.mcmc.sample_chain(
+    _, extra_ = sample.sample_chain(
         num_results=1,
         num_burnin_steps=10,
         current_state=[tf.zeros([20, 10])],
@@ -358,7 +372,7 @@ class NutsTest(test_util.TestCase):
     # utilization, in the sense that the number of leapfrogs computed is forced
     # by the length of some batch member's computation.
     kernel = self._correlated_mvn_nuts(dim=10, step_size=0.4, num_steps=10)
-    _, extra_ = tfp.mcmc.sample_chain(
+    _, extra_ = sample.sample_chain(
         num_results=1,
         num_burnin_steps=0,
         current_state=[tf.zeros([20, 10])],
@@ -371,10 +385,9 @@ class NutsTest(test_util.TestCase):
   def testProgramProperties(self):
     def target(x):
       return x
-    operator = tfp.experimental.mcmc.NoUTurnSampler(
-        target,
-        step_size=0,
-        use_auto_batching=True)
+
+    operator = nuts_autobatching.NoUTurnSampler(
+        target, step_size=0, use_auto_batching=True)
     program = operator.autobatch_context.program_lowered('evolve_trajectory')
     def full_var(var):
       return program.var_alloc[var] == inst.VariableAllocation.FULL

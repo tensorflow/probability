@@ -21,10 +21,33 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.bijectors import joint_map
+from tensorflow_probability.python.bijectors import reshape
+from tensorflow_probability.python.bijectors import scale as scale_lib
+from tensorflow_probability.python.bijectors import shift
+from tensorflow_probability.python.bijectors import split
+from tensorflow_probability.python.distributions import bernoulli
+from tensorflow_probability.python.distributions import beta
+from tensorflow_probability.python.distributions import categorical
+from tensorflow_probability.python.distributions import chi2 as chi2_lib
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import exponential
+from tensorflow_probability.python.distributions import gamma
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import inverse_gamma
+from tensorflow_probability.python.distributions import joint_distribution_coroutine as jdc
+from tensorflow_probability.python.distributions import laplace
+from tensorflow_probability.python.distributions import mixture_same_family
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import normal as normal_lib
+from tensorflow_probability.python.distributions import student_t
+from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.distributions import uniform
+from tensorflow_probability.python.distributions import wishart
 from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
@@ -32,7 +55,7 @@ from tensorflow_probability.python.internal import test_util
 from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-class TupleDistribution(tfd.Distribution):
+class TupleDistribution(distribution.Distribution):
 
   def __init__(self):
     super(TupleDistribution, self).__init__(
@@ -56,7 +79,7 @@ class TupleDistribution(tfd.Distribution):
     return (None, tf.TensorShape([3, None]), tf.TensorShape(None))
 
 
-class DictDistribution(tfd.Distribution):
+class DictDistribution(distribution.Distribution):
 
   def __init__(self):
     super(DictDistribution, self).__init__(
@@ -80,7 +103,7 @@ class DictDistribution(tfd.Distribution):
     return dict(a=None, b=tf.TensorShape([3, None]), c=tf.TensorShape(None))
 
 
-class NamedTupleDistribution(tfd.Distribution):
+class NamedTupleDistribution(distribution.Distribution):
 
   class MyType(collections.namedtuple('MyType', 'a b c')):
     __slots__ = ()
@@ -113,7 +136,7 @@ class DistributionMetaTest(test_util.TestCase):
 
   def test_private_docstring_is_propagated_to_public_method(self):
 
-    class MyDistribution(tfd.Distribution):
+    class MyDistribution(distribution.Distribution):
 
       def _sample_and_log_prob(self, sample_shape):
         """Custom docstring for MyDistribution.sample_and_log_prob."""
@@ -128,7 +151,7 @@ class DistributionMetaTest(test_util.TestCase):
 class DistributionStrReprTest(test_util.TestCase):
 
   def testStrWorksCorrectlyScalar(self):
-    normal = tfd.Normal(loc=np.float16(0), scale=1, validate_args=True)
+    normal = normal_lib.Normal(loc=np.float16(0), scale=1, validate_args=True)
     self.assertEqual(
         str(normal),
         'tfp.distributions.Normal('
@@ -137,7 +160,8 @@ class DistributionStrReprTest(test_util.TestCase):
         'event_shape=[], '
         'dtype=float16)')
 
-    chi2 = tfd.Chi2(df=np.float32([1., 2.]), name='silly', validate_args=True)
+    chi2 = chi2_lib.Chi2(
+        df=np.float32([1., 2.]), name='silly', validate_args=True)
     self.assertEqual(
         str(chi2),
         'tfp.distributions.Chi2('
@@ -151,7 +175,7 @@ class DistributionStrReprTest(test_util.TestCase):
     if tf.executing_eagerly():
       return
 
-    exp = tfd.Exponential(
+    exp = exponential.Exponential(
         rate=tf1.placeholder_with_default(1., shape=None), validate_args=True)
     self.assertEqual(
         str(exp),
@@ -161,7 +185,7 @@ class DistributionStrReprTest(test_util.TestCase):
         'dtype=float32)')
 
   def testStrWorksCorrectlyMultivariate(self):
-    mvn_static = tfd.MultivariateNormalDiag(
+    mvn_static = mvn_diag.MultivariateNormalDiag(
         loc=np.zeros([2, 2]), name='MVN', validate_args=True)
     self.assertEqual(
         str(mvn_static),
@@ -176,7 +200,7 @@ class DistributionStrReprTest(test_util.TestCase):
     if tf.executing_eagerly():
       return
 
-    mvn_dynamic = tfd.MultivariateNormalDiag(
+    mvn_dynamic = mvn_diag.MultivariateNormalDiag(
         loc=tf1.placeholder_with_default(
             np.ones((3, 3), dtype=np.float32), shape=[None, 3]),
         name='MVN2',
@@ -190,7 +214,7 @@ class DistributionStrReprTest(test_util.TestCase):
         'dtype=float32)')
 
   def testReprWorksCorrectlyScalar(self):
-    normal = tfd.Normal(
+    normal = normal_lib.Normal(
         loc=np.float16(0), scale=np.float16(1), validate_args=True)
     self.assertEqual(
         repr(normal),
@@ -200,7 +224,8 @@ class DistributionStrReprTest(test_util.TestCase):
         ' event_shape=[]'
         ' dtype=float16>')
 
-    chi2 = tfd.Chi2(df=np.float32([1., 2.]), name='silly', validate_args=True)
+    chi2 = chi2_lib.Chi2(
+        df=np.float32([1., 2.]), name='silly', validate_args=True)
     self.assertEqual(
         repr(chi2),
         '<tfp.distributions.Chi2'
@@ -214,7 +239,7 @@ class DistributionStrReprTest(test_util.TestCase):
     if tf.executing_eagerly():
       return
 
-    exp = tfd.Exponential(
+    exp = exponential.Exponential(
         rate=tf1.placeholder_with_default(1., shape=None), validate_args=True)
     self.assertEqual(
         repr(exp),
@@ -225,7 +250,7 @@ class DistributionStrReprTest(test_util.TestCase):
         ' dtype=float32>')
 
   def testReprWorksCorrectlyMultivariate(self):
-    mvn_static = tfd.MultivariateNormalDiag(
+    mvn_static = mvn_diag.MultivariateNormalDiag(
         loc=np.zeros([2, 2]), name='MVN', validate_args=True)
     self.assertEqual(
         repr(mvn_static),
@@ -240,7 +265,7 @@ class DistributionStrReprTest(test_util.TestCase):
     if tf.executing_eagerly():
       return
 
-    mvn_dynamic = tfd.MultivariateNormalDiag(
+    mvn_dynamic = mvn_diag.MultivariateNormalDiag(
         loc=tf1.placeholder_with_default(
             np.ones((3, 3), dtype=np.float32), shape=[None, 3]),
         name='MVN2',
@@ -307,16 +332,16 @@ class DistributionTest(test_util.TestCase):
 
   def testParamPropertiesAndFromParams(self):
     classes = [
-        tfd.Normal,
-        tfd.Bernoulli,
-        tfd.Beta,
-        tfd.Chi2,
-        tfd.Exponential,
-        tfd.Gamma,
-        tfd.InverseGamma,
-        tfd.Laplace,
-        tfd.StudentT,
-        tfd.Uniform,
+        normal_lib.Normal,
+        bernoulli.Bernoulli,
+        beta.Beta,
+        chi2_lib.Chi2,
+        exponential.Exponential,
+        gamma.Gamma,
+        inverse_gamma.InverseGamma,
+        laplace.Laplace,
+        student_t.StudentT,
+        uniform.Uniform,
     ]
 
     sample_shapes = [(), (10,), (10, 20, 30)]
@@ -347,15 +372,16 @@ class DistributionTest(test_util.TestCase):
   def testCopyExtraArgs(self):
     # Note: we cannot easily test all distributions since each requires
     # different initialization arguments. We therefore spot test a few.
-    normal = tfd.Normal(loc=1., scale=2., validate_args=True)
+    normal = normal_lib.Normal(loc=1., scale=2., validate_args=True)
     self.assertEqual(normal.parameters, normal.copy().parameters)
-    wishart = tfd.WishartTriL(
-        df=2, scale_tril=tf.linalg.cholesky([[1., 2], [2, 5]]),
+    wish = wishart.WishartTriL(
+        df=2,
+        scale_tril=tf.linalg.cholesky([[1., 2], [2, 5]]),
         validate_args=True)
-    self.assertEqual(wishart.parameters, wishart.copy().parameters)
+    self.assertEqual(wish.parameters, wish.copy().parameters)
 
   def testCopyOverride(self):
-    normal = tfd.Normal(loc=1., scale=2., validate_args=True)
+    normal = normal_lib.Normal(loc=1., scale=2., validate_args=True)
     unused_normal_copy = normal.copy(validate_args=False)
     base_params = normal.parameters.copy()
     copy_params = normal.copy(validate_args=False).parameters.copy()
@@ -367,19 +393,19 @@ class DistributionTest(test_util.TestCase):
     mu = 1.
     sigma = 2.
 
-    normal = tfd.Normal(mu, sigma, validate_args=True)
+    normal = normal_lib.Normal(mu, sigma, validate_args=True)
     self.assertTrue(tf.get_static_value(normal.is_scalar_event()))
     self.assertTrue(tf.get_static_value(normal.is_scalar_batch()))
 
-    normal = tfd.Normal([mu], [sigma], validate_args=True)
+    normal = normal_lib.Normal([mu], [sigma], validate_args=True)
     self.assertTrue(tf.get_static_value(normal.is_scalar_event()))
     self.assertFalse(tf.get_static_value(normal.is_scalar_batch()))
 
-    mvn = tfd.MultivariateNormalDiag([mu], [sigma], validate_args=True)
+    mvn = mvn_diag.MultivariateNormalDiag([mu], [sigma], validate_args=True)
     self.assertFalse(tf.get_static_value(mvn.is_scalar_event()))
     self.assertTrue(tf.get_static_value(mvn.is_scalar_batch()))
 
-    mvn = tfd.MultivariateNormalDiag([[mu]], [[sigma]], validate_args=True)
+    mvn = mvn_diag.MultivariateNormalDiag([[mu]], [[sigma]], validate_args=True)
     self.assertFalse(tf.get_static_value(mvn.is_scalar_event()))
     self.assertFalse(tf.get_static_value(mvn.is_scalar_batch()))
 
@@ -414,7 +440,8 @@ class DistributionTest(test_util.TestCase):
     self.assertFalse(self.evaluate(is_scalar))
 
   def _GetFakeDistribution(self):
-    class FakeDistribution(tfd.Distribution):
+
+    class FakeDistribution(distribution.Distribution):
       """Fake Distribution for testing _set_sample_static_shape."""
 
       def __init__(self, batch_shape=None, event_shape=None):
@@ -422,7 +449,7 @@ class DistributionTest(test_util.TestCase):
         self._static_event_shape = tf.TensorShape(event_shape)
         super(FakeDistribution, self).__init__(
             dtype=tf.float32,
-            reparameterization_type=tfd.NOT_REPARAMETERIZED,
+            reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
             validate_args=True,
             allow_nan_stats=True,
             name='DummyDistribution')
@@ -490,11 +517,13 @@ class DistributionTest(test_util.TestCase):
 
     seed = test_util.test_seed()
 
-    outer_dist = tfd.Normal(loc=0., scale=1., name='dist', validate_args=True)
+    outer_dist = normal_lib.Normal(
+        loc=0., scale=1., name='dist', validate_args=True)
     self.assertStartsWith(outer_dist.name, 'dist')
 
     with tf.name_scope('inside'):
-      inner_dist = tfd.Normal(loc=0., scale=1., name='dist', validate_args=True)
+      inner_dist = normal_lib.Normal(
+          loc=0., scale=1., name='dist', validate_args=True)
       self.assertStartsWith(inner_dist.name, 'dist')
       self.assertStartsWith(inner_dist.sample(seed=seed, name='x').name,
                             'inside/dist/x')
@@ -504,9 +533,8 @@ class DistributionTest(test_util.TestCase):
       self.assertStartsWith(outer_dist.sample(seed=seed, name='x').name,
                             'inside/dist_CONSTRUCTED_AT_top_level/x')
 
-      meta_dist = tfd.Independent(inner_dist,
-                                  reinterpreted_batch_ndims=0,
-                                  name='meta_dist')
+      meta_dist = independent.Independent(
+          inner_dist, reinterpreted_batch_ndims=0, name='meta_dist')
       # Patch to return tensors directly from the inner distribution, so we can
       # read their names.
       meta_dist._call_sample_n = meta_dist._sample_n
@@ -526,10 +554,10 @@ class DistributionTest(test_util.TestCase):
         'meta_dist_CONSTRUCTED_AT_inside/x/dist/sample')
 
   def testNameScopeWorksCorrectly(self):
-    x = tfd.Normal(loc=0., scale=1., name='x')
-    x_duplicate = tfd.Normal(loc=0., scale=1., name='x')
+    x = normal_lib.Normal(loc=0., scale=1., name='x')
+    x_duplicate = normal_lib.Normal(loc=0., scale=1., name='x')
     with tf.name_scope('y') as name:
-      y = tfd.Bernoulli(logits=0., name=name)
+      y = bernoulli.Bernoulli(logits=0., name=name)
     x_sample = x.sample(
         name='custom_sample', seed=test_util.test_seed())
     x_sample_duplicate = x.sample(
@@ -553,12 +581,13 @@ class DistributionTest(test_util.TestCase):
     self.assertStartsWith(x_sample_duplicate.name, 'x/custom_sample_1')
 
   def testUnimplemtnedProbAndLogProbExceptions(self):
-    class TerribleDistribution(tfd.Distribution):
+
+    class TerribleDistribution(distribution.Distribution):
 
       def __init__(self):
         super(TerribleDistribution, self).__init__(
             dtype=tf.float32,
-            reparameterization_type=tfd.NOT_REPARAMETERIZED,
+            reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
             validate_args=False,
             allow_nan_stats=False)
 
@@ -581,12 +610,12 @@ class DistributionTest(test_util.TestCase):
 
   def testUnnormalizedProbDerivation(self):
 
-    class DistributionWithProbOnly(tfd.Distribution):
+    class DistributionWithProbOnly(distribution.Distribution):
 
       def __init__(self):
         super(DistributionWithProbOnly, self).__init__(
             dtype=tf.float32,
-            reparameterization_type=tfd.NOT_REPARAMETERIZED,
+            reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
             validate_args=False,
             allow_nan_stats=False)
 
@@ -598,12 +627,12 @@ class DistributionTest(test_util.TestCase):
         self.evaluate(distribution_with_prob_only.unnormalized_log_prob(3.0)),
         self.evaluate(tf.math.log(2.0)))
 
-    class DistributionWithLogProbOnly(tfd.Distribution):
+    class DistributionWithLogProbOnly(distribution.Distribution):
 
       def __init__(self):
         super(DistributionWithLogProbOnly, self).__init__(
             dtype=tf.float32,
-            reparameterization_type=tfd.NOT_REPARAMETERIZED,
+            reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
             validate_args=False,
             allow_nan_stats=False)
 
@@ -616,7 +645,7 @@ class DistributionTest(test_util.TestCase):
         distribution_with_log_prob_only.unnormalized_log_prob(3.0))
 
   def testNotIterable(self):
-    normal = tfd.Normal(loc=0., scale=1.)
+    normal = normal_lib.Normal(loc=0., scale=1.)
     with self.assertRaisesRegexp(
         TypeError,
         '\'Normal\' object is not iterable'
@@ -624,7 +653,7 @@ class DistributionTest(test_util.TestCase):
       list(normal)
 
   def testQuantileOutOfBounds(self):
-    normal = tfd.Normal(loc=0., scale=1., validate_args=True)
+    normal = normal_lib.Normal(loc=0., scale=1., validate_args=True)
     self.evaluate(normal.quantile(0.01))
     with self.assertRaisesOpError(r'must be >= 0'):
       self.evaluate(normal.quantile(-.01))
@@ -640,35 +669,30 @@ class DistributionFittingTest(test_util.TestCase):
         test_util.test_seed(sampler_type='stateless'),
         n=2)
     return self.evaluate(
-        tfd.Normal(
+        normal_lib.Normal(
             loc=tf.random.stateless_normal(batch_shape, seed=loc_seed),
-            scale=3.14159).sample(
-                sample_shape=sample_shape, seed=sample_seed))
+            scale=3.14159).sample(sample_shape=sample_shape, seed=sample_seed))
 
   def testConstructFittedDistribution(self):
     xs = self._sample_xs(batch_shape=[2], sample_shape=[3, 2, 1])
-    dist = tfd.Normal.experimental_fit(
-        xs,
-        sample_ndims=3,
-        name='elizabeth',
-        validate_args=True)
+    dist = normal_lib.Normal.experimental_fit(
+        xs, sample_ndims=3, name='elizabeth', validate_args=True)
     self.assertAllEqual(dist.batch_shape, [2])
     self.assertTrue(dist.validate_args)
     self.assertEqual(dist.name, 'elizabeth')
 
-    dist = tfd.Normal.experimental_fit(xs, sample_ndims=2)
+    dist = normal_lib.Normal.experimental_fit(xs, sample_ndims=2)
     self.assertAllEqual(dist.batch_shape, [1, 2])
 
-    dist = tfd.Normal.experimental_fit(xs)
+    dist = normal_lib.Normal.experimental_fit(xs)
     self.assertAllEqual(dist.batch_shape, [2, 1, 2])
 
     with self.assertRaisesRegex(ValueError, 'must be a positive integer'):
-      dist = tfd.Normal.experimental_fit(xs, sample_ndims=0)
+      dist = normal_lib.Normal.experimental_fit(xs, sample_ndims=0)
 
   def testParamOverride(self):
-    dist = tfd.Normal.experimental_fit(
-        self._sample_xs(batch_shape=[], sample_shape=[20]),
-        scale=42.)
+    dist = normal_lib.Normal.experimental_fit(
+        self._sample_xs(batch_shape=[], sample_shape=[20]), scale=42.)
     self.assertAllEqual(dist.batch_shape, [])
     self.assertAllClose(dist.scale, 42.)
 
@@ -679,14 +703,14 @@ class DistributionFittingTest(test_util.TestCase):
     xs = self._sample_xs(batch_shape=[2], sample_shape=[3, 2, 1])
 
     # Dynamic `xs` and `sample_ndims`.
-    dist = tfd.Normal.experimental_fit(
+    dist = normal_lib.Normal.experimental_fit(
         tf1.placeholder_with_default(xs, shape=None),
         sample_ndims=tf1.placeholder_with_default(1, shape=[]))
     self.assertAllEqual(dist.batch_shape, tf.TensorShape(None))
     self.assertAllEqual(dist.batch_shape_tensor(), [2, 1, 2])
 
     # Dynamic `sample_ndims` only.
-    dist = tfd.Normal.experimental_fit(
+    dist = normal_lib.Normal.experimental_fit(
         xs, sample_ndims=tf1.placeholder_with_default(1, shape=[]))
     self.assertAllEqual(dist.batch_shape, tf.TensorShape(None))
     self.assertAllEqual(dist.batch_shape_tensor(), [2, 1, 2])
@@ -694,20 +718,20 @@ class DistributionFittingTest(test_util.TestCase):
     # Invalid `sample_ndims`.
     with self.assertRaisesRegex(tf.errors.InvalidArgumentError,
                                 'must be a positive integer'):
-      dist = tfd.Normal.experimental_fit(
+      dist = normal_lib.Normal.experimental_fit(
           xs,
           sample_ndims=tf1.placeholder_with_default(0, shape=[]),
           validate_args=True)
       self.evaluate(dist.mean())
 
 
-class Dummy(tfd.Distribution):
+class Dummy(distribution.Distribution):
 
   # To ensure no code is keying on the unspecial name 'self', we use 'me'.
   def __init__(me, arg1, arg2, arg3=None, **named):  # pylint: disable=no-self-argument
     super(Dummy, me).__init__(
         dtype=tf.float32,
-        reparameterization_type=tfd.NOT_REPARAMETERIZED,
+        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
         validate_args=False,
         allow_nan_stats=False)
     me._mean_ = tf.convert_to_tensor(arg1 + arg2)
@@ -734,7 +758,7 @@ class ParametersTest(test_util.TestCase):
     if not tf.executing_eagerly(): return
     @tf.function
     def normal_differential_entropy(scale):
-      return tfd.Normal(0., scale, validate_args=True).entropy()
+      return normal_lib.Normal(0., scale, validate_args=True).entropy()
 
     scale = 0.25
     self.assertNear(0.5 * np.log(2. * np.pi * np.e * scale**2.),
@@ -744,10 +768,10 @@ class ParametersTest(test_util.TestCase):
   def testParameterPropertiesNotInherited(self):
 
     # Subclasses that don't redefine __init__ can inherit properties.
-    class NormalTrivialSubclass(tfd.Normal):
+    class NormalTrivialSubclass(normal_lib.Normal):
       pass
 
-    class NormalWithPassThroughInit(tfd.Normal):
+    class NormalWithPassThroughInit(normal_lib.Normal):
 
       def __init__(self, *args, **kwargs):
         self._not_a_new_parameter = 42
@@ -756,7 +780,7 @@ class ParametersTest(test_util.TestCase):
     # It's safe for direct subclasses of Distribution to inherit
     # Distribution._parameter_properties, since it just throws a
     # NotImplementedError.
-    class MyDistribution(tfd.Distribution):
+    class MyDistribution(distribution.Distribution):
 
       def __init__(self, param1, param2):
         pass
@@ -768,12 +792,12 @@ class ParametersTest(test_util.TestCase):
         MyDistribution.parameter_properties()
       with self.assertRaises(NotImplementedError):
         # Ensure that the unimplemented JD propertoes don't raise a warning.
-        tfd.JointDistributionCoroutine.parameter_properties()
+        jdc.JointDistributionCoroutine.parameter_properties()
       logging.warning('assertLogs context requires at least one warning.')
     # Assert that no warnings occurred other than the dummy warning.
     self.assertLen(log.records, 1)
 
-    class NormalWithExtraParam(tfd.Normal):
+    class NormalWithExtraParam(normal_lib.Normal):
 
       def __init__(self, extra_param, *args, **kwargs):
         self._extra_param = extra_param
@@ -791,14 +815,14 @@ class TfModuleTest(test_util.TestCase):
   @test_util.jax_disable_variable_test
   def test_variable_tracking_works(self):
     scale = tf.Variable(1.)
-    normal = tfd.Normal(loc=0, scale=scale, validate_args=True)
+    normal = normal_lib.Normal(loc=0, scale=scale, validate_args=True)
     self.assertIsInstance(normal, tf.Module)
     self.assertEqual((scale,), normal.trainable_variables)
 
   @test_util.tf_tape_safety_test
   def test_gradient(self):
     scale = tf.Variable(1.)
-    normal = tfd.Normal(loc=0, scale=scale, validate_args=True)
+    normal = normal_lib.Normal(loc=0, scale=scale, validate_args=True)
     self.assertEqual((scale,), normal.trainable_variables)
     with tf.GradientTape() as tape:
       loss = -normal.log_prob(0.)
@@ -811,7 +835,8 @@ class TfModuleTest(test_util.TestCase):
 class ConditionalDistributionTest(test_util.TestCase):
 
   def _GetFakeDistribution(self):
-    class _FakeDistribution(tfd.Distribution):
+
+    class _FakeDistribution(distribution.Distribution):
       """Fake Distribution for testing conditioning kwargs are passed in."""
 
       def __init__(self, batch_shape=None, event_shape=None):
@@ -819,7 +844,7 @@ class ConditionalDistributionTest(test_util.TestCase):
         self._static_event_shape = tf.TensorShape(event_shape)
         super(_FakeDistribution, self).__init__(
             dtype=tf.float32,
-            reparameterization_type=tfd.NOT_REPARAMETERIZED,
+            reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
             validate_args=True,
             allow_nan_stats=True,
             name='DummyDistribution')
@@ -866,7 +891,8 @@ class ConditionalDistributionTest(test_util.TestCase):
           method(1.0, arg1='b1', arg2='b2')
 
   def _GetPartiallyImplementedDistribution(self):
-    class _PartiallyImplementedDistribution(tfd.Distribution):
+
+    class _PartiallyImplementedDistribution(distribution.Distribution):
       """Partially implemented Distribution for testing default methods."""
 
       def __init__(
@@ -875,7 +901,7 @@ class ConditionalDistributionTest(test_util.TestCase):
         self._static_event_shape = tf.TensorShape(event_shape)
         super(_PartiallyImplementedDistribution, self).__init__(
             dtype=tf.float32,
-            reparameterization_type=tfd.NOT_REPARAMETERIZED,
+            reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
             validate_args=True,
             allow_nan_stats=True,
             name='PartiallyImplementedDistribution')
@@ -944,37 +970,56 @@ class ConditionalDistributionTest(test_util.TestCase):
 class BatchShapeInferenceTests(test_util.TestCase):
 
   @parameterized.named_parameters(
-      {'testcase_name': '_trivial',
-       'value_fn': lambda: tfd.Normal(loc=0., scale=1.),
-       'expected_batch_shape': []},
-      {'testcase_name': '_simple_tensor_broadcasting',
-       'value_fn': lambda: tfd.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
-           loc=[0., 0.], scale_diag=tf.convert_to_tensor([[1., 1.], [1., 1.]])),
-       'expected_batch_shape': [2]},
-      {'testcase_name': '_rank_deficient_tensor_broadcasting',
-       'value_fn': lambda: tfd.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
-           loc=0., scale_diag=tf.convert_to_tensor([[1., 1.], [1., 1.]])),
-       'expected_batch_shape': [2]},
-      {'testcase_name': '_mixture_same_family',
-       'value_fn': lambda: tfd.MixtureSameFamily(  # pylint: disable=g-long-lambda
-           mixture_distribution=tfd.Categorical(
-               logits=[[[1., 2., 3.],
-                        [4., 5., 6.]]]),
-           components_distribution=tfd.Normal(loc=0.,
-                                              scale=[[[1., 2., 3.],
-                                                      [4., 5., 6.]]])),
-       'expected_batch_shape': [1, 2]},
-      {'testcase_name': '_deeply_nested',
-       'value_fn': lambda: tfd.Independent(  # pylint: disable=g-long-lambda
-           tfd.Independent(
-               tfd.Independent(
-                   tfd.Independent(
-                       tfd.Normal(loc=0., scale=[[[[[[[[1.]]]]]]]]),
-                       reinterpreted_batch_ndims=2),
-                   reinterpreted_batch_ndims=0),
-               reinterpreted_batch_ndims=1),
-           reinterpreted_batch_ndims=1),
-       'expected_batch_shape': [1, 1, 1, 1]})
+      {
+          'testcase_name': '_trivial',
+          'value_fn': lambda: normal_lib.Normal(loc=0., scale=1.),
+          'expected_batch_shape': []
+      },
+      {
+          'testcase_name':
+              '_simple_tensor_broadcasting',
+          'value_fn':
+              lambda: mvn_diag.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
+                  loc=[0., 0.],
+                  scale_diag=tf.convert_to_tensor([[1., 1.], [1., 1.]])),
+          'expected_batch_shape': [2]
+      },
+      {
+          'testcase_name':
+              '_rank_deficient_tensor_broadcasting',
+          'value_fn':
+              lambda: mvn_diag.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
+                  loc=0.,
+                  scale_diag=tf.convert_to_tensor([[1., 1.], [1., 1.]])),
+          'expected_batch_shape': [2]
+      },
+      {
+          'testcase_name':
+              '_mixture_same_family',
+          'value_fn':
+              lambda: mixture_same_family.MixtureSameFamily(  # pylint: disable=g-long-lambda
+                  mixture_distribution=categorical.Categorical(
+                      logits=[[[1., 2., 3.], [4., 5., 6.]]]),
+                  components_distribution=normal_lib.Normal(
+                      loc=0., scale=[[[1., 2., 3.], [4., 5., 6.]]])),
+          'expected_batch_shape': [1, 2]
+      },
+      {
+          'testcase_name':
+              '_deeply_nested',
+          'value_fn':
+              lambda: independent.Independent(  # pylint: disable=g-long-lambda
+                  independent.Independent(
+                      independent.Independent(
+                          independent.Independent(
+                              normal_lib.Normal(
+                                  loc=0., scale=[[[[[[[[1.]]]]]]]]),
+                              reinterpreted_batch_ndims=2),
+                          reinterpreted_batch_ndims=0),
+                      reinterpreted_batch_ndims=1),
+                  reinterpreted_batch_ndims=1),
+          'expected_batch_shape': [1, 1, 1, 1]
+      })
   def test_batch_shape_inference_is_correct(
       self, value_fn, expected_batch_shape):
     value = value_fn()  # Defer construction until we're in the right graph.
@@ -995,44 +1040,76 @@ class BatchShapeInferenceTests(test_util.TestCase):
       self.assertAllEqual(expected_batch_shape, param_batch_shape)
 
   @parameterized.named_parameters(
-      {'testcase_name': '_trivial',
-       'dist_fn': lambda: tfd.Normal(loc=0., scale=1.)},
-      {'testcase_name': '_simple_tensor_broadcasting',
-       'dist_fn': lambda: tfd.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
-           loc=[0., 0.],
-           scale_diag=[[1., 1.], [1., 1.]])},
-      {'testcase_name': '_rank_deficient_tensor_broadcasting',
-       'dist_fn': lambda: tfd.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
-           loc=0.,
-           scale_diag=[[1., 1.], [1., 1.]])},
-      {'testcase_name': '_deeply_nested',
-       'dist_fn': lambda: tfd.Independent(  # pylint: disable=g-long-lambda
-           tfd.Independent(
-               tfd.Independent(
-                   tfd.Independent(
-                       tfd.Normal(loc=0.,
-                                  scale=[[[[[[[[1.]]]]]]]]),
-                       reinterpreted_batch_ndims=2),
-                   reinterpreted_batch_ndims=0),
-               reinterpreted_batch_ndims=1),
-           reinterpreted_batch_ndims=1)},
-      {'testcase_name': '_transformed_dist_simple',
-       'dist_fn': lambda: tfd.TransformedDistribution(  # pylint: disable=g-long-lambda
-           tfd.Normal(loc=[[1., 2., 3.], [3., 4., 5.]], scale=[1.]),
-           tfb.Scale(scale=[2., 3., 4.]))},
-      {'testcase_name': '_transformed_dist_with_chain',
-       'dist_fn': lambda: tfd.TransformedDistribution(  # pylint: disable=g-long-lambda
-           tfd.Normal(loc=[[1., 2., 3.], [3., 4., 5.]], scale=[1.]),
-           tfb.Shift(-4.)(tfb.Scale(scale=[2., 3., 4.])))},
-      {'testcase_name': '_transformed_dist_multipart_nested',
-       'dist_fn': lambda: tfd.TransformedDistribution(  # pylint: disable=g-long-lambda
-           tfd.TransformedDistribution(
-               tfd.TransformedDistribution(
-                   tfd.MultivariateNormalDiag(tf.zeros([4, 6]), tf.ones([6])),
-                   tfb.Split([3, 3])),
-               tfb.JointMap([tfb.Identity(), tfb.Reshape([3, 1])])),
-           tfb.JointMap([tfb.Scale(scale=[2., 3., 4.]), tfb.Shift(1.)]))}
-      )
+      {
+          'testcase_name': '_trivial',
+          'dist_fn': lambda: normal_lib.Normal(loc=0., scale=1.)
+      },
+      {
+          'testcase_name':
+              '_simple_tensor_broadcasting',
+          'dist_fn':
+              lambda: mvn_diag.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
+                  loc=[0., 0.],
+                  scale_diag=[[1., 1.], [1., 1.]])
+      },
+      {
+          'testcase_name':
+              '_rank_deficient_tensor_broadcasting',
+          'dist_fn':
+              lambda: mvn_diag.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
+                  loc=0.,
+                  scale_diag=[[1., 1.], [1., 1.]])
+      },
+      {
+          'testcase_name':
+              '_deeply_nested',
+          'dist_fn':
+              lambda: independent.Independent(  # pylint: disable=g-long-lambda
+                  independent.Independent(
+                      independent.Independent(
+                          independent.Independent(
+                              normal_lib.Normal(
+                                  loc=0., scale=[[[[[[[[1.]]]]]]]]),
+                              reinterpreted_batch_ndims=2),
+                          reinterpreted_batch_ndims=0),
+                      reinterpreted_batch_ndims=1),
+                  reinterpreted_batch_ndims=1)
+      },
+      {
+          'testcase_name':
+              '_transformed_dist_simple',
+          'dist_fn':
+              lambda: transformed_distribution.TransformedDistribution(  # pylint: disable=g-long-lambda
+                  normal_lib.Normal(
+                      loc=[[1., 2., 3.], [3., 4., 5.]], scale=[1.]),
+                  scale_lib.Scale(scale=[2., 3., 4.]))
+      },
+      {
+          'testcase_name':
+              '_transformed_dist_with_chain',
+          'dist_fn':
+              lambda: transformed_distribution.TransformedDistribution(  # pylint: disable=g-long-lambda
+                  normal_lib.Normal(
+                      loc=[[1., 2., 3.], [3., 4., 5.]], scale=[1.]),
+                  shift.Shift(-4.)(scale_lib.Scale(scale=[2., 3., 4.])))
+      },
+      {
+          'testcase_name':
+              '_transformed_dist_multipart_nested',
+          'dist_fn':
+              lambda: transformed_distribution.TransformedDistribution(  # pylint: disable=g-long-lambda
+                  transformed_distribution.TransformedDistribution(
+                      transformed_distribution.TransformedDistribution(
+                          mvn_diag.MultivariateNormalDiag(
+                              tf.zeros([4, 6]), tf.ones([6])),
+                          split.Split([3, 3])),
+                      joint_map.JointMap(
+                          [identity.Identity(),
+                           reshape.Reshape([3, 1])])),
+                  joint_map.JointMap(
+                      [scale_lib.Scale(scale=[2., 3., 4.]),
+                       shift.Shift(1.)]))
+      })
   def test_batch_broadcasting(self, dist_fn):
     dist = dist_fn()
     broadcast_dist = dist._broadcast_parameters_with_batch_shape(

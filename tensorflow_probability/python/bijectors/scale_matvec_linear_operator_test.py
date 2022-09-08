@@ -18,7 +18,7 @@
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import scale_matvec_linear_operator
 from tensorflow_probability.python.internal import test_util
 
 
@@ -29,7 +29,7 @@ class ScaleMatvecLinearOperatorTest(test_util.TestCase):
     diag = np.array([[1, 2, 3],
                      [2, 5, 6]], dtype=np.float32)
     scale = tf.linalg.LinearOperatorDiag(diag, is_non_singular=True)
-    bijector = tfb.ScaleMatvecLinearOperator(
+    bijector = scale_matvec_linear_operator.ScaleMatvecLinearOperator(
         scale=scale, validate_args=True)
 
     x = np.array([[1, 0, -1], [2, 3, 4]], dtype=np.float32)
@@ -56,7 +56,7 @@ class ScaleMatvecLinearOperatorTest(test_util.TestCase):
                     dtype=np.float32)
     scale = tf.linalg.LinearOperatorLowerTriangular(
         tril, is_non_singular=True)
-    bijector = tfb.ScaleMatvecLinearOperator(
+    bijector = scale_matvec_linear_operator.ScaleMatvecLinearOperator(
         scale=scale, validate_args=True)
 
     x = np.array([[[1, 0, -1],
@@ -92,7 +92,7 @@ class ScaleMatvecLinearOperatorTest(test_util.TestCase):
                     dtype=np.float32)
     scale = tf.linalg.LinearOperatorLowerTriangular(
         tril, is_non_singular=True)
-    bijector = tfb.ScaleMatvecLinearOperator(
+    bijector = scale_matvec_linear_operator.ScaleMatvecLinearOperator(
         scale=scale, adjoint=True, validate_args=True)
 
     x = np.array([[[1, 0, -1],
@@ -129,7 +129,8 @@ class _ScaleMatvecLinearOperatorBlockTest(object):
     y = self.evaluate(op.matvec(x))
     ldj = self.evaluate(op.log_abs_determinant())
 
-    bijector = tfb.ScaleMatvecLinearOperatorBlock(scale=op, validate_args=True)
+    bijector = scale_matvec_linear_operator.ScaleMatvecLinearOperatorBlock(
+        scale=op, validate_args=True)
     self.assertStartsWith(bijector.name, 'scale_matvec_linear_operator_block')
 
     f_x = bijector.forward(x)
@@ -157,7 +158,8 @@ class _ScaleMatvecLinearOperatorBlockTest(object):
     x = [tf.ones((1, 1, 1, 4), dtype=tf.float32),
          tf.ones((1, 1, 1, 3), dtype=tf.float32)]
     op = self.build_batched_operator()
-    bijector = tfb.ScaleMatvecLinearOperatorBlock(op, validate_args=True)
+    bijector = scale_matvec_linear_operator.ScaleMatvecLinearOperatorBlock(
+        op, validate_args=True)
 
     self.assertAllEqual(
         self.evaluate(tf.shape(bijector.forward_log_det_jacobian(x, [1, 1]))),
@@ -175,7 +177,7 @@ class _ScaleMatvecLinearOperatorBlockTest(object):
 
   def testEventShapeBroadcast(self):
     op = self.build_operator()
-    bijector = tfb.ScaleMatvecLinearOperatorBlock(
+    bijector = scale_matvec_linear_operator.ScaleMatvecLinearOperatorBlock(
         op, validate_args=True)
     x = [tf.broadcast_to(tf.constant(1., dtype=tf.float32), [2, 3, 3]),
          tf.broadcast_to(tf.constant(2., dtype=tf.float32), [2, 1, 2])]
@@ -196,7 +198,8 @@ class _ScaleMatvecLinearOperatorBlockTest(object):
   def testAlignedEventDims(self):
     x = [tf.ones((3,), dtype=tf.float32), tf.ones((2, 2), tf.float32)]
     op = self.build_operator()
-    bijector = tfb.ScaleMatvecLinearOperatorBlock(op, validate_args=True)
+    bijector = scale_matvec_linear_operator.ScaleMatvecLinearOperatorBlock(
+        op, validate_args=True)
     with self.assertRaisesRegexp(ValueError, 'equal for all elements'):
       self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=[1, 2]))
 

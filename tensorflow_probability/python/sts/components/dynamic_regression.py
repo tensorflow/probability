@@ -16,8 +16,12 @@
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import chain
+from tensorflow_probability.python.bijectors import scale
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.distributions import linear_gaussian_ssm as lgssm
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import mvn_diag
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
@@ -27,7 +31,8 @@ from tensorflow_probability.python.sts.structural_time_series import Parameter
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
 
 
-class DynamicLinearRegressionStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
+class DynamicLinearRegressionStateSpaceModel(lgssm.LinearGaussianStateSpaceModel
+                                            ):
   """State space model for a dynamic linear regression from provided covariates.
 
   A state space model (SSM) posits a set of latent (unobserved) variables that
@@ -185,15 +190,13 @@ class DynamicLinearRegressionStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       super(DynamicLinearRegressionStateSpaceModel, self).__init__(
           num_timesteps=num_timesteps,
           transition_matrix=tf.linalg.LinearOperatorIdentity(
-              num_rows=num_features,
-              dtype=dtype,
-              name='transition_matrix'),
-          transition_noise=tfd.MultivariateNormalDiag(
+              num_rows=num_features, dtype=dtype, name='transition_matrix'),
+          transition_noise=mvn_diag.MultivariateNormalDiag(
               scale_diag=(drift_scale[..., tf.newaxis] *
                           tf.ones([num_features], dtype=dtype)),
               name='transition_noise'),
           observation_matrix=observation_matrix_fn,
-          observation_noise=tfd.MultivariateNormalDiag(
+          observation_noise=mvn_diag.MultivariateNormalDiag(
               scale_diag=observation_noise_scale[..., tf.newaxis],
               name='observation_noise'),
           initial_state_prior=initial_state_prior,
@@ -274,7 +277,7 @@ class DynamicLinearRegression(StructuralTimeSeries):
 
       # Default to a weakly-informative Normal(0., 10.) for the initital state
       if initial_weights_prior is None:
-        initial_weights_prior = tfd.MultivariateNormalDiag(
+        initial_weights_prior = mvn_diag.MultivariateNormalDiag(
             scale_diag=10. * tf.ones([num_features], dtype=dtype))
 
       # Heuristic default priors. Overriding these may dramatically
@@ -286,7 +289,7 @@ class DynamicLinearRegression(StructuralTimeSeries):
           _, observed_stddev, _ = sts_util.empirical_statistics(
               observed_time_series)
 
-        drift_scale_prior = tfd.LogNormal(
+        drift_scale_prior = lognormal.LogNormal(
             loc=tf.math.log(.05 * observed_stddev),
             scale=3.,
             name='drift_scale_prior')
@@ -296,9 +299,12 @@ class DynamicLinearRegression(StructuralTimeSeries):
 
       super(DynamicLinearRegression, self).__init__(
           parameters=[
-              Parameter('drift_scale', drift_scale_prior,
-                        tfb.Chain([tfb.Scale(scale=observed_stddev),
-                                   tfb.Softplus(low=dtype_util.eps(dtype))]))
+              Parameter(
+                  'drift_scale', drift_scale_prior,
+                  chain.Chain([
+                      scale.Scale(scale=observed_stddev),
+                      softplus.Softplus(low=dtype_util.eps(dtype))
+                  ]))
           ],
           latent_size=num_features,
           init_parameters=init_parameters,

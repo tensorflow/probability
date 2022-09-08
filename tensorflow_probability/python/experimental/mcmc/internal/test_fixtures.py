@@ -18,14 +18,16 @@ import collections
 
 # Dependency imports
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.experimental.mcmc import reducer
+from tensorflow_probability.python.mcmc import kernel
+from tensorflow_probability.python.random import random_ops
 
 
 TestTransitionKernelResults = collections.namedtuple(
     'TestTransitionKernelResults', 'counter_1, counter_2')
 
 
-class TestTransitionKernel(tfp.mcmc.TransitionKernel):
+class TestTransitionKernel(kernel.TransitionKernel):
   """Fake deterministic Transition Kernel."""
 
   def __init__(
@@ -60,7 +62,7 @@ class TestTransitionKernel(tfp.mcmc.TransitionKernel):
     return self._is_calibrated
 
 
-class RandomTransitionKernel(tfp.mcmc.TransitionKernel):
+class RandomTransitionKernel(kernel.TransitionKernel):
   """Outputs a random next state following a Rayleigh distribution."""
 
   def __init__(self, shape=(), is_calibrated=True, accepts_seed=True):
@@ -71,7 +73,7 @@ class RandomTransitionKernel(tfp.mcmc.TransitionKernel):
   def one_step(self, current_state, previous_kernel_results, seed=None):
     if seed is not None and not self._accepts_seed:
       raise TypeError('seed arg not accepted')
-    new_state = tfp.random.rayleigh(self._shape, seed=seed)
+    new_state = random_ops.rayleigh(self._shape, seed=seed)
     return new_state, TestTransitionKernelResults(
         counter_1=previous_kernel_results.counter_1 + 1,
         counter_2=previous_kernel_results.counter_2 + 2)
@@ -85,7 +87,7 @@ class RandomTransitionKernel(tfp.mcmc.TransitionKernel):
     return self._is_calibrated
 
 
-class NaiveMeanReducer(tfp.experimental.mcmc.Reducer):
+class NaiveMeanReducer(reducer.Reducer):
   """Simple Reducer that (naively) computes the mean."""
 
   def initialize(self, initial_chain_state=None, initial_kernel_results=None):
@@ -98,7 +100,7 @@ class NaiveMeanReducer(tfp.experimental.mcmc.Reducer):
     return final_state[1] / final_state[0]
 
 
-class TestReducer(tfp.experimental.mcmc.Reducer):
+class TestReducer(reducer.Reducer):
   """Simple Reducer that just keeps track of the last sample."""
 
   def initialize(self, initial_chain_state, initial_kernel_results=None):
@@ -109,11 +111,11 @@ class TestReducer(tfp.experimental.mcmc.Reducer):
     return new_chain_state
 
 
-def reduce(reducer, elems):
+def reduce(r, elems):
   """Reduces `elems` along the first dimension with `reducer`."""
   elems = tf.convert_to_tensor(elems)
-  state = reducer.initialize(elems[0])
+  state = r.initialize(elems[0])
   def body(i, state):
-    return i + 1, reducer.one_step(elems[i], state)
+    return i + 1, r.one_step(elems[i], state)
   _, state = tf.while_loop(lambda i, _: i < elems.shape[0], body, (0, state))
-  return reducer.finalize(state)
+  return r.finalize(state)

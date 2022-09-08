@@ -18,13 +18,11 @@ import numpy as np
 from scipy import stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions import binomial as binomial_lib
 from tensorflow_probability.python.internal import implementation_selection
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
 
 
 @test_util.test_all_tf_execution_regimes
@@ -37,27 +35,29 @@ class BinomialTest(test_util.TestCase):
   def testAssertionsOneOfProbsAndLogits(self):
     with self.assertRaisesRegex(
         ValueError, 'Construct `Binomial` with `probs` or `logits`'):
-      self.evaluate(tfd.Binomial(total_count=10))
+      self.evaluate(binomial_lib.Binomial(total_count=10))
 
     with self.assertRaisesRegexp(ValueError, 'but not both'):
-      self.evaluate(tfd.Binomial(total_count=10, probs=0.5, logits=0.))
+      self.evaluate(binomial_lib.Binomial(total_count=10, probs=0.5, logits=0.))
 
   def testInvalidProbabilities(self):
     invalid_probabilities = [1.01, 2.]
     for p in invalid_probabilities:
       with self.assertRaisesOpError('probs has components greater than 1'):
-        dist = tfd.Binomial(total_count=10, probs=p, validate_args=True)
+        dist = binomial_lib.Binomial(
+            total_count=10, probs=p, validate_args=True)
         self.evaluate(dist.probs_parameter())
 
     invalid_probabilities = [-0.01, -3.]
     for p in invalid_probabilities:
       with self.assertRaisesOpError('x >= 0 did not hold'):
-        dist = tfd.Binomial(total_count=10, probs=p, validate_args=True)
+        dist = binomial_lib.Binomial(
+            total_count=10, probs=p, validate_args=True)
         self.evaluate(dist.probs_parameter())
 
   def testSimpleShapes(self):
     p = np.float32(np.random.beta(1, 1))
-    binom = tfd.Binomial(total_count=1., probs=p, validate_args=True)
+    binom = binomial_lib.Binomial(total_count=1., probs=p, validate_args=True)
     self.assertAllEqual([], self.evaluate(binom.event_shape_tensor()))
     self.assertAllEqual([], self.evaluate(binom.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([]), binom.event_shape)
@@ -66,7 +66,7 @@ class BinomialTest(test_util.TestCase):
   def testComplexShapes(self):
     p = np.random.beta(1, 1, size=(3, 2)).astype(np.float32)
     n = [[3., 2], [4, 5], [6, 7]]
-    binom = tfd.Binomial(total_count=n, probs=p, validate_args=True)
+    binom = binomial_lib.Binomial(total_count=n, probs=p, validate_args=True)
     self.assertAllEqual([], self.evaluate(binom.event_shape_tensor()))
     self.assertAllEqual([3, 2], self.evaluate(binom.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([]), binom.event_shape)
@@ -75,20 +75,21 @@ class BinomialTest(test_util.TestCase):
   def testNProperty(self):
     p = [[0.1, 0.2, 0.7], [0.2, 0.3, 0.5]]
     n = [[3.], [4]]
-    binom = tfd.Binomial(total_count=n, probs=p, validate_args=True)
+    binom = binomial_lib.Binomial(total_count=n, probs=p, validate_args=True)
     self.assertEqual((2, 1), binom.total_count.shape)
     self.assertAllClose(n, self.evaluate(binom.total_count))
 
   def testPProperty(self):
     p = [[0.1, 0.2, 0.7]]
-    binom = tfd.Binomial(total_count=3., probs=p, validate_args=True)
+    binom = binomial_lib.Binomial(total_count=3., probs=p, validate_args=True)
     self.assertEqual((1, 3), binom.probs.shape)
     self.assertEqual((1, 3), binom.logits_parameter().shape)
     self.assertAllClose(p, self.evaluate(binom.probs))
 
   def testLogitsProperty(self):
     logits = [[0., 9., -0.5]]
-    binom = tfd.Binomial(total_count=3., logits=logits, validate_args=True)
+    binom = binomial_lib.Binomial(
+        total_count=3., logits=logits, validate_args=True)
     self.assertEqual((1, 3), binom.probs_parameter().shape)
     self.assertEqual((1, 3), binom.logits.shape)
     self.assertAllClose(logits, self.evaluate(binom.logits))
@@ -96,7 +97,7 @@ class BinomialTest(test_util.TestCase):
   def testPmfAndCdfNandCountsAgree(self):
     p = [[0.1, 0.2, 0.7]]
     n = [[5.]]
-    binom = tfd.Binomial(total_count=n, probs=p, validate_args=True)
+    binom = binomial_lib.Binomial(total_count=n, probs=p, validate_args=True)
     self.evaluate(binom.prob([2., 3, 2]))
     self.evaluate(binom.prob([3., 1, 2]))
     self.evaluate(binom.cdf([2., 3, 2]))
@@ -114,7 +115,7 @@ class BinomialTest(test_util.TestCase):
     p = [[0.1, 0.2, 0.7]]
     n = [[5.]]
     # No errors with integer n.
-    binom = tfd.Binomial(total_count=n, probs=p, validate_args=True)
+    binom = binomial_lib.Binomial(total_count=n, probs=p, validate_args=True)
     self.evaluate(binom.prob([2., 3, 2]))
     self.evaluate(binom.prob([3., 1, 2]))
     self.evaluate(binom.cdf([2., 3, 2]))
@@ -126,7 +127,7 @@ class BinomialTest(test_util.TestCase):
     with self.assertRaisesOpError('cannot contain fractional components.'):
       self.evaluate(binom.cdf(placeholder))
 
-    binom = tfd.Binomial(total_count=n, probs=p, validate_args=False)
+    binom = binomial_lib.Binomial(total_count=n, probs=p, validate_args=False)
     self.evaluate(binom.prob([1., 2., 3.]))
     self.evaluate(binom.cdf([1., 2., 3.]))
     # Non-integer arguments work.
@@ -137,7 +138,7 @@ class BinomialTest(test_util.TestCase):
     n = 5.
     p = [0., 1.]
     counts = [[0.], [3.], [5.]]
-    binom = tfd.Binomial(total_count=n, probs=p, validate_args=True)
+    binom = binomial_lib.Binomial(total_count=n, probs=p, validate_args=True)
     self.assertAllClose(self.evaluate(binom.prob(counts)),
                         [[1., 0.], [0., 0.], [0., 1.]])
     self.assertAllClose(self.evaluate(binom.cdf(counts)),
@@ -147,7 +148,7 @@ class BinomialTest(test_util.TestCase):
     # Both zero-batches.  No broadcast
     p = 0.5
     counts = 1.
-    binom = tfd.Binomial(total_count=1., probs=p, validate_args=True)
+    binom = binomial_lib.Binomial(total_count=1., probs=p, validate_args=True)
     pmf = binom.prob(counts)
     cdf = binom.cdf(counts)
     self.assertAllClose(0.5, self.evaluate(pmf))
@@ -159,7 +160,7 @@ class BinomialTest(test_util.TestCase):
     # Both zero-batches.  No broadcast
     p = 0.1
     counts = 3.
-    binom = tfd.Binomial(total_count=5., probs=p, validate_args=True)
+    binom = binomial_lib.Binomial(total_count=5., probs=p, validate_args=True)
     pmf = binom.prob(counts)
     cdf = binom.cdf(counts)
     self.assertAllClose(stats.binom.pmf(counts, n=5., p=p), self.evaluate(pmf))
@@ -170,7 +171,7 @@ class BinomialTest(test_util.TestCase):
   def testPmfAndCdfPStretchedInBroadcastWhenSameRank(self):
     p = [[0.1, 0.9]]
     counts = [[1., 2.]]
-    binom = tfd.Binomial(total_count=3., probs=p, validate_args=True)
+    binom = binomial_lib.Binomial(total_count=3., probs=p, validate_args=True)
     pmf = binom.prob(counts)
     cdf = binom.cdf(counts)
     self.assertAllClose(stats.binom.pmf(counts, n=3., p=p), self.evaluate(pmf))
@@ -181,7 +182,7 @@ class BinomialTest(test_util.TestCase):
   def testPmfAndCdfPStretchedInBroadcastWhenLowerRank(self):
     p = [0.1, 0.4]
     counts = [[1.], [0.]]
-    binom = tfd.Binomial(total_count=1., probs=p, validate_args=True)
+    binom = binomial_lib.Binomial(total_count=1., probs=p, validate_args=True)
     pmf = binom.prob(counts)
     cdf = binom.cdf(counts)
     self.assertAllClose([[0.1, 0.4], [0.9, 0.6]], self.evaluate(pmf))
@@ -192,14 +193,14 @@ class BinomialTest(test_util.TestCase):
   def testCdfBeyondSupport(self):
     p = [[0.1, 0.9]]
     counts = [[-1., 4.]]
-    binom = tfd.Binomial(total_count=3., probs=p, validate_args=False)
+    binom = binomial_lib.Binomial(total_count=3., probs=p, validate_args=False)
     cdf = binom.cdf(counts)
     self.assertAllEqual([[0., 1.]], self.evaluate(cdf))
 
   def testBinomialMean(self):
     n = 5.
     p = [0.1, 0.2, 0.7]
-    binom = tfd.Binomial(total_count=n, probs=p, validate_args=True)
+    binom = binomial_lib.Binomial(total_count=n, probs=p, validate_args=True)
     expected_means = stats.binom.mean(n, p)
     self.assertEqual((3,), binom.mean().shape)
     self.assertAllClose(expected_means, self.evaluate(binom.mean()))
@@ -207,7 +208,7 @@ class BinomialTest(test_util.TestCase):
   def testBinomialVariance(self):
     n = 5.
     p = [0.1, 0.2, 0.7]
-    binom = tfd.Binomial(total_count=n, probs=p, validate_args=True)
+    binom = binomial_lib.Binomial(total_count=n, probs=p, validate_args=True)
     expected_variances = stats.binom.var(n, p)
     self.assertEqual((3,), binom.variance().shape)
     self.assertAllClose(expected_variances, self.evaluate(binom.variance()))
@@ -215,7 +216,7 @@ class BinomialTest(test_util.TestCase):
   def testBinomialMode(self):
     n = 5.
     p = [0.1, 0.2, 0.7]
-    binom = tfd.Binomial(total_count=n, probs=p, validate_args=True)
+    binom = binomial_lib.Binomial(total_count=n, probs=p, validate_args=True)
     expected_modes = [0., 1, 4]
     self.assertEqual((3,), binom.mode().shape)
     self.assertAllClose(expected_modes, self.evaluate(binom.mode()))
@@ -224,13 +225,13 @@ class BinomialTest(test_util.TestCase):
     n = [51., 52.]
 
     p = 1.
-    binom = tfd.Binomial(total_count=n, probs=p, validate_args=True)
+    binom = binomial_lib.Binomial(total_count=n, probs=p, validate_args=True)
     expected_modes = n
     self.assertEqual((2,), binom.mode().shape)
     self.assertAllClose(expected_modes, self.evaluate(binom.mode()))
 
     p = 0.
-    binom = tfd.Binomial(total_count=n, probs=p, validate_args=True)
+    binom = binomial_lib.Binomial(total_count=n, probs=p, validate_args=True)
     expected_modes = [0., 0.]
     self.assertEqual((2,), binom.mode().shape)
     self.assertAllClose(expected_modes, self.evaluate(binom.mode()))
@@ -238,7 +239,7 @@ class BinomialTest(test_util.TestCase):
   def testBinomialMultipleMode(self):
     n = 9.
     p = [0.1, 0.2, 0.7]
-    binom = tfd.Binomial(total_count=n, probs=p, validate_args=True)
+    binom = binomial_lib.Binomial(total_count=n, probs=p, validate_args=True)
     # For the case where (n + 1) * p is an integer, the modes are:
     # (n + 1) * p and (n + 1) * p - 1. In this case, we get back
     # the larger of the two modes.
@@ -249,7 +250,8 @@ class BinomialTest(test_util.TestCase):
   def testSampleUnbiasedBroadcastingBatch(self):
     probs = self._rng.rand(4, 3).astype(np.float64)
     counts = np.float64([4, 11., 20.])
-    dist = tfd.Binomial(total_count=counts, probs=probs, validate_args=True)
+    dist = binomial_lib.Binomial(
+        total_count=counts, probs=probs, validate_args=True)
     n = int(1e5)
     x = dist.sample(n, seed=test_util.test_seed())
     sample_mean, sample_variance = tf.nn.moments(x=x, axes=0)
@@ -270,7 +272,8 @@ class BinomialTest(test_util.TestCase):
   def testSampleUnbiasedVectorBatch(self):
     for counts in np.float32(5.), np.float32(50.):
       probs = self._rng.rand(4).astype(np.float32)
-      dist = tfd.Binomial(total_count=counts, probs=probs, validate_args=True)
+      dist = binomial_lib.Binomial(
+          total_count=counts, probs=probs, validate_args=True)
       n = int(1e5)
       x = dist.sample(n, seed=test_util.test_seed())
       sample_mean, sample_variance = tf.nn.moments(x=x, axes=0)
@@ -294,7 +297,7 @@ class BinomialTest(test_util.TestCase):
   def testSampleExtremeValues(self):
     total_count = tf.constant(17., dtype=tf.float32)
     probs = tf.constant([0., 1.], dtype=tf.float32)
-    dist = tfd.Binomial(
+    dist = binomial_lib.Binomial(
         total_count=total_count, probs=probs, validate_args=True)
     samples, expected_samples = self.evaluate(
         (dist.sample(seed=test_util.test_seed()),
@@ -304,8 +307,8 @@ class BinomialTest(test_util.TestCase):
   def testSampleWithLargeCountAndSmallProbs(self):
     total_count = tf.constant(1e6, dtype=tf.float32)
     probs = tf.constant(1e-6, dtype=tf.float32)
-    dist = tfd.Binomial(total_count=total_count,
-                        probs=probs, validate_args=True)
+    dist = binomial_lib.Binomial(
+        total_count=total_count, probs=probs, validate_args=True)
     small_probs = self.evaluate(dist.prob([0., 1., 2.]))
     # Approximate analytic probabilities for very small counts for this
     # binomial:
@@ -333,7 +336,7 @@ class BinomialTest(test_util.TestCase):
     # nan; and should not interfere with the rest of the batch.
     total_count = tf.constant([23., 0.], dtype=tf.float32)
     probs = tf.constant([1., np.nan], dtype=tf.float32)
-    dist = tfd.Binomial(
+    dist = binomial_lib.Binomial(
         total_count=total_count, probs=probs, validate_args=False)
     samples, expected_samples = self.evaluate(
         (dist.sample(seed=test_util.test_seed()),
@@ -348,7 +351,7 @@ class BinomialTest(test_util.TestCase):
     total_count = tf.constant([23., 6.], dtype=tf.float32)
     probs = tf.constant([1., np.nan], dtype=tf.float32)
     expected_samples = [23., np.nan]
-    dist = tfd.Binomial(
+    dist = binomial_lib.Binomial(
         total_count=total_count, probs=probs, validate_args=False)
     samples = self.evaluate(dist.sample(5, seed=test_util.test_seed()))
     self.assertAllEqual(samples, [expected_samples] * 5)
@@ -360,7 +363,7 @@ class BinomialTest(test_util.TestCase):
     num_samples = 1000000
     total_count = tf.constant([1.], dtype=tf.float32)
     probs = tf.constant([0.], dtype=tf.float32)
-    dist = tfd.Binomial(
+    dist = binomial_lib.Binomial(
         total_count=total_count, probs=probs, validate_args=True)
     samples = self.evaluate(
         dist.sample(num_samples, seed=test_util.test_seed()))
@@ -368,7 +371,7 @@ class BinomialTest(test_util.TestCase):
 
   def testParamTensorFromLogits(self):
     x = tf.constant([-1., 0.5, 1.])
-    d = tfd.Binomial(total_count=1, logits=x, validate_args=True)
+    d = binomial_lib.Binomial(total_count=1, logits=x, validate_args=True)
     logit = lambda x: tf.math.log(x) - tf.math.log1p(-x)
     self.assertAllClose(
         *self.evaluate([logit(d.prob(1.)), d.logits_parameter()]),
@@ -379,7 +382,7 @@ class BinomialTest(test_util.TestCase):
 
   def testParamTensorFromProbs(self):
     x = tf.constant([0.1, 0.5, 0.4])
-    d = tfd.Binomial(total_count=1, probs=x, validate_args=True)
+    d = binomial_lib.Binomial(total_count=1, probs=x, validate_args=True)
     logit = lambda x: tf.math.log(x) - tf.math.log1p(-x)
     self.assertAllClose(
         *self.evaluate([logit(d.prob(1.)), d.logits_parameter()]),
@@ -394,10 +397,10 @@ class BinomialTest(test_util.TestCase):
       'No gradient for while loops in JAX backend.')
   def testNotReparameterized(self):
     def f(n, p):
-      b = tfd.Binomial(n, p)
+      b = binomial_lib.Binomial(n, p)
       return b.sample(5, seed=test_util.test_seed())
 
-    _, [grad_n, grad_p] = tfp.math.value_and_gradient(f, [10., 0.5])
+    _, [grad_n, grad_p] = gradient.value_and_gradient(f, [10., 0.5])
     self.assertIsNone(grad_n)
     self.assertIsNone(grad_p)
 
@@ -407,14 +410,16 @@ class BinomialFromVariableTest(test_util.TestCase):
 
   def testAssertionsTotalCount(self):
     x = tf.Variable([-1.0, 4.0, 1.0])
-    d = tfd.Binomial(total_count=x, logits=[0.0, 0.0, 0.0], validate_args=True)
+    d = binomial_lib.Binomial(
+        total_count=x, logits=[0.0, 0.0, 0.0], validate_args=True)
     self.evaluate([v.initializer for v in d.variables])
     with self.assertRaisesOpError('`total_count` must be non-negative.'):
       self.evaluate(d.mean())
 
   def testAssertionsTotalCountMutation(self):
     x = tf.Variable([1.0, 4.0, 1.0])
-    d = tfd.Binomial(total_count=x, logits=[0.0, 0.0, 0.0], validate_args=True)
+    d = binomial_lib.Binomial(
+        total_count=x, logits=[0.0, 0.0, 0.0], validate_args=True)
     self.evaluate([v.initializer for v in d.variables])
     self.evaluate(d.mean())
     self.evaluate(x.assign(-x))
@@ -424,7 +429,7 @@ class BinomialFromVariableTest(test_util.TestCase):
   def testAssertionsProbsMutation(self):
     probs = tf.Variable([0.5])
 
-    d = tfd.Binomial(total_count=10, probs=probs, validate_args=True)
+    d = binomial_lib.Binomial(total_count=10, probs=probs, validate_args=True)
     self.evaluate([v.initializer for v in d.variables])
     self.evaluate(d.probs_parameter())
 
@@ -474,7 +479,8 @@ class BinomialSamplingTest(test_util.TestCase):
     if not tf.executing_eagerly(): return  # jit_compile is eager-only.
     probs = np.random.rand(4, 3).astype(np.float32)
     counts = np.float32([4, 11., 20.])
-    dist = tfd.Binomial(total_count=counts, probs=probs, validate_args=True)
+    dist = binomial_lib.Binomial(
+        total_count=counts, probs=probs, validate_args=True)
     # Verify the compile succeeds going all the way through the distribution.
     self.evaluate(
         tf.function(lambda: dist.sample(5, seed=test_util.test_seed()),

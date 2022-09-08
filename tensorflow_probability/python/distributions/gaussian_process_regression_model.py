@@ -25,7 +25,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.math import psd_kernels as tfpk
+from tensorflow_probability.python.math.psd_kernels import schur_complement
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -534,7 +534,7 @@ class GaussianProcessRegressionModel(
 
       with tf.name_scope('init'):
         if _conditional_kernel is None:
-          _conditional_kernel = tfpk.SchurComplement(
+          _conditional_kernel = schur_complement.SchurComplement(
               base_kernel=kernel,
               fixed_inputs=observation_index_points,
               cholesky_fn=cholesky_fn,
@@ -571,6 +571,10 @@ class GaussianProcessRegressionModel(
                   chol_linop.solvevec(chol_linop.solvevec(diff), adjoint=True))
             _conditional_mean_fn = conditional_mean_fn
 
+        # Store `_conditional_kernel` and `_conditional_mean_fn` as attributes
+        # for `AutoCompositeTensor`.
+        self._conditional_kernel = _conditional_kernel
+        self._conditional_mean_fn = _conditional_mean_fn
         super(GaussianProcessRegressionModel, self).__init__(
             kernel=_conditional_kernel,
             mean_fn=_conditional_mean_fn,
@@ -745,7 +749,7 @@ class GaussianProcessRegressionModel(
       if cholesky_fn is None:
         cholesky_fn = cholesky_util.make_cholesky_with_jitter_fn(jitter)
 
-      conditional_kernel = tfpk.SchurComplement.with_precomputed_divisor(
+      conditional_kernel = schur_complement.SchurComplement.with_precomputed_divisor(
           base_kernel=kernel,
           fixed_inputs=observation_index_points,
           fixed_inputs_is_missing=observations_is_missing,

@@ -18,8 +18,12 @@
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import chain
+from tensorflow_probability.python.bijectors import scale
+from tensorflow_probability.python.bijectors import shift
+from tensorflow_probability.python.bijectors import sigmoid
+from tensorflow_probability.python.bijectors import tanh
 from tensorflow_probability.python.internal import test_util
 
 
@@ -28,11 +32,11 @@ class TanhBijectorTest(test_util.TestCase):
   """Tests correctness of the Y = g(X) = tanh(X) transformation."""
 
   def testBijector(self):
-    self.assertStartsWith(tfb.Tanh().name, "tanh")
+    self.assertStartsWith(tanh.Tanh().name, "tanh")
     x = np.linspace(-3., 3., 100).reshape([2, 5, 10]).astype(np.float64)
     y = np.tanh(x)
     ildj = -np.log1p(-np.square(np.tanh(x)))
-    bijector = tfb.Tanh()
+    bijector = tanh.Tanh()
     self.assertAllClose(
         y, self.evaluate(bijector.forward(x)), atol=0., rtol=1e-2)
     self.assertAllClose(
@@ -48,24 +52,33 @@ class TanhBijectorTest(test_util.TestCase):
 
   def testScalarCongruency(self):
     bijector_test_util.assert_scalar_congruency(
-        tfb.Tanh(), lower_x=-7., upper_x=7., eval_func=self.evaluate,
-        n=int(10e4), rtol=.5)
+        tanh.Tanh(),
+        lower_x=-7.,
+        upper_x=7.,
+        eval_func=self.evaluate,
+        n=int(10e4),
+        rtol=.5)
 
   def testBijectiveAndFinite(self):
     x = np.linspace(-100., 100., 100).astype(np.float64)
     eps = 1e-3
     y = np.linspace(-1. + eps, 1. - eps, 100).astype(np.float64)
     bijector_test_util.assert_bijective_and_finite(
-        tfb.Tanh(), x, y, eval_func=self.evaluate, event_ndims=0, atol=0.,
+        tanh.Tanh(),
+        x,
+        y,
+        eval_func=self.evaluate,
+        event_ndims=0,
+        atol=0.,
         rtol=1e-4)
 
   def testMatchWithAffineTransform(self):
-    direct_bj = tfb.Tanh()
-    indirect_bj = tfb.Chain([
-        tfb.Shift(tf.cast(-1.0, dtype=tf.float64)),
-        tfb.Scale(tf.cast(2.0, dtype=tf.float64)),
-        tfb.Sigmoid(),
-        tfb.Scale(tf.cast(2.0, dtype=tf.float64))
+    direct_bj = tanh.Tanh()
+    indirect_bj = chain.Chain([
+        shift.Shift(tf.cast(-1.0, dtype=tf.float64)),
+        scale.Scale(tf.cast(2.0, dtype=tf.float64)),
+        sigmoid.Sigmoid(),
+        scale.Scale(tf.cast(2.0, dtype=tf.float64))
     ])
 
     x = np.linspace(-3.0, 3.0, 100)

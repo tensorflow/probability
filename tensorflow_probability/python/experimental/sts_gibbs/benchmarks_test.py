@@ -17,14 +17,15 @@
 import time
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import inverse_gamma
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.experimental.sts_gibbs import gibbs_sampler
 from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.sts.internal import missing_values_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-tfd = tfp.distributions
 tfl = tf.linalg
 
 
@@ -55,15 +56,15 @@ class XLABenchmarkTests(tfp_test_util.TestCase):
                                    dtype=dtype, seed=strm()) < missing_prob
 
     model = gibbs_sampler.build_model_for_gibbs_fitting(
-        observed_time_series=tfp.sts.MaskedTimeSeries(
+        observed_time_series=missing_values_util.MaskedTimeSeries(
             time_series[..., tf.newaxis], is_missing),
         design_matrix=design_matrix,
-        weights_prior=tfd.Normal(loc=tf.cast(0., dtype),
-                                 scale=tf.cast(10.0, dtype)),
-        level_variance_prior=tfd.InverseGamma(
+        weights_prior=normal.Normal(
+            loc=tf.cast(0., dtype), scale=tf.cast(10.0, dtype)),
+        level_variance_prior=inverse_gamma.InverseGamma(
             concentration=tf.cast(0.01, dtype),
             scale=tf.cast(0.01 * 0.01, dtype)),
-        observation_noise_variance_prior=tfd.InverseGamma(
+        observation_noise_variance_prior=inverse_gamma.InverseGamma(
             concentration=tf.cast(0.01, dtype),
             scale=tf.cast(0.01 * 0.01, dtype)))
     return model, time_series, is_missing
@@ -79,8 +80,8 @@ class XLABenchmarkTests(tfp_test_util.TestCase):
           num_timesteps=336, batch_shape=[])
       return gibbs_sampler.fit_with_gibbs_sampling(
           model,
-          tfp.sts.MaskedTimeSeries(observed_time_series[..., tf.newaxis],
-                                   is_missing),
+          missing_values_util.MaskedTimeSeries(
+              observed_time_series[..., tf.newaxis], is_missing),
           num_results=500,
           num_warmup_steps=100,
           seed=seed)

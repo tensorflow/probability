@@ -17,8 +17,13 @@
 # Dependency imports
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions import batch_concat
+from tensorflow_probability.python.distributions import dirichlet
+from tensorflow_probability.python.distributions import exponential
+from tensorflow_probability.python.distributions import logistic
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import onehot_categorical
 from tensorflow_probability.python.internal import test_util
 
 
@@ -33,52 +38,41 @@ class _BatchConcatTest(object):
   dtype = tf.float32
 
   def get_distributions(self, validate_args=False):
-    self.dist1 = tfd.MultivariateNormalDiag(
+    self.dist1 = mvn_diag.MultivariateNormalDiag(
         loc=self.maybe_static(
             tf.zeros(self.batch_dim_1 + self.event_dim_1, dtype=self.dtype),
             self.is_static),
         scale_diag=self.maybe_static(
             tf.ones(self.batch_dim_1 + self.event_dim_1, dtype=self.dtype),
-            self.is_static)
-    )
+            self.is_static))
 
-    self.dist2 = tfd.OneHotCategorical(
+    self.dist2 = onehot_categorical.OneHotCategorical(
         logits=self.maybe_static(
-            tf.zeros(self.batch_dim_2 + self.event_dim_2),
-            self.is_static),
+            tf.zeros(self.batch_dim_2 + self.event_dim_2), self.is_static),
         dtype=self.dtype)
 
-    self.dist3 = tfd.Dirichlet(
+    self.dist3 = dirichlet.Dirichlet(
         self.maybe_static(
             tf.zeros(self.batch_dim_3 + self.event_dim_3, dtype=self.dtype),
-            self.is_static)
-        )
+            self.is_static))
     return batch_concat.BatchConcat(
         distributions=[self.dist1, self.dist2, self.dist3], axis=self.axis,
         validate_args=validate_args)
 
   def test_scalar_distributions(self):
-    self.dist1 = tfd.Normal(
+    self.dist1 = normal.Normal(
         loc=self.maybe_static(
-            tf.zeros(self.batch_dim_1, dtype=self.dtype),
-            self.is_static),
+            tf.zeros(self.batch_dim_1, dtype=self.dtype), self.is_static),
         scale=self.maybe_static(
-            tf.ones(self.batch_dim_1, dtype=self.dtype),
-            self.is_static)
-    )
-    self.dist2 = tfd.Logistic(
+            tf.ones(self.batch_dim_1, dtype=self.dtype), self.is_static))
+    self.dist2 = logistic.Logistic(
         loc=self.maybe_static(
-            tf.zeros(self.batch_dim_2, dtype=self.dtype),
-            self.is_static),
+            tf.zeros(self.batch_dim_2, dtype=self.dtype), self.is_static),
         scale=self.maybe_static(
-            tf.ones(self.batch_dim_2, dtype=self.dtype),
-            self.is_static)
-    )
-    self.dist3 = tfd.Exponential(
+            tf.ones(self.batch_dim_2, dtype=self.dtype), self.is_static))
+    self.dist3 = exponential.Exponential(
         rate=self.maybe_static(
-            tf.ones(self.batch_dim_3, dtype=self.dtype),
-            self.is_static)
-    )
+            tf.ones(self.batch_dim_3, dtype=self.dtype), self.is_static))
     concat_dist = batch_concat.BatchConcat(
         distributions=[self.dist1, self.dist2, self.dist3], axis=1,
         validate_args=False)

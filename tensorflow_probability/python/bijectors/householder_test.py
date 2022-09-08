@@ -16,7 +16,7 @@
 
 # Dependency imports
 from absl.testing import parameterized
-from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import householder
 from tensorflow_probability.python.internal import test_util
 
 
@@ -26,16 +26,16 @@ class HouseholderBijectorTest(test_util.TestCase, parameterized.TestCase):
 
   def testComputesCorrectValues(self):
     reflection_axis1 = [-0.8, 0.6]
-    bijector1 = tfb.Householder(reflection_axis=reflection_axis1,
-                                validate_args=True)
+    bijector1 = householder.Householder(
+        reflection_axis=reflection_axis1, validate_args=True)
     x1 = [1., 0.]
     y1 = [-0.28, 0.96]
     self.assertAllClose(y1, bijector1.forward(x1))
     self.assertAllClose(x1, bijector1.inverse(y1))
 
     reflection_axis2 = [2/7, 3/7, 6/7]
-    bijector2 = tfb.Householder(reflection_axis=reflection_axis2,
-                                validate_args=True)
+    bijector2 = householder.Householder(
+        reflection_axis=reflection_axis2, validate_args=True)
     x2 = [1., 0., 0.]
     y2 = [41/49, -12/49, -24/49]
     self.assertAllClose(y2, bijector2.forward(x2))
@@ -50,8 +50,8 @@ class HouseholderBijectorTest(test_util.TestCase, parameterized.TestCase):
 
   def testBatch(self, is_static):
     reflection_axis1 = [[-0.8, 0.6], [0.8, 0.6]]
-    bijector1 = tfb.Householder(reflection_axis=reflection_axis1,
-                                validate_args=True)
+    bijector1 = householder.Householder(
+        reflection_axis=reflection_axis1, validate_args=True)
     x = self.maybe_static([1., 1.], is_static)
 
     self.assertAllClose([[0.68, 1.24], [-1.24, -0.68]], bijector1.forward(x))
@@ -60,8 +60,8 @@ class HouseholderBijectorTest(test_util.TestCase, parameterized.TestCase):
         bijector1.inverse_log_det_jacobian(x, event_ndims=1))
 
     reflection_axis2 = [2/7, 3/7, 6/7]
-    bijector2 = tfb.Householder(reflection_axis=reflection_axis2,
-                                validate_args=True)
+    bijector2 = householder.Householder(
+        reflection_axis=reflection_axis2, validate_args=True)
     x = self.maybe_static([[1., 0., 0.], [0., 0., 1.]], is_static)
 
     self.assertAllClose([[41/49, -12/49, -24/49], [-24/49, -36/49, -23/49]],

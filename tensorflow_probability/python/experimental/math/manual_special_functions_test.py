@@ -21,11 +21,11 @@ from absl.testing import parameterized
 import mock
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
 from tensorflow_probability.python.experimental.math import manual_special_functions
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
 
 flags.DEFINE_enum('compute_on', 'cpu', ['cpu', 'tpu'],
                   'On which device to run the computation.')
@@ -73,32 +73,32 @@ class ManualSpecialFunctionsTest(test_util.TestCase):
                                           np.float('inf')]],
               axis=0),
           old_fn=tf.math.exp,
-          new_fn=tfp.experimental.math.exp_pade_4_4,
+          new_fn=manual_special_functions.exp_pade_4_4,
       ),
       dict(
           testcase_name='_log_pade_4_4',
           x=np.linspace(0., 5., 50),
           old_fn=tf.math.log,
-          new_fn=tfp.experimental.math.log_pade_4_4,
+          new_fn=manual_special_functions.log_pade_4_4,
       ),
       dict(
           testcase_name='_expm1_pade_4_4',
           x=np.linspace(-5., 5., 50),
           old_fn=tf.math.expm1,
-          new_fn=tfp.experimental.math.expm1_pade_4_4,
+          new_fn=manual_special_functions.expm1_pade_4_4,
       ),
       dict(
           testcase_name='_log1p_pade_4_4',
           x=np.linspace(0., 2., 50),
           old_fn=tf.math.log1p,
-          new_fn=tfp.experimental.math.log1p_pade_4_4,
+          new_fn=manual_special_functions.log1p_pade_4_4,
       ),
       dict(
           testcase_name='_reduce_logsumexp',
           x=np.linspace(0., 10., 320).reshape([4, 10, 8]),
           old_fn=functools.partial(tf.math.reduce_logsumexp, axis=1),
           new_fn=functools.partial(
-              tfp.experimental.math.reduce_logsumexp, axis=1),
+              manual_special_functions.reduce_logsumexp, axis=1),
       ),
       dict(
           testcase_name='_reduce_logsumexp_keepdims',
@@ -106,13 +106,13 @@ class ManualSpecialFunctionsTest(test_util.TestCase):
           old_fn=functools.partial(
               tf.math.reduce_logsumexp, axis=1, keepdims=True),
           new_fn=functools.partial(
-              tfp.experimental.math.reduce_logsumexp, axis=1, keepdims=True),
+              manual_special_functions.reduce_logsumexp, axis=1, keepdims=True),
       ),
       dict(
           testcase_name='_softplus',
           x=np.linspace(-10., 10., 50),
           old_fn=tf.nn.softplus,
-          new_fn=tfp.experimental.math.softplus,
+          new_fn=manual_special_functions.softplus,
       ),
   ])
   def test_correspondence(self,
@@ -138,11 +138,13 @@ class ManualSpecialFunctionsTest(test_util.TestCase):
     dy = tf.reshape(tf.range(1, 1 + num_outputs, dtype=y1.dtype), y1.shape)
 
     y1, grads1 = self.run_fn(
-        lambda x, dy: tfp.math.value_and_gradient(  # pylint: disable=g-long-lambda
-            old_fn, x, output_gradients=dy), (x, dy))
+        lambda x, dy: gradient.value_and_gradient(  # pylint: disable=g-long-lambda
+            old_fn, x, output_gradients=dy),
+        (x, dy))
     y2, grads2 = self.run_fn(
-        lambda x, dy: tfp.math.value_and_gradient(  # pylint: disable=g-long-lambda
-            new_fn, x, output_gradients=dy), (x, dy))
+        lambda x, dy: gradient.value_and_gradient(  # pylint: disable=g-long-lambda
+            new_fn, x, output_gradients=dy),
+        (x, dy))
 
     self.assertAllClose(y1, y2, rtol=value_rtol)
     self.assertAllClose(grads1, grads2, rtol=grad_rtol)
@@ -203,7 +205,7 @@ class ManualSpecialFunctionsTest(test_util.TestCase):
       dict(
           testcase_name='_exp_pade_4_4',
           x=10**np.linspace(-5., 0.5, 50),
-          fn=tfp.experimental.math.exp_pade_4_4,
+          fn=manual_special_functions.exp_pade_4_4,
           true_fwd_fn=np.exp,
           true_bwd_fn=lambda x, dy: dy * np.exp(x),
           value_rtol=1e-6,
@@ -214,7 +216,7 @@ class ManualSpecialFunctionsTest(test_util.TestCase):
           x=10**np.concatenate(
               [-np.linspace(3., 21., 50),
                np.linspace(3., 21., 50)]),
-          fn=tfp.experimental.math.log_pade_4_4,
+          fn=manual_special_functions.log_pade_4_4,
           true_fwd_fn=np.log,
           true_bwd_fn=lambda x, dy: dy / x,
           value_rtol=1e-6,
@@ -223,7 +225,7 @@ class ManualSpecialFunctionsTest(test_util.TestCase):
       dict(
           testcase_name='_log_pade_4_4_near',
           x=10**np.linspace(-3., 3., 50),
-          fn=tfp.experimental.math.log_pade_4_4,
+          fn=manual_special_functions.log_pade_4_4,
           true_fwd_fn=np.log,
           true_bwd_fn=lambda x, dy: dy / x,
           value_rtol=1e-5,
@@ -232,7 +234,7 @@ class ManualSpecialFunctionsTest(test_util.TestCase):
       dict(
           testcase_name='_expm1_pade_4_4',
           x=10**np.linspace(-5., 0.5, 50),
-          fn=tfp.experimental.math.expm1_pade_4_4,
+          fn=manual_special_functions.expm1_pade_4_4,
           true_fwd_fn=np.expm1,
           true_bwd_fn=lambda x, dy: dy * np.exp(x),
           value_rtol=1e-6,
@@ -241,7 +243,7 @@ class ManualSpecialFunctionsTest(test_util.TestCase):
       dict(
           testcase_name='_log1p_pade_4_4',
           x=10.**np.linspace(-4., 4., 50),
-          fn=tfp.experimental.math.log1p_pade_4_4,
+          fn=manual_special_functions.log1p_pade_4_4,
           true_fwd_fn=np.log1p,
           true_bwd_fn=lambda x, dy: dy / (1. + x),
           value_rtol=1e-6,
@@ -277,7 +279,7 @@ class ManualSpecialFunctionsTest(test_util.TestCase):
     dy = dy_gt.astype(dtype)
 
     y, grads = self.run_fn(
-        lambda x, dy: tfp.math.value_and_gradient(fn, x, output_gradients=dy),
+        lambda x, dy: gradient.value_and_gradient(fn, x, output_gradients=dy),
         (x, dy))
     grads_gt = true_bwd_fn(x_gt, dy_gt).astype(dtype)
 
@@ -316,7 +318,7 @@ class ManualSpecialFunctionsTest(test_util.TestCase):
     log1p_calls = 0
     logsumexp_calls = 0
     softplus_calls = 0
-    with tfp.experimental.math.patch_manual_special_functions():
+    with manual_special_functions.patch_manual_special_functions():
       tf.exp(0.)
       exp_calls += 1
       self.assertEqual(exp_calls, exp.call_count)
@@ -389,7 +391,7 @@ class ManualSpecialFunctionsTest(test_util.TestCase):
     log1p_calls = 0
     logsumexp_calls = 0
     softplus_calls = 0
-    with tfp.experimental.math.patch_manual_special_functions():
+    with manual_special_functions.patch_manual_special_functions():
       jax.numpy.exp(0.)
       exp_calls += 1
       self.assertEqual(exp_calls, exp.call_count)

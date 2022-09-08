@@ -93,7 +93,7 @@ def effective_sample_size(states,
   criteria.
 
   This function can also compute cross-chain ESS following
-  [Vehtari et al. (2019)][2] by specifying the `cross_chain_dims` argument.
+  [Vehtari et al. (2021)][2] by specifying the `cross_chain_dims` argument.
   Cross-chain ESS takes into account the cross-chain variance to reduce the ESS
   in cases where the chains are not mixing well. In general, this will be a
   smaller number than computing the ESS for individual chains and then summing
@@ -177,9 +177,9 @@ def effective_sample_size(states,
        Statistical Science, 7:473-511, 1992.
 
   [2]: Aki Vehtari, Andrew Gelman, Daniel Simpson, Bob Carpenter, Paul-Christian
-       Burkner. Rank-normalization, folding, and localization: An improved R-hat
-       for assessing convergence of MCMC, 2019. Retrieved from
-       http://arxiv.org/abs/1903.08008
+       Bürkner. Rank-normalization, folding, and localization: An improved R-hat
+       for assessing convergence of MCMC, 2021. Bayesian analysis,
+       16(2):667-718.
   """
   if cross_chain_dims is None:
     cross_chain_dims = nest_util.broadcast_structure(states, None)
@@ -233,7 +233,7 @@ def _effective_sample_size_single_state(states, filter_beyond_lag,
 
       with tf.control_dependencies(assertions):
         # We're computing the R[k] from equation 10 of Vehtari et al.
-        # (2019):
+        # (2021):
         #
         # R[k] := 1 - (W - 1/C * Sum_{c=1}^C s_c**2 R[k, c]) / (var^+),
         #
@@ -450,9 +450,9 @@ def potential_scale_reduction(chains_states,
        Using Multiple Sequences. _Statistical Science_, 7(4):457-472, 1992.
 
   [3]: Aki Vehtari, Andrew Gelman, Daniel Simpson, Bob Carpenter, Paul-Christian
-       Burkner. Rank-normalization, folding, and localization: An improved R-hat
-       for assessing convergence of MCMC, 2019. Retrieved from
-       http://arxiv.org/abs/1903.08008
+       Bürkner. Rank-normalization, folding, and localization: An improved R-hat
+       for assessing convergence of MCMC, 2021. Bayesian analysis,
+       16(2):667-718.
   """
   # tf.get_static_value returns None iff a constant value (as a numpy
   # array) is not efficiently computable.  Therefore, we try constant_value then

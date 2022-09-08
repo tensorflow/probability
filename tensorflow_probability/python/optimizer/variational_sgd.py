@@ -27,7 +27,8 @@ __all__ = [
 ]
 
 
-class VariationalSGD(tf.optimizers.Optimizer):
+# pylint: disable=g-classes-have-attributes
+class VariationalSGD(tf.keras.optimizers.legacy.Optimizer):
   """An optimizer module for constant stochastic gradient descent.
 
   This implements an optimizer module for the constant stochastic gradient

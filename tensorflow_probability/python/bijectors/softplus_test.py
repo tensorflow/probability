@@ -19,10 +19,10 @@
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import softplus
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
 
 
 rng = np.random.RandomState(42)
@@ -46,10 +46,10 @@ class SoftplusBijectorTest(test_util.TestCase):
     with self.assertRaisesOpError(
         'Argument `hinge_softness` must be non-zero.'):
       self.evaluate(
-          tfb.Softplus(hinge_softness=0., validate_args=True).forward(1.))
+          softplus.Softplus(hinge_softness=0., validate_args=True).forward(1.))
 
   def testBijectorForwardInverseEventDimsZero(self):
-    bijector = tfb.Softplus()
+    bijector = softplus.Softplus()
     self.assertStartsWith(bijector.name, 'softplus')
     x = 2 * rng.randn(2, 10)
     y = self._softplus(x)
@@ -58,7 +58,7 @@ class SoftplusBijectorTest(test_util.TestCase):
     self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
 
   def testBijectorForwardInverseWithHingeSoftnessEventDimsZero(self):
-    bijector = tfb.Softplus(hinge_softness=np.float64(1.5))
+    bijector = softplus.Softplus(hinge_softness=np.float64(1.5))
     x = 2 * rng.randn(2, 10)
     y = 1.5 * self._softplus(x / 1.5)
 
@@ -66,7 +66,7 @@ class SoftplusBijectorTest(test_util.TestCase):
     self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
 
   def testBijectorLogDetJacobianEventDimsZero(self):
-    bijector = tfb.Softplus()
+    bijector = softplus.Softplus()
     y = 2 * rng.rand(2, 10)
     # No reduction needed if event_dims = 0.
     ildj = self._softplus_ildj_before_reduction(y)
@@ -77,7 +77,7 @@ class SoftplusBijectorTest(test_util.TestCase):
             y, event_ndims=0)))
 
   def testBijectorForwardInverseEventDimsOne(self):
-    bijector = tfb.Softplus()
+    bijector = softplus.Softplus()
     self.assertStartsWith(bijector.name, 'softplus')
     x = 2 * rng.randn(2, 10)
     y = self._softplus(x)
@@ -86,7 +86,7 @@ class SoftplusBijectorTest(test_util.TestCase):
     self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
 
   def testBijectorLogDetJacobianEventDimsOne(self):
-    bijector = tfb.Softplus()
+    bijector = softplus.Softplus()
     y = 2 * rng.rand(2, 10)
     ildj_before = self._softplus_ildj_before_reduction(y)
     ildj = np.sum(ildj_before, axis=1)
@@ -98,32 +98,32 @@ class SoftplusBijectorTest(test_util.TestCase):
                 y, event_ndims=1)))
 
   def testScalarCongruency(self):
-    bijector = tfb.Softplus()
+    bijector = softplus.Softplus()
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate, rtol=.02)
 
   def testScalarCongruencyWithPositiveHingeSoftness(self):
-    bijector = tfb.Softplus(hinge_softness=1.3)
+    bijector = softplus.Softplus(hinge_softness=1.3)
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate, rtol=.02)
 
   def testScalarCongruencyWithNegativeHingeSoftness(self):
-    bijector = tfb.Softplus(hinge_softness=-1.3)
+    bijector = softplus.Softplus(hinge_softness=-1.3)
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate, rtol=.02)
 
   def testScalarCongruencyWithLowerBound(self):
-    bijector = tfb.Softplus(low=1.6)
+    bijector = softplus.Softplus(low=1.6)
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate, rtol=.02)
 
   def testScalarCongruencyWithHingeSoftnessAndLowerBound(self):
-    bijector = tfb.Softplus(hinge_softness=1.3, low=1.6)
+    bijector = softplus.Softplus(hinge_softness=1.3, low=1.6)
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate, rtol=.02)
 
   def testBijectiveAndFinite32bit(self):
-    bijector = tfb.Softplus()
+    bijector = softplus.Softplus()
     x = np.linspace(-20., 20., 100).astype(np.float32)
     y = np.logspace(-10, 10, 100).astype(np.float32)
     bijector_test_util.assert_bijective_and_finite(
@@ -131,7 +131,7 @@ class SoftplusBijectorTest(test_util.TestCase):
         atol=1e-2)
 
   def testBijectiveAndFiniteWithPositiveHingeSoftness32Bit(self):
-    bijector = tfb.Softplus(hinge_softness=1.23)
+    bijector = softplus.Softplus(hinge_softness=1.23)
     x = np.linspace(-20., 20., 100).astype(np.float32)
     y = np.logspace(-10, 10, 100).astype(np.float32)
     bijector_test_util.assert_bijective_and_finite(
@@ -139,7 +139,7 @@ class SoftplusBijectorTest(test_util.TestCase):
         atol=1e-2)
 
   def testBijectiveAndFiniteWithNegativeHingeSoftness32Bit(self):
-    bijector = tfb.Softplus(hinge_softness=-0.7)
+    bijector = softplus.Softplus(hinge_softness=-0.7)
     x = np.linspace(-20., 20., 100).astype(np.float32)
     y = -np.logspace(-10, 10, 100).astype(np.float32)
     bijector_test_util.assert_bijective_and_finite(
@@ -148,7 +148,7 @@ class SoftplusBijectorTest(test_util.TestCase):
 
   def testVariableHingeSoftness(self):
     hinge_softness = tf.Variable(1.)
-    b = tfb.Softplus(hinge_softness=hinge_softness, validate_args=True)
+    b = softplus.Softplus(hinge_softness=hinge_softness, validate_args=True)
     self.evaluate(hinge_softness.initializer)
     self.assertIs(hinge_softness, b.hinge_softness)
     self.assertEqual((), self.evaluate(b.forward(0.5)).shape)
@@ -158,13 +158,13 @@ class SoftplusBijectorTest(test_util.TestCase):
         self.evaluate(b.forward(0.5))
 
   def testDtype(self):
-    b = tfb.Softplus()
+    b = softplus.Softplus()
     self.assertIsNone(b.dtype)
 
-    b = tfb.Softplus(low=1.75)
+    b = softplus.Softplus(low=1.75)
     self.assertEqual(tf.float32, b.dtype)
 
-    b = tfb.Softplus(hinge_softness=tf.constant(0.5, dtype=tf.float64))
+    b = softplus.Softplus(hinge_softness=tf.constant(0.5, dtype=tf.float64))
     self.assertEqual(tf.float64, b.dtype)
 
   @parameterized.named_parameters(
@@ -179,9 +179,9 @@ class SoftplusBijectorTest(test_util.TestCase):
 
     @tf.function(autograph=False, jit_compile=do_compile)
     def fn(x):
-      return tf.math.log(tfb.Softplus().forward(x))
+      return tf.math.log(softplus.Softplus().forward(x))
 
-    _, grad = tfp_math.value_and_gradient(fn, x)
+    _, grad = gradient.value_and_gradient(fn, x)
 
     true_grad = 1 / (1 + np.exp(-x)) / np.log1p(np.exp(x))
     self.assertAllClose(true_grad, self.evaluate(grad), atol=1e-3)

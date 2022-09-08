@@ -15,15 +15,16 @@
 """Tests for tensorflow_probability.python.experimental.bijectors.sharded."""
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.bijectors import sigmoid
+from tensorflow_probability.python.distributions import beta
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.experimental.bijectors import sharded
+from tensorflow_probability.python.experimental.distribute import sharded as sharded_lib
 from tensorflow_probability.python.internal import distribute_lib
 from tensorflow_probability.python.internal import distribute_test_lib as test_lib
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
-tfb = tfp.bijectors
-tfp_dist = tfp.experimental.distribute
+from tensorflow_probability.python.math import gradient
 
 JAX_MODE = False
 
@@ -34,7 +35,7 @@ class ShardedTest(test_lib.DistributedTest):
   def test_sharded_log_det_jacobian(self):
 
     def log_prob(y):
-      return tf.reduce_sum(tfd.Beta(2., 2.).log_prob(y))
+      return tf.reduce_sum(beta.Beta(2., 2.).log_prob(y))
 
     def transform_log_prob(log_prob, bijector):
 
@@ -50,18 +51,18 @@ class ShardedTest(test_lib.DistributedTest):
           log_prob, self.axis_name)
       transformed_log_prob = transform_log_prob(
           untransformed_log_prob,
-          sharded.Sharded(tfb.Sigmoid(), shard_axis_name=self.axis_name))
-      lp, g = tfp.math.value_and_gradient(transformed_log_prob, (x,))
+          sharded.Sharded(sigmoid.Sigmoid(), shard_axis_name=self.axis_name))
+      lp, g = gradient.value_and_gradient(transformed_log_prob, (x,))
       return lp, g
 
     def true_lp_grad(x):
-      transformed_log_prob = transform_log_prob(log_prob, tfb.Sigmoid())
-      lp, g = tfp.math.value_and_gradient(transformed_log_prob, (x,))
+      transformed_log_prob = transform_log_prob(log_prob, sigmoid.Sigmoid())
+      lp, g = gradient.value_and_gradient(transformed_log_prob, (x,))
       return lp, g
 
     y = tf.convert_to_tensor(
         np.linspace(0.2, 0.7, test_lib.NUM_DEVICES, dtype=np.float32))
-    x = self.evaluate(tfb.Sigmoid().inverse(y))
+    x = self.evaluate(sigmoid.Sigmoid().inverse(y))
     sharded_x = self.shard_values(x)
     lp, g = self.evaluate(
         self.per_replica_to_tensor(self.strategy_run(lp_grad, (sharded_x,))))
@@ -72,11 +73,12 @@ class ShardedTest(test_lib.DistributedTest):
 
   def test_sharded_distribution_sharded_bijector(self):
 
-    td = tfd.TransformedDistribution(tfd.Normal(loc=0, scale=1), tfb.Sigmoid())
-    sharded_td = tfd.TransformedDistribution(
-        tfp_dist.Sharded(
-            tfd.Normal(loc=0, scale=1), shard_axis_name=self.axis_name),
-        sharded.Sharded(tfb.Sigmoid(), shard_axis_name=self.axis_name))
+    td = transformed_distribution.TransformedDistribution(
+        normal.Normal(loc=0, scale=1), sigmoid.Sigmoid())
+    sharded_td = transformed_distribution.TransformedDistribution(
+        sharded_lib.Sharded(
+            normal.Normal(loc=0, scale=1), shard_axis_name=self.axis_name),
+        sharded.Sharded(sigmoid.Sigmoid(), shard_axis_name=self.axis_name))
 
     x = self.evaluate(td.sample(test_lib.NUM_DEVICES, seed=self.key))
     sharded_x = self.shard_values(x)
@@ -86,12 +88,12 @@ class ShardedTest(test_lib.DistributedTest):
       def log_prob(x):
         return tf.reduce_sum(td.log_prob(x))
 
-      lp, g = tfp.math.value_and_gradient(log_prob, (x,))
+      lp, g = gradient.value_and_gradient(log_prob, (x,))
       return lp, g
 
     @tf.function
     def sharded_lp_grad(x):
-      lp, g = tfp.math.value_and_gradient(sharded_td.log_prob, (x,))
+      lp, g = gradient.value_and_gradient(sharded_td.log_prob, (x,))
       return lp, g
 
     true_lp, true_grad = self.evaluate(true_lp_grad(x))

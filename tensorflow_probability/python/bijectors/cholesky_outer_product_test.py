@@ -18,7 +18,7 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import cholesky_outer_product
 from tensorflow_probability.python.internal import test_util
 
 
@@ -27,7 +27,7 @@ class CholeskyOuterProductBijectorTest(test_util.TestCase):
   """Tests the correctness of the Y = X @ X.T transformation."""
 
   def testBijectorMatrix(self):
-    bijector = tfb.CholeskyOuterProduct(validate_args=True)
+    bijector = cholesky_outer_product.CholeskyOuterProduct(validate_args=True)
     self.assertStartsWith(bijector.name, "cholesky_outer_product")
     x = [[[1., 0], [2, 1]], [[np.sqrt(2.), 0], [np.sqrt(8.), 1]]]
     y = np.matmul(x, np.transpose(x, axes=(0, 2, 1)))
@@ -63,7 +63,9 @@ class CholeskyOuterProductBijectorTest(test_util.TestCase):
     def robust_cholesky(x):
       return tf.linalg.cholesky(
           tf.linalg.set_diag(x, tf.linalg.diag_part(x) + 1.))
-    bijector = tfb.CholeskyOuterProduct(cholesky_fn=robust_cholesky)
+
+    bijector = cholesky_outer_product.CholeskyOuterProduct(
+        cholesky_fn=robust_cholesky)
     # We'll add one to the diagonal, so we'll expect the inverse to be
     # the `sqrt(diagonal + 1)`.
     x = 3 * np.eye(3)
@@ -72,7 +74,7 @@ class CholeskyOuterProductBijectorTest(test_util.TestCase):
 
   def testNoBatchStaticJacobian(self):
     x = np.eye(2)
-    bijector = tfb.CholeskyOuterProduct()
+    bijector = cholesky_outer_product.CholeskyOuterProduct()
 
     # The Jacobian matrix is 2 * tf.eye(2), which has jacobian determinant 4.
     self.assertAllClose(
@@ -80,7 +82,7 @@ class CholeskyOuterProductBijectorTest(test_util.TestCase):
         self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=2)))
 
   def testNoBatchDynamicJacobian(self):
-    bijector = tfb.CholeskyOuterProduct()
+    bijector = cholesky_outer_product.CholeskyOuterProduct()
     x = tf1.placeholder_with_default(
         np.eye(2, dtype=np.float32), shape=None)
 
@@ -93,8 +95,8 @@ class CholeskyOuterProductBijectorTest(test_util.TestCase):
   def testNoBatchStatic(self):
     x = np.array([[1., 0], [2, 1]])  # np.linalg.cholesky(y)
     y = np.array([[1., 2], [2, 5]])  # np.matmul(x, x.T)
-    y_actual = tfb.CholeskyOuterProduct().forward(x=x)
-    x_actual = tfb.CholeskyOuterProduct().inverse(y=y)
+    y_actual = cholesky_outer_product.CholeskyOuterProduct().forward(x=x)
+    x_actual = cholesky_outer_product.CholeskyOuterProduct().inverse(y=y)
     [y_actual_, x_actual_] = self.evaluate([y_actual, x_actual])
     self.assertAllEqual([2, 2], y_actual.shape)
     self.assertAllEqual([2, 2], x_actual.shape)
@@ -106,8 +108,8 @@ class CholeskyOuterProductBijectorTest(test_util.TestCase):
     y_ = np.array([[1., 2], [2, 5]])  # np.matmul(x, x.T)
     x = tf1.placeholder_with_default(x_, shape=None)
     y = tf1.placeholder_with_default(y_, shape=None)
-    y_actual = tfb.CholeskyOuterProduct().forward(x=x)
-    x_actual = tfb.CholeskyOuterProduct().inverse(y=y)
+    y_actual = cholesky_outer_product.CholeskyOuterProduct().forward(x=x)
+    x_actual = cholesky_outer_product.CholeskyOuterProduct().inverse(y=y)
     [y_actual_, x_actual_] = self.evaluate([y_actual, x_actual])
     # Shapes are always known in eager.
     if not tf.executing_eagerly():
@@ -125,8 +127,8 @@ class CholeskyOuterProductBijectorTest(test_util.TestCase):
                    [2, 5]],
                   [[9., 3],
                    [3, 5]]])  # np.matmul(x, x.T)
-    y_actual = tfb.CholeskyOuterProduct().forward(x=x)
-    x_actual = tfb.CholeskyOuterProduct().inverse(y=y)
+    y_actual = cholesky_outer_product.CholeskyOuterProduct().forward(x=x)
+    x_actual = cholesky_outer_product.CholeskyOuterProduct().inverse(y=y)
     [y_actual_, x_actual_] = self.evaluate([y_actual, x_actual])
     self.assertEqual([2, 2, 2], y_actual.shape)
     self.assertEqual([2, 2, 2], x_actual.shape)
@@ -144,8 +146,8 @@ class CholeskyOuterProductBijectorTest(test_util.TestCase):
                     [3, 5]]])  # np.matmul(x, x.T)
     x = tf1.placeholder_with_default(x_, shape=None)
     y = tf1.placeholder_with_default(y_, shape=None)
-    y_actual = tfb.CholeskyOuterProduct().forward(x)
-    x_actual = tfb.CholeskyOuterProduct().inverse(y)
+    y_actual = cholesky_outer_product.CholeskyOuterProduct().forward(x)
+    x_actual = cholesky_outer_product.CholeskyOuterProduct().inverse(y)
     [y_actual_, x_actual_] = self.evaluate([y_actual, x_actual])
 
     # Shapes are always known in eager.

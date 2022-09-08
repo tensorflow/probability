@@ -17,7 +17,7 @@
 # Dependency imports
 
 from absl.testing import parameterized
-from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import shift
 from tensorflow_probability.python.internal import test_util
 
 
@@ -29,24 +29,23 @@ class ShiftTest(test_util.TestCase, parameterized.TestCase):
       dict(testcase_name='dynamic', is_static=False),
   )
   def testNoBatch(self, is_static):
-    shift = tfb.Shift([1., -1.])
+    bijector = shift.Shift([1., -1.])
     x = self.maybe_static([1., 1.], is_static)
-    self.assertAllClose([2., 0.], shift.forward(x))
-    self.assertAllClose([0., 2.], shift.inverse(x))
-    self.assertAllClose(0.,
-                        shift.inverse_log_det_jacobian(x, event_ndims=1))
+    self.assertAllClose([2., 0.], bijector.forward(x))
+    self.assertAllClose([0., 2.], bijector.inverse(x))
+    self.assertAllClose(0., bijector.inverse_log_det_jacobian(x, event_ndims=1))
 
   @parameterized.named_parameters(
       dict(testcase_name='static', is_static=True),
       dict(testcase_name='dynamic', is_static=False),
   )
   def testBatch(self, is_static):
-    shift = tfb.Shift([[2., -.5], [1., -3.]])
+    bijector = shift.Shift([[2., -.5], [1., -3.]])
     x = self.maybe_static([1., 1.], is_static)
 
-    self.assertAllClose([[3., .5], [2., -2.]], shift.forward(x))
-    self.assertAllClose([[-1., 1.5], [0., 4.]], shift.inverse(x))
-    self.assertAllClose(0., shift.inverse_log_det_jacobian(x, event_ndims=1))
+    self.assertAllClose([[3., .5], [2., -2.]], bijector.forward(x))
+    self.assertAllClose([[-1., 1.5], [0., 4.]], bijector.inverse(x))
+    self.assertAllClose(0., bijector.inverse_log_det_jacobian(x, event_ndims=1))
 
 
 if __name__ == '__main__':

@@ -20,8 +20,14 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import inline
+from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.bijectors import real_nvp
+from tensorflow_probability.python.bijectors import scale
+from tensorflow_probability.python.bijectors import shift as shift_lib
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import sample
+from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -39,7 +45,7 @@ class RealNVPTestBase(
   )
   def testRegularMask(self, num_masked, fraction_masked, batch_shape):
     x_ = np.random.normal(0., 1., batch_shape + (8,)).astype(np.float32)
-    nvp = tfb.RealNVP(
+    nvp = real_nvp.RealNVP(
         num_masked=num_masked,
         fraction_masked=fraction_masked,
         validate_args=True,
@@ -82,7 +88,7 @@ class RealNVPTestBase(
     input_depth = 8
     x_ = np.random.normal(0., 1.,
                           batch_shape + (input_depth,)).astype(np.float32)
-    flip_nvp = tfb.RealNVP(
+    flip_nvp = real_nvp.RealNVP(
         num_masked=num_masked,
         fraction_masked=fraction_masked,
         validate_args=True,
@@ -114,10 +120,10 @@ class RealNVPTestBase(
 
   def testMutuallyConsistent(self):
     dims = 4
-    nvp = tfb.RealNVP(
+    nvp = real_nvp.RealNVP(
         num_masked=3, validate_args=True, **self._real_nvp_kwargs)
-    dist = tfd.TransformedDistribution(
-        distribution=tfd.Sample(tfd.Normal(0., 1.), [dims]),
+    dist = transformed_distribution.TransformedDistribution(
+        distribution=sample.Sample(normal.Normal(0., 1.), [dims]),
         bijector=nvp,
         validate_args=True)
     self.run_test_sample_consistent_log_prob(
@@ -132,11 +138,11 @@ class RealNVPTestBase(
 
   def testInvertMutuallyConsistent(self):
     dims = 4
-    nvp = tfb.Invert(
-        tfb.RealNVP(
+    nvp = invert.Invert(
+        real_nvp.RealNVP(
             num_masked=3, validate_args=True, **self._real_nvp_kwargs))
-    dist = tfd.TransformedDistribution(
-        distribution=tfd.Sample(tfd.Normal(0., 1.), [dims]),
+    dist = transformed_distribution.TransformedDistribution(
+        distribution=sample.Sample(normal.Normal(0., 1.), [dims]),
         bijector=nvp,
         validate_args=True)
     self.run_test_sample_consistent_log_prob(
@@ -171,7 +177,8 @@ class RealNVPTest(RealNVPTestBase):
   def _real_nvp_kwargs(self):
     return {
         'shift_and_log_scale_fn':
-            tfb.real_nvp_default_template(hidden_layers=[3], shift_only=False),
+            real_nvp.real_nvp_default_template(
+                hidden_layers=[3], shift_only=False),
         'is_constant_jacobian':
             False,
     }
@@ -186,7 +193,8 @@ class NICETest(RealNVPTestBase):
   def _real_nvp_kwargs(self):
     return {
         'shift_and_log_scale_fn':
-            tfb.real_nvp_default_template(hidden_layers=[2], shift_only=True),
+            real_nvp.real_nvp_default_template(
+                hidden_layers=[2], shift_only=True),
         'is_constant_jacobian':
             True,
     }
@@ -223,7 +231,7 @@ def _make_gated_bijector_fn():
     shift = reshape_output(shift)
     logit_gate = reshape_output(logit_gate)
     gate = tf.nn.sigmoid(logit_gate)
-    return tfb.Shift(shift=(1. - gate) * shift)(tfb.Scale(scale=gate))
+    return shift_lib.Shift(shift=(1. - gate) * shift)(scale.Scale(scale=gate))
   return tf1.make_template('gated_bijector', _bijector_fn)
 
 
@@ -248,9 +256,9 @@ class RealNVPTestCommon(test_util.TestCase):
 
       def bijector_fn(*args, **kwargs):
         del args, kwargs
-        return tfb.Inline(forward_min_event_ndims=2)
+        return inline.Inline(forward_min_event_ndims=2)
 
-      rnvp = tfb.RealNVP(1, bijector_fn=bijector_fn, validate_args=True)
+      rnvp = real_nvp.RealNVP(1, bijector_fn=bijector_fn, validate_args=True)
       rnvp.forward([1., 2.])
 
   def testRankChangingBijectorRaises(self):
@@ -259,19 +267,22 @@ class RealNVPTestCommon(test_util.TestCase):
 
       def bijector_fn(*args, **kwargs):
         del args, kwargs
-        return tfb.Inline(forward_min_event_ndims=1, inverse_min_event_ndims=0)
+        return inline.Inline(
+            forward_min_event_ndims=1, inverse_min_event_ndims=0)
 
-      rnvp = tfb.RealNVP(1, bijector_fn=bijector_fn, validate_args=True)
+      rnvp = real_nvp.RealNVP(1, bijector_fn=bijector_fn, validate_args=True)
       rnvp.forward([1., 2.])
 
   def testNonIntegerNumMaskedRaises(self):
     with self.assertRaisesRegexp(TypeError, '`num_masked` must be an integer'):
-      tfb.RealNVP(num_masked=0.5, shift_and_log_scale_fn=lambda x, _: (x, x))
+      real_nvp.RealNVP(
+          num_masked=0.5, shift_and_log_scale_fn=lambda x, _: (x, x))
 
   def testNonFloatFractionMaskedRaises(self):
     with self.assertRaisesRegexp(TypeError,
                                  '`fraction_masked` must be a float'):
-      tfb.RealNVP(fraction_masked=1, shift_and_log_scale_fn=lambda x, _: (x, x))
+      real_nvp.RealNVP(
+          fraction_masked=1, shift_and_log_scale_fn=lambda x, _: (x, x))
 
   @parameterized.named_parameters(
       ('TooLarge', 1.1),
@@ -281,7 +292,7 @@ class RealNVPTestCommon(test_util.TestCase):
   )
   def testBadFractionRaises(self, fraction_masked):
     with self.assertRaisesRegexp(ValueError, '`fraction_masked` must be in'):
-      tfb.RealNVP(
+      real_nvp.RealNVP(
           fraction_masked=fraction_masked,
           shift_and_log_scale_fn=lambda x, _: (x, x))
 
@@ -296,7 +307,7 @@ class RealNVPTestCommon(test_util.TestCase):
         ValueError,
         'Number of masked units {} must be smaller than the event size 1'
         .format(num_masked)):
-      rnvp = tfb.RealNVP(
+      rnvp = real_nvp.RealNVP(
           num_masked=num_masked, shift_and_log_scale_fn=lambda x, _: (x, x))
       rnvp.forward(np.zeros(1))
 
@@ -314,7 +325,7 @@ class RealNVPTestCommon(test_util.TestCase):
       del output_units
       return x0 + a, x0 + b
 
-    nvp = tfb.RealNVP(
+    nvp = real_nvp.RealNVP(
         num_masked=4,
         validate_args=True,
         is_constant_jacobian=False,

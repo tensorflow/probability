@@ -75,6 +75,8 @@ def custom_gradient(vjp_fwd=None, vjp_bwd=None, jvp_fn=None,
         closure = {i: a for i, a in enumerate(args)
                    if i in nondiff_argnums or a is None}
         trimmed_args = [a for i, a in enumerate(args) if i not in closure]
+        # Convert DeferredTensors to Tensors.
+        trimmed_args = tf.nest.map_structure(tf.convert_to_tensor, trimmed_args)
 
         @tf.custom_gradient
         def f_wrapped(*args, **kwargs):

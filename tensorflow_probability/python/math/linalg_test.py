@@ -23,10 +23,16 @@ from hypothesis.extra import numpy as hpnp
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python import math
+from tensorflow_probability.python.bijectors import exp
+from tensorflow_probability.python.bijectors import fill_scale_tril
+from tensorflow_probability.python.experimental import linalg as experimental_linalg
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
+from tensorflow_probability.python.math import linalg
+from tensorflow_probability.python.math.psd_kernels import matern
 from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 JAX_MODE = False
@@ -39,7 +45,7 @@ class _CholeskyExtend(test_util.TestCase):
     xs = rng.random_sample(7).astype(self.dtype)[:, tf.newaxis]
     xs = tf1.placeholder_with_default(
         xs, shape=xs.shape if self.use_static_shape else None)
-    k = tfp.math.psd_kernels.MaternOneHalf()
+    k = matern.MaternOneHalf()
     mat = k.matrix(xs, xs)
     chol = tf.linalg.cholesky(mat)
 
@@ -50,7 +56,7 @@ class _CholeskyExtend(test_util.TestCase):
     xsys = tf.concat([xs, ys], 0)
     new_chol_expected = tf.linalg.cholesky(k.matrix(xsys, xsys))
 
-    new_chol = tfp.math.cholesky_concat(chol, k.matrix(xsys, ys))
+    new_chol = linalg.cholesky_concat(chol, k.matrix(xsys, ys))
     self.assertAllClose(new_chol_expected, new_chol, rtol=1e-5, atol=2e-5)
 
   @hp.given(hps.data())
@@ -79,7 +85,7 @@ class _CholeskyExtend(test_util.TestCase):
     xs = tf1.placeholder_with_default(
         xs, shape=xs.shape if self.use_static_shape else None)
 
-    k = tfp.math.psd_kernels.MaternOneHalf()
+    k = matern.MaternOneHalf()
     mat = k.matrix(xs, xs) + jitter(n)
     chol = tf.linalg.cholesky(mat)
 
@@ -96,8 +102,8 @@ class _CholeskyExtend(test_util.TestCase):
                      axis=-2)
     new_chol_expected = tf.linalg.cholesky(k.matrix(xsys, xsys) + jitter(z))
 
-    new_chol = tfp.math.cholesky_concat(
-        chol, k.matrix(xsys, ys) + jitter(z)[:, n:])
+    new_chol = linalg.cholesky_concat(chol,
+                                      k.matrix(xsys, ys) + jitter(z)[:, n:])
     self.assertAllClose(new_chol_expected, new_chol, rtol=1e-5, atol=2e-5)
 
 
@@ -144,19 +150,18 @@ class _CholeskyUpdate(test_util.TestCase):
     if not (tf1.control_flow_v2_enabled() or self.use_static_shape):
       self.skipTest('TF1 broken')
 
-    cholesky_update_fun = tf.function(tfp.math.cholesky_update,
-                                      jit_compile=True)
+    cholesky_update_fun = tf.function(linalg.cholesky_update, jit_compile=True)
     self._testCholeskyUpdate(cholesky_update_fun)
 
   def testCholeskyUpdate(self):
-    self._testCholeskyUpdate(tfp.math.cholesky_update)
+    self._testCholeskyUpdate(linalg.cholesky_update)
 
   def _testCholeskyUpdate(self, cholesky_update_fun):
     rng = test_util.test_np_rng()
     xs = rng.random_sample(7).astype(self.dtype)[:, tf.newaxis]
     xs = tf1.placeholder_with_default(
         xs, shape=xs.shape if self.use_static_shape else None)
-    k = tfp.math.psd_kernels.MaternOneHalf()
+    k = matern.MaternOneHalf()
     mat = k.matrix(xs, xs)
     chol = tf.linalg.cholesky(mat)
 
@@ -175,7 +180,7 @@ class _CholeskyUpdate(test_util.TestCase):
     xs = rng.random_sample((3, 1, 7)).astype(self.dtype)[..., tf.newaxis]
     xs = tf1.placeholder_with_default(
         xs, shape=xs.shape if self.use_static_shape else None)
-    k = tfp.math.psd_kernels.MaternOneHalf()
+    k = matern.MaternOneHalf()
     mat = k.matrix(xs, xs)
     chol = tf.linalg.cholesky(mat)
 
@@ -187,7 +192,7 @@ class _CholeskyUpdate(test_util.TestCase):
     new_chol_expected = tf.linalg.cholesky(
         mat + multiplier[..., np.newaxis, np.newaxis] * tf.linalg.matmul(
             u, u, transpose_b=True))
-    new_chol = tfp.math.cholesky_update(
+    new_chol = linalg.cholesky_update(
         chol, tf.squeeze(u, axis=-1), multiplier=multiplier)
     self.assertAllClose(new_chol_expected, new_chol, rtol=1e-5, atol=2e-5)
     self.assertAllEqual(tf.linalg.band_part(new_chol, -1, 0), new_chol)
@@ -210,7 +215,7 @@ class _CholeskyUpdate(test_util.TestCase):
     xs = tf1.placeholder_with_default(
         xs, shape=xs.shape if self.use_static_shape else None)
 
-    k = tfp.math.psd_kernels.MaternOneHalf()
+    k = matern.MaternOneHalf()
     jitter = lambda n: tf.linalg.eye(n, dtype=self.dtype) * 5e-5
 
     mat = k.matrix(xs, xs) + jitter(l)
@@ -232,7 +237,7 @@ class _CholeskyUpdate(test_util.TestCase):
         mat + multiplier[..., tf.newaxis, tf.newaxis] * tf.linalg.matmul(
             u[..., tf.newaxis], u[..., tf.newaxis, :]))
 
-    new_chol = tfp.math.cholesky_update(chol, u, multiplier=multiplier)
+    new_chol = linalg.cholesky_update(chol, u, multiplier=multiplier)
     self.assertAllClose(new_chol_expected, new_chol, rtol=1e-5, atol=2e-5)
     self.assertAllEqual(tf.linalg.band_part(new_chol, -1, 0), new_chol)
 
@@ -268,14 +273,14 @@ class _PivotedCholesky(test_util.TestCase):
     matrix = self._random_batch_psd(dim)
     true_diag = tf.linalg.diag_part(matrix)
 
-    pchol = tfp.math.pivoted_cholesky(matrix, max_rank=1)
+    pchol = linalg.pivoted_cholesky(matrix, max_rank=1)
     mat = tf.matmul(pchol, pchol, transpose_b=True)
     diag_diff_prev = self.evaluate(tf.abs(tf.linalg.diag_part(mat) - true_diag))
     diff_norm_prev = self.evaluate(
         tf.linalg.norm(mat - matrix, ord='fro', axis=[-1, -2]))
     for rank in range(2, dim + 1):
       # Specifying diag_rtol forces the full max_rank decomposition.
-      pchol = tfp.math.pivoted_cholesky(matrix, max_rank=rank, diag_rtol=-1)
+      pchol = linalg.pivoted_cholesky(matrix, max_rank=rank, diag_rtol=-1)
       zeros_per_col = dim - tf.math.count_nonzero(pchol, axis=-2)
       mat = tf.matmul(pchol, pchol, transpose_b=True)
       pchol_shp, diag_diff, diff_norm, zeros_per_col = self.evaluate([
@@ -295,8 +300,8 @@ class _PivotedCholesky(test_util.TestCase):
   def testGradient(self):
     dim = 11
     matrix = self._random_batch_psd(dim)
-    _, dmatrix = tfp.math.value_and_gradient(
-        lambda matrix: tfp.math.pivoted_cholesky(matrix, max_rank=dim // 3),
+    _, dmatrix = gradient.value_and_gradient(
+        lambda matrix: linalg.pivoted_cholesky(matrix, max_rank=dim // 3),
         matrix)
     self.assertIsNotNone(dmatrix)
     self.assertAllGreater(tf.linalg.norm(dmatrix, ord='fro', axis=[-1, -2]), 0.)
@@ -308,7 +313,7 @@ class _PivotedCholesky(test_util.TestCase):
     matrix = self._random_batch_psd(dim)
     with tf.GradientTape() as tape:
       tape.watch(matrix)
-      pchol = tfp.math.pivoted_cholesky(matrix, max_rank=dim // 3)
+      pchol = linalg.pivoted_cholesky(matrix, max_rank=dim // 3)
     dmatrix = tape.gradient(
         pchol, matrix, output_gradients=tf.ones_like(pchol) * .01)
     self.assertIsNotNone(dmatrix)
@@ -362,17 +367,17 @@ class _PivotedCholesky(test_util.TestCase):
     for rank in range(1, mat.shape[-1] + 1):
       self.assertAllClose(
           oracle_pchol[..., :rank],
-          tfp.math.pivoted_cholesky(mat, max_rank=rank, diag_rtol=-1),
+          linalg.pivoted_cholesky(mat, max_rank=rank, diag_rtol=-1),
           atol=1e-4)
 
   def testLinopKernel(self):
     x = tf.random.uniform([10, 2], dtype=self.dtype, seed=test_util.test_seed())
     masked_shape = x.shape if self.use_static_shape else [None] * len(x.shape)
     x = tf1.placeholder_with_default(x, shape=masked_shape)
-    k = tfp.math.psd_kernels.ExponentiatedQuadratic()
-    expected = tfp.math.pivoted_cholesky(k.matrix(x, x), max_rank=3)
-    actual = tfp.math.pivoted_cholesky(
-        tfp.experimental.linalg.LinearOperatorPSDKernel(k, x), max_rank=3)
+    k = matern.MaternThreeHalves()
+    expected = linalg.pivoted_cholesky(k.matrix(x, x), max_rank=3)
+    actual = linalg.pivoted_cholesky(
+        experimental_linalg.LinearOperatorPSDKernel(k, x), max_rank=3)
     expected, actual = self.evaluate([expected, actual])
     self.assertAllClose(expected, actual)
 
@@ -414,7 +419,7 @@ class _LUReconstruct(object):
     x = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
 
-    y = tfp.math.lu_reconstruct(*tf.linalg.lu(x), validate_args=True)
+    y = linalg.lu_reconstruct(*tf.linalg.lu(x), validate_args=True)
     y_ = self.evaluate(y)
 
     if self.use_static_shape:
@@ -431,7 +436,7 @@ class _LUReconstruct(object):
     x = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
 
-    y = tfp.math.lu_reconstruct(*tf.linalg.lu(x), validate_args=True)
+    y = linalg.lu_reconstruct(*tf.linalg.lu(x), validate_args=True)
     y_ = self.evaluate(y)
 
     if self.use_static_shape:
@@ -458,7 +463,7 @@ class _LUMatrixInverse(object):
     x = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
 
-    y = tfp.math.lu_matrix_inverse(*tf.linalg.lu(x), validate_args=True)
+    y = linalg.lu_matrix_inverse(*tf.linalg.lu(x), validate_args=True)
     y_ = self.evaluate(y)
 
     if self.use_static_shape:
@@ -479,7 +484,7 @@ class _LUMatrixInverse(object):
     x = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
 
-    y = tfp.math.lu_matrix_inverse(*tf.linalg.lu(x), validate_args=True)
+    y = linalg.lu_matrix_inverse(*tf.linalg.lu(x), validate_args=True)
     y_ = self.evaluate(y)
 
     if self.use_static_shape:
@@ -513,7 +518,7 @@ class _LUSolve(object):
         rhs_, shape=rhs_.shape if self.use_static_shape else None)
 
     lower_upper, perm = tf.linalg.lu(x)
-    y = tfp.math.lu_solve(lower_upper, perm, rhs, validate_args=True)
+    y = linalg.lu_solve(lower_upper, perm, rhs, validate_args=True)
     y_, perm_ = self.evaluate([y, perm])
 
     self.assertAllEqual([1, 0], perm_)
@@ -540,7 +545,7 @@ class _LUSolve(object):
         rhs_, shape=rhs_.shape if self.use_static_shape else None)
 
     lower_upper, perm = tf.linalg.lu(x)
-    y = tfp.math.lu_solve(lower_upper, perm, rhs, validate_args=True)
+    y = linalg.lu_solve(lower_upper, perm, rhs, validate_args=True)
     y_, perm_ = self.evaluate([y, perm])
 
     self.assertAllEqual([[1, 0],
@@ -587,13 +592,13 @@ class _SparseOrDenseMatmul(test_util.TestCase):
 
   def verify_sparse_dense_matmul(self, x_, y_):
     if self.use_sparse_tensor:
-      x = self._make_sparse_placeholder(tfp.math.dense_to_sparse(x_))
+      x = self._make_sparse_placeholder(math.dense_to_sparse(x_))
     else:
       x = self._make_placeholder(x_)
 
     y = self._make_placeholder(y_)
 
-    z = tfp.math.sparse_or_dense_matmul(x, y)
+    z = linalg.sparse_or_dense_matmul(x, y)
     z_ = self.evaluate(z)
 
     if self.use_static_shape:
@@ -604,13 +609,13 @@ class _SparseOrDenseMatmul(test_util.TestCase):
 
   def verify_sparse_dense_matvecmul(self, x_, y_):
     if self.use_sparse_tensor:
-      x = self._make_sparse_placeholder(tfp.math.dense_to_sparse(x_))
+      x = self._make_sparse_placeholder(math.dense_to_sparse(x_))
     else:
       x = self._make_placeholder(x_)
 
     y = self._make_placeholder(y_)
 
-    z = tfp.math.sparse_or_dense_matvecmul(x, y)
+    z = linalg.sparse_or_dense_matvecmul(x, y)
     z_ = self.evaluate(z)
 
     if self.use_static_shape:
@@ -722,8 +727,9 @@ class FillTriangularTest(test_util.TestCase):
     #   gradient(zeros_like_x_pl, x_pl) == x_pl - 1
     def _zeros_like(x):
       return x * tf.stop_gradient(x - 1.) - tf.stop_gradient(x * (x - 1.))
-    actual, grad_actual = tfp.math.value_and_gradient(
-        lambda x: tfp.math.fill_triangular(  # pylint: disable=g-long-lambda
+
+    actual, grad_actual = gradient.value_and_gradient(
+        lambda x: linalg.fill_triangular(  # pylint: disable=g-long-lambda
             x + _zeros_like(x), **kwargs),
         x_pl)
     actual_, grad_actual_ = self.evaluate([actual, grad_actual])
@@ -796,8 +802,8 @@ class FillTriangularInverseTest(FillTriangularTest):
 
     @tf.function(jit_compile=True)
     def transform(x):
-      return tfp.bijectors.FillScaleTriL(
-          diag_bijector=tfp.bijectors.Exp(), diag_shift=None).inverse(x)
+      return fill_scale_tril.FillScaleTriL(
+          diag_bijector=exp.Exp(), diag_shift=None).inverse(x)
 
     self.evaluate(transform(tf.linalg.eye(3, dtype=tf.float32)))
 
@@ -809,8 +815,8 @@ class FillTriangularInverseTest(FillTriangularTest):
     zeros_like_x_pl = (x_pl * tf.stop_gradient(x_pl - 1.)
                        - tf.stop_gradient(x_pl * (x_pl - 1.)))
     x = x_pl + zeros_like_x_pl
-    actual = tfp.math.fill_triangular(x, **kwargs)
-    inverse_actual = tfp.math.fill_triangular_inverse(actual, **kwargs)
+    actual = linalg.fill_triangular(x, **kwargs)
+    inverse_actual = linalg.fill_triangular_inverse(actual, **kwargs)
 
     inverse_actual_ = self.evaluate(inverse_actual)
 

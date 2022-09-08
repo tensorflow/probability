@@ -28,6 +28,7 @@ from tensorflow_probability.python.internal import tensorshape_util
 __all__ = [
     'atan_difference',
     'betainc',
+    'betaincinv',
     'dawsn',
     'erfcinv',
     'erfcx',
@@ -43,6 +44,9 @@ __all__ = [
     'lbeta',
     'owens_t',
 ]
+
+
+NUMPY_MODE = False
 
 
 def atan_difference(x, y, name=None):
@@ -87,259 +91,428 @@ def atan_difference(x, y, name=None):
     return difference
 
 
+# 16-bit (half precision) floating-point dtypes available on current backend.
+_f16bit_dtypes = [tf.float16] if NUMPY_MODE else [tf.bfloat16, tf.float16]
+
+
 def _betainc_naive(a, b, x):
-  """Returns the regularized incomplete beta function elementwise."""
-  dtype = dtype_util.common_dtype([a, b, x], tf.float32)
-  a = tf.convert_to_tensor(a, dtype=dtype)
-  b = tf.convert_to_tensor(b, dtype=dtype)
-  x = tf.convert_to_tensor(x, dtype=dtype)
-  broadcast_shape = ps.broadcast_shape(
-      ps.shape(a), ps.shape(b))
-  broadcast_shape = ps.broadcast_shape(
-      broadcast_shape, ps.shape(x))
-  a = tf.broadcast_to(a, broadcast_shape)
-  b = tf.broadcast_to(b, broadcast_shape)
-  x = tf.broadcast_to(x, broadcast_shape)
-  return tf.math.betainc(a, b, x)
+  """Returns the regularized incomplete beta function element-wise."""
+  dtype_orig = dtype_util.common_dtype([a, b, x], tf.float32)
+  # We promote bfloat16 and float16 to float32 to make this function consistent
+  # with the XLA implementation of betainc.
+  should_promote_dtype = (dtype_orig in _f16bit_dtypes)
+  dtype = tf.float32 if should_promote_dtype else dtype_orig
 
-# Derivative implementation based on
-# [1] R. Boik, J. Robinson-Cox,
-#     Derivatives of the Incomplete Beta Function
-#     https://www.jstatsoft.org/article/view/v003i01/beta.der.pdf
-
-
-def partial_numerator(a, b, x, i):
-  """Partial numerator used in continued fraction expansion of betainc."""
-  f = b * x / (a * (1 - x))
-  result = (a + b + i - 2.) * (a + i - 1) * (b - i) / (
-      (a + 2 * i - 3.) * tf.math.square(a + 2 * i - 2.) * (a + 2 * i - 1.))
-  result = result * tf.math.square(a * f / b) * (i - 1.)
-  return tf.where(
-      tf.math.equal(i, 1.),
-      a * f * (b - 1.) / (b * (a + 1.)),
-      result)
-
-
-def partial_denominator(a, b, x, i):
-  """Partial denominator used in continued fraction expansion of betainc."""
-  f = b * x / (a * (1 - x))
-  numerator = 2 * (a * f + 2 * b) * i * (i + a - 1.) + a * b * (a - 2. - a * f)
-  denominator = b * (a + 2 * i - 2) * (a + 2 * i)
-  return numerator / denominator
-
-
-def partial_numerator_da(a, b, x, i):
-  """Derivative of betainc partial numerators with respect to a."""
-  f = b * x / (a * (1 - x))
-  result_numerator = 8 * i ** 3 * (a + b - 1.)
-  result_numerator = result_numerator + 2 * tf.math.square(i) * (
-      8 * tf.math.square(a) + (10 * b - 22.) * a + 13. - 12. * b)
-  result_numerator = result_numerator + 2 * i * (
-      5 * a ** 3 + (7 * b - 23) * tf.math.square(a) +
-      (-20. * b + 33) * a - 14. + 12. * b)
-  result_numerator = result_numerator + 2 * a ** 4 + (-13. + 3 * b) * a ** 3
-  result_numerator = result_numerator + (
-      (-14 * b + 30) * tf.math.square(a) + (-29. + 19 * b) * a + 10. - 8 * b)
-  result_denominator = tf.math.square(b * (a + 2 * i - 3.) * (a + 2 * i - 1.))
-  result_denominator = result_denominator * (a + 2 * i - 2.) ** 3
-  result = result_numerator / result_denominator
-  result = -(i - 1.) * (b - i) * tf.math.square(f * a) * result
-  return tf.where(
-      tf.math.equal(i, 1.),
-      -a * f * (b - 1.) / (b * tf.math.square(a + 1.)),
-      result)
-
-
-def partial_denominator_da(a, b, x, i):
-  """Derivative of betainc partial denominators with respect to a."""
-  f = b * x / (a * (1 - x))
-  result_numerator = (a * f / b) * (
-      4. * (1 - a - b) * tf.math.square(i) -
-      (4 * (1 - a - b) + 2 * tf.math.square(a)) * i +
-      tf.math.square(a) * b)
-  result_denominator = tf.math.square((a + 2 * i - 2) * (a + 2 * i))
-  return result_numerator / result_denominator
-
-
-def partial_numerator_db(a, b, x, i):
-  """Derivative of betainc partial numerators with respect to b."""
-  f = b * x / (a * (1 - x))
-  numerator = (
-      tf.math.square(a * f / b) * (i - 1.) * (a + i - 1.) * (2 * b + a - 2.))
-  denominator = (
-      (a + 2 * i - 3.) * tf.math.square(a + 2 * i - 2.) * (a + 2 * i - 1.))
-  return tf.where(
-      tf.math.equal(i, 1.),
-      a * f / (b * (a + 1)),
-      numerator / denominator)
-
-
-def partial_denominator_db(a, b, x, i):
-  """Derivative of betainc partial denominators with respect to b."""
-  f = b * x / (a * (1 - x))
-  return -f * tf.math.square(a) / (b * (a + 2 * i - 2.) * (a + 2 * i))
-
-
-def _betainc_der_helper(a, b, x, compute_partial_a=True):
-  """Shared code for computing partial derivatives of betainc."""
-  dtype = dtype_util.common_dtype([a, b, x], tf.float32)
-  a = tf.convert_to_tensor(a, dtype=dtype)
-  b = tf.convert_to_tensor(b, dtype=dtype)
-  x = tf.convert_to_tensor(x, dtype=dtype)
-
-  if compute_partial_a:
-    numerator_der_fn = partial_numerator_da
-    denominator_der_fn = partial_denominator_da
-  else:
-    numerator_der_fn = partial_numerator_db
-    denominator_der_fn = partial_denominator_db
-
-  def _continued_fraction_one_step(
-      iteration_count,
-      numerator,
-      previous_numerator,
-      dnumerator,
-      previous_dnumerator,
-      denominator,
-      previous_denominator,
-      ddenominator,
-      previous_ddenominator):
-    partial_num = partial_numerator(a, b, x, iteration_count)
-    partial_den = partial_denominator(a, b, x, iteration_count)
-    partial_num_der = numerator_der_fn(a, b, x, iteration_count)
-    partial_den_der = denominator_der_fn(a, b, x, iteration_count)
-
-    # A_n = a_n * A_{n - 2} + b_n * A_{n - 1}
-    new_numerator = (previous_numerator * partial_num +
-                     numerator * partial_den)
-    # dA_n / ds = (da_n/ds * A_{n - 2} +  a_n * dA_{n - 2}/ds) +
-    #             (db_n/ds * A_{n - 1} + b_n * dA_{n - 1}/ds)
-    new_dnumerator = (partial_num_der * previous_numerator +
-                      partial_num * previous_dnumerator +
-                      partial_den_der * numerator +
-                      partial_den * dnumerator)
-    # B_n = a_n * B_{n - 2} + b_n * B_{n - 1}
-    new_denominator = (previous_denominator * partial_num +
-                       denominator * partial_den)
-    # dB_n / ds = (da_n/ds * B_{n - 2} +  a_n * dB_{n - 2}/ds) +
-    #             (db_n/ds * B_{n - 1} + b_n * dB_{n - 1}/ds)
-    new_ddenominator = (partial_num_der * previous_denominator +
-                        partial_num * previous_ddenominator +
-                        partial_den_der * denominator +
-                        partial_den * ddenominator)
-
-    return (iteration_count + 1.,
-            new_numerator,
-            numerator,
-            new_dnumerator,
-            dnumerator,
-            new_denominator,
-            denominator,
-            new_ddenominator,
-            ddenominator)
+  a, b, x = [tf.convert_to_tensor(z, dtype=dtype_orig) for z in [a, b, x]]
+  if should_promote_dtype:
+    a, b, x = [tf.cast(z, dtype) for z in [a, b, x]]
 
   broadcast_shape = functools.reduce(
       ps.broadcast_shape, [ps.shape(a), ps.shape(b), ps.shape(x)])
+  a, b, x = [tf.broadcast_to(z, broadcast_shape) for z in [a, b, x]]
 
-  zeroth_numerator = tf.ones(broadcast_shape, dtype=dtype)
-  first_numerator = tf.ones(broadcast_shape, dtype=dtype)
+  result = tf.math.betainc(a, b, x)
 
-  zeroth_dnumerator = tf.zeros(broadcast_shape, dtype=dtype)
-  first_dnumerator = tf.zeros(broadcast_shape, dtype=dtype)
+  # If we promoted the dtype, then we have to convert the result back to the
+  # original dtype.
+  if should_promote_dtype:
+    result = tf.cast(result, dtype_orig)
 
-  zeroth_denominator = tf.zeros(broadcast_shape, dtype=dtype)
-  first_denominator = tf.ones(broadcast_shape, dtype=dtype)
+  return result
 
-  zeroth_ddenominator = tf.zeros(broadcast_shape, dtype=dtype)
-  first_ddenominator = tf.zeros(broadcast_shape, dtype=dtype)
 
-  (_,
-   numerator, _,
-   dnumerator, _,
-   denominator, _,
-   ddenominator, _) = tf.while_loop(
-       cond=lambda iteration_count, *_: iteration_count < 50,
-       body=_continued_fraction_one_step,
-       loop_vars=(
-           tf.cast(1., dtype=dtype),
-           first_numerator,
-           zeroth_numerator,
-           first_dnumerator,
-           zeroth_dnumerator,
-           first_denominator,
-           zeroth_denominator,
-           first_ddenominator,
-           zeroth_ddenominator))
+def _betainc_even_partial_numerator(iteration, a, b, x, dtype):
+  """Even partial numerator used in the continued fraction for betainc."""
+  # This function computes the partial numerator d_{2m} that is specified
+  # here: https://dlmf.nist.gov/8.17.E23
+  one = tf.constant(1., dtype=dtype)
+  two = tf.constant(2., dtype=dtype)
 
-  result = numerator / denominator
-  if compute_partial_a:
-    result = result * (
-        tf.math.log(x) - tf.math.reciprocal(a) +
-        tf.math.digamma(a + b) - tf.math.digamma(a))
+  m = iteration
+  a_plus_2m = a + two * m
+  a_plus_2m_minus_one = a_plus_2m - one
+  denominator = a_plus_2m * a_plus_2m_minus_one
+
+  db = m * x / denominator
+  value = db * (b - m)
+  da = -value * (a_plus_2m + a_plus_2m_minus_one) / denominator
+  gradient = tf.concat([da, db], axis=-1)
+  return value, gradient
+
+
+def _betainc_odd_partial_numerator(iteration, a, b, x, dtype):
+  """Odd partial numerator used in the continued fraction for betainc."""
+  # This function computes the partial numerator d_{2m + 1} that is specified
+  # here: https://dlmf.nist.gov/8.17.E23
+  one = tf.constant(1., dtype=dtype)
+  two = tf.constant(2., dtype=dtype)
+
+  m = iteration
+  a_plus_m = a + m
+  a_plus_2m = a_plus_m + m
+  a_plus_2m_plus_one = a_plus_2m + one
+  a_plus_b_plus_m = a_plus_m + b
+  denominator = a_plus_2m * a_plus_2m_plus_one
+
+  db = -a_plus_m * x / denominator
+  value = db * a_plus_b_plus_m
+  da = -value * ((a_plus_2m + a_plus_2m_plus_one) / denominator) - x * (
+      two * a_plus_m + b) / denominator
+  gradient = tf.concat([da, db], axis=-1)
+  return value, gradient
+
+
+def _betainc_modified_lentz_method(a, b, x, dtype, use_continued_fraction):
+  """Returns the continued fraction for betainc by modified Lentz's method."""
+  # This function implements the method described in the appendix of [1] for
+  # evaluating continued fractions.
+  # [1] Thompson, Ian J., and A. Ross Barnett.
+  #     Coulomb and Bessel functions of complex arguments and order.
+  #     Journal of Computational Physics 64.2 (1986): 490-509.
+  #     https://www.fresco.org.uk/papers/Thompson-JCP64p490.pdf
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  one = tf.constant(1., dtype=dtype)
+  eps = tf.constant(np.finfo(numpy_dtype).eps, dtype=dtype)
+  tiny = tf.constant(np.finfo(numpy_dtype).tiny, dtype=dtype)
+
+  # max_iterations and tolerance were taken from Cephes.
+  if numpy_dtype == np.float32:
+    max_iterations = 100
+    tolerance = eps
   else:
-    result = result * (
-        tf.math.log1p(-x) +
-        tf.math.digamma(a + b) - tf.math.digamma(b))
+    max_iterations = 300
+    tolerance = tf.constant(3., dtype=dtype) * eps
 
-  result = (result + dnumerator / denominator -
-            numerator * ddenominator / tf.math.square(denominator))
+  small = tf.sqrt(tiny)
 
-  return result * tf.math.exp(
-      tf.math.xlogy(a, x) + tf.math.xlog1py(b - 1., -x) -
+  def continued_fraction_step(
+      iteration,
+      values,
+      gradients,
+      partial_numerator_fn):
+    ratio_numerators, ratio_denominators, convergent = values
+    dratio_numerators, dratio_denominators, dconvergent = gradients
+
+    partial_numerator, dpartial_numerator = partial_numerator_fn(
+        iteration, a, b, x, dtype)
+
+    # new_ratio_numerators = C_n = A_n / A_{n - 1}
+    new_ratio_numerators = one + partial_numerator / ratio_numerators
+    new_ratio_numerators = tf.where(
+        tf.abs(new_ratio_numerators) < small, small, new_ratio_numerators)
+    # new_ratio_denominators = D_n = B_{n - 1} / B_n
+    new_ratio_denominators = one + partial_numerator * ratio_denominators
+    new_ratio_denominators = tf.where(
+        tf.abs(new_ratio_denominators) < small, small, new_ratio_denominators)
+    new_ratio_denominators = tf.math.reciprocal(new_ratio_denominators)
+    # new_convergent = h_n = A_n / B_n = h_{n - 1} * C_n * D_n
+    delta = new_ratio_numerators * new_ratio_denominators
+    new_convergent = convergent * delta
+
+    new_dratio_numerators = (dpartial_numerator * ratio_numerators -
+                             partial_numerator * dratio_numerators)
+    new_dratio_numerators = new_dratio_numerators / tf.math.square(
+        ratio_numerators)
+    new_dratio_denominators = (dpartial_numerator * ratio_denominators +
+                               partial_numerator * dratio_denominators)
+    new_dratio_denominators = -new_dratio_denominators * tf.math.square(
+        new_ratio_denominators)
+    new_dconvergent = dconvergent * delta + (
+        convergent * new_dratio_numerators * new_ratio_denominators)
+    new_dconvergent = new_dconvergent + (
+        convergent * new_dratio_denominators * new_ratio_numerators)
+
+    new_values = (new_ratio_numerators, new_ratio_denominators, new_convergent)
+    new_gradients = (
+        new_dratio_numerators, new_dratio_denominators, new_dconvergent)
+
+    return new_values, new_gradients, delta
+
+  def continued_fraction_evaluation(should_stop, iteration, values, gradients):
+    # We run two steps of modified Lentz's method per iteration.
+    # First step of the iteration: the even one.
+    new_values, new_gradients, _ = continued_fraction_step(
+        iteration, values, gradients, _betainc_even_partial_numerator)
+
+    # Second step of the iteration: the odd one.
+    new_values, new_gradients, delta = continued_fraction_step(
+        iteration, new_values, new_gradients, _betainc_odd_partial_numerator)
+
+    should_stop = should_stop | (tf.math.abs(delta - one) < tolerance)
+
+    return should_stop, iteration + one, new_values, new_gradients
+
+  # Assume all input Tensors have the same shape. The extra dimension is
+  # needed to compute the gradients with respect to a and b.
+  a, b, x, use_continued_fraction = [
+      z[..., tf.newaxis] for z in [a, b, x, use_continued_fraction]]
+
+  apb = a + b
+  ap1 = a + one
+
+  # Initialization and first step of modified Lentz's method.
+  initial_ratio_numerators = tf.ones_like(x)
+  initial_ratio_denominators = one - apb * x / ap1
+  initial_ratio_denominators = tf.where(
+      tf.abs(initial_ratio_denominators) < small,
+      small,
+      initial_ratio_denominators)
+  initial_ratio_denominators = tf.math.reciprocal(initial_ratio_denominators)
+  initial_convergent = initial_ratio_denominators
+  initial_values = (
+      initial_ratio_numerators, initial_ratio_denominators, initial_convergent)
+
+  initial_dratio_denominators = (tf.concat([one - b, ap1], axis=-1) * x /
+                                 tf.math.square(x * apb - ap1))
+  initial_dratio_numerators = tf.zeros_like(initial_dratio_denominators)
+  initial_dconvergent = initial_dratio_denominators
+  initial_gradients = (
+      initial_dratio_numerators,
+      initial_dratio_denominators,
+      initial_dconvergent)
+
+  (_, _, values, gradients) = tf.while_loop(
+      cond=lambda stop, *_: tf.reduce_any(~stop),
+      body=continued_fraction_evaluation,
+      loop_vars=(
+          ~use_continued_fraction,
+          tf.constant(1., dtype=dtype),
+          initial_values,
+          initial_gradients),
+      maximum_iterations=max_iterations)
+
+  # Remove the previously added extra dimension: it is no longer needed.
+  convergent = tf.squeeze(values[-1], axis=-1)
+  convergent_grad_a, convergent_grad_b = tf.unstack(gradients[-1], axis=-1)
+
+  return convergent, convergent_grad_a, convergent_grad_b
+
+
+def _betainc_der_continued_fraction(a, b, x, dtype, use_continued_fraction):
+  """Returns the partial derivatives of betainc with respect to a and b."""
+  # This function evaluates betainc(a, b, x) by its continued fraction
+  # expansion given here: https://dlmf.nist.gov/8.17.E22
+  # We apply this function when the input (a, b, x) does not belong to the
+  # proper region of computation of `_betainc_der_power_series`.
+  one = tf.constant(1., dtype=dtype)
+  two = tf.constant(2., dtype=dtype)
+
+  # This continued fraction expansion of betainc converges rapidly
+  # for x < (a - 1) / (a + b - 2). For x >= (a - 1) / (a + b - 2),
+  # we can obtain an equivalent computation by using the symmetry
+  # relation given here: https://dlmf.nist.gov/8.17.E4
+  #   betainc(a, b, x) = 1 - betainc(b, a, 1 - x)
+  use_symmetry_relation = (x >= (a - one) / (a + b - two))
+  a_orig = a
+  a = tf.where(use_symmetry_relation, b, a)
+  b = tf.where(use_symmetry_relation, a_orig, b)
+  x = tf.where(use_symmetry_relation, one - x, x)
+
+  cf, cf_grad_a, cf_grad_b = _betainc_modified_lentz_method(
+      a, b, x, dtype, use_continued_fraction)
+
+  normalization = tf.math.exp(
+      tf.math.xlogy(a, x) + tf.math.xlog1py(b, -x) -
       tf.math.log(a) - lbeta(a, b))
 
+  digamma_apb = tf.math.digamma(a + b)
+  grad_a = normalization * (
+      cf_grad_a + cf * (
+          tf.math.log(x) - tf.math.reciprocal(a) +
+          digamma_apb - tf.math.digamma(a)))
+  grad_b = normalization * (
+      cf_grad_b + cf * (
+          tf.math.log1p(-x) + digamma_apb -
+          tf.math.digamma(b)))
 
-def _betainc_partial_a(a, b, x):
-  dtype = dtype_util.common_dtype([a, b, x], tf.float32)
+  # If we are taking advantage of the symmetry relation, then we have to
+  # adjust grad_a and grad_b.
+  grad_a_orig = grad_a
+  grad_a = tf.where(use_symmetry_relation, -grad_b, grad_a)
+  grad_b = tf.where(use_symmetry_relation, -grad_a_orig, grad_b)
+
+  return grad_a, grad_b
+
+
+def _betainc_der_power_series(a, b, x, dtype, use_power_series):
+  """Returns the partial derivatives of betainc with respect to a and b."""
+  # This function evaluates betainc(a, b, x) by its series representation:
+  #   x ** a * 2F1(a, 1 - b; a + 1; x) / (a * B(a, b)) ,
+  # where 2F1 is the Gaussian hypergeometric function.
+  # We apply this function when the input (a, b, x) satisfies at least one
+  # of the following conditions:
+  #   C1: (x < a / (a + b)) & (b * x <= 1) & (x <= 0.95)
+  #   C2: (x >= a / (a + b)) & (a * (1 - x) <= 1) & (x >= 0.05)
   numpy_dtype = dtype_util.as_numpy_dtype(dtype)
-  result = tf.where(
-      x > a / (a + b),
-      -_betainc_der_helper(b, a, 1. - x, compute_partial_a=False),
-      _betainc_der_helper(a, b, x, compute_partial_a=True))
-  return tf.where(tf.math.equal(x, 0.), numpy_dtype(0.), result)
+  eps = tf.constant(np.finfo(numpy_dtype).eps, dtype=dtype)
+  half = tf.constant(0.5, dtype=dtype)
+  one = tf.constant(1., dtype=dtype)
+
+  # Avoid returning NaN or infinity when the input does not satisfy either
+  # C1 or C2.
+  safe_a = tf.where(use_power_series, a, half)
+  safe_b = tf.where(use_power_series, b, half)
+  safe_x = tf.where(use_power_series, x, half)
+
+  # When x >= a / (a + b), we must apply the symmetry relation given here:
+  # https://dlmf.nist.gov/8.17.E4
+  #   betainc(a, b, x) = 1 - betainc(b, a, 1 - x)
+  use_symmetry_relation = (safe_x >= safe_a / (safe_a + safe_b))
+  safe_a_orig = safe_a
+  safe_a = tf.where(use_symmetry_relation, safe_b, safe_a)
+  safe_b = tf.where(use_symmetry_relation, safe_a_orig, safe_b)
+  safe_x = tf.where(use_symmetry_relation, one - safe_x, safe_x)
+
+  # max_iterations was set by experimentation and tolerance was taken from
+  # Cephes.
+  max_iterations = 300 if numpy_dtype == np.float32 else 600
+  tolerance = eps / safe_a
+
+  # Evaluate the series that defines the following expression:
+  #   2F1(a, 1 - b; a + 1; x) / a
+  def power_series_evaluation(should_stop, values, gradients):
+    n, product, series_sum = values
+    product_grad_b, da, db = gradients
+
+    x_div_n = safe_x / n
+    factor = (n - safe_b) * x_div_n
+    apn = safe_a + n
+
+    new_product = product * factor
+    term = new_product / apn
+    new_product_grad_b = factor * product_grad_b - product * x_div_n
+    new_da = da - new_product / tf.math.square(apn)
+    new_db = db + new_product_grad_b / apn
+
+    values = n + one, new_product, series_sum + term
+    gradients = new_product_grad_b, new_da, new_db
+
+    return should_stop | (tf.math.abs(term) <= tolerance), values, gradients
+
+  initial_n = one
+  initial_product = tf.ones_like(safe_a)
+  initial_series_sum = one / safe_a
+  initial_values = (initial_n, initial_product, initial_series_sum)
+
+  initial_product_grad_b = tf.zeros_like(safe_b)
+  initial_da = -tf.math.reciprocal(tf.math.square(safe_a))
+  initial_db = initial_product_grad_b
+  initial_gradients = (initial_product_grad_b, initial_da, initial_db)
+
+  (_, values, gradients) = tf.while_loop(
+      cond=lambda stop, *_: tf.reduce_any(~stop),
+      body=power_series_evaluation,
+      loop_vars=(
+          ~use_power_series,
+          initial_values,
+          initial_gradients),
+      maximum_iterations=max_iterations)
+
+  _, _, series_sum = values
+  _, series_grad_a, series_grad_b = gradients
+
+  normalization = tf.math.exp(
+      tf.math.xlogy(safe_a, safe_x) - lbeta(safe_a, safe_b))
+
+  digamma_apb = tf.math.digamma(safe_a + safe_b)
+  grad_a = normalization * (series_grad_a + series_sum * (
+      digamma_apb - tf.math.digamma(safe_a) + tf.math.log(safe_x)))
+  grad_b = normalization * (series_grad_b + series_sum * (
+      digamma_apb - tf.math.digamma(safe_b)))
+
+  # If we are taking advantage of the symmetry relation, then we have to
+  # adjust grad_a and grad_b.
+  grad_a_orig = grad_a
+  grad_a = tf.where(use_symmetry_relation, -grad_b, grad_a)
+  grad_b = tf.where(use_symmetry_relation, -grad_a_orig, grad_b)
+
+  return grad_a, grad_b
 
 
-def _betainc_partial_b(a, b, x):
-  dtype = dtype_util.common_dtype([a, b, x], tf.float32)
+def _betainc_partials(a, b, x):
+  """Returns the partial derivatives of `betainc(a, b, x)`."""
+  dtype_orig = dtype_util.common_dtype([a, b, x], tf.float32)
+  # We promote bfloat16 and float16 to float32 to make this function consistent
+  # with betainc.
+  should_promote_dtype = (dtype_orig in _f16bit_dtypes)
+  dtype = tf.float32 if should_promote_dtype else dtype_orig
   numpy_dtype = dtype_util.as_numpy_dtype(dtype)
-  result = tf.where(
-      x > a / (a + b),
-      -_betainc_der_helper(b, a, 1. - x, compute_partial_a=True),
-      _betainc_der_helper(a, b, x, compute_partial_a=False))
-  return tf.where(tf.math.equal(x, 0.), numpy_dtype(0.), result)
+  zero = tf.constant(0., dtype=dtype)
+  one = tf.constant(1., dtype=dtype)
 
+  a, b, x = [tf.convert_to_tensor(z, dtype=dtype_orig) for z in [a, b, x]]
+  if should_promote_dtype:
+    a, b, x = [tf.cast(z, dtype) for z in [a, b, x]]
 
-def _betainc_partial_x(a, b, x):
-  result = tf.math.xlogy(a - 1., x) + tf.math.xlog1py(b - 1., -x) - lbeta(a, b)
-  return tf.math.exp(result)
+  broadcast_shape = functools.reduce(
+      ps.broadcast_shape, [ps.shape(a), ps.shape(b), ps.shape(x)])
+  a, b, x = [tf.broadcast_to(z, broadcast_shape) for z in [a, b, x]]
+
+  # The partial derivative of betainc with respect to x can be obtained
+  # directly by using the expression given here:
+  # http://functions.wolfram.com/06.21.20.0001.01
+  grad_x = tf.math.exp(
+      tf.math.xlogy(a - one, x) + tf.math.xlog1py(b - one, -x) - lbeta(a, b))
+
+  # The partial derivatives of betainc with respect to a and b are computed
+  # by using forward mode.
+  use_power_series = (
+      ((x < a / (a + b)) & (b * x <= one) & (x <= 0.95)) | (
+          (x >= a / (a + b)) & (a * (one - x) <= one) & (x >= 0.05)))
+  ps_grad_a, ps_grad_b = _betainc_der_power_series(
+      a, b, x, dtype, use_power_series)
+  cf_grad_a, cf_grad_b = _betainc_der_continued_fraction(
+      a, b, x, dtype, ~use_power_series)
+  grad_a = tf.where(use_power_series, ps_grad_a, cf_grad_a)
+  grad_b = tf.where(use_power_series, ps_grad_b, cf_grad_b)
+
+  # According to the code accompanying [1], grad_a = grad_b = 0 when x is
+  # equal to 0 or 1.
+  # [1] R. Boik, J. Robinson-Cox,
+  #     Derivatives of the Incomplete Beta Function
+  #     https://www.jstatsoft.org/article/view/v003i01/beta.der.pdf
+  grads_a_and_b_should_be_zero = tf.math.equal(x, zero) | tf.math.equal(x, one)
+  grad_a, grad_b = [
+      tf.where(grads_a_and_b_should_be_zero, zero, grad)
+      for grad in [grad_a, grad_b]]
+
+  # Determine if the inputs are out of range (should return NaN output).
+  result_is_nan = (a <= zero) | (b <= zero) | (x < zero) | (x > one)
+  grad_a, grad_b, grad_x = [
+      tf.where(result_is_nan, numpy_dtype(np.nan), grad)
+      for grad in [grad_a, grad_b, grad_x]]
+
+  # If we promoted the dtype, then we have to convert the gradients back to the
+  # original dtype.
+  if should_promote_dtype:
+    grad_a, grad_b, grad_x = [
+        tf.cast(grad, dtype_orig) for grad in [grad_a, grad_b, grad_x]]
+
+  return grad_a, grad_b, grad_x
 
 
 def _betainc_fwd(a, b, x):
-  """Compute output, aux (collaborates with _dawsn_bwd)."""
+  """Computes output, aux (collaborates with _betainc_bwd)."""
   output = _betainc_naive(a, b, x)
   return output, (a, b, x)
 
 
 def _betainc_bwd(aux, g):
-  """Reverse mode impl for dawsn."""
+  """Reverse mode impl for betainc."""
   a, b, x = aux
-  pa = _betainc_partial_a(a, b, x)
-  pb = _betainc_partial_b(a, b, x)
-  px = _betainc_partial_x(a, b, x)
+  pa, pb, px = _betainc_partials(a, b, x)
   return _fix_gradient_for_broadcasting(
       [a, b, x], [pa * g, pb * g, px * g])
 
 
 def _betainc_jvp(primals, tangents):
-  """Computes JVP for dawsn (supports JAX custom derivative)."""
+  """Computes JVP for betainc (supports JAX custom derivative)."""
   a, b, x = primals
   da, db, dx = tangents
 
   y = _betainc_custom_gradient(a, b, x)
-  return (y,
-          da * _betainc_partial_a(a, b, x) +
-          db * _betainc_partial_b(a, b, x) +
-          dx * _betainc_partial_x(a, b, x))
+  pa, pb, px = _betainc_partials(a, b, x)
+  return (y, pa * da + pb * db + px * dx)
 
 
 @tfp_custom_gradient.custom_gradient(
@@ -347,21 +520,22 @@ def _betainc_jvp(primals, tangents):
     vjp_bwd=_betainc_bwd,
     jvp_fn=_betainc_jvp)
 def _betainc_custom_gradient(a, b, x):
+  """Computes `betainc(a, b, x)` with correct custom gradient."""
   return _betainc_naive(a, b, x)
 
 
 def betainc(a, b, x, name=None):
-  """Computes Regularized Incomplete Beta element-wise.
+  """Computes the regularized incomplete beta function element-wise.
 
   Args:
-    a:
-    b:
-    x: A Tensor with type `float32` or `float64`.
+    a: Floating-point Tensor. Must be broadcastable with `b` and `x`.
+    b: Floating-point Tensor. Must be broadcastable with `a` and `x`.
+    x: Floating-point Tensor. Must be broadcastable with `a` and `b`.
     name: A name for the operation (optional).
 
   Returns:
-    betainc: dawsn evaluated at `x`. A Tensor with the same shape and same
-      dtype as `x`.
+    betainc: Floating-point Tensor, the regularized incomplete beta
+    function computed element-wise.
   """
   with tf.name_scope(name or 'betainc'):
     dtype = dtype_util.common_dtype([a, b, x], tf.float32)
@@ -369,6 +543,329 @@ def betainc(a, b, x, name=None):
     b = tf.convert_to_tensor(b, dtype=dtype)
     x = tf.convert_to_tensor(x, dtype=dtype)
     return _betainc_custom_gradient(a, b, x)
+
+
+# The implementation of the inverse of the regularized incomplete beta function
+# is based on ideas and equations available in the following references:
+# [1] Milton Abramowitz and Irene A. Stegun
+#     Handbook of Mathematical Functions with Formulas, Graphs, and
+#         Mathematical Tables
+#     US Government Printing Office, 1964 (reprinted 1972)
+#     https://archive.org/details/AandS-mono600
+# [2] William Press, Saul Teukolsky, William Vetterling and Brian Flannery
+#     Numerical Recipes: The Art of Scientific Computing
+#     Cambridge University Press, 2007 (Third Edition)
+#     http://numerical.recipes/book/book.html
+# [3] John Maddock, Paul A. Bristow, et al.
+#     The Incomplete Beta Function Inverses
+#     https://www.boost.org/doc/libs/1_79_0/libs/math/doc/html/special.html
+# [4] Stephen L. Moshier
+#     Cephes Mathematical Library
+#     https://netlib.org/cephes/
+
+
+def _betaincinv_initial_approx(a, b, y, dtype):
+  """Computes an initial approximation for `betaincinv(a, b, y)`."""
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  tiny = np.finfo(numpy_dtype).tiny
+  eps = np.finfo(numpy_dtype).eps
+  one = numpy_dtype(1.)
+  two = numpy_dtype(2.)
+  three = numpy_dtype(3.)
+  five = numpy_dtype(5.)
+  six = numpy_dtype(6.)
+  max_log = numpy_dtype((np.finfo(numpy_dtype).maxexp - 1.) * np.log(2.))
+
+  # When min(a, b) >= 1, we use the approximation proposed by [1].
+
+  # Equation 26.5.22 [1, page 945].
+  yp = -tf.math.ndtri(y)
+  inv_2a_minus_one = tf.math.reciprocal(two * a - one)
+  inv_2b_minus_one = tf.math.reciprocal(two * b - one)
+  lmb = (tf.math.square(yp) - three) / six
+  h = two * tf.math.reciprocal(inv_2a_minus_one + inv_2b_minus_one)
+  w = (yp * tf.math.sqrt(h + lmb) / h -
+       (inv_2b_minus_one - inv_2a_minus_one) *
+       (lmb + five / six - two / (three * h)))
+  result_for_large_a_and_b = a / (a + b * tf.math.exp(two * w))
+
+  # When min(a, b) < 1 and max(a, b) >= 1, we use the approximation proposed by
+  # [2]. This approximation depends on the following approximation for betainc:
+  #   betainc(a, b, x) ~=
+  #       x ** a / (integral_approx * a) , when x <= mean ,
+  #       (1 - x) ** b / (integral_approx * b) , when x > mean ,
+  # where:
+  #   integral_approx = (mean ** a) / a + (mean_complement ** b) / b ,
+  #   mean = a / (a + b) ,
+  #   mean_complement = 1 - mean = b / (a + b) .
+  # We invert betainc(a, b, x) with respect to x in the proper regime.
+
+  # Equation 6.4.7 [2, page 271].
+  a_plus_b = a + b
+  mean = a / a_plus_b
+  mean_complement = b / a_plus_b
+  integral_approx_part_a = tf.math.exp(tf.math.xlogy(a, mean) - tf.math.log(a))
+  integral_approx_part_b = tf.math.exp(tf.math.xlogy(b, mean_complement) -
+                                       tf.math.log(b))
+  integral_approx = integral_approx_part_a + integral_approx_part_b
+
+  # Solve Equation 6.4.8 [2, page 271] for x in the respective regimes.
+  inv_a = tf.math.reciprocal(a)
+  inv_b = tf.math.reciprocal(b)
+  result_for_small_a_or_b = tf.where(
+      y <= (integral_approx_part_a / integral_approx),
+      tf.math.exp(tf.math.xlogy(inv_a, y) + tf.math.xlogy(inv_a, a) +
+                  tf.math.xlogy(inv_a, integral_approx)),
+      -tf.math.expm1(tf.math.xlog1py(inv_b, -y) + tf.math.xlogy(inv_b, b) +
+                     tf.math.xlogy(inv_b, integral_approx)))
+
+  # And when max(a, b) < 1, we use the approximation proposed by [3] for the
+  # same domain:
+  #   betaincinv(a, b, y) ~= xg / (1 + xg) ,
+  # where:
+  #   xg = (a * y * Beta(a, b)) ** (1 / a) .
+  log_xg = tf.math.xlogy(inv_a, a) + tf.math.xlogy(inv_a, y) + (
+      inv_a * lbeta(a, b))
+  xg = tf.math.exp(tf.math.minimum(log_xg, max_log))
+  result_for_small_a_and_b = xg / (one + xg)
+
+  # Return the appropriate result for parameters a and b.
+  result = tf.where(
+      tf.math.minimum(a, b) >= one,
+      result_for_large_a_and_b,
+      tf.where(
+          tf.math.maximum(a, b) < one,
+          result_for_small_a_and_b,
+          result_for_small_a_or_b))
+
+  return tf.clip_by_value(result, tiny, one - eps)
+
+
+def _betaincinv_computation(a, b, y):
+  """Returns the inverse of `betainc(a, b, x)` with respect to `x`."""
+  dtype_orig = dtype_util.common_dtype([a, b, y], tf.float32)
+  # We promote bfloat16 and float16 to float32 to make this function consistent
+  # with betainc.
+  should_promote_dtype = (dtype_orig in _f16bit_dtypes)
+  dtype = tf.float32 if should_promote_dtype else dtype_orig
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  zero = numpy_dtype(0.)
+  tiny = np.finfo(numpy_dtype).tiny
+  eps = np.finfo(numpy_dtype).eps
+  half = numpy_dtype(0.5)
+  one = numpy_dtype(1.)
+  two = numpy_dtype(2.)
+  halley_correction_min = numpy_dtype(0.5)
+  halley_correction_max = numpy_dtype(1.5)
+
+  a, b, y = [tf.convert_to_tensor(z, dtype=dtype_orig) for z in [a, b, y]]
+  if should_promote_dtype:
+    a, b, y = [tf.cast(z, dtype) for z in [a, b, y]]
+
+  broadcast_shape = functools.reduce(
+      ps.broadcast_shape, [ps.shape(a), ps.shape(b), ps.shape(y)])
+  a, b, y = [tf.broadcast_to(z, broadcast_shape) for z in [a, b, y]]
+
+  # When tfp_math.betainc(a, b, 0.5) < y, we apply the symmetry relation given
+  # here: https://dlmf.nist.gov/8.17.E4
+  #   betainc(a, b, x) = 1 - betainc(b, a, 1 - x) .
+  # If dtype is float32, we have additional conditions to apply this relation:
+  #   (a < 1) & (b < 1) & (tfp_math.betainc(a, b, a / (a + b)) < y) .
+  error_at_half = betainc(a, b, half) - y
+  if numpy_dtype == np.float32:
+    a_and_b_are_small = (a < one) & (b < one)
+    error_at_mean = betainc(a, b, a / (a + b)) - y
+    use_symmetry_relation = (error_at_half < zero) & a_and_b_are_small & (
+        error_at_mean < zero)
+  else:
+    use_symmetry_relation = (error_at_half < zero)
+
+  a_orig, y_orig = (a, y)
+  a = tf.where(use_symmetry_relation, b, a)
+  b = tf.where(use_symmetry_relation, a_orig, b)
+  y = tf.where(use_symmetry_relation, one - y, y)
+
+  a_minus_1 = a - one
+  b_minus_1 = b - one
+  lbeta_a_and_b = lbeta(a, b)
+  two_tiny = two * tiny
+
+  # max_iterations was taken from [4] and tolerance was set by experimentation.
+  if numpy_dtype == np.float32:
+    max_iterations = 10
+    tolerance = numpy_dtype(8.) * eps
+  else:
+    max_iterations = 8
+    tolerance = numpy_dtype(4096.) * eps
+
+  def root_finding_iteration(should_stop, low, high, candidate):
+    error = betainc(a, b, candidate) - y
+    error_over_der = error / tf.math.exp(
+        tf.math.xlogy(a_minus_1, candidate) +
+        tf.math.xlog1py(b_minus_1, -candidate) -
+        lbeta_a_and_b)
+    second_der_over_der = a_minus_1 / candidate - b_minus_1 / (one - candidate)
+    # Following [2, section 9.4.2, page 463], we limit the influence of the
+    # Halley's correction to the Newton's method, since this correction can
+    # reduce the Newton's region of convergence. We set minimum and maximum
+    # values for this correction by experimentation.
+    halley_correction = tf.clip_by_value(
+        one - half * error_over_der * second_der_over_der,
+        halley_correction_min,
+        halley_correction_max)
+    halley_delta = error_over_der / halley_correction
+    halley_candidate = tf.where(
+        should_stop, candidate, candidate - halley_delta)
+
+    # Fall back to bisection if the current step would take the new candidate
+    # out of bounds.
+    new_candidate = tf.where(
+        halley_candidate <= low,
+        half * (candidate + low),
+        tf.where(
+            halley_candidate >= high,
+            half * (candidate + high),
+            halley_candidate))
+
+    new_delta = candidate - new_candidate
+    new_delta_is_negative = (new_delta < zero)
+    new_low = tf.where(new_delta_is_negative, candidate, low)
+    new_high = tf.where(new_delta_is_negative, high, candidate)
+
+    adjusted_tolerance = tf.math.maximum(tolerance * new_candidate, two_tiny)
+    should_stop = (should_stop | (tf.math.abs(new_delta) < adjusted_tolerance) |
+                   tf.math.equal(new_low, new_high))
+
+    return should_stop, new_low, new_high, new_candidate
+
+  initial_candidate = _betaincinv_initial_approx(a, b, y, dtype)
+  # Bracket the solution with the interval (low, high).
+  initial_low = tf.zeros_like(y)
+  if numpy_dtype == np.float32:
+    initial_high = tf.ones_like(y) * tf.where(
+        a_and_b_are_small & (error_at_mean < zero), half, one)
+  else:
+    initial_high = tf.ones_like(y) * half
+
+  (_, _, _, result) = tf.while_loop(
+      cond=lambda stop, *_: tf.reduce_any(~stop),
+      body=root_finding_iteration,
+      loop_vars=(
+          tf.equal(y, initial_low) | tf.equal(y, initial_high),
+          initial_low,
+          initial_high,
+          initial_candidate),
+      maximum_iterations=max_iterations)
+
+  # If we are taking advantage of the symmetry relation, we have to adjust the
+  # input y and the solution.
+  y = y_orig
+  result = tf.where(
+      use_symmetry_relation, one - tf.math.maximum(result, eps), result)
+
+  # Handle trivial cases.
+  result = tf.where(tf.equal(y, zero) | tf.equal(y, one), y, result)
+
+  # Determine if the inputs are out of range (should return NaN output).
+  result_is_nan = (a <= zero) | (b <= zero) | (y < zero) | (y > one)
+  result = tf.where(result_is_nan, numpy_dtype(np.nan), result)
+
+  # If we promoted the dtype, then we have to convert the result back to the
+  # original dtype.
+  if should_promote_dtype:
+    result = tf.cast(result, dtype_orig)
+
+  return result
+
+
+def _betaincinv_partials(a, b, y, return_value=False):
+  """Returns the partial derivatives of `betaincinv(a, b, y)`."""
+  dtype_orig = dtype_util.common_dtype([a, b, y], tf.float32)
+  # We promote bfloat16 and float16 to float32 to make this function consistent
+  # with betaincinv.
+  should_promote_dtype = (dtype_orig in _f16bit_dtypes)
+  dtype = tf.float32 if should_promote_dtype else dtype_orig
+
+  a, b, y = [tf.convert_to_tensor(z, dtype=dtype_orig) for z in [a, b, y]]
+  if should_promote_dtype:
+    a, b, y = [tf.cast(z, dtype) for z in [a, b, y]]
+
+  # We use the fact that betainc and betaincinv are inverses of each other to
+  # compute the gradients.
+  x = _betaincinv_custom_gradient(a, b, y)
+  betainc_partial_a, betainc_partial_b, betainc_partial_x = _betainc_partials(
+      a, b, x)
+
+  partial_a = -betainc_partial_a / betainc_partial_x
+  partial_b = -betainc_partial_b / betainc_partial_x
+  partial_y = tf.math.reciprocal(betainc_partial_x)
+
+  if return_value:
+    results = (partial_a, partial_b, partial_y, x)
+  else:
+    results = (partial_a, partial_b, partial_y)
+
+  # If we promoted the dtype, then we have to convert the results back to the
+  # original dtype.
+  if should_promote_dtype:
+    results = [tf.cast(z, dtype_orig) for z in results]
+
+  return results
+
+
+def _betaincinv_fwd(a, b, y):
+  """Computes output, aux (collaborates with _betaincinv_bwd)."""
+  output = _betaincinv_computation(a, b, y)
+  return output, (a, b, y)
+
+
+def _betaincinv_bwd(aux, g):
+  """Reverse mode impl for betaincinv."""
+  a, b, y = aux
+  # pylint: disable=unbalanced-tuple-unpacking
+  pa, pb, py = _betaincinv_partials(a, b, y)
+  return _fix_gradient_for_broadcasting(
+      [a, b, y], [pa * g, pb * g, py * g])
+
+
+def _betaincinv_jvp(primals, tangents):
+  """Computes JVP for betaincinv (supports JAX custom derivative)."""
+  a, b, y = primals
+  da, db, dy = tangents
+  pa, pb, py, x = _betaincinv_partials(a, b, y, return_value=True)
+  return (x, pa * da + pb * db + py * dy)
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_betaincinv_fwd,
+    vjp_bwd=_betaincinv_bwd,
+    jvp_fn=_betaincinv_jvp)
+def _betaincinv_custom_gradient(a, b, y):
+  """Computes `betaincinv(a, b, y)` with correct custom gradient."""
+  return _betaincinv_computation(a, b, y)
+
+
+def betaincinv(a, b, y, name=None):
+  """Computes the inverse of `tfp.math.betainc` with respect to `x`.
+
+  This function returns a value `x` such that `y = tfp.math.betainc(a, b, x)`.
+
+  Args:
+    a: Floating-point Tensor. Must be broadcastable with `b` and `y`.
+    b: Floating-point Tensor. Must be broadcastable with `a` and `y`.
+    y: Floating-point Tensor. Must be broadcastable with `a` and `b`.
+    name: A name for the operation (optional).
+
+  Returns:
+    betaincinv: Floating-point Tensor, inverse of the regularized incomplete
+    beta function computed element-wise.
+  """
+  with tf.name_scope(name or 'betaincinv'):
+    dtype = dtype_util.common_dtype([a, b, y], tf.float32)
+    a = tf.convert_to_tensor(a, dtype=dtype)
+    b = tf.convert_to_tensor(b, dtype=dtype)
+    y = tf.convert_to_tensor(y, dtype=dtype)
+    return _betaincinv_custom_gradient(a, b, y)
 
 
 def _dawsn_naive(x):

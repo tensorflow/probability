@@ -17,7 +17,6 @@
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import bernoulli
 from tensorflow_probability.python.distributions import categorical
@@ -29,6 +28,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math.gram_schmidt import gram_schmidt
 from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -119,7 +119,7 @@ def _orthogonal_complement_e_i(vectors, i, gram_schmidt_iters):
   mask_n = tf.not_equal(tf.range(n), n - 1)
   result = tf.where(mask_d & mask_n, result, 0)  # Make exactly zero.
   # Orthonormalize. This is equivalent, but faster than tf.linalg.qr(result).q
-  return tfp_math.gram_schmidt(result, gram_schmidt_iters)
+  return gram_schmidt(result, gram_schmidt_iters)
 
 
 def _reconstruct_matrix(eigenvalues, eigenvectors, indices=None):

@@ -19,12 +19,11 @@ from scipy import special as sp_special
 from scipy import stats as sp_stats
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import beta_quotient
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
 
 
 class _BetaQuotientTest(object):
@@ -54,44 +53,41 @@ class _BetaQuotientTest(object):
     b = tf.ones([5], dtype=self.dtype)
     c = tf.ones([5], dtype=self.dtype)
     d = tf.ones([5], dtype=self.dtype)
-    beta_quotient = tfd.BetaQuotient(a, b, c, d, validate_args=True)
+    dist = beta_quotient.BetaQuotient(a, b, c, d, validate_args=True)
 
-    self.assertEqual(self.evaluate(beta_quotient.batch_shape_tensor()), (5,))
-    self.assertEqual(beta_quotient.batch_shape, tf.TensorShape([5]))
-    self.assertAllEqual(self.evaluate(beta_quotient.event_shape_tensor()),
-                        [])
-    self.assertEqual(beta_quotient.event_shape, tf.TensorShape([]))
+    self.assertEqual(self.evaluate(dist.batch_shape_tensor()), (5,))
+    self.assertEqual(dist.batch_shape, tf.TensorShape([5]))
+    self.assertAllEqual(self.evaluate(dist.event_shape_tensor()), [])
+    self.assertEqual(dist.event_shape, tf.TensorShape([]))
 
   def testBetaQuotientShapeBroadcast(self):
     a = tf.ones([3, 1, 1, 1], dtype=self.dtype)
     b = tf.ones([1, 2, 1, 1], dtype=self.dtype)
     c = tf.ones([1, 1, 5, 1], dtype=self.dtype)
     d = tf.ones([1, 1, 1, 7], dtype=self.dtype)
-    beta_quotient = tfd.BetaQuotient(a, b, c, d, validate_args=True)
+    dist = beta_quotient.BetaQuotient(a, b, c, d, validate_args=True)
 
-    self.assertAllEqual(
-        self.evaluate(beta_quotient.batch_shape_tensor()), (3, 2, 5, 7))
-    self.assertEqual(beta_quotient.batch_shape, tf.TensorShape([3, 2, 5, 7]))
-    self.assertAllEqual(
-        self.evaluate(beta_quotient.event_shape_tensor()), [])
-    self.assertEqual(beta_quotient.event_shape, tf.TensorShape([]))
+    self.assertAllEqual(self.evaluate(dist.batch_shape_tensor()), (3, 2, 5, 7))
+    self.assertEqual(dist.batch_shape, tf.TensorShape([3, 2, 5, 7]))
+    self.assertAllEqual(self.evaluate(dist.event_shape_tensor()), [])
+    self.assertEqual(dist.event_shape, tf.TensorShape([]))
 
   def testInvalidConcentration(self):
     with self.assertRaisesOpError('`concentration` must be positive'):
-      beta_quotient = tfd.BetaQuotient(-1., 1., 1., 1., validate_args=True)
-      self.evaluate(beta_quotient.sample())
+      dist = beta_quotient.BetaQuotient(-1., 1., 1., 1., validate_args=True)
+      self.evaluate(dist.sample())
 
     with self.assertRaisesOpError('`concentration` must be positive'):
-      beta_quotient = tfd.BetaQuotient(1., -1., 1., 1., validate_args=True)
-      self.evaluate(beta_quotient.sample())
+      dist = beta_quotient.BetaQuotient(1., -1., 1., 1., validate_args=True)
+      self.evaluate(dist.sample())
 
     with self.assertRaisesOpError('`concentration` must be positive'):
-      beta_quotient = tfd.BetaQuotient(1., 1., -1., 1., validate_args=True)
-      self.evaluate(beta_quotient.sample())
+      dist = beta_quotient.BetaQuotient(1., 1., -1., 1., validate_args=True)
+      self.evaluate(dist.sample())
 
     with self.assertRaisesOpError('`concentration` must be positive'):
-      beta_quotient = tfd.BetaQuotient(1., 1., 1., -1., validate_args=True)
-      self.evaluate(beta_quotient.sample())
+      dist = beta_quotient.BetaQuotient(1., 1., 1., -1., validate_args=True)
+      self.evaluate(dist.sample())
 
   def testLogPdf(self):
     # Keep the `concentration`'s above 1 since quadrature has problems
@@ -100,12 +96,13 @@ class _BetaQuotientTest(object):
     b = np.array([1.8, 2.4, 3.2], dtype=self.dtype)[..., np.newaxis]
     c = np.array([5.5, 2., 4.3], dtype=self.dtype)[..., np.newaxis]
     d = np.array([1.6, 2.9, 6.4], dtype=self.dtype)[..., np.newaxis]
-    beta_quotient = tfd.BetaQuotient(a, b, c, d, validate_args=True)
+    dist = beta_quotient.BetaQuotient(a, b, c, d, validate_args=True)
     x = np.linspace(0.1, 10., 50).astype(self.dtype)
 
     self.assertAllClose(
         self._compute_logpdf_quadrature(a, b, c, d, x),
-        self.evaluate(beta_quotient.log_prob(x)), rtol=1e-4)
+        self.evaluate(dist.log_prob(x)),
+        rtol=1e-4)
 
   def testLogPdfBroadcast(self):
     # Keep the `concentration`'s above 1 since quadrature has problems
@@ -122,10 +119,9 @@ class _BetaQuotientTest(object):
     d = tf.random.uniform(
         shape=[1, 1, 1, 7],
         minval=1., maxval=5., seed=test_util.test_seed(), dtype=self.dtype)
-    beta_quotient = tfd.BetaQuotient(a, b, c, d, validate_args=True)
+    dist = beta_quotient.BetaQuotient(a, b, c, d, validate_args=True)
     x = np.linspace(0.1, 5., 7).astype(self.dtype)
-    log_prob, a, b, c, d = self.evaluate(
-        [beta_quotient.log_prob(x), a, b, c, d])
+    log_prob, a, b, c, d = self.evaluate([dist.log_prob(x), a, b, c, d])
     self.assertAllClose(
         self._compute_logpdf_quadrature(a, b, c, d, x),
         log_prob, rtol=4e-4)
@@ -143,11 +139,11 @@ class _BetaQuotientTest(object):
     d = tf.random.uniform(
         shape=[1, 1, 1, 7],
         minval=1., maxval=5., seed=test_util.test_seed(), dtype=self.dtype)
-    beta_quotient = tfd.BetaQuotient(a, b, c, d, validate_args=True)
+    dist = beta_quotient.BetaQuotient(a, b, c, d, validate_args=True)
     # TODO(b/179283344): Increase this to 3e5 when CPU-only gamma sampler is
     # fixed.
     n = int(3e4)
-    samples = beta_quotient.sample(n, seed=test_util.test_seed())
+    samples = dist.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(sample_values.shape, (n, 2, 3, 5, 7))
     self.assertFalse(np.any(sample_values < 0.0))
@@ -156,7 +152,7 @@ class _BetaQuotientTest(object):
             samples,
             low=self.dtype(0.),
             high=self.dtype(np.inf),
-            expected=beta_quotient.mean(),
+            expected=dist.mean(),
             false_fail_rate=self.dtype(1e-6)))
 
   @test_util.numpy_disable_gradient_test
@@ -165,10 +161,14 @@ class _BetaQuotientTest(object):
     b = tf.constant(2.0)
     c = tf.constant(3.0)
     d = tf.constant(4.0)
-    _, [grad_a, grad_b, grad_c, grad_d] = tfp.math.value_and_gradient(
-        lambda a_, b_, c_, d_: tfd.BetaQuotient(  # pylint: disable=g-long-lambda
-            a_, b_, c_, d_, validate_args=True).sample(
-                10, seed=test_util.test_seed()), [a, b, c, d])
+    _, [grad_a, grad_b, grad_c, grad_d] = gradient.value_and_gradient(
+        lambda a_, b_, c_, d_: beta_quotient.BetaQuotient(  # pylint: disable=g-long-lambda
+            a_,
+            b_,
+            c_,
+            d_,
+            validate_args=True).sample(10, seed=test_util.test_seed()),
+        [a, b, c, d])
     self.assertIsNotNone(grad_a)
     self.assertIsNotNone(grad_b)
     self.assertIsNotNone(grad_c)
@@ -184,10 +184,10 @@ class _BetaQuotientTest(object):
     b = np.array([2.0, 4.0, 5.0])
     c = np.array([1.0, 3.0, 2.5])
     d = np.array([3.0, 4.0, 5.0])
-    beta_quotient = tfd.BetaQuotient(
+    dist = beta_quotient.BetaQuotient(
         a, b, c, d, allow_nan_stats=False, validate_args=True)
     with self.assertRaisesOpError('mean undefined'):
-      self.evaluate(beta_quotient.mean())
+      self.evaluate(dist.mean())
 
   def testBetaQuotientMeanAllowNanStats(self):
     # Mean will not be defined for the first entry.
@@ -195,10 +195,10 @@ class _BetaQuotientTest(object):
     b = np.array([2.0, 4.0, 5.0])
     c = np.array([1.0, 3.0, 2.5])
     d = np.array([3.0, 4.0, 5.0])
-    beta_quotient = tfd.BetaQuotient(
+    dist = beta_quotient.BetaQuotient(
         a, b, c, d, allow_nan_stats=True, validate_args=True)
-    self.assertEqual(beta_quotient.mean().shape, (3,))
-    self.assertAllNan(self.evaluate(beta_quotient.mean())[0])
+    self.assertEqual(dist.mean().shape, (3,))
+    self.assertAllNan(self.evaluate(dist.mean())[0])
 
 
 @test_util.test_all_tf_execution_regimes

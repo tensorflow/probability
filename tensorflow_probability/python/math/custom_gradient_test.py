@@ -18,10 +18,10 @@
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
 
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import custom_gradient
+from tensorflow_probability.python.math import gradient
 
 
 @test_util.test_all_tf_execution_regimes
@@ -32,8 +32,9 @@ class CustomGradientTest(test_util.TestCase):
     f = lambda x: x**2 / 2
     g = lambda x: (x - 1)**3 / 3
     x = np.concatenate([np.linspace(-100, 100, int(1e3)), [0.]], axis=0)
-    fx, gx = self.evaluate(tfp.math.value_and_gradient(
-        lambda x_: tfp.math.custom_gradient(f(x_), g(x_), x_), x))
+    fx, gx = self.evaluate(
+        gradient.value_and_gradient(
+            lambda x_: custom_gradient.custom_gradient(f(x_), g(x_), x_), x))
     self.assertAllClose(f(x), fx)
     self.assertAllClose(g(x), gx)
 
@@ -42,8 +43,9 @@ class CustomGradientTest(test_util.TestCase):
     f = lambda x: x**2 / 2
     g = lambda x: x**3 / 3
     x = np.concatenate([np.linspace(-100, 100, int(1e3)), [0.]], axis=0)
-    fx, gx = self.evaluate(tfp.math.value_and_gradient(
-        lambda x_: tfp.math.custom_gradient(f(x_), g(x_), x_), x))
+    fx, gx = self.evaluate(
+        gradient.value_and_gradient(
+            lambda x_: custom_gradient.custom_gradient(f(x_), g(x_), x_), x))
     self.assertAllClose(f(x), fx)
     self.assertAllClose(g(x), gx)
 
@@ -59,7 +61,7 @@ class CustomGradientTest(test_util.TestCase):
 
     with tf.GradientTape() as tape:
       z = tf.stack([x, y])
-      fz = tfp.math.custom_gradient(f(z), g(z), z)
+      fz = custom_gradient.custom_gradient(f(z), g(z), z)
     gz = tape.gradient(fz, [x, y])
     [z_, fz_, gx_, gy_] = self.evaluate([z, fz, gz[0], gz[1]])
 
@@ -80,7 +82,7 @@ class CustomGradientTest(test_util.TestCase):
     g = lambda z: tf.square(x) * y
 
     with tf.GradientTape() as tape:
-      fx = tfp.math.custom_gradient(f(x), g(x), x)
+      fx = custom_gradient.custom_gradient(f(x), g(x), x)
     gx = tape.gradient(fx, [x, y])
     [x_, fx_, gx_] = self.evaluate([x, fx, gx[0]])
     gy_ = gx[1]
@@ -106,8 +108,8 @@ class CustomGradientTest(test_util.TestCase):
     f = lambda x: stop(x) * y
     g = lambda x: stop(tf.square(x)) * y
     with tf.GradientTape() as tape:
-      fx = tfp.math.custom_gradient(f(x), g(x), x + stop(y),
-                                    fx_gx_manually_stopped=True)
+      fx = custom_gradient.custom_gradient(
+          f(x), g(x), x + stop(y), fx_gx_manually_stopped=True)
 
     gx = tape.gradient(fx, [x, y])
     [x_, fx_, gx_, gy_] = self.evaluate([x, fx, gx[0], gx[1]])

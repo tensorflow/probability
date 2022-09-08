@@ -15,14 +15,15 @@
 """Autoregressive Moving Average model."""
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import linear_gaussian_ssm as lgssm
+from tensorflow_probability.python.distributions import mvn_diag
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.sts.components.autoregressive import make_ar_transition_matrix
 from tensorflow_probability.python.sts.internal import util as sts_util
 
 
 class AutoregressiveMovingAverageStateSpaceModel(
-    tfd.LinearGaussianStateSpaceModel):
+    lgssm.LinearGaussianStateSpaceModel):
   """State space model for an autoregressive moving average process.
 
     A state space model (SSM) posits a set of latent (unobserved) variables that
@@ -208,14 +209,13 @@ class AutoregressiveMovingAverageStateSpaceModel(
       super(AutoregressiveMovingAverageStateSpaceModel, self).__init__(
           num_timesteps=num_timesteps,
           transition_matrix=make_ar_transition_matrix(ar_coefficients),
-          transition_noise=tfd.MultivariateNormalDiag(
+          transition_noise=mvn_diag.MultivariateNormalDiag(
               loc=sts_util.pad_tensor_with_trailing_zeros(
-                  latent_level_drift[..., tf.newaxis],
-                  self.order - 1),
+                  latent_level_drift[..., tf.newaxis], self.order - 1),
               scale_diag=sts_util.pad_tensor_with_trailing_zeros(
                   level_scale[..., tf.newaxis], self.order - 1)),
           observation_matrix=make_ma_observation_matrix(ma_coefficients),
-          observation_noise=tfd.MultivariateNormalDiag(
+          observation_noise=mvn_diag.MultivariateNormalDiag(
               scale_diag=observation_noise_scale[..., tf.newaxis]),
           initial_state_prior=initial_state_prior,
           name=name,

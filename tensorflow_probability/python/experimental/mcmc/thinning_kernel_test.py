@@ -18,8 +18,11 @@
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.experimental.mcmc import covariance_reducer
+from tensorflow_probability.python.experimental.mcmc import thinning_kernel
+from tensorflow_probability.python.experimental.mcmc import with_reductions
 from tensorflow_probability.python.experimental.mcmc.internal import test_fixtures
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 
 
@@ -28,10 +31,11 @@ class ThinningTest(test_util.TestCase):
 
   def test_thinning(self):
     fake_inner_kernel = test_fixtures.TestTransitionKernel()
-    thinner = tfp.experimental.mcmc.ThinningKernel(
+    thinner = thinning_kernel.ThinningKernel(
         fake_inner_kernel,
-        num_steps_to_skip=1,)
-    seed1, seed2 = tfp.random.split_seed(
+        num_steps_to_skip=1,
+    )
+    seed1, seed2 = samplers.split_seed(
         test_util.test_seed(sampler_type='stateless'))
     first_state, kernel_results = thinner.one_step(
         0., thinner.bootstrap_results(0.), seed=seed1)
@@ -46,10 +50,11 @@ class ThinningTest(test_util.TestCase):
 
   def test_no_thinning(self):
     fake_inner_kernel = test_fixtures.TestTransitionKernel()
-    thinner = tfp.experimental.mcmc.ThinningKernel(
+    thinner = thinning_kernel.ThinningKernel(
         fake_inner_kernel,
-        num_steps_to_skip=0,)
-    seed1, seed2 = tfp.random.split_seed(
+        num_steps_to_skip=0,
+    )
+    seed1, seed2 = samplers.split_seed(
         test_util.test_seed(sampler_type='stateless'))
     first_state, kernel_results = thinner.one_step(
         0., thinner.bootstrap_results(0.), seed=seed1)
@@ -64,10 +69,11 @@ class ThinningTest(test_util.TestCase):
 
   def test_cold_start(self):
     fake_inner_kernel = test_fixtures.TestTransitionKernel()
-    thinner = tfp.experimental.mcmc.ThinningKernel(
+    thinner = thinning_kernel.ThinningKernel(
         fake_inner_kernel,
-        num_steps_to_skip=1,)
-    seed1, seed2 = tfp.random.split_seed(
+        num_steps_to_skip=1,
+    )
+    seed1, seed2 = samplers.split_seed(
         test_util.test_seed(sampler_type='stateless'))
     first_state, _ = thinner.one_step(
         0., thinner.bootstrap_results(0.), seed=seed1)
@@ -84,26 +90,25 @@ class ThinningTest(test_util.TestCase):
     calibrated_kernel = test_fixtures.TestTransitionKernel()
     uncalibrated_kernel = test_fixtures.TestTransitionKernel(
         is_calibrated=False)
-    calibrated_thinner = tfp.experimental.mcmc.ThinningKernel(
-        calibrated_kernel, 0)
-    uncalibrated_thinner = tfp.experimental.mcmc.ThinningKernel(
+    calibrated_thinner = thinning_kernel.ThinningKernel(calibrated_kernel, 0)
+    uncalibrated_thinner = thinning_kernel.ThinningKernel(
         uncalibrated_kernel, 0)
     self.assertTrue(calibrated_thinner.is_calibrated)
     self.assertFalse(uncalibrated_thinner.is_calibrated)
 
   def test_with_composed_kernel(self):
     fake_inner_kernel = test_fixtures.TestTransitionKernel()
-    cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
-    reducer_kernel = tfp.experimental.mcmc.WithReductions(
-        inner_kernel=tfp.experimental.mcmc.ThinningKernel(
+    cov_reducer = covariance_reducer.CovarianceReducer()
+    reducer_kernel = with_reductions.WithReductions(
+        inner_kernel=thinning_kernel.ThinningKernel(
             inner_kernel=fake_inner_kernel,
-            num_steps_to_skip=2,),
-        reducer=cov_reducer
-    )
+            num_steps_to_skip=2,
+        ),
+        reducer=cov_reducer)
     current_state, kernel_results = 0., reducer_kernel.bootstrap_results(0.)
     seed = test_util.test_seed(sampler_type='stateless')
     for _ in range(2):
-      mcmc_seed, seed = tfp.random.split_seed(seed)
+      mcmc_seed, seed = samplers.split_seed(seed)
       current_state, kernel_results = reducer_kernel.one_step(
           current_state, kernel_results, seed=mcmc_seed)
     cov = self.evaluate(cov_reducer.finalize(kernel_results.reduction_results))
@@ -114,12 +119,13 @@ class ThinningTest(test_util.TestCase):
 
   def test_tf_while(self):
     fake_inner_kernel = test_fixtures.TestTransitionKernel()
-    thinner = tfp.experimental.mcmc.ThinningKernel(
+    thinner = thinning_kernel.ThinningKernel(
         fake_inner_kernel,
-        num_steps_to_skip=1,)
+        num_steps_to_skip=1,
+    )
 
     def _loop_body(i, seed, curr_state, pkr):
-      mcmc_seed, seed = tfp.random.split_seed(seed)
+      mcmc_seed, seed = samplers.split_seed(seed)
       new_state, kernel_results = thinner.one_step(
           curr_state, pkr, seed=mcmc_seed,
       )
@@ -139,12 +145,13 @@ class ThinningTest(test_util.TestCase):
 
   def test_tensor_thinning(self):
     fake_inner_kernel = test_fixtures.TestTransitionKernel()
-    thinner = tfp.experimental.mcmc.ThinningKernel(
+    thinner = thinning_kernel.ThinningKernel(
         fake_inner_kernel,
-        num_steps_to_skip=tf.convert_to_tensor(1),)
+        num_steps_to_skip=tf.convert_to_tensor(1),
+    )
 
     def _loop_body(i, seed, curr_state, pkr):
-      mcmc_seed, seed = tfp.random.split_seed(seed)
+      mcmc_seed, seed = samplers.split_seed(seed)
       new_state, kernel_results = thinner.one_step(
           curr_state, pkr, seed=mcmc_seed,
       )
@@ -167,9 +174,8 @@ class ThinningTest(test_util.TestCase):
   def test_non_static_thinning(self):
     fake_inner_kernel = test_fixtures.TestTransitionKernel()
     num_steps_to_skip = tf.Variable(1, dtype=tf.int32)
-    thinner = tfp.experimental.mcmc.ThinningKernel(
-        fake_inner_kernel,
-        num_steps_to_skip=num_steps_to_skip)
+    thinner = thinning_kernel.ThinningKernel(
+        fake_inner_kernel, num_steps_to_skip=num_steps_to_skip)
 
     def _loop_body(i, curr_state, pkr):
       new_state, kernel_results = thinner.one_step(

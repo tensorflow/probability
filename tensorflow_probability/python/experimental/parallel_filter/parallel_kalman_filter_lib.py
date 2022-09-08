@@ -20,10 +20,10 @@ import functools
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.math.scan_associative import scan_associative
 
 
 __all__ = ['kalman_filter',
@@ -230,13 +230,14 @@ def sample_walk(transition_matrix,
             observation_mean=observation_mean))
 
     s1, s2, s3 = samplers.split_seed(seed, n=3)
-    updates = tfp_math.scan_associative(
+    updates = scan_associative(
         combine_walk,
-        AffineUpdate(transition_matrix=time_dep.transition_matrix[:-1],
-                     mean=mvn_tril.MultivariateNormalTriL(
-                         loc=time_dep.transition_mean[:-1],
-                         scale_tril=time_dep.transition_scale_tril[:-1]
-                         ).sample(seed=s1)))
+        AffineUpdate(
+            transition_matrix=time_dep.transition_matrix[:-1],
+            mean=mvn_tril.MultivariateNormalTriL(
+                loc=time_dep.transition_mean[:-1],
+                scale_tril=time_dep.transition_scale_tril[:-1]).sample(
+                    seed=s1)))
     x0 = mvn_tril.MultivariateNormalTriL(
         loc=time_indep.initial_mean,
         scale_tril=time_indep.initial_scale_tril).sample(seed=s2)
@@ -596,10 +597,9 @@ def kalman_filter(transition_matrix,
           mask=observation.mask)
 
     # Run Kalman filter.
-    filtered = tfp_math.scan_associative(combine_filter_elements,
-                                         filter_elements(time_indep,
-                                                         time_dep,
-                                                         observation))
+    filtered = scan_associative(
+        combine_filter_elements,
+        filter_elements(time_indep, time_dep, observation))
     filtered_means = filtered.posterior_mean
     filtered_covs = filtered.posterior_cov
     log_likelihoods = None

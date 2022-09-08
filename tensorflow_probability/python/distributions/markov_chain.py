@@ -17,7 +17,6 @@
 import functools
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import log_prob_ratio
@@ -28,6 +27,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import generic
 
 __all__ = [
     'MarkovChain',
@@ -256,7 +256,7 @@ class MarkovChain(distribution.Distribution):
   @property
   def _sum_fn(self):
     if self._experimental_use_kahan_sum:
-      return lambda x, axis: tfp_math.reduce_kahan_sum(x, axis=axis).value
+      return lambda x, axis: generic.reduce_kahan_sum(x, axis=axis).value
     return tf.reduce_sum
 
   @classmethod
@@ -465,7 +465,7 @@ def _markov_chain_log_prob_ratio(p, x, q, y, name=None):
     transition_lp_ratios = p_transition_lps - q_transition_lps
     if (p._experimental_use_kahan_sum or
         q._experimental_use_kahan_sum):
-      transition_lp_ratio = tfp_math.reduce_kahan_sum(
+      transition_lp_ratio = generic.reduce_kahan_sum(
           transition_lp_ratios, axis=0).value
     else:
       transition_lp_ratio = tf.reduce_sum(transition_lp_ratios, axis=0)

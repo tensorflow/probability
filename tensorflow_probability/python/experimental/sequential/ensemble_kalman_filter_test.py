@@ -21,13 +21,15 @@ from absl.testing import parameterized
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import joint_distribution_named as jdn
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.distributions import poisson
+from tensorflow_probability.python.experimental.sequential import ensemble_kalman_filter as ekf
 from tensorflow_probability.python.internal import test_combinations
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
-tfs = tfp.experimental.sequential
+from tensorflow_probability.python.stats import sample_stats
 
 NUMPY_MODE = False
 
@@ -37,46 +39,47 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
 
   def test_ensemble_kalman_filter_expect_mvn(self):
 
-    state = tfs.EnsembleKalmanFilterState(step=0, particles=[1.], extra=None)
+    state = ekf.EnsembleKalmanFilterState(step=0, particles=[1.], extra=None)
 
     with self.assertRaises(ValueError):
-      state = tfs.ensemble_kalman_filter_update(
+      state = ekf.ensemble_kalman_filter_update(
           state,
           observation=[0.],
-          observation_fn=lambda t, p, e: (tfd.Poisson(rate=p), e))
+          observation_fn=lambda t, p, e: (poisson.Poisson(rate=p), e))
 
   def test_ensemble_kalman_filter_constant_univariate_shapes(self):
     # Simple transition model where the state doesn't change,
     # so we are estimating a constant.
 
     def transition_fn(_, particles, extra):
-      return tfd.MultivariateNormalDiag(
+      return mvn_diag.MultivariateNormalDiag(
           loc=particles, scale_diag=[1e-11]), extra
 
     def observation_fn(_, particles, extra):
-      return tfd.MultivariateNormalDiag(loc=particles, scale_diag=[1e-2]), extra
+      return mvn_diag.MultivariateNormalDiag(
+          loc=particles, scale_diag=[1e-2]), extra
 
     # Initialize the ensemble.
     particles = self.evaluate(
         tf.random.normal(shape=[100, 1], seed=test_util.test_seed()))
 
-    state = tfs.EnsembleKalmanFilterState(
+    state = ekf.EnsembleKalmanFilterState(
         step=0, particles=particles, extra={'unchanged': 1})
 
-    predicted_state = tfs.ensemble_kalman_filter_predict(
+    predicted_state = ekf.ensemble_kalman_filter_predict(
         state,
         transition_fn=transition_fn,
         inflate_fn=None,
         seed=test_util.test_seed())
 
     observation = tf.convert_to_tensor([0.], dtype=particles.dtype)
-    log_ml = tfs.ensemble_kalman_filter_log_marginal_likelihood(
+    log_ml = ekf.ensemble_kalman_filter_log_marginal_likelihood(
         predicted_state,
         observation=observation,
         observation_fn=observation_fn,
         seed=test_util.test_seed())
     self.assertAllEqual(observation.shape[:-1], log_ml.shape)
-    log_ml_krazy_obs = tfs.ensemble_kalman_filter_log_marginal_likelihood(
+    log_ml_krazy_obs = ekf.ensemble_kalman_filter_log_marginal_likelihood(
         predicted_state,
         observation=observation + 10.,
         observation_fn=observation_fn,
@@ -90,7 +93,7 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
     # Check that the state respected the constant dynamics.
     self.assertAllClose(state.particles, predicted_state.particles)
 
-    updated_state = tfs.ensemble_kalman_filter_update(
+    updated_state = ekf.ensemble_kalman_filter_update(
         predicted_state,
         # The observation is the constant 0.
         observation=observation,
@@ -112,16 +115,16 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
           'xdot': particles['xdot']
       }
       extra['transition_count'] += 1
-      return tfd.JointDistributionNamed(
+      return jdn.JointDistributionNamed(
           dict(
-              x=tfd.MultivariateNormalDiag(
+              x=mvn_diag.MultivariateNormalDiag(
                   loc=particles['x'], scale_diag=[1e-11]),
-              xdot=tfd.MultivariateNormalDiag(
+              xdot=mvn_diag.MultivariateNormalDiag(
                   particles['xdot'], scale_diag=[1e-11]))), extra
 
     def observation_fn(_, particles, extra):
       extra['observation_count'] += 1
-      return tfd.MultivariateNormalDiag(
+      return mvn_diag.MultivariateNormalDiag(
           loc=particles['x'], scale_diag=[1e-2]), extra
 
     seed_stream = test_util.test_seed_stream()
@@ -136,7 +139,7 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
                 tf.random.normal(shape=[300, 5, 1], seed=seed_stream()))
     }
 
-    state = tfs.EnsembleKalmanFilterState(
+    state = ekf.EnsembleKalmanFilterState(
         step=0,
         particles=particles,
         extra={
@@ -145,7 +148,7 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
         })
 
     for i in range(5):
-      state = tfs.ensemble_kalman_filter_predict(
+      state = ekf.ensemble_kalman_filter_predict(
           state,
           transition_fn=transition_fn,
           seed=seed_stream(),
@@ -153,7 +156,7 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
       self.assertIn('transition_count', state.extra)
       self.assertEqual(i + 1, state.extra['transition_count'])
 
-      state = tfs.ensemble_kalman_filter_update(
+      state = ekf.ensemble_kalman_filter_update(
           state,
           observation=[1. * i],
           observation_fn=observation_fn,
@@ -170,11 +173,11 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
   def test_ensemble_kalman_filter_constant_model_multivariate(self):
 
     def transition_fn(_, particles, extra):
-      return tfd.MultivariateNormalDiag(
+      return mvn_diag.MultivariateNormalDiag(
           loc=particles, scale_diag=[1e-11] * 2), extra
 
     def observation_fn(_, particles, extra):
-      return tfd.MultivariateNormalDiag(
+      return mvn_diag.MultivariateNormalDiag(
           loc=particles, scale_diag=[1e-1] * 2), extra
 
     seed_stream = test_util.test_seed_stream()
@@ -184,17 +187,17 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
         tf.random.normal(
             shape=[300, 3, 2], seed=seed_stream(), dtype=tf.float64))
 
-    state = tfs.EnsembleKalmanFilterState(
+    state = ekf.EnsembleKalmanFilterState(
         step=0, particles=particles, extra={'unchanged': 1})
 
     for _ in range(8):
-      state = tfs.ensemble_kalman_filter_predict(
+      state = ekf.ensemble_kalman_filter_predict(
           state,
           transition_fn=transition_fn,
           seed=seed_stream(),
           inflate_fn=None)
 
-      state = tfs.ensemble_kalman_filter_update(
+      state = ekf.ensemble_kalman_filter_update(
           state,
           observation=[0., 0.],
           observation_fn=observation_fn,
@@ -213,16 +216,16 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
           'xdot': particles['xdot']
       }
       extra['transition_count'] += 1
-      return tfd.JointDistributionNamed(
+      return jdn.JointDistributionNamed(
           dict(
-              x=tfd.MultivariateNormalDiag(
+              x=mvn_diag.MultivariateNormalDiag(
                   particles['x'], scale_diag=[1e-11] * 2),
-              xdot=tfd.MultivariateNormalDiag(
+              xdot=mvn_diag.MultivariateNormalDiag(
                   particles['xdot'], scale_diag=[1e-11] * 2))), extra
 
     def observation_fn(_, particles, extra):
       extra['observation_count'] += 1
-      return tfd.MultivariateNormalDiag(
+      return mvn_diag.MultivariateNormalDiag(
           loc=particles['x'], scale_diag=[1e-2] * 2), extra
 
     seed_stream = test_util.test_seed_stream()
@@ -242,7 +245,7 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
                     dtype=tf.float64))
     }
 
-    state = tfs.EnsembleKalmanFilterState(
+    state = ekf.EnsembleKalmanFilterState(
         step=0,
         particles=particles,
         extra={
@@ -252,7 +255,7 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
 
     for i in range(10):
       # Predict.
-      state = tfs.ensemble_kalman_filter_predict(
+      state = ekf.ensemble_kalman_filter_predict(
           state,
           transition_fn=transition_fn,
           seed=seed_stream(),
@@ -262,7 +265,7 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
 
       # Marginal likelihood.
       observation = tf.convert_to_tensor([1. * i, 2. * i], dtype=tf.float64)
-      log_ml = tfs.ensemble_kalman_filter_log_marginal_likelihood(
+      log_ml = ekf.ensemble_kalman_filter_log_marginal_likelihood(
           state,
           observation=observation,
           observation_fn=observation_fn,
@@ -272,7 +275,7 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
       self.assertEqual(3 * i + 1, state.extra['observation_count'])
       self.assertFalse(np.any(np.isnan(self.evaluate(log_ml))))
 
-      log_ml_krazy_obs = tfs.ensemble_kalman_filter_log_marginal_likelihood(
+      log_ml_krazy_obs = ekf.ensemble_kalman_filter_log_marginal_likelihood(
           state,
           observation=observation + 10.,
           observation_fn=observation_fn,
@@ -282,7 +285,7 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
       self.assertEqual(3 * i + 2, state.extra['observation_count'])
 
       # Update.
-      state = tfs.ensemble_kalman_filter_update(
+      state = ekf.ensemble_kalman_filter_update(
           state,
           observation=observation,
           observation_fn=observation_fn,
@@ -313,12 +316,12 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
     }
 
     def observation_fn(_, particles, extra):
-      return tfd.MultivariateNormalDiag(
+      return mvn_diag.MultivariateNormalDiag(
           loc=particles['x'], scale_diag=[1e-2] * event_size), extra
 
     # Marginal likelihood.
-    log_ml = tfs.ensemble_kalman_filter_log_marginal_likelihood(
-        state=tfs.EnsembleKalmanFilterState(
+    log_ml = ekf.ensemble_kalman_filter_log_marginal_likelihood(
+        state=ekf.EnsembleKalmanFilterState(
             step=0, particles=particles, extra={}),
         observation=tf.random.normal(shape=(event_size,), seed=seed_stream()),
         observation_fn=observation_fn,
@@ -433,7 +436,7 @@ class ComparingMethodsTest(test_util.TestCase):
         a_b(kalman_gain, p.observation_mat), predictive_cov)
 
     # p(Y | X_{predictive})
-    marginal_dist = tfd.MultivariateNormalTriL(
+    marginal_dist = mvn_tril.MultivariateNormalTriL(
         loc=a_x(p.observation_mat, predictive_mean),
         scale_tril=tf.linalg.cholesky(
             a_b_at(p.observation_mat, predictive_cov) +
@@ -461,17 +464,17 @@ class ComparingMethodsTest(test_util.TestCase):
   ):
     """Get parameters specific to EnKF reconstructions."""
     particles = prior_dist.sample(n_ensemble, seed=seed_stream())
-    state = tfs.EnsembleKalmanFilterState(step=0, particles=particles, extra={})
+    state = ekf.EnsembleKalmanFilterState(step=0, particles=particles, extra={})
 
     def observation_fn(_, particles, extra):
-      observation_particles_dist = tfd.MultivariateNormalTriL(
+      observation_particles_dist = mvn_tril.MultivariateNormalTriL(
           loc=tf.linalg.matvec(linear_model_params.observation_mat, particles),
           scale_tril=tf.linalg.cholesky(
               linear_model_params.observation_noise_cov))
       return observation_particles_dist, extra
 
     def transition_fn(_, particles, extra):
-      new_particles_dist = tfd.MultivariateNormalTriL(
+      new_particles_dist = mvn_tril.MultivariateNormalTriL(
           loc=tf.linalg.matvec(linear_model_params.transition_mat, particles),
           scale_tril=tf.linalg.cholesky(linear_model_params.transition_cov))
       return new_particles_dist, extra
@@ -486,18 +489,18 @@ class ComparingMethodsTest(test_util.TestCase):
   def _enkf_solve(self, observation, enkf_params, predict_kwargs, update_kwargs,
                   log_marginal_likelihood_kwargs, seed_stream):
     """Solve one data assimilation step using an EnKF."""
-    predicted_state = tfs.ensemble_kalman_filter_predict(
+    predicted_state = ekf.ensemble_kalman_filter_predict(
         enkf_params.state,
         enkf_params.transition_fn,
         seed=seed_stream(),
         **predict_kwargs)
-    updated_state = tfs.ensemble_kalman_filter_update(
+    updated_state = ekf.ensemble_kalman_filter_update(
         predicted_state,
         observation,
         enkf_params.observation_fn,
         seed=seed_stream(),
         **update_kwargs)
-    log_marginal_likelihood = tfs.ensemble_kalman_filter_log_marginal_likelihood(
+    log_marginal_likelihood = ekf.ensemble_kalman_filter_log_marginal_likelihood(
         predicted_state,
         observation,
         enkf_params.observation_fn,
@@ -506,11 +509,11 @@ class ComparingMethodsTest(test_util.TestCase):
 
     return dict(
         predictive_mean=tf.reduce_mean(predicted_state.particles, axis=0),
-        predictive_cov=tfp.stats.covariance(predicted_state.particles),
-        predictive_stddev=tfp.stats.stddev(predicted_state.particles),
+        predictive_cov=sample_stats.covariance(predicted_state.particles),
+        predictive_stddev=sample_stats.stddev(predicted_state.particles),
         updated_mean=tf.reduce_mean(updated_state.particles, axis=0),
-        updated_cov=tfp.stats.covariance(updated_state.particles),
-        updated_stddev=tfp.stats.stddev(updated_state.particles),
+        updated_cov=sample_stats.covariance(updated_state.particles),
+        updated_stddev=sample_stats.stddev(updated_state.particles),
         log_marginal_likelihood=log_marginal_likelihood,
     )
 
@@ -550,7 +553,7 @@ class ComparingMethodsTest(test_util.TestCase):
         dtype=dtype)
 
     # Ensure that our observation comes from a state that ~ prior.
-    prior_dist = tfd.MultivariateNormalTriL(
+    prior_dist = mvn_tril.MultivariateNormalTriL(
         loc=linear_model_params.prior_mean,
         scale_tril=tf.linalg.cholesky(linear_model_params.prior_cov))
     true_state = prior_dist.sample(seed=seed_stream())
@@ -678,7 +681,7 @@ class ComparingMethodsTest(test_util.TestCase):
         dtype=dtype)
 
     # Ensure that our observation comes from a state that ~ prior.
-    prior_dist = tfd.MultivariateNormalTriL(
+    prior_dist = mvn_tril.MultivariateNormalTriL(
         loc=linear_model_params.prior_mean,
         scale_tril=tf.linalg.cholesky(linear_model_params.prior_cov))
     true_state = prior_dist.sample(seed=seed_stream())

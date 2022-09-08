@@ -16,9 +16,12 @@
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import chain
+from tensorflow_probability.python.bijectors import scale
+from tensorflow_probability.python.bijectors import softplus
 from tensorflow_probability.python.distributions import linear_gaussian_ssm
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import mvn_diag
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
@@ -27,7 +30,8 @@ from tensorflow_probability.python.sts.structural_time_series import Parameter
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
 
 
-class LocalLevelStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
+class LocalLevelStateSpaceModel(
+    linear_gaussian_ssm.LinearGaussianStateSpaceModel):
   """State space model for a local level.
 
   A state space model (SSM) posits a set of latent (unobserved) variables that
@@ -152,13 +156,15 @@ class LocalLevelStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       # class docstring for further explanation.
       super(LocalLevelStateSpaceModel, self).__init__(
           num_timesteps=num_timesteps,
-          transition_matrix=tf.constant(
-              [[1.]], dtype=dtype, name='transition_matrix'),
-          transition_noise=tfd.MultivariateNormalDiag(
+          transition_matrix=tf.constant([[1.]],
+                                        dtype=dtype,
+                                        name='transition_matrix'),
+          transition_noise=mvn_diag.MultivariateNormalDiag(
               scale_diag=level_scale[..., tf.newaxis], name='transition_noise'),
-          observation_matrix=tf.constant(
-              [[1.]], dtype=dtype, name='observation_matrix'),
-          observation_noise=tfd.MultivariateNormalDiag(
+          observation_matrix=tf.constant([[1.]],
+                                         dtype=dtype,
+                                         name='observation_matrix'),
+          observation_noise=mvn_diag.MultivariateNormalDiag(
               scale_diag=observation_noise_scale[..., tf.newaxis],
               name='observation_noise'),
           initial_state_prior=initial_state_prior,
@@ -295,26 +301,29 @@ class LocalLevel(StructuralTimeSeries):
       # Heuristic default priors. Overriding these may dramatically
       # change inference performance and results.
       if level_scale_prior is None:
-        level_scale_prior = tfd.LogNormal(
+        level_scale_prior = lognormal.LogNormal(
             loc=tf.math.log(.05 * observed_stddev),
             scale=3.,
             name='level_scale_prior')
       if initial_level_prior is None:
-        self._initial_state_prior = tfd.MultivariateNormalDiag(
+        self._initial_state_prior = mvn_diag.MultivariateNormalDiag(
             loc=tf.convert_to_tensor(observed_initial)[..., tf.newaxis],
-            scale_diag=(
-                tf.abs(observed_initial) + observed_stddev)[..., tf.newaxis],
+            scale_diag=(tf.abs(observed_initial) + observed_stddev)[...,
+                                                                    tf.newaxis],
             name='initial_level_prior')
       else:
-        self._initial_state_prior = tfd.MultivariateNormalDiag(
+        self._initial_state_prior = mvn_diag.MultivariateNormalDiag(
             loc=initial_level_prior.mean()[..., tf.newaxis],
             scale_diag=initial_level_prior.stddev()[..., tf.newaxis])
 
       super(LocalLevel, self).__init__(
           parameters=[
-              Parameter('level_scale', level_scale_prior,
-                        tfb.Chain([tfb.Scale(scale=observed_stddev),
-                                   tfb.Softplus(low=dtype_util.eps(dtype))])),
+              Parameter(
+                  'level_scale', level_scale_prior,
+                  chain.Chain([
+                      scale.Scale(scale=observed_stddev),
+                      softplus.Softplus(low=dtype_util.eps(dtype))
+                  ])),
           ],
           latent_size=1,
           init_parameters=init_parameters,

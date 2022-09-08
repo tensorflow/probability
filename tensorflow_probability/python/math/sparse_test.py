@@ -18,10 +18,9 @@
 import numpy as np
 
 import tensorflow.compat.v1 as tf1
-import tensorflow_probability as tfp
-
 
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import sparse
 
 
 def _assert_sparse_tensor_value(test_case_instance, expected, actual):
@@ -42,7 +41,7 @@ class SparseTest(test_util.TestCase):
   # tensorflow/contrib/layers/python/ops/sparse_ops.py.
 
   def test_dense_to_sparse_1d(self):
-    st = tfp.math.dense_to_sparse([1, 0, 2, 0])
+    st = sparse.dense_to_sparse([1, 0, 2, 0])
     result = self.evaluate(st)
     self.assertEqual(result.indices.dtype, np.int64)
     self.assertEqual(result.values.dtype, np.int32)
@@ -52,7 +51,7 @@ class SparseTest(test_util.TestCase):
     self.assertAllEqual([4], result.dense_shape)
 
   def test_dense_to_sparse_1d_float(self):
-    st = tfp.math.dense_to_sparse([1.5, 0.0, 2.3, 0.0])
+    st = sparse.dense_to_sparse([1.5, 0.0, 2.3, 0.0])
     result = self.evaluate(st)
     self.assertEqual(result.indices.dtype, np.int64)
     self.assertEqual(result.values.dtype, np.float32)
@@ -62,7 +61,7 @@ class SparseTest(test_util.TestCase):
     self.assertAllEqual([4], result.dense_shape)
 
   def test_dense_to_sparse_1d_bool(self):
-    st = tfp.math.dense_to_sparse([True, False, True, False])
+    st = sparse.dense_to_sparse([True, False, True, False])
     result = self.evaluate(st)
     self.assertEqual(result.indices.dtype, np.int64)
     self.assertEqual(result.values.dtype, np.bool_)
@@ -72,7 +71,7 @@ class SparseTest(test_util.TestCase):
     self.assertAllEqual([4], result.dense_shape)
 
   def test_dense_to_sparse_1d_str(self):
-    st = tfp.math.dense_to_sparse([b'qwe', b'', b'ewq', b''])
+    st = sparse.dense_to_sparse([b'qwe', b'', b'ewq', b''])
     result = self.evaluate(st)
     self.assertEqual(result.indices.dtype, np.int64)
     self.assertEqual(result.values.dtype, np.object_)
@@ -82,8 +81,7 @@ class SparseTest(test_util.TestCase):
     self.assertAllEqual([4], result.dense_shape)
 
   def test_dense_to_sparse_1d_str_special_ignore(self):
-    st = tfp.math.dense_to_sparse(
-        [b'qwe', b'', b'ewq', b''], ignore_value=b'qwe')
+    st = sparse.dense_to_sparse([b'qwe', b'', b'ewq', b''], ignore_value=b'qwe')
     result = self.evaluate(st)
     self.assertEqual(result.indices.dtype, np.int64)
     self.assertEqual(result.values.dtype, np.object_)
@@ -93,7 +91,7 @@ class SparseTest(test_util.TestCase):
     self.assertAllEqual([4], result.dense_shape)
 
   def test_dense_to_sparse_2d(self):
-    st = tfp.math.dense_to_sparse([[1, 2, 0, 0], [3, 4, 5, 0]])
+    st = sparse.dense_to_sparse([[1, 2, 0, 0], [3, 4, 5, 0]])
     result = self.evaluate(st)
     self.assertAllEqual([[0, 0], [0, 1], [1, 0], [1, 1], [1, 2]],
                         result.indices)
@@ -101,11 +99,8 @@ class SparseTest(test_util.TestCase):
     self.assertAllEqual([2, 4], result.dense_shape)
 
   def test_dense_to_sparse_3d(self):
-    st = tfp.math.dense_to_sparse(
-        [[[1, 2, 0, 0],
-          [3, 4, 5, 0]],
-         [[7, 8, 0, 0],
-          [9, 0, 0, 0]]])
+    st = sparse.dense_to_sparse([[[1, 2, 0, 0], [3, 4, 5, 0]],
+                                 [[7, 8, 0, 0], [9, 0, 0, 0]]])
     result = self.evaluate(st)
     self.assertAllEqual(
         [[0, 0, 0],
@@ -123,7 +118,7 @@ class SparseTest(test_util.TestCase):
   def test_dense_to_sparse_unknown_1d_shape(self):
     tensor = tf1.placeholder_with_default(
         np.array([0, 100, 0, 3], np.int32), shape=[None])
-    st = tfp.math.dense_to_sparse(tensor)
+    st = sparse.dense_to_sparse(tensor)
     result = self.evaluate(st)
     self.assertAllEqual([[1], [3]], result.indices)
     self.assertAllEqual([100, 3], result.values)
@@ -134,7 +129,7 @@ class SparseTest(test_util.TestCase):
         np.array([[[1, 2, 0, 0], [3, 4, 5, 0]], [[7, 8, 0, 0], [9, 0, 0, 0]]],
                  np.int32),
         shape=[None, None, None])
-    st = tfp.math.dense_to_sparse(tensor)
+    st = sparse.dense_to_sparse(tensor)
     result = self.evaluate(st)
     self.assertAllEqual(
         [[0, 0, 0],
@@ -152,7 +147,7 @@ class SparseTest(test_util.TestCase):
   def test_dense_to_sparse_unknown_rank(self):
     ph = tf1.placeholder_with_default(
         np.array([[1, 2, 0, 0], [3, 4, 5, 0]], np.int32), shape=None)
-    st = tfp.math.dense_to_sparse(ph)
+    st = sparse.dense_to_sparse(ph)
     result = self.evaluate(st)
     self.assertAllEqual(
         [[0, 0],

@@ -17,9 +17,16 @@
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import exp
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.bijectors import scale_matvec_diag
+from tensorflow_probability.python.bijectors import shift
+from tensorflow_probability.python.bijectors import softmax_centered
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.distributions import gamma
+from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -30,13 +37,13 @@ class InvertBijectorTest(test_util.TestCase):
 
   def testBijector(self):
     for fwd in [
-        tfb.Identity(),
-        tfb.Exp(),
-        tfb.ScaleMatvecDiag(scale_diag=[2., 3.]),
-        tfb.Softplus(),
-        tfb.SoftmaxCentered(),
+        identity.Identity(),
+        exp.Exp(),
+        scale_matvec_diag.ScaleMatvecDiag(scale_diag=[2., 3.]),
+        softplus.Softplus(),
+        softmax_centered.SoftmaxCentered(),
     ]:
-      rev = tfb.Invert(fwd)
+      rev = invert.Invert(fwd)
       self.assertStartsWith(rev.name, '_'.join(['invert', fwd.name]))
       x = [[[1., 2.],
             [2., 3.]]]
@@ -52,13 +59,13 @@ class InvertBijectorTest(test_util.TestCase):
           self.evaluate(rev.forward_log_det_jacobian(x, event_ndims=1)))
 
   def testScalarCongruency(self):
-    bijector = tfb.Invert(tfb.Exp())
+    bijector = invert.Invert(exp.Exp())
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=1e-3, upper_x=1.5, eval_func=self.evaluate, rtol=0.05)
 
   def testShapeGetters(self):
-    bijector = tfb.Invert(
-        tfb.SoftmaxCentered(validate_args=True))
+    bijector = invert.Invert(
+        softmax_centered.SoftmaxCentered(validate_args=True))
     x = tf.TensorShape([2])
     y = tf.TensorShape([1])
     self.assertAllEqual(y, bijector.forward_event_shape(x))
@@ -74,9 +81,9 @@ class InvertBijectorTest(test_util.TestCase):
 
   def testDocstringExample(self):
     exp_gamma_distribution = (
-        tfd.TransformedDistribution(
-            distribution=tfd.Gamma(concentration=1., rate=2.),
-            bijector=tfb.Invert(tfb.Exp())))
+        transformed_distribution.TransformedDistribution(
+            distribution=gamma.Gamma(concentration=1., rate=2.),
+            bijector=invert.Invert(exp.Exp())))
     self.assertAllEqual(
         [],
         self.evaluate(
@@ -85,16 +92,16 @@ class InvertBijectorTest(test_util.TestCase):
 
   def testInvertCallStillWorks(self):
     x = [1., 2.]
-    self.assertAllClose(np.log(x), tfb.Invert(tfb.Exp())(x),
-                        atol=1e-5, rtol=1e-5)
+    self.assertAllClose(
+        np.log(x), invert.Invert(exp.Exp())(x), atol=1e-5, rtol=1e-5)
 
   def testSharedCaching(self):
     for fwd in [
-        tfb.Exp(),
-        tfb.Shift(2.),
+        exp.Exp(),
+        shift.Shift(2.),
     ]:
       x = tf.constant([0.5, -1.], dtype=tf.float32)
-      inv = tfb.Invert(fwd)
+      inv = invert.Invert(fwd)
       y = fwd.forward(x)
 
       self.assertIs(inv.forward(y), x)
@@ -102,7 +109,7 @@ class InvertBijectorTest(test_util.TestCase):
 
   def testNoReductionWhenEventNdimsIsOmitted(self):
     x = np.array([0.5, 2.]).astype(np.float32)
-    bij = tfb.Invert(tfb.Exp())
+    bij = invert.Invert(exp.Exp())
     self.assertAllClose(
         -np.log(x),
         self.evaluate(bij.forward_log_det_jacobian(x)))
@@ -113,7 +120,7 @@ class InvertBijectorTest(test_util.TestCase):
   def testNonCompositeTensorBijectorTfFunction(self):
     scale = tf.Variable(5.)
     b = test_util.NonCompositeTensorScale(scale)
-    inv_b = tfb.Invert(b)
+    inv_b = invert.Invert(b)
     x = tf.constant([3.])
 
     @tf.function
@@ -133,7 +140,7 @@ class InvertBijectorTest(test_util.TestCase):
         self.bijector = bijector
 
     b = test_util.NonCompositeTensorScale(tf.Variable(3.))
-    inv_b = tfb.Invert(b)
+    inv_b = invert.Invert(b)
     bc = BijectorContainer(inv_b)
 
     # If `Invert` subclasses `CompositeTensor` but its inner bijector does not,

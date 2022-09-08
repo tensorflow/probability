@@ -19,8 +19,22 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import chain
+from tensorflow_probability.python.bijectors import exp
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.bijectors import joint_map
+from tensorflow_probability.python.bijectors import scale
+from tensorflow_probability.python.bijectors import scale_matvec_diag
+from tensorflow_probability.python.bijectors import shift
+from tensorflow_probability.python.bijectors import split
+from tensorflow_probability.python.distributions import bernoulli
+from tensorflow_probability.python.distributions import categorical
+from tensorflow_probability.python.distributions import exponential
+from tensorflow_probability.python.distributions import mixture_same_family
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import slicing
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
@@ -187,8 +201,9 @@ class SlicingTest(test_util.TestCase):
 
   def test_slice_single_param_distribution(self):
     sliced = slicing._slice_single_param(
-        tfd.Normal(loc=tf.zeros([4, 3, 1]),  # batch = [4, 3], event = [2]
-                   scale=tf.ones([2])),
+        normal.Normal(
+            loc=tf.zeros([4, 3, 1]),  # batch = [4, 3], event = [2]
+            scale=tf.ones([2])),
         param_event_ndims=1,
         slices=make_slices[..., tf.newaxis, 2:, tf.newaxis],
         batch_shape=tf.constant([7, 4, 3]))
@@ -198,7 +213,7 @@ class SlicingTest(test_util.TestCase):
 
   def test_slice_single_param_atomic(self):
     sliced = slicing._slice_single_param(
-        tfb.Identity(),
+        identity.Identity(),
         param_event_ndims=0,
         slices=make_slices[..., tf.newaxis, 2:, tf.newaxis],
         batch_shape=tf.constant([7, 4, 3]))
@@ -206,9 +221,9 @@ class SlicingTest(test_util.TestCase):
 
   def test_slice_single_param_bijector_composition(self):
     sliced = slicing._slice_single_param(
-        tfb.JointMap({'a': tfb.Chain([
-            tfb.Invert(tfb.Scale(tf.ones([4, 3, 1])))
-        ])}),
+        joint_map.JointMap({
+            'a': chain.Chain([invert.Invert(scale.Scale(tf.ones([4, 3, 1])))])
+        }),
         param_event_ndims={'a': 1},
         slices=make_slices[..., tf.newaxis, 2:, tf.newaxis],
         batch_shape=tf.constant([7, 4, 3]))
@@ -223,19 +238,22 @@ class SlicingTest(test_util.TestCase):
     @tf.function(jit_compile=True)
     def f(ix):
       return slicing._slice_params_to_dict(
-          tfd.MultivariateNormalDiag(t, tf.ones([shp[-1]])),
+          mvn_diag.MultivariateNormalDiag(t, tf.ones([shp[-1]])),
           slices=make_slices[..., ix, :])
     self.assertAllEqual(t[:, 3], f(tf.constant(3))['loc'])
 
   def test_slice_transformed_distribution_with_chain(self):
-    dist = tfd.TransformedDistribution(
-        distribution=tfd.MultivariateNormalDiag(
+    dist = transformed_distribution.TransformedDistribution(
+        distribution=mvn_diag.MultivariateNormalDiag(
             loc=tf.zeros([4]), scale_diag=tf.ones([1, 4])),
-        bijector=tfb.Chain([tfb.JointMap([tfb.Identity(),
-                                          tfb.Shift(tf.ones([4, 3, 2]))]),
-                            tfb.Split(2),
-                            tfb.ScaleMatvecDiag(tf.ones([5, 1, 3, 4])),
-                            tfb.Exp()]))
+        bijector=chain.Chain([
+            joint_map.JointMap(
+                [identity.Identity(),
+                 shift.Shift(tf.ones([4, 3, 2]))]),
+            split.Split(2),
+            scale_matvec_diag.ScaleMatvecDiag(tf.ones([5, 1, 3, 4])),
+            exp.Exp()
+        ]))
     self.assertAllEqual(dist.batch_shape_tensor(), [5, 4, 3])
     self.assertAllEqualNested(
         tf.nest.map_structure(lambda x: x.shape,
@@ -250,17 +268,17 @@ class SlicingTest(test_util.TestCase):
         [[1, 4, 2, 2], [1, 4, 2, 2]])
 
   def test_slice_nested_mixture(self):
-    dist = tfd.MixtureSameFamily(
-        tfd.Categorical(logits=tf.zeros([2])),
-        tfd.MixtureSameFamily(
-            tfd.Categorical(logits=tf.zeros([2])),
-            tfd.Bernoulli(logits=tf.zeros([1, 2, 2]))))
+    dist = mixture_same_family.MixtureSameFamily(
+        categorical.Categorical(logits=tf.zeros([2])),
+        mixture_same_family.MixtureSameFamily(
+            categorical.Categorical(logits=tf.zeros([2])),
+            bernoulli.Bernoulli(logits=tf.zeros([1, 2, 2]))))
     self.assertAllEqual(dist[0, ...].batch_shape_tensor(), [])
     self.assertAllEqual(dist[0, ..., tf.newaxis].batch_shape_tensor(), [1])
     self.assertAllEqual(dist[..., tf.newaxis].batch_shape_tensor(), [1, 1])
 
   def test_slicing_does_not_modify_the_sliced_distribution(self):
-    dist = tfd.Exponential(tf.ones((5, 2, 3)))
+    dist = exponential.Exponential(tf.ones((5, 2, 3)))
     sliced = dist[:4, :, 2]
     self.assertAllEqual([2], sliced[-1].batch_shape_tensor())
     self.assertAllEqual([3], sliced[:-1, 1].batch_shape_tensor())

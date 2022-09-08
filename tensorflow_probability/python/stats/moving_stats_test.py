@@ -17,9 +17,10 @@
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.stats import moving_stats
 
 
 @test_util.test_all_tf_execution_regimes
@@ -39,30 +40,28 @@ class MovingReduceMeanVarianceTest(test_util.TestCase):
         zero_debias_count.initializer,
     ])
 
-    def body(it):
-      x = tf.random.normal(shape, dtype=np.float64, seed=17)
+    def body(it, seed):
+      next_seed, current_seed = samplers.split_seed(seed)
+      x = tf.random.stateless_normal(shape, dtype=np.float64, seed=current_seed)
       x = true_stddev * x + true_mean
-      ema, emv = tfp.stats.assign_moving_mean_variance(
+      ema, emv = moving_stats.assign_moving_mean_variance(
           x, mean_var, variance_var, zero_debias_count, decay=0.999, axis=-2)
       with tf.control_dependencies([ema, emv]):
-        return [it + 1]
+        return [it + 1, next_seed]
 
     # Run 10000 updates; moving averages should be near the true values.
-    run_op = tf.while_loop(
-        cond=lambda it: it < 10000,
+    run_op, _ = tf.while_loop(
+        cond=lambda it, _: it < 10000,
         body=body,
-        loop_vars=[0],
+        loop_vars=[0, test_util.test_seed(sampler_type='stateless')],
         parallel_iterations=1)
 
-    with tf.control_dependencies(run_op):
+    with tf.control_dependencies([run_op]):
       [
           final_unbiased_mean,
           final_ubiased_variance,
-      ] = tfp.stats.moving_mean_variance_zero_debiased(
-          mean_var,
-          variance_var,
-          zero_debias_count,
-          decay=0.999)
+      ] = moving_stats.moving_mean_variance_zero_debiased(
+          mean_var, variance_var, zero_debias_count, decay=0.999)
       final_biased_mean = tf.convert_to_tensor(mean_var)
       final_biased_variance = tf.convert_to_tensor(variance_var)
       read_zero_debias_count = tf.convert_to_tensor(zero_debias_count)
@@ -115,10 +114,10 @@ class MovingReduceMeanVarianceTest(test_util.TestCase):
         variance_var.assign(np.array([[2., 1.]])),
     ])
     # Run 10000 updates; moving averages should be near the true values.
-    run_op = tf.while_loop(
-        cond=lambda it: it < 10000,
+    run_op, _ = tf.while_loop(
+        cond=lambda it, _: it < 10000,
         body=body,
-        loop_vars=[0],
+        loop_vars=[0, test_util.test_seed(sampler_type='stateless')],
         parallel_iterations=1)
     self.evaluate(run_op)
 
@@ -141,10 +140,11 @@ class MovingLogExponentialMovingMeanExpTest(test_util.TestCase):
     expected_var = tf.Variable(tf.zeros_like(true_mean))
     self.evaluate([log_mean_exp_var.initializer, expected_var.initializer])
 
-    def body(it):
-      x = tf.random.normal(shape, dtype=np.float64, seed=0)
+    def body(it, seed):
+      next_seed, current_seed = samplers.split_seed(seed)
+      x = tf.random.stateless_normal(shape, dtype=np.float64, seed=current_seed)
       x = true_stddev * x + true_mean
-      log_mean_exp = tfp.stats.assign_log_moving_mean_exp(
+      log_mean_exp = moving_stats.assign_log_moving_mean_exp(
           x, log_mean_exp_var, decay=decay)
       expected = tf.math.log(
           decay * tf.math.exp(expected_var) + (1 - decay) * tf.math.exp(x))
@@ -152,13 +152,14 @@ class MovingLogExponentialMovingMeanExpTest(test_util.TestCase):
       relerr = tf.abs((log_mean_exp - expected) / expected)
       op = tf.debugging.assert_less(relerr, np.array(1e-6, dtype=np.float64))
       with tf.control_dependencies([op]):
-        return [it + 1]
+        return [it + 1, next_seed]
 
-    self.evaluate(tf.while_loop(
-        cond=lambda it: it < 2000,
-        body=body,
-        loop_vars=[0],
-        parallel_iterations=1))
+    self.evaluate(
+        tf.while_loop(
+            cond=lambda it, _: it < 2000,
+            body=body,
+            loop_vars=[0, test_util.test_seed(sampler_type='stateless')],
+            parallel_iterations=1))
 
 
 if __name__ == '__main__':

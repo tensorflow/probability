@@ -22,11 +22,11 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.experimental.linalg import linear_operator_interpolated_psd_kernel as loipk
 from tensorflow_probability.python.internal import test_util
-
-tfpk = tfp.math.psd_kernels
+from tensorflow_probability.python.math.psd_kernels import matern
+from tensorflow_probability.python.math.psd_kernels import polynomial
 
 JAX_MODE = False
 
@@ -94,8 +94,8 @@ class _LinearOperatorInterpolatedPSDKernelTest(test_util.TestCase):
       length_scale = _add_batch(length_scale, length_scale_batch)
 
     # Construct linop, do some operations on it.
-    linop = tfp.experimental.linalg.LinearOperatorInterpolatedPSDKernel(
-        kernel=tfpk.MaternThreeHalves(
+    linop = loipk.LinearOperatorInterpolatedPSDKernel(
+        kernel=matern.MaternThreeHalves(
             length_scale=self.make_input(length_scale, [])),
         bounds_min=tf.constant(bounds_min, self.dtype),
         bounds_max=tf.constant(bounds_max, self.dtype),
@@ -204,8 +204,8 @@ class _LinearOperatorInterpolatedPSDKernelTestStaticTest(
     length_scale = 3.
 
     # Construct linop, do some operations on it.
-    linop = tfp.experimental.linalg.LinearOperatorInterpolatedPSDKernel(
-        kernel=tfpk.MaternThreeHalves(
+    linop = loipk.LinearOperatorInterpolatedPSDKernel(
+        kernel=matern.MaternThreeHalves(
             length_scale=self.make_input(length_scale, [])),
         bounds_min=tf.constant(bounds_min, self.dtype),
         bounds_max=tf.constant(bounds_max, self.dtype),
@@ -252,9 +252,9 @@ class _LinearOperatorInterpolatedPSDKernelTestStaticTest(
     diag_shift = 1. if is_square else None
     shift = 1.
 
-    kernel = tfpk.Linear(shift=self.make_input(shift, []))
+    kernel = polynomial.Linear(shift=self.make_input(shift, []))
     # Construct linop, do some operations on it.
-    linop = tfp.experimental.linalg.LinearOperatorInterpolatedPSDKernel(
+    linop = loipk.LinearOperatorInterpolatedPSDKernel(
         kernel=kernel,
         bounds_min=tf.constant(bounds_min, self.dtype),
         bounds_max=tf.constant(bounds_max, self.dtype),

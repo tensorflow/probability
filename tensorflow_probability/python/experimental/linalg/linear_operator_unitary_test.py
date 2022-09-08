@@ -18,33 +18,33 @@
 # Dependency imports
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.experimental.linalg import linear_operator_unitary
 from tensorflow_probability.python.internal import test_util
 
 
 @test_util.test_all_tf_execution_regimes
 class LinearOperatorUnitaryTest(test_util.TestCase):
-  """Tests for tfp.experimental.linalg.LinearOperatorUnitary."""
+  """Tests for linear_operator_unitary.LinearOperatorUnitary."""
 
   def test_unitary_linop_raises_non_square(self):
     with self.assertRaisesRegex(ValueError, 'Expected square matrix'):
       x = tf.random.stateless_normal(
           [12, 13], seed=test_util.test_seed(sampler_type='stateless'))
-      tfp.experimental.linalg.LinearOperatorUnitary(x)
+      linear_operator_unitary.LinearOperatorUnitary(x)
 
   def test_shape(self):
     x = tf.random.stateless_normal(
         [5, 13, 13], seed=test_util.test_seed(sampler_type='stateless'))
     q, _ = tf.linalg.qr(x)
-    operator = tfp.experimental.linalg.LinearOperatorUnitary(q)
+    operator = linear_operator_unitary.LinearOperatorUnitary(q)
     self.assertEqual([5], operator.batch_shape)
 
   def test_log_det(self):
     x = tf.random.stateless_normal(
         [5, 13, 13], seed=test_util.test_seed(sampler_type='stateless'))
     q, _ = tf.linalg.qr(x)
-    operator = tfp.experimental.linalg.LinearOperatorUnitary(q)
+    operator = linear_operator_unitary.LinearOperatorUnitary(q)
     true_logdet, expected_logdet = self.evaluate([
         tf.linalg.slogdet(q)[1], operator.log_abs_determinant()])
     self.assertAllClose(expected_logdet, true_logdet)
@@ -53,7 +53,7 @@ class LinearOperatorUnitaryTest(test_util.TestCase):
     x = tf.random.stateless_normal(
         [7, 1, 13, 13], seed=test_util.test_seed(sampler_type='stateless'))
     q, _ = tf.linalg.qr(x)
-    operator = tfp.experimental.linalg.LinearOperatorUnitary(q)
+    operator = linear_operator_unitary.LinearOperatorUnitary(q)
     y = tf.random.stateless_normal(
         [13, 13], seed=test_util.test_seed(sampler_type='stateless'))
     self.assertAllClose(
@@ -76,7 +76,7 @@ class LinearOperatorUnitaryTest(test_util.TestCase):
     x = tf.random.stateless_normal(
         [7, 1, 13, 13], seed=test_util.test_seed(sampler_type='stateless'))
     q, _ = tf.linalg.qr(x)
-    operator = tfp.experimental.linalg.LinearOperatorUnitary(q)
+    operator = linear_operator_unitary.LinearOperatorUnitary(q)
     y = tf.random.stateless_normal(
         [13, 3], seed=test_util.test_seed(sampler_type='stateless'))
     broadcasted_y = tf.broadcast_to(y, [7, 1, 13, 3])

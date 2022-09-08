@@ -21,7 +21,6 @@ import sys
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
@@ -32,6 +31,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import special
 
 __all__ = [
     'Bates',
@@ -356,8 +356,8 @@ def _bates_pdf(total_count, low, high, dtype, value):
                                           num_terms_f)
     terms = (tf.cast(-1., dtype) ** term_idx_s
              * (1. / ((total_count_s + 1.) * tf.math.exp(
-                 tfp_math.lbeta(total_count_s - term_idx_s + 1.,
-                                term_idx_s + 1.))))
+                 special.lbeta(total_count_s - term_idx_s + 1.,
+                               term_idx_s + 1.))))
              * (total_count_x_value_adj_s - term_idx_s) ** (total_count_s - 1.))
     # Segment sum.
     segment_ids = tf.repeat(tf.range(tf.size(num_terms_f)), num_terms_f)
@@ -438,8 +438,8 @@ def _bates_cdf(total_count, low, high, dtype, value):
                                           num_terms_f)
     terms = (tf.cast(-1., dtype) ** term_idx_s
              * (1. / ((total_count_s + 1.) * tf.math.exp(
-                 tfp_math.lbeta(total_count_s - term_idx_s + 1.,
-                                term_idx_s + 1.))))
+                 special.lbeta(total_count_s - term_idx_s + 1.,
+                               term_idx_s + 1.))))
              * (total_count_x_value_adj_s - term_idx_s) ** total_count_s)
     # Segment sum.
     segment_ids = tf.repeat(tf.range(tf.size(num_terms_f)), num_terms_f)

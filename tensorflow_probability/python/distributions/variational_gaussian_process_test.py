@@ -22,11 +22,13 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-import tensorflow_probability as tfp
+from tensorflow_probability.python.distributions import bernoulli
+from tensorflow_probability.python.distributions import categorical
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import variational_gaussian_process
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
+from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic as tfpk
 
 
 def _np_kernel_matrix_fn(amp, length_scale, x, y):
@@ -85,10 +87,9 @@ class VariationalGaussianProcessTest(test_util.TestCase):
       variational_inducing_observations_scale = tf1.placeholder_with_default(
           variational_inducing_observations_scale, shape=None)
 
-    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
-        amplitude, length_scale)
+    kernel = tfpk.ExponentiatedQuadratic(amplitude, length_scale)
 
-    vgp = tfd.VariationalGaussianProcess(
+    vgp = variational_gaussian_process.VariationalGaussianProcess(
         kernel=kernel,
         index_points=batched_index_points,
         inducing_index_points=inducing_index_points,
@@ -175,10 +176,9 @@ class VariationalGaussianProcessTest(test_util.TestCase):
 
       inducing_index_points = tf1.placeholder_with_default(
           inducing_index_points, shape=None)
-    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
-        amplitude, length_scale)
+    kernel = tfpk.ExponentiatedQuadratic(amplitude, length_scale)
 
-    loc, scale = tfd.VariationalGaussianProcess.optimal_variational_posterior(
+    loc, scale = variational_gaussian_process.VariationalGaussianProcess.optimal_variational_posterior(
         kernel=kernel,
         inducing_index_points=inducing_index_points,
         observation_index_points=observation_index_points,
@@ -255,10 +255,9 @@ class VariationalGaussianProcessTest(test_util.TestCase):
       variational_inducing_observations_scale = tf1.placeholder_with_default(
           variational_inducing_observations_scale, shape=None)
 
-    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
-        amplitude, length_scale)
+    kernel = tfpk.ExponentiatedQuadratic(amplitude, length_scale)
 
-    vgp = tfd.VariationalGaussianProcess(
+    vgp = variational_gaussian_process.VariationalGaussianProcess(
         kernel=kernel,
         index_points=batched_index_points,
         inducing_index_points=inducing_index_points,
@@ -293,10 +292,9 @@ class VariationalGaussianProcessTest(test_util.TestCase):
     length_scale = np.float64(1.)
 
     jitter = np.float64(1e-6)
-    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
-        amplitude, length_scale)
+    kernel = tfpk.ExponentiatedQuadratic(amplitude, length_scale)
 
-    vgp = tfd.VariationalGaussianProcess(
+    vgp = variational_gaussian_process.VariationalGaussianProcess(
         kernel=kernel,
         index_points=index_points,
         inducing_index_points=inducing_index_points,
@@ -312,28 +310,28 @@ class VariationalGaussianProcessTest(test_util.TestCase):
     self.assertGreaterEqual(test_cholesky.cholesky_count, 1)
 
   def testBernoulliLikelihood(self):
-    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic()
+    kernel = tfpk.ExponentiatedQuadratic()
     num_predictive_points = 10
     num_inducing_points = 5
     num_observations = 15
-    vgp = tfd.VariationalGaussianProcess(
+    vgp = variational_gaussian_process.VariationalGaussianProcess(
         kernel=kernel,
         # 10 predictive locations, 5 inducing points both in 1-d
         index_points=np.random.uniform(size=(num_predictive_points, 1)),
         inducing_index_points=np.random.uniform(size=(num_inducing_points, 1)),
         # Variational inducing observations posterior normal with mean zero and
         # identity scale.
-        variational_inducing_observations_loc=np.zeros(num_inducing_points,
-                                                       dtype=np.float64),
-        variational_inducing_observations_scale=np.eye(num_inducing_points,
-                                                       dtype=np.float64),
+        variational_inducing_observations_loc=np.zeros(
+            num_inducing_points, dtype=np.float64),
+        variational_inducing_observations_scale=np.eye(
+            num_inducing_points, dtype=np.float64),
         # No observation noise
         observation_noise_variance=0.)
 
     def log_likelihood_fn(observations, gp_events):
-      bernoulli = tfd.Independent(tfd.Bernoulli(logits=gp_events),
-                                  reinterpreted_batch_ndims=1)
-      return bernoulli.log_prob(observations)
+      bern = independent.Independent(
+          bernoulli.Bernoulli(logits=gp_events), reinterpreted_batch_ndims=1)
+      return bern.log_prob(observations)
 
     observations = np.random.randint(2, size=num_observations)
     observation_index_points = np.random.uniform(size=(num_observations, 1))
@@ -350,7 +348,7 @@ class VariationalGaussianProcessTest(test_util.TestCase):
         quadrature_size=20)
 
   def testMulticlassClassificationLikelihood(self):
-    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic()
+    kernel = tfpk.ExponentiatedQuadratic()
     num_predictive_points = 10
     num_inducing_points = 5
     num_observations = 15
@@ -359,22 +357,20 @@ class VariationalGaussianProcessTest(test_util.TestCase):
     # To handle the multiclass classification task, we just need to make sure we
     # model a batch of `num_classes` independent GPs, whose values are the
     # logits of a Categorical distribution over observations.
-    vgp = tfd.VariationalGaussianProcess(
+    vgp = variational_gaussian_process.VariationalGaussianProcess(
         kernel=kernel,
         index_points=np.random.uniform(size=(num_predictive_points, 1)),
 
         # Batch inducing points of size `num_classes`.
-        inducing_index_points=np.random.uniform(size=(num_classes,
-                                                      num_inducing_points,
-                                                      1)),
+        inducing_index_points=np.random.uniform(
+            size=(num_classes, num_inducing_points, 1)),
         # Variational inducing observations posterior normal with mean zero and
         # identity scale. These are also in batches of size `num_classes`.
-        variational_inducing_observations_loc=np.zeros((num_classes,
-                                                        num_inducing_points),
-                                                       dtype=np.float64),
-        variational_inducing_observations_scale=(np.ones((num_classes, 1, 1)) *
-                                                 np.eye(num_inducing_points,
-                                                        dtype=np.float64)),
+        variational_inducing_observations_loc=np.zeros(
+            (num_classes, num_inducing_points), dtype=np.float64),
+        variational_inducing_observations_scale=(
+            np.ones((num_classes, 1, 1)) *
+            np.eye(num_inducing_points, dtype=np.float64)),
         # No observation noise
         observation_noise_variance=0.)
 
@@ -392,8 +388,8 @@ class VariationalGaussianProcessTest(test_util.TestCase):
       #
       #   [quadrature_size, num_observations, num_classes].
       logits = tf.transpose(gp_events, [1, 2, 0])
-      independent_categorical = tfd.Independent(
-          tfd.Categorical(logits=logits),
+      independent_categorical = independent.Independent(
+          categorical.Categorical(logits=logits),
           # Reinterpret `num_observations` as part of the event shape.
           reinterpreted_batch_ndims=1)
       return independent_categorical.log_prob(observations)

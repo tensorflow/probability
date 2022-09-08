@@ -19,8 +19,8 @@
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import sinh_arcsinh
 from tensorflow_probability.python.internal import test_util
 
 
@@ -32,7 +32,7 @@ class SinhArcsinhTest(test_util.TestCase):
     skewness = 0.2
     tailweight = 2.0
     multiplier = 2.0 / np.sinh(np.arcsinh(2.0) * tailweight)
-    bijector = tfb.SinhArcsinh(
+    bijector = sinh_arcsinh.SinhArcsinh(
         skewness=skewness, tailweight=tailweight, validate_args=True)
     self.assertStartsWith(bijector.name, 'sinh_arcsinh')
     x = np.array([[[-2.01], [2.], [1e-4]]]).astype(np.float32)
@@ -58,7 +58,7 @@ class SinhArcsinhTest(test_util.TestCase):
     # Will broadcast together to shape [3, 2].
     x = [-1., 1.]
     skewness = [[-1.], [0.], [1.]]
-    bijector = tfb.SinhArcsinh(skewness=skewness, validate_args=True)
+    bijector = sinh_arcsinh.SinhArcsinh(skewness=skewness, validate_args=True)
     y = self.evaluate(bijector.forward(x))
 
     # For skew < 0, |forward(-1)| > |forward(1)|
@@ -73,7 +73,8 @@ class SinhArcsinhTest(test_util.TestCase):
   def testKurtosis(self):
     x = np.logspace(-2, 2, 1000).astype(np.float32)
     tailweight = [[0.5], [1.0], [2.0]]
-    bijector = tfb.SinhArcsinh(tailweight=tailweight, validate_args=True)
+    bijector = sinh_arcsinh.SinhArcsinh(
+        tailweight=tailweight, validate_args=True)
     y = self.evaluate(bijector.forward(x))
     mean = np.mean(x, axis=-1)
     stddev = np.std(x, axis=-1, ddof=0)
@@ -81,19 +82,19 @@ class SinhArcsinhTest(test_util.TestCase):
     self.assertAllClose(kurtosis, np.sort(kurtosis))
 
   def testScalarCongruencySkewness1Tailweight0p5(self):
-    bijector = tfb.SinhArcsinh(
+    bijector = sinh_arcsinh.SinhArcsinh(
         skewness=1.0, tailweight=0.5, validate_args=True)
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=-2., upper_x=2.0, eval_func=self.evaluate, rtol=0.05)
 
   def testScalarCongruencySkewnessNeg1Tailweight1p5(self):
-    bijector = tfb.SinhArcsinh(
+    bijector = sinh_arcsinh.SinhArcsinh(
         skewness=-1.0, tailweight=1.5, validate_args=True)
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=-2., upper_x=2.0, eval_func=self.evaluate, rtol=0.05)
 
   def testBijectiveAndFiniteSkewnessNeg1Tailweight0p5(self):
-    bijector = tfb.SinhArcsinh(
+    bijector = sinh_arcsinh.SinhArcsinh(
         skewness=-1., tailweight=0.5, validate_args=True)
     x = np.concatenate((-np.logspace(-2, 10, 1000), [0], np.logspace(
         -2, 10, 1000))).astype(np.float32)
@@ -101,7 +102,8 @@ class SinhArcsinhTest(test_util.TestCase):
         bijector, x, x, eval_func=self.evaluate, event_ndims=0, rtol=1e-3)
 
   def testBijectiveAndFiniteSkewness1Tailweight3(self):
-    bijector = tfb.SinhArcsinh(skewness=1., tailweight=3., validate_args=True)
+    bijector = sinh_arcsinh.SinhArcsinh(
+        skewness=1., tailweight=3., validate_args=True)
     x = np.concatenate((-np.logspace(-2, 5, 1000), [0], np.logspace(
         -2, 5, 1000))).astype(np.float32)
     bijector_test_util.assert_bijective_and_finite(
@@ -109,7 +111,7 @@ class SinhArcsinhTest(test_util.TestCase):
 
   @parameterized.parameters(np.float32, np.float64)
   def testBijectorEndpoints(self, dtype):
-    bijector = tfb.SinhArcsinh(
+    bijector = sinh_arcsinh.SinhArcsinh(
         skewness=dtype(0.), tailweight=dtype(1.), validate_args=True)
     # Use bounds that are very large to check that the transformation remains
     # bijective. We stray away from the largest/smallest value to avoid issues
@@ -143,7 +145,7 @@ class SinhArcsinhTest(test_util.TestCase):
     x = np.swapaxes(x, 0, 1)
     multiplier = 2. / np.sinh(np.arcsinh(2.) * tailweight)
     y = np.sinh((np.arcsinh(x) + skewness) * tailweight) * multiplier
-    bijector = tfb.SinhArcsinh(
+    bijector = sinh_arcsinh.SinhArcsinh(
         skewness=skewness, tailweight=tailweight, validate_args=True)
 
     self.assertAllClose(
@@ -181,16 +183,17 @@ class SinhArcsinhTest(test_util.TestCase):
   def testZeroTailweightRaises(self):
     with self.assertRaisesOpError('Argument `tailweight` must be positive'):
       self.evaluate(
-          tfb.SinhArcsinh(tailweight=0., validate_args=True).forward(1.0))
+          sinh_arcsinh.SinhArcsinh(tailweight=0.,
+                                   validate_args=True).forward(1.0))
 
   def testDefaultDtypeIsFloat32(self):
-    bijector = tfb.SinhArcsinh()
+    bijector = sinh_arcsinh.SinhArcsinh()
     self.assertEqual(bijector.tailweight.dtype, np.float32)
     self.assertEqual(bijector.skewness.dtype, np.float32)
 
   def testVariableTailweight(self):
     x = tf.Variable(1.)
-    b = tfb.SinhArcsinh(tailweight=x, validate_args=True)
+    b = sinh_arcsinh.SinhArcsinh(tailweight=x, validate_args=True)
     self.evaluate(x.initializer)
     self.assertIs(x, b.tailweight)
     self.assertEqual((), self.evaluate(b.forward(0.5)).shape)

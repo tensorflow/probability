@@ -18,12 +18,14 @@
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import distribute_lib
 from tensorflow_probability.python.internal import distribute_test_lib
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.mcmc import langevin
+from tensorflow_probability.python.mcmc import sample
 
 
 JAX_MODE = False
@@ -37,11 +39,11 @@ class LangevinTest(test_util.TestCase):
     dtype = np.float32
     nchains = 32
 
-    target = tfd.Normal(loc=dtype(0), scale=dtype(1))
-    samples = tfp.mcmc.sample_chain(
+    target = normal.Normal(loc=dtype(0), scale=dtype(1))
+    samples = sample.sample_chain(
         num_results=500,
         current_state=np.ones([nchains], dtype=dtype),
-        kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
+        kernel=langevin.MetropolisAdjustedLangevinAlgorithm(
             target_log_prob_fn=target.log_prob,
             step_size=0.75,
             volatility_fn=lambda *args: .5),
@@ -67,7 +69,7 @@ class LangevinTest(test_util.TestCase):
 
     # Target distribution is defined through the Cholesky decomposition
     chol = tf.linalg.cholesky(true_cov)
-    target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
+    target = mvn_tril.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
 
     # Assume that the state is passed as a list of tensors `x` and `y`.
     # Then the target log-density is defined as follows:
@@ -82,12 +84,11 @@ class LangevinTest(test_util.TestCase):
 
     # Run MALA with normal proposal for `num_results` iterations for
     # `num_chains` independent chains:
-    states = tfp.mcmc.sample_chain(
+    states = sample.sample_chain(
         num_results=num_results,
         current_state=init_state,
-        kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
-            target_log_prob_fn=target_log_prob,
-            step_size=.1),
+        kernel=langevin.MetropolisAdjustedLangevinAlgorithm(
+            target_log_prob_fn=target_log_prob, step_size=.1),
         num_burnin_steps=200,
         num_steps_between_results=1,
         trace_fn=None,
@@ -115,7 +116,7 @@ class LangevinTest(test_util.TestCase):
 
     # Targeg distribution is defined through the Cholesky decomposition
     chol = tf.linalg.cholesky(true_cov)
-    target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
+    target = mvn_tril.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
 
     # Assume that the state is passed as a list of 1-d tensors `x` and `y`.
     # Then the target log-density is defined as follows:
@@ -136,10 +137,10 @@ class LangevinTest(test_util.TestCase):
 
     # Run Random Walk Metropolis with normal proposal for `num_results`
     # iterations for `num_chains` independent chains:
-    states = tfp.mcmc.sample_chain(
+    states = sample.sample_chain(
         num_results=num_results,
         current_state=init_state,
-        kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
+        kernel=langevin.MetropolisAdjustedLangevinAlgorithm(
             target_log_prob_fn=target_log_prob,
             volatility_fn=volatility_fn,
             step_size=.1),
@@ -167,7 +168,7 @@ class LangevinTest(test_util.TestCase):
     num_chains = 100
 
     chol = tf.linalg.cholesky(true_cov)
-    target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
+    target = mvn_tril.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
 
     def target_log_prob(x, y):
       # Stack the input tensors together
@@ -184,11 +185,10 @@ class LangevinTest(test_util.TestCase):
                   np.ones([num_chains, 1], dtype=dtype)]
 
     # Define MALA with constant volatility
-    langevin_unit = tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
-        target_log_prob_fn=target_log_prob,
-        step_size=0.1)
+    langevin_unit = langevin.MetropolisAdjustedLangevinAlgorithm(
+        target_log_prob_fn=target_log_prob, step_size=0.1)
     # Define MALA with volatility being `volatility_fn`
-    langevin_general = tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
+    langevin_general = langevin.MetropolisAdjustedLangevinAlgorithm(
         target_log_prob_fn=target_log_prob,
         step_size=0.1,
         volatility_fn=volatility_fn)
@@ -217,14 +217,14 @@ class LangevinTest(test_util.TestCase):
                         atol=0.01, rtol=0.01)
 
   def testMALAIsCalibrated(self):
-    mala = tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
+    mala = langevin.MetropolisAdjustedLangevinAlgorithm(
         target_log_prob_fn=lambda x: -tf.square(x) / 2.,
         step_size=0.1,
     )
     self.assertTrue(mala.is_calibrated)
 
   def testUncalibratedLangevinIsNotCalibrated(self):
-    uncal_langevin = tfp.mcmc.UncalibratedLangevin(
+    uncal_langevin = langevin.UncalibratedLangevin(
         target_log_prob_fn=lambda x: -tf.square(x) / 2.,
         step_size=0.1,
     )
@@ -235,16 +235,17 @@ class LangevinTest(test_util.TestCase):
 class DistributedLangevinTest(distribute_test_lib.DistributedTest):
 
   def test_langevin_kernel_tracks_axis_names(self):
-    kernel = tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
-        tfd.Normal(0, 1).log_prob, step_size=1.9)
+    kernel = langevin.MetropolisAdjustedLangevinAlgorithm(
+        normal.Normal(0, 1).log_prob, step_size=1.9)
     self.assertIsNone(kernel.experimental_shard_axis_names)
-    kernel = tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
-        tfd.Normal(0, 1).log_prob, step_size=1.9,
+    kernel = langevin.MetropolisAdjustedLangevinAlgorithm(
+        normal.Normal(0, 1).log_prob,
+        step_size=1.9,
         experimental_shard_axis_names=['a'])
     self.assertListEqual(kernel.experimental_shard_axis_names, ['a'])
-    kernel = tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
-        tfd.Normal(0, 1).log_prob, step_size=1.9
-    ).experimental_with_shard_axes(['a'])
+    kernel = langevin.MetropolisAdjustedLangevinAlgorithm(
+        normal.Normal(0, 1).log_prob,
+        step_size=1.9).experimental_with_shard_axes(['a'])
     self.assertListEqual(kernel.experimental_shard_axis_names, ['a'])
 
   def test_computes_same_log_acceptance_correction_with_sharded_state(self):
@@ -253,13 +254,12 @@ class DistributedLangevinTest(distribute_test_lib.DistributedTest):
       self.skipTest('Test in TF runs into `merge_call` error: see b/178944108')
 
     def target_log_prob(a, b):
-      return (
-          tfd.Normal(0., 1.).log_prob(a)
-          + distribute_lib.psum(tfd.Normal(
-              distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b), 'foo'))
+      return (normal.Normal(0., 1.).log_prob(a) + distribute_lib.psum(
+          normal.Normal(distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b),
+          'foo'))
 
-    kernel = tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(target_log_prob,
-                                                          step_size=1.9)
+    kernel = langevin.MetropolisAdjustedLangevinAlgorithm(
+        target_log_prob, step_size=1.9)
     sharded_kernel = kernel.experimental_with_shard_axes([None, ['foo']])
 
     def run(seed):
@@ -282,13 +282,12 @@ class DistributedLangevinTest(distribute_test_lib.DistributedTest):
       self.skipTest('Test in TF runs into `merge_call` error: see b/178944108')
 
     def target_log_prob(a, b):
-      return (
-          tfd.Normal(0., 1.).log_prob(a)
-          + distribute_lib.psum(tfd.Normal(
-              distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b), 'foo'))
+      return (normal.Normal(0., 1.).log_prob(a) + distribute_lib.psum(
+          normal.Normal(distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b),
+          'foo'))
 
-    kernel = tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(target_log_prob,
-                                                          step_size=1e-1)
+    kernel = langevin.MetropolisAdjustedLangevinAlgorithm(
+        target_log_prob, step_size=1e-1)
     sharded_kernel = kernel.experimental_with_shard_axes([None, ['foo']])
 
     def run(seed):

@@ -22,7 +22,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import loop_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
-from tensorflow_probability.python.math import value_and_gradient
+from tensorflow_probability.python.math.gradient import value_and_gradient
 
 JAX_MODE = False
 

@@ -20,13 +20,10 @@ from absl.testing import parameterized
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
 from tensorflow_probability.python.experimental.nn.util import convolution_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
-
-tfn = tfp.experimental.nn
 
 
 # pylint: disable=bad-whitespace
@@ -73,11 +70,11 @@ def _make_input_and_kernel(
 
 def _get_conv_transpose_fn(method):
   if method == 'subkernels':
-    return tfn.util.make_convolution_transpose_fn_with_subkernels
+    return convolution_util.make_convolution_transpose_fn_with_subkernels
   elif method == 'subkernels_matrix':
-    return tfn.util.make_convolution_transpose_fn_with_subkernels_matrix
+    return convolution_util.make_convolution_transpose_fn_with_subkernels_matrix
   elif method == 'dilation':
-    return tfn.util.make_convolution_transpose_fn_with_dilation
+    return convolution_util.make_convolution_transpose_fn_with_dilation
   else:
     raise ValueError('Unsupported method for `_get_conv_transpose_fn`: {}.'
                      ''.format(method))
@@ -117,11 +114,8 @@ class Im2RowTest(test_util.TestCase):
     ], tf.float32)  # shape=[2, 2, 1, 2]
     k = tf.concat([k, k], axis=-2)
     strides = [1, 2]
-    im2row_x = tfn.util.im2row(
-        x,
-        block_shape=ps.shape(k)[:2],
-        slice_step=strides,
-        padding='VALID')
+    im2row_x = convolution_util.im2row(
+        x, block_shape=ps.shape(k)[:2], slice_step=strides, padding='VALID')
     y_expected = tf.nn.conv2d(x, k, strides=strides, padding='VALID')
     y_actual = tf.matmul(im2row_x, tf.reshape(k, shape=[-1, k.shape[-1]]))
     [y_expected_, y_actual_] = self.evaluate([y_expected, y_actual])
@@ -129,10 +123,8 @@ class Im2RowTest(test_util.TestCase):
 
   @parameterized.parameters((tf.int32, np.int32), (tf.int64, np.int64))
   def test_dtype(self, tf_dtype, np_dtype):
-    ind, _ = tfn.util.im2row_index(
-        input_shape=(1, 12, 16, 3),
-        block_shape=(2, 3),
-        dtype=tf_dtype)
+    ind, _ = convolution_util.im2row_index(
+        input_shape=(1, 12, 16, 3), block_shape=(2, 3), dtype=tf_dtype)
     self.assertDTypeEqual(ind, np_dtype)
 
 
@@ -204,7 +196,7 @@ class _BatchedConvTest(test_util.TestCase, _Common):
     y_expected = tf.nn.conv2d(
         x, tf_kernel, strides=strides, padding=padding, dilations=dilations)
 
-    conv_fn = tfn.util.make_convolution_fn(
+    conv_fn = convolution_util.make_convolution_fn(
         self.make_integer_input(filter_shape),
         rank=2,
         strides=self.make_integer_input(strides),
@@ -244,9 +236,13 @@ class _BatchedConvTest(test_util.TestCase, _Common):
         channels_out=channels_out,
         dtype=self.dtype)
 
-    conv_fn = tfn.util.make_convolution_fn(
-        filter_shape, rank=2, strides=strides, padding=padding,
-        dilations=dilations, validate_args=True)
+    conv_fn = convolution_util.make_convolution_fn(
+        filter_shape,
+        rank=2,
+        strides=strides,
+        padding=padding,
+        dilations=dilations,
+        validate_args=True)
     y_batched = conv_fn(x, k)
 
     broadcast_batch_shape = ps.broadcast_shape(
@@ -291,7 +287,7 @@ class _BatchedConvTest(test_util.TestCase, _Common):
     k_dim = np.prod(filter_shape) * c_in_kernel
     kernel = self.make_input(tf.ones((2, k_dim, c_out), dtype=tf.float32))
     x = self.make_input(tf.ones((3, 2, 16, 16, c_in_image), dtype=tf.float32))
-    conv_fn = tfn.util.make_convolution_fn(
+    conv_fn = convolution_util.make_convolution_fn(
         self.make_integer_input(filter_shape),
         rank=2,
         strides=self.make_integer_input((1, 1)),
@@ -303,15 +299,19 @@ class _BatchedConvTest(test_util.TestCase, _Common):
 
   def test_dtype(self):
     # Test int64 indices.
-    conv_fn = tfn.util.make_convolution_fn(
-        (2, 2), rank=2, strides=(1, 1), padding='SAME', dilations=(1, 1),
-        dtype=tf.int64, validate_args=True)
+    conv_fn = convolution_util.make_convolution_fn((2, 2),
+                                                   rank=2,
+                                                   strides=(1, 1),
+                                                   padding='SAME',
+                                                   dilations=(1, 1),
+                                                   dtype=tf.int64,
+                                                   validate_args=True)
     x = tf.ones((2, 8, 8, 2), dtype=tf.float32)
     kernel = tf.ones((2, 8, 2), dtype=tf.float32)
     _ = self.evaluate(conv_fn(x, kernel))
 
     # Test f64 input.
-    conv_fn = tfn.util.make_convolution_fn(
+    conv_fn = convolution_util.make_convolution_fn(
         self.make_integer_input((2, 2)),
         rank=2,
         strides=self.make_integer_input((1, 1)),

@@ -21,11 +21,12 @@ import warnings
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 from tensorflow_probability.python.experimental.mcmc.internal import test_fixtures
 from tensorflow_probability.python.experimental.mcmc.step import step_kernel
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.mcmc import hmc
+from tensorflow_probability.python.mcmc import sample
 
 
 class StepKernelTest(test_util.TestCase):
@@ -79,7 +80,7 @@ class StepKernelTest(test_util.TestCase):
   def test_calibration_warning(self):
     with warnings.catch_warnings(record=True) as triggered:
       kernel = test_fixtures.TestTransitionKernel(is_calibrated=False)
-      tfp.mcmc.sample_chain(
+      sample.sample_chain(
           num_results=2,
           current_state=0,
           kernel=kernel,
@@ -137,10 +138,10 @@ class StepKernelTest(test_util.TestCase):
       z = tf.linalg.triangular_solve(true_cov_chol, z[..., tf.newaxis])[..., 0]
       return -0.5 * tf.reduce_sum(z**2., axis=-1)
 
-    _ = tfp.experimental.mcmc.step_kernel(
+    _ = step_kernel(
         num_steps=num_results,
         current_state=[dtype(-2), dtype(2)],
-        kernel=tfp.mcmc.HamiltonianMonteCarlo(
+        kernel=hmc.HamiltonianMonteCarlo(
             target_log_prob_fn=target_log_prob,
             step_size=[0.5, 0.5],
             num_leapfrog_steps=2),

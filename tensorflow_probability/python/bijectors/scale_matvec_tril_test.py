@@ -17,7 +17,7 @@
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
-from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import scale_matvec_tril
 from tensorflow_probability.python.internal import test_util
 
 
@@ -30,7 +30,7 @@ class ScaleMatvecTriLTest(test_util.TestCase, parameterized.TestCase):
       dict(testcase_name='dynamic', is_static=False),
   )
   def testNoBatch(self, is_static):
-    bijector = tfb.ScaleMatvecTriL(
+    bijector = scale_matvec_tril.ScaleMatvecTriL(
         scale_tril=[[2., 0.], [2., 2.]])
     x = self.maybe_static([[1., 2.]], is_static)
     self.assertAllClose([[2., 6.]], bijector.forward(x))
@@ -44,9 +44,8 @@ class ScaleMatvecTriLTest(test_util.TestCase, parameterized.TestCase):
       dict(testcase_name='dynamic', is_static=False),
   )
   def testBatch(self, is_static):
-    bijector = tfb.ScaleMatvecTriL(
-        scale_tril=[[[2., 0.], [2., 2.]],
-                    [[3., 0.], [3., 3.]]])
+    bijector = scale_matvec_tril.ScaleMatvecTriL(
+        scale_tril=[[[2., 0.], [2., 2.]], [[3., 0.], [3., 3.]]])
     x = self.maybe_static([[1., 2.]], is_static)
     self.assertAllClose([[2., 6.], [3., 9.]], bijector.forward(x))
     self.assertAllClose([[.5, .5], [1./3., 1./3.]], bijector.inverse(x))
@@ -58,7 +57,7 @@ class ScaleMatvecTriLTest(test_util.TestCase, parameterized.TestCase):
     with self.assertRaisesRegexp(
         Exception,
         '.*Singular operator:  Diagonal contained zero values.*'):
-      bijector = tfb.ScaleMatvecTriL(
+      bijector = scale_matvec_tril.ScaleMatvecTriL(
           # Has zero on the diagonal.
           scale_tril=[[0., 0.], [1., 1.]],
           validate_args=True)

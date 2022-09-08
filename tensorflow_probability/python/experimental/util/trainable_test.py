@@ -18,14 +18,26 @@ from absl.testing import parameterized
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
-from tensorflow_probability.python.experimental import util as tfe_util
+from tensorflow_probability.python.bijectors import fill_scale_tril
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.bijectors import scale
+from tensorflow_probability.python.bijectors import scale_matvec_tril
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.distributions import dirichlet
+from tensorflow_probability.python.distributions import gamma
+from tensorflow_probability.python.distributions import geometric
+from tensorflow_probability.python.distributions import kumaraswamy
+from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import poisson
+from tensorflow_probability.python.distributions import wishart
+from tensorflow_probability.python.experimental.util import trainable
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
+from tensorflow_probability.python.math.minimize import minimize
+from tensorflow_probability.python.math.minimize import minimize_stateless
 
 JAX_MODE = False
 
@@ -34,16 +46,15 @@ JAX_MODE = False
 class TestStatefulMakeTrainable(test_util.TestCase):
 
   @parameterized.named_parameters(
-      ('Normal', tfd.Normal, []),
-      ('Gamma', tfd.Gamma, [2, 3]),
-      ('Dirichlet', tfd.Dirichlet, [5]),
-      ('MultivariateNormalTriL', tfd.MultivariateNormalTriL, [4]),
-      ('Kumaraswamy', tfd.Kumaraswamy, [2, 1]),
-      ('Poisson', tfd.Poisson, []),
-      ('Geometric', tfd.Geometric, [1, 1]))
+      ('Normal', normal.Normal, []), ('Gamma', gamma.Gamma, [2, 3]),
+      ('Dirichlet', dirichlet.Dirichlet, [5]),
+      ('MultivariateNormalTriL', mvn_tril.MultivariateNormalTriL, [4]),
+      ('Kumaraswamy', kumaraswamy.Kumaraswamy, [2, 1]),
+      ('Poisson', poisson.Poisson, []),
+      ('Geometric', geometric.Geometric, [1, 1]))
   @test_util.jax_disable_variable_test
   def test_trainable_distributions(self, cls, batch_and_event_shape):
-    distribution = tfp.experimental.util.make_trainable(
+    distribution = trainable.make_trainable(
         cls,
         batch_and_event_shape=batch_and_event_shape,
         seed=test_util.test_seed(),
@@ -65,14 +76,13 @@ class TestStatefulMakeTrainable(test_util.TestCase):
     self.assertAllNotNone(grad)
 
   @parameterized.named_parameters(
-      ('Scale', tfb.Scale, [2]),
-      ('ScaleMatvecTriL', tfb.ScaleMatvecTriL, [4]),
-      ('FillScaleTriL', tfb.FillScaleTriL, [2, 6]),
-      ('Softplus', tfb.Softplus, [2]),
-      ('Identity', tfb.Identity, []))
+      ('Scale', scale.Scale, [2]),
+      ('ScaleMatvecTriL', scale_matvec_tril.ScaleMatvecTriL, [4]),
+      ('FillScaleTriL', fill_scale_tril.FillScaleTriL, [2, 6]),
+      ('Softplus', softplus.Softplus, [2]), ('Identity', identity.Identity, []))
   @test_util.jax_disable_variable_test
   def test_trainable_bijectors(self, cls, batch_and_event_shape):
-    bijector = tfp.experimental.util.make_trainable(
+    bijector = trainable.make_trainable(
         cls,
         batch_and_event_shape=batch_and_event_shape,
         seed=test_util.test_seed(),
@@ -102,8 +112,8 @@ class TestStatefulMakeTrainable(test_util.TestCase):
 
   @test_util.jax_disable_variable_test
   def test_can_specify_initial_values(self):
-    distribution = tfp.experimental.util.make_trainable(
-        tfd.Normal,
+    distribution = trainable.make_trainable(
+        normal.Normal,
         initial_parameters={'scale': 1e-4},
         batch_and_event_shape=[3],
         seed=test_util.test_seed(),
@@ -124,8 +134,8 @@ class TestStatefulMakeTrainable(test_util.TestCase):
               constraining_bijector.inverse_event_shape_tensor(shape),
               dtype=dtype, seed=seed))
 
-    distribution = tfp.experimental.util.make_trainable(
-        tfd.Normal,
+    distribution = trainable.make_trainable(
+        normal.Normal,
         initial_parameters=uniform_initializer,
         batch_and_event_shape=[3, 4],
         seed=test_util.test_seed(),
@@ -139,12 +149,12 @@ class TestStatefulMakeTrainable(test_util.TestCase):
   @test_util.jax_disable_variable_test
   def test_initialization_is_deterministic_with_seed(self):
     seed = test_util.test_seed(sampler_type='stateless')
-    distribution1 = tfp.experimental.util.make_trainable(
-        tfd.Normal, seed=seed, validate_args=True)
+    distribution1 = trainable.make_trainable(
+        normal.Normal, seed=seed, validate_args=True)
     self.evaluate([v.initializer for v in distribution1.trainable_variables])
 
-    distribution2 = tfp.experimental.util.make_trainable(
-        tfd.Normal, seed=seed, validate_args=True)
+    distribution2 = trainable.make_trainable(
+        normal.Normal, seed=seed, validate_args=True)
     self.evaluate([v.initializer for v in distribution2.trainable_variables])
 
     self.assertAllEqual(distribution1.mean(), distribution2.mean())
@@ -152,8 +162,8 @@ class TestStatefulMakeTrainable(test_util.TestCase):
 
   @test_util.jax_disable_variable_test
   def test_can_specify_parameter_dtype(self):
-    distribution = tfp.experimental.util.make_trainable(
-        tfd.Normal,
+    distribution = trainable.make_trainable(
+        normal.Normal,
         initial_parameters={'loc': 17.},
         parameter_dtype=tf.float64,
         seed=test_util.test_seed(sampler_type='stateless'),
@@ -165,8 +175,8 @@ class TestStatefulMakeTrainable(test_util.TestCase):
 
   @test_util.jax_disable_variable_test
   def test_can_specify_fixed_values(self):
-    distribution = tfp.experimental.util.make_trainable(
-        tfd.WishartTriL,
+    distribution = trainable.make_trainable(
+        wishart.WishartTriL,
         batch_and_event_shape=[2, 2],
         seed=test_util.test_seed(sampler_type='stateless'),
         validate_args=True,
@@ -178,19 +188,18 @@ class TestStatefulMakeTrainable(test_util.TestCase):
 
   @test_util.jax_disable_variable_test
   def test_docstring(self):
-    self.assertContainsExactSubsequence(
-        tfe_util.make_trainable.__doc__,
-        'lambda: -model.log_prob(samples)')
+    self.assertContainsExactSubsequence(trainable.make_trainable.__doc__,
+                                        'lambda: -model.log_prob(samples)')
 
   @test_util.jax_disable_variable_test
   def test_docstring_example_normal(self):
     samples = [4.57, 6.37, 5.93, 7.98, 2.03, 3.59, 8.55, 3.45, 5.06, 6.44]
-    model = tfe_util.make_trainable(
-        tfd.Normal,
-        seed=test_util.test_seed(sampler_type='stateless'))
-    losses = tfp.math.minimize(lambda: -model.log_prob(samples),
-                               optimizer=tf.optimizers.Adam(0.1),
-                               num_steps=200)
+    model = trainable.make_trainable(
+        normal.Normal, seed=test_util.test_seed(sampler_type='stateless'))
+    losses = minimize(
+        lambda: -model.log_prob(samples),
+        optimizer=tf.optimizers.Adam(0.1),
+        num_steps=200)
     self.evaluate(tf1.global_variables_initializer())
     self.evaluate(losses)
     self.assertAllClose(tf.reduce_mean(samples), model.mean(), atol=2.0)
@@ -201,18 +210,15 @@ class TestStatefulMakeTrainable(test_util.TestCase):
 class TestStatelessTrainableDistributionsAndBijectors(test_util.TestCase):
 
   @parameterized.named_parameters(
-      ('Normal', tfd.Normal, []),
-      ('Gamma', tfd.Gamma, [2, 3]),
-      ('Dirichlet', tfd.Dirichlet, [5]),
-      ('MultivariateNormalTriL', tfd.MultivariateNormalTriL, [4]),
-      ('Kumaraswamy', tfd.Kumaraswamy, [2, 1]),
-      ('Poisson', tfd.Poisson, []),
-      ('Geometric', tfd.Geometric, [1, 1]))
+      ('Normal', normal.Normal, []), ('Gamma', gamma.Gamma, [2, 3]),
+      ('Dirichlet', dirichlet.Dirichlet, [5]),
+      ('MultivariateNormalTriL', mvn_tril.MultivariateNormalTriL, [4]),
+      ('Kumaraswamy', kumaraswamy.Kumaraswamy, [2, 1]),
+      ('Poisson', poisson.Poisson, []),
+      ('Geometric', geometric.Geometric, [1, 1]))
   def test_trainable_distributions(self, cls, batch_and_event_shape):
-    init_fn, apply_fn = tfe_util.make_trainable_stateless(
-        cls,
-        batch_and_event_shape=batch_and_event_shape,
-        validate_args=True)
+    init_fn, apply_fn = trainable.make_trainable_stateless(
+        cls, batch_and_event_shape=batch_and_event_shape, validate_args=True)
 
     raw_parameters = init_fn(seed=test_util.test_seed())
     distribution = apply_fn(raw_parameters)
@@ -225,22 +231,18 @@ class TestStatelessTrainableDistributionsAndBijectors(test_util.TestCase):
         len([k for k, p in distribution.parameter_properties().items()
              if p.is_preferred]))
     # Verify gradients to all parameters.
-    _, grad = tfp.math.value_and_gradient(
-        lambda params: apply_fn(params).log_prob(x),
-        [raw_parameters])
+    _, grad = gradient.value_and_gradient(
+        lambda params: apply_fn(params).log_prob(x), [raw_parameters])
     self.assertAllNotNone(grad)
 
   @parameterized.named_parameters(
-      ('Scale', tfb.Scale, [2]),
-      ('ScaleMatvecTriL', tfb.ScaleMatvecTriL, [4]),
-      ('FillScaleTriL', tfb.FillScaleTriL, [2, 6]),
-      ('Softplus', tfb.Softplus, [2]),
-      ('Identity', tfb.Identity, []))
+      ('Scale', scale.Scale, [2]),
+      ('ScaleMatvecTriL', scale_matvec_tril.ScaleMatvecTriL, [4]),
+      ('FillScaleTriL', fill_scale_tril.FillScaleTriL, [2, 6]),
+      ('Softplus', softplus.Softplus, [2]), ('Identity', identity.Identity, []))
   def test_trainable_bijectors(self, cls, batch_and_event_shape):
-    init_fn, apply_fn = tfe_util.make_trainable_stateless(
-        cls,
-        batch_and_event_shape=batch_and_event_shape,
-        validate_args=True)
+    init_fn, apply_fn = trainable.make_trainable_stateless(
+        cls, batch_and_event_shape=batch_and_event_shape, validate_args=True)
 
     # Verify expected number of trainable variables.
     raw_parameters = init_fn(seed=test_util.test_seed())
@@ -251,9 +253,8 @@ class TestStatelessTrainableDistributionsAndBijectors(test_util.TestCase):
     # Verify gradients to all parameters.
     x = self.evaluate(samplers.normal(batch_and_event_shape,
                                       seed=test_util.test_seed()))
-    y, grad = tfp.math.value_and_gradient(
-        lambda params: apply_fn(params).forward(x),
-        [raw_parameters])
+    y, grad = gradient.value_and_gradient(
+        lambda params: apply_fn(params).forward(x), [raw_parameters])
     self.assertAllNotNone(grad)
 
     # Verify that the round trip doesn't broadcast, i.e., that it preserves
@@ -264,8 +265,8 @@ class TestStatelessTrainableDistributionsAndBijectors(test_util.TestCase):
         atol=1e-2)
 
   def test_can_specify_initial_values(self):
-    init_fn, apply_fn = tfe_util.make_trainable_stateless(
-        tfd.Normal,
+    init_fn, apply_fn = trainable.make_trainable_stateless(
+        normal.Normal,
         initial_parameters={'scale': 1e-4},
         batch_and_event_shape=[3],
         validate_args=True)
@@ -280,8 +281,8 @@ class TestStatelessTrainableDistributionsAndBijectors(test_util.TestCase):
               constraining_bijector.inverse_event_shape_tensor(shape),
               dtype=dtype, seed=seed))
 
-    init_fn, _ = tfe_util.make_trainable_stateless(
-        tfd.Normal,
+    init_fn, _ = trainable.make_trainable_stateless(
+        normal.Normal,
         initial_parameters=uniform_initializer,
         batch_and_event_shape=[3, 4],
         validate_args=True)
@@ -293,13 +294,13 @@ class TestStatelessTrainableDistributionsAndBijectors(test_util.TestCase):
 
   def test_initialization_is_deterministic_with_seed(self):
     seed = test_util.test_seed(sampler_type='stateless')
-    init_fn, _ = tfe_util.make_trainable_stateless(
-        tfd.Normal, validate_args=True)
+    init_fn, _ = trainable.make_trainable_stateless(
+        normal.Normal, validate_args=True)
     self.assertAllCloseNested(init_fn(seed=seed), init_fn(seed=seed))
 
   def test_can_specify_parameter_dtype(self):
-    init_fn, apply_fn = tfe_util.make_trainable_stateless(
-        tfd.Normal,
+    init_fn, apply_fn = trainable.make_trainable_stateless(
+        normal.Normal,
         initial_parameters={'loc': 17.},
         parameter_dtype=tf.float64,
         validate_args=True)
@@ -310,8 +311,8 @@ class TestStatelessTrainableDistributionsAndBijectors(test_util.TestCase):
                      tf.float64)
 
   def test_can_specify_fixed_values(self):
-    init_fn, apply_fn = tfe_util.make_trainable_stateless(
-        tfd.WishartTriL,
+    init_fn, apply_fn = trainable.make_trainable_stateless(
+        wishart.WishartTriL,
         batch_and_event_shape=[2, 2],
         validate_args=True,
         df=3)
@@ -325,8 +326,8 @@ class TestStatelessTrainableDistributionsAndBijectors(test_util.TestCase):
   def test_dynamic_shape(self):
     batch_and_event_shape = tf1.placeholder_with_default(
         [4, 3, 2], shape=None)
-    init_fn, apply_fn = tfe_util.make_trainable_stateless(
-        tfd.Normal,
+    init_fn, apply_fn = trainable.make_trainable_stateless(
+        normal.Normal,
         batch_and_event_shape=batch_and_event_shape,
         validate_args=True)
     distribution = apply_fn(init_fn(seed=test_util.test_seed()))
@@ -335,7 +336,7 @@ class TestStatelessTrainableDistributionsAndBijectors(test_util.TestCase):
 
   def test_docstring(self):
     self.assertContainsExactSubsequence(
-        tfe_util.make_trainable_stateless.__doc__,
+        trainable.make_trainable_stateless.__doc__,
         'lambda *params: -apply_fn(params).log_prob(samples)')
 
   def test_docstring_example_normal(self):
@@ -344,8 +345,8 @@ class TestStatelessTrainableDistributionsAndBijectors(test_util.TestCase):
     import optax  # pylint: disable=g-import-not-at-top
 
     samples = [4.57, 6.37, 5.93, 7.98, 2.03, 3.59, 8.55, 3.45, 5.06, 6.44]
-    init_fn, apply_fn = tfe_util.make_trainable_stateless(tfd.Normal)
-    final_params, losses = tfp.math.minimize_stateless(
+    init_fn, apply_fn = trainable.make_trainable_stateless(normal.Normal)
+    final_params, losses = minimize_stateless(
         lambda *params: -apply_fn(params).log_prob(samples),
         init=init_fn(seed=test_util.test_seed(sampler_type='stateless')),
         optimizer=optax.adam(0.1),

@@ -18,8 +18,14 @@
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import exp
+from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.bijectors import joint_map
 from tensorflow_probability.python.bijectors import ldj_ratio
+from tensorflow_probability.python.bijectors import reshape
+from tensorflow_probability.python.bijectors import scale
+from tensorflow_probability.python.bijectors import shift
+from tensorflow_probability.python.bijectors import softplus
 from tensorflow_probability.python.internal import test_util
 
 
@@ -31,10 +37,10 @@ class JointMapBijectorTest(test_util.TestCase):
     self.assertEqual(expect_shape, np.asarray(observed))
 
   def testBijector(self):
-    bij = tfb.JointMap({
-        'a': tfb.Exp(),
-        'b': tfb.Scale(2.),
-        'c': tfb.Shift(3.)
+    bij = joint_map.JointMap({
+        'a': exp.Exp(),
+        'b': scale.Scale(2.),
+        'c': shift.Shift(3.)
     })
 
     a = np.asarray([[[1, 2], [2, 3]]], dtype=np.float32)   # shape=[1, 2, 2]
@@ -59,12 +65,11 @@ class JointMapBijectorTest(test_util.TestCase):
     self.assertAllClose(-np.log(a).sum(axis=-1) - np.log(2), ildj)
 
   def testBijectorWithDeepStructure(self):
-    bij = tfb.JointMap({
-        'a': tfb.Exp(),
-        'bc': tfb.JointMap([
-            tfb.Scale(2.),
-            tfb.Shift(3.)
-        ])})
+    bij = joint_map.JointMap({
+        'a': exp.Exp(),
+        'bc': joint_map.JointMap([scale.Scale(2.),
+                                  shift.Shift(3.)])
+    })
 
     a = np.asarray([[[1, 2], [2, 3]]], dtype=np.float32)   # shape=[1, 2, 2]
     b = np.asarray([[0, 4]], dtype=np.float32)             # shape=[1, 2]
@@ -88,8 +93,11 @@ class JointMapBijectorTest(test_util.TestCase):
     self.assertAllClose(-np.log(a).sum(axis=-1) - np.log(2), ildj)
 
   def testBatchShapeBroadcasts(self):
-    bij = tfb.JointMap({'a': tfb.Exp(), 'b': tfb.Scale(10.)},
-                       validate_args=True)
+    bij = joint_map.JointMap({
+        'a': exp.Exp(),
+        'b': scale.Scale(10.)
+    },
+                             validate_args=True)
     self.assertStartsWith(bij.name, 'jointmap_of_exp_and_scale')
 
     a = np.asarray([[[1, 2]], [[2, 3]]], dtype=np.float32)  # shape=[2, 1, 2]
@@ -109,10 +117,10 @@ class JointMapBijectorTest(test_util.TestCase):
       disable_numpy=True,
       reason='NumPy backend overrides dtypes in __init__.')
   def testMixedDtypeLogDetJacobian(self):
-    bij = tfb.JointMap({
-        'a': tfb.Scale(tf.constant(1, dtype=tf.float16)),
-        'b': tfb.Scale(tf.constant(2, dtype=tf.float32)),
-        'c': tfb.Scale(tf.constant(3, dtype=tf.float64))
+    bij = joint_map.JointMap({
+        'a': scale.Scale(tf.constant(1, dtype=tf.float16)),
+        'b': scale.Scale(tf.constant(2, dtype=tf.float32)),
+        'c': scale.Scale(tf.constant(3, dtype=tf.float64))
     })
 
     fldj = bij.forward_log_det_jacobian(
@@ -122,7 +130,7 @@ class JointMapBijectorTest(test_util.TestCase):
     self.assertAllClose(np.log(1) + np.log(2) + np.log(3), self.evaluate(fldj))
 
   def test_inverse_has_event_ndims(self):
-    bij_reshape = tfb.Invert(tfb.JointMap([tfb.Reshape([])]))
+    bij_reshape = invert.Invert(joint_map.JointMap([reshape.Reshape([])]))
     bij_reshape.inverse_event_ndims([10])  # expect [9]
     self.assertEqual(bij_reshape.inverse_event_ndims([10]), [9])
 
@@ -130,16 +138,16 @@ class JointMapBijectorTest(test_util.TestCase):
       disable_numpy=True, disable_jax=True,
       reason='Numpy and JAX have no notion of CompositeTensor/saved_model.')
   def testCompositeTensor(self):
-    exp = tfb.Exp()
-    sp = tfb.Softplus()
-    aff = tfb.Scale(scale=2.)
-    bij = tfb.JointMap(bijectors=[exp, sp, aff])
+    e = exp.Exp()
+    sp = softplus.Softplus()
+    aff = scale.Scale(scale=2.)
+    bij = joint_map.JointMap(bijectors=[e, sp, aff])
     self.assertIsInstance(bij, tf.__internal__.CompositeTensor)
 
     # Bijector may be flattened into `Tensor` components and rebuilt.
     flat = tf.nest.flatten(bij, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(bij, flat, expand_composites=True)
-    self.assertIsInstance(unflat, tfb.JointMap)
+    self.assertIsInstance(unflat, joint_map.JointMap)
 
     # Bijector may be input to a `tf.function`-decorated callable.
     @tf.function
@@ -155,24 +163,23 @@ class JointMapBijectorTest(test_util.TestCase):
     self.assertEqual(bij._type_spec, dec)
 
   def testNonCompositeTensor(self):
-    exp = tfb.Exp()
-    scale = test_util.NonCompositeTensorScale(scale=tf.constant(3.))
-    bij = tfb.JointMap(bijectors=[exp, scale])
+    e = exp.Exp()
+    s = test_util.NonCompositeTensorScale(scale=tf.constant(3.))
+    bij = joint_map.JointMap(bijectors=[e, s])
     self.assertNotIsInstance(bij, tf.__internal__.CompositeTensor)
     self.assertAllCloseNested(
-        bij.forward([1., 1.]),
-        [exp.forward(1.), scale.forward(1.)])
+        bij.forward([1., 1.]), [e.forward(1.), s.forward(1.)])
 
   def testLDJRatio(self):
-    q = tfb.JointMap({
-        'a': tfb.Exp(),
-        'b': tfb.Scale(2.),
-        'c': tfb.Shift(3.)
+    q = joint_map.JointMap({
+        'a': exp.Exp(),
+        'b': scale.Scale(2.),
+        'c': shift.Shift(3.)
     })
-    p = tfb.JointMap({
-        'a': tfb.Exp(),
-        'b': tfb.Scale(3.),
-        'c': tfb.Shift(4.)
+    p = joint_map.JointMap({
+        'a': exp.Exp(),
+        'b': scale.Scale(3.),
+        'c': shift.Shift(4.)
     })
 
     a = np.asarray([[[1, 2], [2, 3]]], dtype=np.float32)   # shape=[1, 2, 2]

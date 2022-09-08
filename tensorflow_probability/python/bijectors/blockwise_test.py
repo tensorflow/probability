@@ -20,8 +20,14 @@ from absl.testing import parameterized
 import mock
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import blockwise
+from tensorflow_probability.python.bijectors import exp
+from tensorflow_probability.python.bijectors import inline
+from tensorflow_probability.python.bijectors import scale
+from tensorflow_probability.python.bijectors import scale_matvec_diag
+from tensorflow_probability.python.bijectors import softmax_centered
+from tensorflow_probability.python.bijectors import softplus
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -42,11 +48,11 @@ class BlockwiseBijectorTest(test_util.TestCase):
         shape=([None] * len(block_sizes.shape)
                if dynamic_shape else
                block_sizes.shape))
-    exp = tfb.Exp()
-    sp = tfb.Softplus()
-    aff = tfb.ScaleMatvecDiag(scale_diag=[2., 3., 4.])
-    blockwise = tfb.Blockwise(
-        bijectors=[exp, sp, aff],
+    e = exp.Exp()
+    sp = softplus.Softplus()
+    aff = scale_matvec_diag.ScaleMatvecDiag(scale_diag=[2., 3., 4.])
+    bijector = blockwise.Blockwise(
+        bijectors=[e, sp, aff],
         block_sizes=block_sizes,
         maybe_changes_size=False)
 
@@ -58,10 +64,10 @@ class BlockwiseBijectorTest(test_util.TestCase):
         x, shape=None if dynamic_shape else x.shape)
 
     # Identity to break the caching.
-    blockwise_y = tf.identity(blockwise.forward(x))
-    blockwise_fldj = blockwise.forward_log_det_jacobian(x, event_ndims=1)
-    blockwise_x = blockwise.inverse(blockwise_y)
-    blockwise_ildj = blockwise.inverse_log_det_jacobian(
+    blockwise_y = tf.identity(bijector.forward(x))
+    blockwise_fldj = bijector.forward_log_det_jacobian(x, event_ndims=1)
+    blockwise_x = bijector.inverse(blockwise_y)
+    blockwise_ildj = bijector.inverse_log_det_jacobian(
         blockwise_y, event_ndims=1)
 
     if not dynamic_shape:
@@ -79,24 +85,24 @@ class BlockwiseBijectorTest(test_util.TestCase):
         self.evaluate(tf.shape(blockwise_ildj)), batch_shape + [])
 
     expl_y = tf.concat([
-        exp.forward(x[..., :2]),
+        e.forward(x[..., :2]),
         sp.forward(x[..., 2:3]),
         aff.forward(x[..., 3:]),
     ],
                        axis=-1)
     expl_fldj = sum([
-        exp.forward_log_det_jacobian(x[..., :2], event_ndims=1),
+        e.forward_log_det_jacobian(x[..., :2], event_ndims=1),
         sp.forward_log_det_jacobian(x[..., 2:3], event_ndims=1),
         aff.forward_log_det_jacobian(x[..., 3:], event_ndims=1)
     ])
     expl_x = tf.concat([
-        exp.inverse(expl_y[..., :2]),
+        e.inverse(expl_y[..., :2]),
         sp.inverse(expl_y[..., 2:3]),
         aff.inverse(expl_y[..., 3:])
     ],
                        axis=-1)
     expl_ildj = sum([
-        exp.inverse_log_det_jacobian(expl_y[..., :2], event_ndims=1),
+        e.inverse_log_det_jacobian(expl_y[..., :2], event_ndims=1),
         sp.inverse_log_det_jacobian(expl_y[..., 2:3], event_ndims=1),
         aff.inverse_log_det_jacobian(expl_y[..., 3:], event_ndims=1)
     ])
@@ -117,11 +123,11 @@ class BlockwiseBijectorTest(test_util.TestCase):
     if dynamic_shape:
       block_sizes = tf1.placeholder_with_default(
           block_sizes, shape=block_sizes.shape)
-    exp = tfb.Exp()
-    sc = tfb.SoftmaxCentered()
-    aff = tfb.ScaleMatvecDiag(scale_diag=[2., 3., 4.])
-    blockwise = tfb.Blockwise(
-        bijectors=[exp, sc, aff],
+    e = exp.Exp()
+    sc = softmax_centered.SoftmaxCentered()
+    aff = scale_matvec_diag.ScaleMatvecDiag(scale_diag=[2., 3., 4.])
+    bijector = blockwise.Blockwise(
+        bijectors=[e, sc, aff],
         block_sizes=block_sizes,
         maybe_changes_size=True)
 
@@ -133,17 +139,16 @@ class BlockwiseBijectorTest(test_util.TestCase):
         x, shape=None if dynamic_shape else x.shape)
 
     # Identity to break the caching.
-    blockwise_y = tf.identity(blockwise.forward(x))
-    blockwise_fldj = blockwise.forward_log_det_jacobian(x, event_ndims=1)
-    blockwise_y_shape_tensor = blockwise.forward_event_shape_tensor(
-        tf.shape(x))
-    blockwise_y_shape = blockwise.forward_event_shape(x.shape)
+    blockwise_y = tf.identity(bijector.forward(x))
+    blockwise_fldj = bijector.forward_log_det_jacobian(x, event_ndims=1)
+    blockwise_y_shape_tensor = bijector.forward_event_shape_tensor(tf.shape(x))
+    blockwise_y_shape = bijector.forward_event_shape(x.shape)
 
-    blockwise_x = blockwise.inverse(blockwise_y)
-    blockwise_x_shape_tensor = blockwise.inverse_event_shape_tensor(
+    blockwise_x = bijector.inverse(blockwise_y)
+    blockwise_x_shape_tensor = bijector.inverse_event_shape_tensor(
         tf.shape(blockwise_y))
-    blockwise_x_shape = blockwise.inverse_event_shape(blockwise_y.shape)
-    blockwise_ildj = blockwise.inverse_log_det_jacobian(
+    blockwise_x_shape = bijector.inverse_event_shape(blockwise_y.shape)
+    blockwise_ildj = bijector.inverse_log_det_jacobian(
         blockwise_y, event_ndims=1)
 
     if not dynamic_shape:
@@ -167,24 +172,24 @@ class BlockwiseBijectorTest(test_util.TestCase):
         self.evaluate(tf.shape(blockwise_ildj)), batch_shape + [])
 
     expl_y = tf.concat([
-        exp.forward(x[..., :2]),
+        e.forward(x[..., :2]),
         sc.forward(x[..., 2:3]),
         aff.forward(x[..., 3:]),
     ],
                        axis=-1)
     expl_fldj = sum([
-        exp.forward_log_det_jacobian(x[..., :2], event_ndims=1),
+        e.forward_log_det_jacobian(x[..., :2], event_ndims=1),
         sc.forward_log_det_jacobian(x[..., 2:3], event_ndims=1),
         aff.forward_log_det_jacobian(x[..., 3:], event_ndims=1)
     ])
     expl_x = tf.concat([
-        exp.inverse(expl_y[..., :2]),
+        e.inverse(expl_y[..., :2]),
         sc.inverse(expl_y[..., 2:4]),
         aff.inverse(expl_y[..., 4:])
     ],
                        axis=-1)
     expl_ildj = sum([
-        exp.inverse_log_det_jacobian(expl_y[..., :2], event_ndims=1),
+        e.inverse_log_det_jacobian(expl_y[..., :2], event_ndims=1),
         sc.inverse_log_det_jacobian(expl_y[..., 2:4], event_ndims=1),
         aff.inverse_log_det_jacobian(expl_y[..., 4:], event_ndims=1)
     ])
@@ -195,46 +200,48 @@ class BlockwiseBijectorTest(test_util.TestCase):
     self.assertAllClose(self.evaluate(expl_ildj), self.evaluate(blockwise_ildj))
 
   def testBijectiveAndFinite(self):
-    exp = tfb.Exp()
-    sp = tfb.Softplus()
-    aff = tfb.ScaleMatvecDiag(scale_diag=[2., 3., 4.])
-    blockwise = tfb.Blockwise(bijectors=[exp, sp, aff], block_sizes=[2, 1, 3])
+    e = exp.Exp()
+    sp = softplus.Softplus()
+    aff = scale_matvec_diag.ScaleMatvecDiag(scale_diag=[2., 3., 4.])
+    bijector = blockwise.Blockwise(
+        bijectors=[e, sp, aff], block_sizes=[2, 1, 3])
 
     x = tf.cast([0.1, 0.2, 0.3, 0.4, 0.5, 0.6], dtype=tf.float32)
     x = tf1.placeholder_with_default(x, shape=x.shape)
     # Identity to break the caching.
-    blockwise_y = tf.identity(blockwise.forward(x))
+    blockwise_y = tf.identity(bijector.forward(x))
 
     bijector_test_util.assert_bijective_and_finite(
-        blockwise,
+        bijector,
         x=self.evaluate(x),
         y=self.evaluate(blockwise_y),
         eval_func=self.evaluate,
         event_ndims=1)
 
   def testImplicitBlocks(self):
-    exp = tfb.Exp()
-    sp = tfb.Softplus()
-    aff = tfb.ScaleMatvecDiag(scale_diag=[2.])
-    blockwise = tfb.Blockwise(bijectors=[exp, sp, aff])
-    self.assertAllEqual(self.evaluate(blockwise.block_sizes), [1, 1, 1])
+    e = exp.Exp()
+    sp = softplus.Softplus()
+    aff = scale_matvec_diag.ScaleMatvecDiag(scale_diag=[2.])
+    bijector = blockwise.Blockwise(bijectors=[e, sp, aff])
+    self.assertAllEqual(self.evaluate(bijector.block_sizes), [1, 1, 1])
 
   def testName(self):
-    exp = tfb.Exp()
-    sp = tfb.Softplus()
-    aff = tfb.ScaleMatvecDiag(scale_diag=[2., 3., 4.])
-    blockwise = tfb.Blockwise(bijectors=[exp, sp, aff], block_sizes=[2, 1, 3])
-    self.assertStartsWith(blockwise.name,
-                          'blockwise_of_exp_and_softplus_and_scale_matvec_diag')
+    e = exp.Exp()
+    sp = softplus.Softplus()
+    aff = scale_matvec_diag.ScaleMatvecDiag(scale_diag=[2., 3., 4.])
+    bijector = blockwise.Blockwise(
+        bijectors=[e, sp, aff], block_sizes=[2, 1, 3])
+    self.assertStartsWith(
+        bijector.name, 'blockwise_of_exp_and_softplus_and_scale_matvec_diag')
 
   def testNameOneBijector(self):
-    exp = tfb.Exp()
-    blockwise = tfb.Blockwise(bijectors=[exp], block_sizes=[3])
-    self.assertStartsWith(blockwise.name, 'blockwise_of_exp')
+    e = exp.Exp()
+    bijector = blockwise.Blockwise(bijectors=[e], block_sizes=[3])
+    self.assertStartsWith(bijector.name, 'blockwise_of_exp')
 
   def testRaisesEmptyBijectors(self):
     with self.assertRaisesRegexp(ValueError, '`bijectors` must not be empty'):
-      tfb.Blockwise(bijectors=[])
+      blockwise.Blockwise(bijectors=[])
 
   def testRaisesBadBlocks(self):
     with self.assertRaisesRegexp(
@@ -242,27 +249,27 @@ class BlockwiseBijectorTest(test_util.TestCase):
         r'`block_sizes` must be `None`, or a vector of the same length as '
         r'`bijectors`. Got a `Tensor` with shape \(2L?,\) and `bijectors` of '
         r'length 1'):
-      tfb.Blockwise(bijectors=[tfb.Exp()], block_sizes=[1, 2])
+      blockwise.Blockwise(bijectors=[exp.Exp()], block_sizes=[1, 2])
 
   def testRaisesBadBlocksDynamic(self):
     if tf.executing_eagerly(): return
     with self.assertRaises(tf.errors.InvalidArgumentError):
       block_sizes = tf1.placeholder_with_default([1, 2], shape=None)
-      blockwise = tfb.Blockwise(
-          bijectors=[tfb.Exp()], block_sizes=block_sizes, validate_args=True)
-      self.evaluate(blockwise.block_sizes)
+      bijector = blockwise.Blockwise(
+          bijectors=[exp.Exp()], block_sizes=block_sizes, validate_args=True)
+      self.evaluate(bijector.block_sizes)
 
     with self.assertRaises(tf.errors.InvalidArgumentError):
       block_sizes = tf1.placeholder_with_default([[1]], shape=None)
-      blockwise = tfb.Blockwise(
-          bijectors=[tfb.Exp()], block_sizes=block_sizes, validate_args=True)
-      self.evaluate(blockwise.block_sizes)
+      bijector = blockwise.Blockwise(
+          bijectors=[exp.Exp()], block_sizes=block_sizes, validate_args=True)
+      self.evaluate(bijector.block_sizes)
 
   def testKwargs(self):
     zeros = tf.zeros(1)
 
     bijectors = [
-        tfb.Inline(  # pylint: disable=g-complex-comprehension
+        inline.Inline(  # pylint: disable=g-complex-comprehension
             forward_fn=mock.Mock(return_value=zeros),
             inverse_fn=mock.Mock(return_value=zeros),
             forward_log_det_jacobian_fn=mock.Mock(return_value=zeros),
@@ -271,14 +278,14 @@ class BlockwiseBijectorTest(test_util.TestCase):
             name='inner{}'.format(i)) for i in range(2)
     ]
 
-    blockwise = tfb.Blockwise(bijectors)
+    bijector = blockwise.Blockwise(bijectors)
 
     x = [1, 2]
-    blockwise.forward(x, inner0={'arg': 1}, inner1={'arg': 2})
-    blockwise.inverse(x, inner0={'arg': 3}, inner1={'arg': 4})
-    blockwise.forward_log_det_jacobian(
+    bijector.forward(x, inner0={'arg': 1}, inner1={'arg': 2})
+    bijector.inverse(x, inner0={'arg': 3}, inner1={'arg': 4})
+    bijector.forward_log_det_jacobian(
         x, event_ndims=1, inner0={'arg': 5}, inner1={'arg': 6})
-    blockwise.inverse_log_det_jacobian(
+    bijector.inverse_log_det_jacobian(
         x, event_ndims=1, inner0={'arg': 7}, inner1={'arg': 8})
 
     bijectors[0]._forward.assert_any_call(mock.ANY, arg=1)
@@ -294,16 +301,16 @@ class BlockwiseBijectorTest(test_util.TestCase):
       disable_numpy=True, disable_jax=True,
       reason='Numpy and JAX have no notion of CompositeTensor.')
   def testCompositeTensor(self):
-    exp = tfb.Exp()
-    sp = tfb.Softplus()
-    aff = tfb.Scale(scale=2.)
-    blockwise = tfb.Blockwise(bijectors=[exp, sp, aff])
-    self.assertIsInstance(blockwise, tf.__internal__.CompositeTensor)
+    e = exp.Exp()
+    sp = softplus.Softplus()
+    aff = scale.Scale(scale=2.)
+    bijector = blockwise.Blockwise(bijectors=[e, sp, aff])
+    self.assertIsInstance(bijector, tf.__internal__.CompositeTensor)
 
     # Bijector may be flattened into `Tensor` components and rebuilt.
-    flat = tf.nest.flatten(blockwise, expand_composites=True)
-    unflat = tf.nest.pack_sequence_as(blockwise, flat, expand_composites=True)
-    self.assertIsInstance(unflat, tfb.Blockwise)
+    flat = tf.nest.flatten(bijector, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(bijector, flat, expand_composites=True)
+    self.assertIsInstance(unflat, blockwise.Blockwise)
 
     # Bijector may be input to a `tf.function`-decorated callable.
     @tf.function
@@ -311,21 +318,21 @@ class BlockwiseBijectorTest(test_util.TestCase):
       return bij.forward(x)
 
     x = tf.ones([2, 3], dtype=tf.float32)
-    self.assertAllClose(call_forward(unflat, x), blockwise.forward(x))
+    self.assertAllClose(call_forward(unflat, x), bijector.forward(x))
 
     # Type spec can be encoded/decoded.
-    enc = tf.__internal__.saved_model.encode_structure(blockwise._type_spec)
+    enc = tf.__internal__.saved_model.encode_structure(bijector._type_spec)
     dec = tf.__internal__.saved_model.decode_proto(enc)
-    self.assertEqual(blockwise._type_spec, dec)
+    self.assertEqual(bijector._type_spec, dec)
 
   def testNonCompositeTensor(self):
-    exp = tfb.Exp()
-    scale = test_util.NonCompositeTensorScale(scale=tf.constant(3.))
-    blockwise = tfb.Blockwise(bijectors=[exp, scale])
-    self.assertNotIsInstance(blockwise, tf.__internal__.CompositeTensor)
+    e = exp.Exp()
+    s = test_util.NonCompositeTensorScale(scale=tf.constant(3.))
+    bijector = blockwise.Blockwise(bijectors=[e, s])
+    self.assertNotIsInstance(bijector, tf.__internal__.CompositeTensor)
     self.assertAllClose(
-        blockwise.forward([1., 1.]),
-        tf.convert_to_tensor([exp.forward(1.), scale.forward(1.)]))
+        bijector.forward([1., 1.]),
+        tf.convert_to_tensor([e.forward(1.), s.forward(1.)]))
 
 
 if __name__ == '__main__':

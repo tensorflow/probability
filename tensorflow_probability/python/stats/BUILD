@@ -33,7 +33,6 @@ multi_substrate_py_library(
     name = "stats",
     srcs = ["__init__.py"],
     jax_omit_deps = [
-        ":kendalls_tau",
         ":ranking",
     ],
     deps = [
@@ -66,12 +65,12 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["leave_one_out_test.py"],
     jax_size = "medium",
-    numpy_tags = ["notap"],
     deps = [
+        ":leave_one_out",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
     ],
 )
 
@@ -91,11 +90,11 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["moving_stats_test.py"],
     jax_tags = ["notap"],
-    numpy_tags = ["notap"],
     deps = [
+        ":moving_stats",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -117,10 +116,12 @@ multi_substrate_py_test(
     jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
+        ":quantiles",
+        ":ranking",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:truncated_normal",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -146,9 +147,9 @@ multi_substrate_py_test(
     srcs = ["sample_stats_test.py"],
     shard_count = 5,
     deps = [
+        ":sample_stats",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
         # tensorflow/compiler/jit dep,
     ],
@@ -174,10 +175,12 @@ multi_substrate_py_test(
     srcs = ["quantiles_test.py"],
     numpy_tags = ["notap"],
     deps = [
+        ":quantiles",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
     ],
 )
 
@@ -191,7 +194,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/math",
+        "//tensorflow_probability/python/math:generic",
     ],
 )
 
@@ -201,11 +204,12 @@ multi_substrate_py_test(
     srcs = ["calibration_test.py"],
     numpy_tags = ["notap"],
     deps = [
+        ":calibration",
         # absl/logging dep,
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:categorical",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -228,7 +232,7 @@ multi_substrate_py_test(
     jax_tags = ["notap"],
     deps = [
         ":kendalls_tau",
-        "//tensorflow_probability",
+        # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

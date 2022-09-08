@@ -19,8 +19,10 @@
 import numpy as np
 from scipy import stats
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import shift
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.bijectors import transform_diagonal
+from tensorflow_probability.python.distributions import matrix_normal_linear_operator as mnlo
 from tensorflow_probability.python.internal import test_util
 
 
@@ -29,8 +31,9 @@ class _MatrixNormalTest(object):
 
   def _random_tril_matrix(self, shape, seed):
     mat = tf.random.normal(shape=shape, seed=seed, dtype=self.dtype)
-    chol = tfb.TransformDiagonal(
-        tfb.Shift(shift=self.dtype(1.))(tfb.Softplus()))(mat)
+    chol = transform_diagonal.TransformDiagonal(
+        shift.Shift(shift=self.dtype(1.))(softplus.Softplus()))(
+            mat)
     return tf.linalg.band_part(chol, -1, 0)
 
   def _random_loc_and_scale(
@@ -57,7 +60,7 @@ class _MatrixNormalTest(object):
     seed_stream = test_util.test_seed_stream()
     loc, scale_row, scale_col = self._random_loc_and_scale(
         [], [2, 3], seed_stream)
-    matrix_normal = tfd.MatrixNormalLinearOperator(
+    matrix_normal = mnlo.MatrixNormalLinearOperator(
         loc, scale_row, scale_col, validate_args=True)
     x = tf.random.normal(shape=[2, 3], seed=seed_stream(), dtype=self.dtype)
 
@@ -83,7 +86,7 @@ class _MatrixNormalTest(object):
     seed_stream = test_util.test_seed_stream()
     loc, scale_row, scale_col = self._random_loc_and_scale(
         batch_shape=[3], matrix_shape=[3, 5], seed_stream=seed_stream)
-    matrix_normal = tfd.MatrixNormalLinearOperator(
+    matrix_normal = mnlo.MatrixNormalLinearOperator(
         loc, scale_row, scale_col, validate_args=True)
     x = tf.random.normal(shape=[3, 3, 5], seed=seed_stream(), dtype=self.dtype)
 
@@ -119,7 +122,7 @@ class _MatrixNormalTest(object):
         self._random_tril_matrix([7, 1, 1, 3, 3], seed_stream()),
         is_non_singular=True)
 
-    matrix_normal = tfd.MatrixNormalLinearOperator(
+    matrix_normal = mnlo.MatrixNormalLinearOperator(
         loc, scale_row, scale_col, validate_args=True)
 
     self.assertAllEqual((2, 3), matrix_normal.event_shape)
@@ -133,7 +136,7 @@ class _MatrixNormalTest(object):
   def testMeanAndVariance(self):
     loc, scale_row, scale_col = self._random_loc_and_scale(
         batch_shape=[3, 4], matrix_shape=[2, 5])
-    matrix_normal = tfd.MatrixNormalLinearOperator(loc, scale_row, scale_col)
+    matrix_normal = mnlo.MatrixNormalLinearOperator(loc, scale_row, scale_col)
 
     cov_row = scale_row.matmul(scale_row.adjoint())
     cov_col = scale_col.matmul(scale_col.adjoint())
@@ -153,7 +156,7 @@ class _MatrixNormalTest(object):
     seed_stream = test_util.test_seed_stream()
     loc, scale_row, scale_col = self._random_loc_and_scale(
         batch_shape=[5, 2], matrix_shape=[2, 3], seed_stream=seed_stream)
-    matrix_normal = tfd.MatrixNormalLinearOperator(loc, scale_row, scale_col)
+    matrix_normal = mnlo.MatrixNormalLinearOperator(loc, scale_row, scale_col)
     samples = matrix_normal.sample(int(1e6), seed=seed_stream())
     mean_, samples_ = self.evaluate([matrix_normal.mean(), samples])
     self.assertAllClose(mean_, np.mean(samples_, axis=0), rtol=1e-2)
@@ -162,7 +165,7 @@ class _MatrixNormalTest(object):
     seed_stream = test_util.test_seed_stream()
     loc, scale_row, scale_col = self._random_loc_and_scale(
         batch_shape=[5, 2], matrix_shape=[2, 3], seed_stream=seed_stream)
-    matrix_normal = tfd.MatrixNormalLinearOperator(loc, scale_row, scale_col)
+    matrix_normal = mnlo.MatrixNormalLinearOperator(loc, scale_row, scale_col)
     samples = matrix_normal.sample(int(2e6), seed=seed_stream())
     variance_, samples_ = self.evaluate([matrix_normal.variance(), samples])
     self.assertAllClose(variance_, np.var(samples_, axis=0), rtol=1e-2)
@@ -174,7 +177,7 @@ class _MatrixNormalTest(object):
         tf.eye(1), is_non_singular=True)
     scale_column = tf.linalg.LinearOperatorLowerTriangular(
         tf.eye(2), is_non_singular=True)
-    d = tfd.MatrixNormalLinearOperator(
+    d = mnlo.MatrixNormalLinearOperator(
         loc, scale_row, scale_column, validate_args=True)
     self.evaluate(loc.initializer)
     with tf.GradientTape() as tape:
@@ -190,7 +193,7 @@ class _MatrixNormalTest(object):
     scale_column = tf.linalg.LinearOperatorLowerTriangular(
         scale_tensor,
         is_non_singular=True)
-    d = tfd.MatrixNormalLinearOperator(
+    d = mnlo.MatrixNormalLinearOperator(
         loc, scale_row, scale_column, validate_args=True)
     self.evaluate(scale_tensor.initializer)
     with self.assertRaises(Exception):

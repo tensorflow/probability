@@ -19,10 +19,11 @@ import numpy as np
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.random import random_ops
+from tensorflow_probability.python.stats import sample_stats
 
 
 @test_util.test_all_tf_execution_regimes
@@ -33,7 +34,7 @@ class _RandomRademacher(object):
     shape = (
         tf.constant(shape_) if self.use_static_shape else
         tf1.placeholder_with_default(shape_, shape=None))
-    x = tfp.random.rademacher(shape, self.dtype, seed=test_util.test_seed())
+    x = random_ops.rademacher(shape, self.dtype, seed=test_util.test_seed())
     if self.use_static_shape:
       self.assertAllEqual(shape_, x.shape)
     x_ = self.evaluate(x)
@@ -69,10 +70,11 @@ class _RandomRayleigh(object):
     scale = (
         tf.constant(scale_) if self.use_static_shape else
         tf1.placeholder_with_default(scale_, shape=None))
-    x = tfp.random.rayleigh(shape,
-                            scale=scale[..., tf.newaxis],
-                            dtype=self.dtype,
-                            seed=test_util.test_seed())
+    x = random_ops.rayleigh(
+        shape,
+        scale=scale[..., tf.newaxis],
+        dtype=self.dtype,
+        seed=test_util.test_seed())
     self.assertEqual(self.dtype, dtype_util.as_numpy_dtype(x.dtype))
     final_shape_ = [3, 2, int(1e3)]
     if self.use_static_shape:
@@ -110,7 +112,7 @@ class _RandomSphericalUniform(object):
     dimension = (
         tf.constant(d) if self.use_static_shape else
         tf1.placeholder_with_default(d, shape=None))
-    x = tfp.random.spherical_uniform(
+    x = random_ops.spherical_uniform(
         dimension=dimension,
         shape=shape,
         dtype=self.dtype,
@@ -120,7 +122,7 @@ class _RandomSphericalUniform(object):
     if self.use_static_shape:
       self.assertAllEqual(final_shape_, x.shape)
     sample_mean = tf.reduce_mean(x, axis=0, keepdims=True)
-    sample_covar = tfp.stats.covariance(x)
+    sample_covar = sample_stats.covariance(x)
     [x_, sample_mean_, sample_covar_] = self.evaluate([
         x, sample_mean, sample_covar])
     self.assertAllEqual(final_shape_, x_.shape)
@@ -152,11 +154,8 @@ class _RandomSphericalUniform(object):
 
     @tf.function(jit_compile=True)
     def sample():
-      return tfp.random.spherical_uniform(
-          dimension=dimension,
-          shape=shape,
-          seed=seed,
-          dtype=self.dtype)
+      return random_ops.spherical_uniform(
+          dimension=dimension, shape=shape, seed=seed, dtype=self.dtype)
 
     samples = self.evaluate(sample())
     self.assertAllEqual([2, 3, 10], samples.shape)

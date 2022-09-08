@@ -20,10 +20,11 @@ import datetime
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.distributions import inverse_gamma
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.experimental.sts_gibbs import gibbs_sampler
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.math import root_search
 from tensorflow_probability.python.sts import default_model
 from tensorflow_probability.python.sts import regularization
 from tensorflow_probability.python.sts.forecast import one_step_predictive
@@ -175,8 +176,6 @@ def _detect_anomalies_inner(observed_time_series,
         num_results=num_samples,
         num_warmup_steps=num_warmup_steps,
         seed=seed)
-    parameter_samples = _parameter_samples_from_gibbs_posterior(
-        model, posterior_samples)
     if use_gibbs_predictive_dist:
       predictive_dist = gibbs_sampler.one_step_predictive(model,
                                                           posterior_samples)
@@ -193,6 +192,8 @@ def _detect_anomalies_inner(observed_time_series,
                             observed_time_series,
                             # Gibbs sampling didn't fit a drift scale(s).
                             allow_drift=False))
+      parameter_samples = gibbs_sampler.model_parameter_samples_from_gibbs_samples(
+          model, posterior_samples)
       predictive_dist = one_step_predictive(seasonal_model,
                                             observed_time_series,
                                             timesteps_are_event_shape=False,
@@ -230,13 +231,13 @@ def _fit_seasonal_model_with_gibbs_sampling(observed_time_series,
     # Default priors.
     # pylint: disable=protected-access
     one = tf.ones([], dtype=dtype)
-    level_variance_prior = tfd.InverseGamma(concentration=16,
-                                            scale=16. * 0.001**2 * one)
+    level_variance_prior = inverse_gamma.InverseGamma(
+        concentration=16, scale=16. * 0.001**2 * one)
     level_variance_prior._upper_bound = one
-    slope_variance_prior = tfd.InverseGamma(concentration=16,
-                                            scale=16. * 0.05**2 * one)
+    slope_variance_prior = inverse_gamma.InverseGamma(
+        concentration=16, scale=16. * 0.05**2 * one)
     slope_variance_prior._upper_bound = 0.01 * one
-    observation_noise_variance_prior = tfd.InverseGamma(
+    observation_noise_variance_prior = inverse_gamma.InverseGamma(
         concentration=0.05, scale=0.05 * one)
     observation_noise_variance_prior._upper_bound = 1.2 * one
     # pylint: enable=protected-access
@@ -244,7 +245,7 @@ def _fit_seasonal_model_with_gibbs_sampling(observed_time_series,
   model = gibbs_sampler.build_model_for_gibbs_fitting(
       observed_time_series=observed_time_series,
       design_matrix=design_matrix,
-      weights_prior=tfd.Normal(loc=0., scale=one),
+      weights_prior=normal.Normal(loc=0., scale=one),
       level_variance_prior=level_variance_prior,
       slope_variance_prior=slope_variance_prior,
       observation_noise_variance_prior=observation_noise_variance_prior)
@@ -256,14 +257,6 @@ def _fit_seasonal_model_with_gibbs_sampling(observed_time_series,
                                             num_warmup_steps=num_warmup_steps,
                                             seed=seed)
   ]
-
-
-def _parameter_samples_from_gibbs_posterior(model, posterior_samples):
-  """Extracts samples of model parameters from Gibbs posterior samples."""
-  posterior_samples_dict = posterior_samples._asdict()
-  get_param = lambda param_name: posterior_samples_dict[  # pylint: disable=g-long-lambda
-      [k for k in posterior_samples_dict if k in param_name][0]]
-  return [get_param(param.name) for param in model.parameters]
 
 
 def compute_predictive_bounds(predictive_dist, anomaly_threshold=0.01):
@@ -302,7 +295,7 @@ def compute_predictive_bounds(predictive_dist, anomaly_threshold=0.01):
       [tf.math.log(anomaly_threshold / 2.),
        tf.math.log1p(-anomaly_threshold / 2.)],
       ps.concat([[2], ps.ones_like(ps.shape(predictive_mean))], axis=0))
-  limits, _, _ = tfp_math.find_root_chandrupatla(
+  limits, _, _ = root_search.find_root_chandrupatla(
       lambda x: target_log_cdfs - predictive_dist.log_cdf(x),
       low=predictive_mean - 100 * predictive_stddev,
       high=predictive_mean + 100 * predictive_stddev)

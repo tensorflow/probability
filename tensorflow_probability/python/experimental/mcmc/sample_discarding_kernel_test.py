@@ -18,8 +18,11 @@
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.experimental.mcmc import covariance_reducer
+from tensorflow_probability.python.experimental.mcmc import sample_discarding_kernel
+from tensorflow_probability.python.experimental.mcmc import with_reductions
 from tensorflow_probability.python.experimental.mcmc.internal import test_fixtures
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 
 
@@ -28,10 +31,11 @@ class SampleDiscardingTest(test_util.TestCase):
 
   def test_thinning(self):
     fake_inner_kernel = test_fixtures.TestTransitionKernel()
-    discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
+    discarder = sample_discarding_kernel.SampleDiscardingKernel(
         fake_inner_kernel,
-        num_steps_between_results=1,)
-    seed1, seed2 = tfp.random.split_seed(
+        num_steps_between_results=1,
+    )
+    seed1, seed2 = samplers.split_seed(
         test_util.test_seed(sampler_type='stateless'))
     first_state, kernel_results = discarder.one_step(
         0., discarder.bootstrap_results(0.), seed=seed1)
@@ -47,9 +51,10 @@ class SampleDiscardingTest(test_util.TestCase):
 
   def test_burnin(self):
     fake_inner_kernel = test_fixtures.TestTransitionKernel()
-    discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
+    discarder = sample_discarding_kernel.SampleDiscardingKernel(
         fake_inner_kernel,
-        num_burnin_steps=5,)
+        num_burnin_steps=5,
+    )
     seed = test_util.test_seed(sampler_type='stateless')
     sample, kernel_results = discarder.one_step(
         0., discarder.bootstrap_results(0.), seed=seed)
@@ -62,9 +67,9 @@ class SampleDiscardingTest(test_util.TestCase):
 
   def test_no_thinning_or_burnin(self):
     fake_inner_kernel = test_fixtures.TestTransitionKernel()
-    discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
+    discarder = sample_discarding_kernel.SampleDiscardingKernel(
         fake_inner_kernel,)
-    seed1, seed2 = tfp.random.split_seed(
+    seed1, seed2 = samplers.split_seed(
         test_util.test_seed(sampler_type='stateless'))
     first_state, kernel_results = discarder.one_step(
         0., discarder.bootstrap_results(0.), seed=seed1)
@@ -80,11 +85,12 @@ class SampleDiscardingTest(test_util.TestCase):
 
   def test_both_thinning_and_burnin(self):
     fake_inner_kernel = test_fixtures.TestTransitionKernel()
-    discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
+    discarder = sample_discarding_kernel.SampleDiscardingKernel(
         fake_inner_kernel,
         num_burnin_steps=10,
-        num_steps_between_results=1,)
-    seed1, seed2 = tfp.random.split_seed(
+        num_steps_between_results=1,
+    )
+    seed1, seed2 = samplers.split_seed(
         test_util.test_seed(sampler_type='stateless'))
     first_state, kernel_results = discarder.one_step(
         0., discarder.bootstrap_results(0.), seed=seed1)
@@ -103,11 +109,12 @@ class SampleDiscardingTest(test_util.TestCase):
 
   def test_cold_start(self):
     fake_inner_kernel = test_fixtures.TestTransitionKernel()
-    discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
+    discarder = sample_discarding_kernel.SampleDiscardingKernel(
         fake_inner_kernel,
         num_burnin_steps=10,
-        num_steps_between_results=1,)
-    seed1, seed2 = tfp.random.split_seed(
+        num_steps_between_results=1,
+    )
+    seed1, seed2 = samplers.split_seed(
         test_util.test_seed(sampler_type='stateless'))
     first_state, _ = discarder.one_step(
         0., discarder.bootstrap_results(0.), seed=seed1)
@@ -130,27 +137,27 @@ class SampleDiscardingTest(test_util.TestCase):
     calibrated_kernel = test_fixtures.TestTransitionKernel()
     uncalibrated_kernel = test_fixtures.TestTransitionKernel(
         is_calibrated=False)
-    calibrated_discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
+    calibrated_discarder = sample_discarding_kernel.SampleDiscardingKernel(
         calibrated_kernel)
-    uncalibrated_discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
+    uncalibrated_discarder = sample_discarding_kernel.SampleDiscardingKernel(
         uncalibrated_kernel)
     self.assertTrue(calibrated_discarder.is_calibrated)
     self.assertFalse(uncalibrated_discarder.is_calibrated)
 
   def test_with_composed_kernel(self):
     fake_inner_kernel = test_fixtures.TestTransitionKernel()
-    cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
-    reducer_kernel = tfp.experimental.mcmc.WithReductions(
-        inner_kernel=tfp.experimental.mcmc.SampleDiscardingKernel(
+    cov_reducer = covariance_reducer.CovarianceReducer()
+    reducer_kernel = with_reductions.WithReductions(
+        inner_kernel=sample_discarding_kernel.SampleDiscardingKernel(
             inner_kernel=fake_inner_kernel,
             num_burnin_steps=10,
-            num_steps_between_results=2,),
-        reducer=cov_reducer
-    )
+            num_steps_between_results=2,
+        ),
+        reducer=cov_reducer)
     current_state, kernel_results = 0., reducer_kernel.bootstrap_results(0.)
     seed = test_util.test_seed(sampler_type='stateless')
     for _ in range(2):
-      mcmc_seed, seed = tfp.random.split_seed(seed)
+      mcmc_seed, seed = samplers.split_seed(seed)
       current_state, kernel_results = reducer_kernel.one_step(
           current_state, kernel_results, seed=mcmc_seed)
     cov = cov_reducer.finalize(kernel_results.reduction_results)
@@ -164,13 +171,14 @@ class SampleDiscardingTest(test_util.TestCase):
 
   def test_tf_while(self):
     fake_inner_kernel = test_fixtures.TestTransitionKernel()
-    discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
+    discarder = sample_discarding_kernel.SampleDiscardingKernel(
         fake_inner_kernel,
         num_burnin_steps=10,
-        num_steps_between_results=1,)
+        num_steps_between_results=1,
+    )
 
     def _loop_body(i, seed, curr_state, pkr):
-      mcmc_seed, seed = tfp.random.split_seed(seed)
+      mcmc_seed, seed = samplers.split_seed(seed)
       new_state, kernel_results = discarder.one_step(
           curr_state, pkr, seed=mcmc_seed,
       )
@@ -191,13 +199,14 @@ class SampleDiscardingTest(test_util.TestCase):
 
   def test_tensor_thinning_and_burnin(self):
     fake_inner_kernel = test_fixtures.TestTransitionKernel()
-    discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
+    discarder = sample_discarding_kernel.SampleDiscardingKernel(
         fake_inner_kernel,
         num_burnin_steps=tf.convert_to_tensor(10),
-        num_steps_between_results=tf.convert_to_tensor(1),)
+        num_steps_between_results=tf.convert_to_tensor(1),
+    )
 
     def _loop_body(i, seed, curr_state, pkr):
-      mcmc_seed, seed = tfp.random.split_seed(seed)
+      mcmc_seed, seed = samplers.split_seed(seed)
       new_state, kernel_results = discarder.one_step(
           curr_state, pkr, seed=mcmc_seed,
       )
@@ -222,7 +231,7 @@ class SampleDiscardingTest(test_util.TestCase):
     fake_inner_kernel = test_fixtures.TestTransitionKernel()
     num_burnin_steps = tf.Variable(10, dtype=tf.int32)
     num_steps_between_results = tf.Variable(1, dtype=tf.int32)
-    discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
+    discarder = sample_discarding_kernel.SampleDiscardingKernel(
         fake_inner_kernel,
         num_burnin_steps=num_burnin_steps,
         num_steps_between_results=num_steps_between_results)
@@ -250,13 +259,14 @@ class SampleDiscardingTest(test_util.TestCase):
 
   def test_tensor_no_burnin(self):
     fake_inner_kernel = test_fixtures.TestTransitionKernel()
-    discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
+    discarder = sample_discarding_kernel.SampleDiscardingKernel(
         fake_inner_kernel,
         num_burnin_steps=tf.convert_to_tensor(0),
-        num_steps_between_results=tf.convert_to_tensor(1),)
+        num_steps_between_results=tf.convert_to_tensor(1),
+    )
 
     def _loop_body(i, seed, curr_state, pkr):
-      mcmc_seed, seed = tfp.random.split_seed(seed)
+      mcmc_seed, seed = samplers.split_seed(seed)
       new_state, kernel_results = discarder.one_step(
           curr_state, pkr, seed=mcmc_seed,
       )
@@ -277,13 +287,14 @@ class SampleDiscardingTest(test_util.TestCase):
 
   def test_call_count_is_int32(self):
     fake_inner_kernel = test_fixtures.TestTransitionKernel()
-    discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
+    discarder = sample_discarding_kernel.SampleDiscardingKernel(
         fake_inner_kernel,
         num_burnin_steps=10,
-        num_steps_between_results=1,)
+        num_steps_between_results=1,
+    )
 
     def _loop_body(i, seed, curr_state, pkr):
-      mcmc_seed, seed = tfp.random.split_seed(seed)
+      mcmc_seed, seed = samplers.split_seed(seed)
       new_state, kernel_results = discarder.one_step(
           curr_state, pkr, seed=mcmc_seed,
       )

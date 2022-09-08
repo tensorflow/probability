@@ -16,14 +16,22 @@
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import util
+from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.bijectors import chain
+from tensorflow_probability.python.bijectors import fill_scale_tril
+from tensorflow_probability.python.bijectors import fill_triangular
+from tensorflow_probability.python.bijectors import pad
+from tensorflow_probability.python.bijectors import shift
+from tensorflow_probability.python.bijectors import sigmoid
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.bijectors import transform_diagonal
 from tensorflow_probability.python.experimental.bijectors import scalar_function_with_inferred_inverse
 from tensorflow_probability.python.internal import cache_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.util import deferred_tensor
 
 __all__ = [
     'build_trainable_highway_flow',
@@ -72,18 +80,18 @@ def build_trainable_highway_flow(width,
   dtype = residual_fraction_initial_value.dtype
 
   bias_seed, upper_seed, lower_seed = samplers.split_seed(seed, n=3)
-  lower_bijector = tfb.Chain([
-      tfb.TransformDiagonal(diag_bijector=tfb.Shift(1.)),
-      tfb.Pad(paddings=[(1, 0), (0, 1)]),
-      tfb.FillTriangular()
+  lower_bijector = chain.Chain([
+      transform_diagonal.TransformDiagonal(diag_bijector=shift.Shift(1.)),
+      pad.Pad(paddings=[(1, 0), (0, 1)]),
+      fill_triangular.FillTriangular()
   ])
   unconstrained_lower_initial_values = samplers.normal(
       shape=lower_bijector.inverse_event_shape([width, width]),
       mean=0.,
       stddev=.01,
       seed=lower_seed)
-  upper_bijector = tfb.FillScaleTriL(
-      diag_bijector=tfb.Softplus(), diag_shift=None)
+  upper_bijector = fill_scale_tril.FillScaleTriL(
+      diag_bijector=softplus.Softplus(), diag_shift=None)
   unconstrained_upper_initial_values = samplers.normal(
       shape=upper_bijector.inverse_event_shape([width, width]),
       mean=0.,
@@ -91,20 +99,20 @@ def build_trainable_highway_flow(width,
       seed=upper_seed)
 
   return HighwayFlow(
-      residual_fraction=util.TransformedVariable(
+      residual_fraction=deferred_tensor.TransformedVariable(
           initial_value=residual_fraction_initial_value,
-          bijector=tfb.Sigmoid(),
+          bijector=sigmoid.Sigmoid(),
           dtype=dtype),
       activation_fn=activation_fn,
       bias=tf.Variable(
           samplers.normal((width,), mean=0., stddev=0.01, seed=bias_seed),
           dtype=dtype),
-      upper_diagonal_weights_matrix=util.TransformedVariable(
+      upper_diagonal_weights_matrix=deferred_tensor.TransformedVariable(
           initial_value=upper_bijector.forward(
               unconstrained_upper_initial_values),
           bijector=upper_bijector,
           dtype=dtype),
-      lower_diagonal_weights_matrix=util.TransformedVariable(
+      lower_diagonal_weights_matrix=deferred_tensor.TransformedVariable(
           initial_value=lower_bijector.forward(
               unconstrained_lower_initial_values),
           bijector=lower_bijector,
@@ -114,7 +122,7 @@ def build_trainable_highway_flow(width,
 
 
 # TODO(b/188814119): Decorate as auto composite tensor and add test.
-class HighwayFlow(tfb.Bijector):
+class HighwayFlow(bijector.Bijector):
   """Implements an Highway Flow bijector [1].
 
   HighwayFlow interpolates the vector-valued input `X` with the transformations

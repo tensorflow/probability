@@ -54,6 +54,12 @@ def _unwrap_tensor_coercible(dist):
   return _unwrap_tensor_coercible(inner_dist)
 
 
+def _get_adam_optimizer(learning_rate):
+  if tf.__internal__.tf2.enabled() and tf.executing_eagerly():
+    return tf.keras.optimizers.Adam(learning_rate=learning_rate)
+  return tf.keras.optimizers.legacy.Adam(learning_rate=learning_rate)
+
+
 # TODO(b/143642032): Figure out how to solve issues with save/load, so that we
 # can decorate all of these tests with @test_util.test_all_tf_execution_regimes
 @test_util.test_graph_and_eager_modes
@@ -132,8 +138,9 @@ class EndToEndTest(test_util.TestCase):
           tf.cast(tf.equal(x, rv_x.mode()), x.dtype),
           axis=tf.range(-rv_x.event_shape.ndims, 0))
 
+    optimizer = _get_adam_optimizer(learning_rate=0.5)
     vae_model.compile(
-        optimizer=tf.optimizers.Adam(learning_rate=0.5),
+        optimizer=optimizer,
         loss=lambda x, rv_x: -rv_x.log_prob(x),
         metrics=[accuracy])
 
@@ -184,11 +191,8 @@ class EndToEndTest(test_util.TestCase):
 
     vae_model = tfk.Model(inputs=images, outputs=decoded)
     vae_model.compile(
-        optimizer=tf.optimizers.Adam(),
-        loss=lambda x, rv_x: -rv_x.log_prob(x),
-        metrics=[])
-    self.assertLen(vae_model.trainable_weights,
-                   (2 + 2) + (2 + 2) + (1 + 1) + 0)
+        optimizer='adam', loss=lambda x, rv_x: -rv_x.log_prob(x), metrics=[])
+    self.assertLen(vae_model.trainable_weights, (2 + 2) + (2 + 2) + (1 + 1) + 0)
     self.evaluate([v.initializer for v in vae_model.variables])
     vae_model.fit(self.x, self.x,
                   batch_size=25,
@@ -245,13 +249,13 @@ class EndToEndTest(test_util.TestCase):
 
     vae_model = tfk.Model(inputs=images, outputs=decoded)
     vae_model.compile(
-        optimizer=tf.optimizers.Adam(),
-        loss=lambda x, rv_x: -rv_x.log_prob(x),
-        metrics=[])
-    vae_model.fit(self.x, self.x,
-                  batch_size=25,
-                  epochs=1,
-                  validation_data=(self.x_test, self.x_test))
+        optimizer='adam', loss=lambda x, rv_x: -rv_x.log_prob(x), metrics=[])
+    vae_model.fit(
+        self.x,
+        self.x,
+        batch_size=25,
+        epochs=1,
+        validation_data=(self.x_test, self.x_test))
     yhat = vae_model(tf.convert_to_tensor(self.x_test))
     self.assertIsInstance(yhat.tensor_distribution, tfd.Independent)
     self.assertIsInstance(yhat.tensor_distribution.distribution, tfd.Bernoulli)
@@ -285,9 +289,7 @@ class EndToEndTest(test_util.TestCase):
         inputs=encoder_model.inputs,
         outputs=decoder_model(encoder_model.outputs[0]))
     vae_model.compile(
-        optimizer=tf.optimizers.Adam(),
-        loss=lambda x, rv_x: -rv_x.log_prob(x),
-        metrics=[])
+        optimizer='adam', loss=lambda x, rv_x: -rv_x.log_prob(x), metrics=[])
     self.assertLen(encoder_model.trainable_variables, (2 + 2) + 1)
     self.assertLen(decoder_model.trainable_variables, 2 + 2)
     self.assertLen(vae_model.trainable_variables, (2 + 2) + (2 + 2) + 1)
@@ -461,9 +463,7 @@ class DistributionLambdaVariableCreation(test_util.TestCase):
 
     model = tfk.Model(x, normal(x))  # pylint: disable=unused-variable
     model.compile(
-        optimizer=tf.optimizers.Adam(),
-        loss=lambda x, rv_x: -rv_x.log_prob(x),
-        metrics=[])
+        optimizer='adam', loss=lambda x, rv_x: -rv_x.log_prob(x), metrics=[])
 
     x_train = np.random.rand(1000, 3, 3, 1).astype(np.float32)
     x_test = np.random.rand(100, 3, 3, 1).astype(np.float32)
@@ -511,7 +511,7 @@ class KLDivergenceAddLossTest(test_util.TestCase):
     self.assertNear(actual_kl_, approx_kl_, err=0.15)
 
     model.compile(
-        optimizer=tf.optimizers.Adam(),
+        optimizer='adam',
         loss=lambda x, dist: -dist.log_prob(x[0, :, :event_size]),
         metrics=[])
     model.fit(x=x,
@@ -558,7 +558,7 @@ class KLDivergenceAddLossTest(test_util.TestCase):
     self.assertNear(actual_kl_, evaluated_kl_, err=1e-5)
 
     model.compile(
-        optimizer=tf.optimizers.Adam(),
+        optimizer='adam',
         loss=lambda x, dist: -dist.log_prob(x[0, :, :event_size]),
         metrics=[])
     model.fit(x=x,
@@ -621,9 +621,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
 
     # Fit.
     model.compile(
-        optimizer=tf.optimizers.Adam(),
-        loss=lambda y, model: -model.log_prob(y),
-        metrics=[])
+        optimizer='adam', loss=lambda y, model: -model.log_prob(y), metrics=[])
     batch_size = 100
     model.fit(x, y,
               batch_size=batch_size,
@@ -681,7 +679,7 @@ class OneHotCategoricalTest(test_util.TestCase):
 
     # Fit.
     model.compile(
-        optimizer=tf.optimizers.Adam(learning_rate=0.5),
+        optimizer=_get_adam_optimizer(learning_rate=0.5),
         loss=lambda y, model: -model.log_prob(y),
         metrics=[])
     batch_size = 100
@@ -764,7 +762,7 @@ class CategoricalMixtureOfOneHotCategoricalTest(test_util.TestCase):
 
     # Fit.
     model.compile(
-        optimizer=tf.optimizers.Adam(learning_rate=0.5),
+        optimizer=_get_adam_optimizer(learning_rate=0.5),
         loss=lambda y, model: -model.log_prob(y),
         metrics=[])
     batch_size = 100
@@ -950,7 +948,7 @@ class IndependentBernoulliTestStaticShape(test_util.TestCase,
 
     # Fit.
     model.compile(
-        optimizer=tf.optimizers.Adam(learning_rate=0.5),
+        optimizer=_get_adam_optimizer(learning_rate=0.5),
         loss=lambda y, model: -model.log_prob(y))
     batch_size = 10000
     model.fit(x, y,
@@ -1138,7 +1136,7 @@ class IndependentPoissonTestStaticShape(test_util.TestCase,
 
     # Fit.
     model.compile(
-        optimizer=tf.optimizers.Adam(learning_rate=0.05),
+        optimizer=_get_adam_optimizer(learning_rate=0.05),
         loss=lambda y, model: -model.log_prob(y),
         metrics=[])
     batch_size = 50
@@ -1324,7 +1322,7 @@ class _MixtureLogisticTest(_MixtureLayerTest):
     # Fit.
     batch_size = 100
     model.compile(
-        optimizer=tf.optimizers.Adam(learning_rate=0.02),
+        optimizer=_get_adam_optimizer(learning_rate=0.02),
         loss=lambda y, model: -model.log_prob(y))
     model.fit(x, y,
               batch_size=batch_size,
@@ -1394,7 +1392,7 @@ class _MixtureNormalTest(_MixtureLayerTest):
     # Fit.
     batch_size = 100
     model.compile(
-        optimizer=tf.optimizers.Adam(learning_rate=0.02),
+        optimizer=_get_adam_optimizer(learning_rate=0.02),
         loss=lambda y, model: -model.log_prob(y))
     model.fit(x, y,
               batch_size=batch_size,
@@ -1514,7 +1512,7 @@ class _MixtureSameFamilyTest(object):
     # Fit.
     batch_size = 100
     model.compile(
-        optimizer=tf.optimizers.Adam(learning_rate=0.02),
+        optimizer=_get_adam_optimizer(learning_rate=0.02),
         loss=lambda y, model: -model.log_prob(y))
     model.fit(x, y,
               batch_size=batch_size,
@@ -1604,7 +1602,7 @@ class VariationalGaussianProcessEndToEnd(test_util.TestCase):
     kl_weight = np.float64(batch_size) / n
     loss = lambda y, d: d.variational_loss(y, kl_weight=kl_weight)
     model.compile(
-        optimizer=tf.optimizers.Adam(learning_rate=0.02),
+        optimizer=_get_adam_optimizer(learning_rate=0.02),
         loss=loss)
 
     if not tf.executing_eagerly():

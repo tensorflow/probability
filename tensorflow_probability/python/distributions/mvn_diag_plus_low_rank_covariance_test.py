@@ -17,9 +17,9 @@
 # Dependency imports
 
 import numpy as np
-from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python import stats as tfps
+from tensorflow_probability.python.distributions import mvn_diag_plus_low_rank_covariance as mvdplrc
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.stats import sample_stats
 
 
 @test_util.test_all_tf_execution_regimes
@@ -41,7 +41,7 @@ class MultivariateNormalLowRankUpdateLinearOperatorCovarianceTest(
         low=1., high=2., size=diag_shape).astype(dtype)
     cov_perturb_factor = np.random.normal(
         size=update_shape).astype(dtype)
-    return tfd.MultivariateNormalDiagPlusLowRankCovariance(
+    return mvdplrc.MultivariateNormalDiagPlusLowRankCovariance(
         loc=loc,
         cov_diag_factor=cov_diag_factor,
         cov_perturb_factor=cov_perturb_factor)
@@ -58,7 +58,7 @@ class MultivariateNormalLowRankUpdateLinearOperatorCovarianceTest(
     samples_, mean, s_cov, cov = self.evaluate([
         samples,
         mvn.mean(),
-        tfps.covariance(samples, sample_axis=0),
+        sample_stats.covariance(samples, sample_axis=0),
         mvn.covariance(),
     ])
 

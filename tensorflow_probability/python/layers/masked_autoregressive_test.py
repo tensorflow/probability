@@ -58,9 +58,7 @@ class AutoregressiveTransformTest(test_util.TestCase):
             params=2, hidden_units=[10], activation='relu')),
     ])
 
-    model.compile(
-        optimizer=tf.optimizers.Adam(),
-        loss=lambda y, rv_y: -rv_y.log_prob(y))
+    model.compile(optimizer='adam', loss=lambda y, rv_y: -rv_y.log_prob(y))
 
     model.fit(x=np.zeros((n, 0)),
               y=data,

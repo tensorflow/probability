@@ -48,8 +48,8 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions
 from tensorflow_probability.python import util as tfp_util
+from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.internal import dtype_util
 
 
@@ -628,7 +628,7 @@ def _binary_crossover(population,
   """
   sizes = [tf.cast(tf.size(x), dtype=tf.float64) for x in population]
   seed_stream = tfp_util.SeedStream(seed, salt='binary_crossover')
-  force_crossover_group = distributions.Categorical(sizes).sample(
+  force_crossover_group = categorical.Categorical(sizes).sample(
       [population_size, 1], seed=seed_stream())
   recombinants = []
   for i, population_part in enumerate(population):

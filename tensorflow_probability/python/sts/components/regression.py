@@ -16,8 +16,16 @@
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.distributions import half_normal
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import inverse_gamma
+from tensorflow_probability.python.distributions import linear_gaussian_ssm
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import sample
+from tensorflow_probability.python.distributions import student_t
 
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
@@ -29,7 +37,7 @@ tfl = tf.linalg
 
 def _zero_dimensional_mvndiag(dtype):
   """Build a zero-dimensional MVNDiag object."""
-  dummy_mvndiag = tfd.MultivariateNormalDiag(
+  dummy_mvndiag = mvn_diag.MultivariateNormalDiag(
       scale_diag=tf.ones([0], dtype=dtype))
   dummy_mvndiag.covariance = lambda: dummy_mvndiag.variance()[..., tf.newaxis]
   return dummy_mvndiag
@@ -39,9 +47,8 @@ def _observe_timeseries_fn(timeseries):
   """Build an observation_noise_fn that observes a Tensor timeseries."""
   def observation_noise_fn(t):
     current_slice = tf.gather(timeseries, t)
-    return tfd.MultivariateNormalDiag(
-        loc=current_slice,
-        scale_diag=tf.zeros_like(current_slice))
+    return mvn_diag.MultivariateNormalDiag(
+        loc=current_slice, scale_diag=tf.zeros_like(current_slice))
   return observation_noise_fn
 
 
@@ -198,14 +205,14 @@ class LinearRegression(StructuralTimeSeries):
         else:
           design_matrix_batch_shape_ = design_matrix.batch_shape_tensor()
         dtype = design_matrix.dtype
-        weights_prior = tfd.StudentT(
+        weights_prior = student_t.StudentT(
             df=tf.constant(5, dtype=dtype),
-            loc=tf.zeros(
-                design_matrix_batch_shape_, dtype=dtype),
+            loc=tf.zeros(design_matrix_batch_shape_, dtype=dtype),
             scale=tf.constant(10, dtype=dtype) * tf.ones([], dtype=dtype))
       # Sugar: if prior is static scalar, lift it to a prior on feature vectors.
       if weights_prior.event_shape.ndims == 0:
-        weights_prior = tfd.Sample(weights_prior, sample_shape=[num_features])
+        weights_prior = sample.Sample(
+            weights_prior, sample_shape=[num_features])
 
       tf.debugging.assert_same_float_dtype([design_matrix, weights_prior])
 
@@ -259,7 +266,7 @@ class LinearRegression(StructuralTimeSeries):
     if initial_state_prior is None:
       initial_state_prior = dummy_mvndiag
 
-    return tfd.LinearGaussianStateSpaceModel(
+    return linear_gaussian_ssm.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
         transition_matrix=tf.zeros([0, 0], dtype=dtype),
         transition_noise=dummy_mvndiag,
@@ -447,32 +454,37 @@ class SparseLinearRegression(StructuralTimeSeries):
       ones_like_weights = tf.ones(weights_shape, dtype=dtype)
       super(SparseLinearRegression, self).__init__(
           parameters=[
-              Parameter('global_scale_variance',
-                        prior=tfd.InverseGamma(
-                            0.5 * ones_like_weights_batch,
-                            0.5 * ones_like_weights_batch),
-                        bijector=tfb.Softplus(low=dtype_util.eps(dtype))),
-              Parameter('global_scale_noncentered',
-                        prior=tfd.HalfNormal(
-                            scale=ones_like_weights_batch),
-                        bijector=tfb.Softplus(low=dtype_util.eps(dtype))),
-              Parameter('local_scale_variances',
-                        prior=tfd.Independent(tfd.InverseGamma(
-                            0.5 * ones_like_weights,
-                            0.5 * ones_like_weights),
-                                              reinterpreted_batch_ndims=1),
-                        bijector=tfb.Softplus(low=dtype_util.eps(dtype))),
-              Parameter('local_scales_noncentered',
-                        prior=tfd.Independent(tfd.HalfNormal(
-                            scale=ones_like_weights),
-                                              reinterpreted_batch_ndims=1),
-                        bijector=tfb.Softplus(low=dtype_util.eps(dtype))),
-              Parameter('weights_noncentered',
-                        prior=tfd.Independent(tfd.Normal(
-                            loc=tf.zeros_like(ones_like_weights),
-                            scale=ones_like_weights),
-                                              reinterpreted_batch_ndims=1),
-                        bijector=tfb.Identity())
+              Parameter(
+                  'global_scale_variance',
+                  prior=inverse_gamma.InverseGamma(
+                      0.5 * ones_like_weights_batch,
+                      0.5 * ones_like_weights_batch),
+                  bijector=softplus.Softplus(low=dtype_util.eps(dtype))),
+              Parameter(
+                  'global_scale_noncentered',
+                  prior=half_normal.HalfNormal(scale=ones_like_weights_batch),
+                  bijector=softplus.Softplus(low=dtype_util.eps(dtype))),
+              Parameter(
+                  'local_scale_variances',
+                  prior=independent.Independent(
+                      inverse_gamma.InverseGamma(0.5 * ones_like_weights,
+                                                 0.5 * ones_like_weights),
+                      reinterpreted_batch_ndims=1),
+                  bijector=softplus.Softplus(low=dtype_util.eps(dtype))),
+              Parameter(
+                  'local_scales_noncentered',
+                  prior=independent.Independent(
+                      half_normal.HalfNormal(scale=ones_like_weights),
+                      reinterpreted_batch_ndims=1),
+                  bijector=softplus.Softplus(low=dtype_util.eps(dtype))),
+              Parameter(
+                  'weights_noncentered',
+                  prior=independent.Independent(
+                      normal.Normal(
+                          loc=tf.zeros_like(ones_like_weights),
+                          scale=ones_like_weights),
+                      reinterpreted_batch_ndims=1),
+                  bijector=identity.Identity())
           ],
           latent_size=0,
           init_parameters=init_parameters,
@@ -521,7 +533,7 @@ class SparseLinearRegression(StructuralTimeSeries):
     if initial_state_prior is None:
       initial_state_prior = dummy_mvndiag
 
-    return tfd.LinearGaussianStateSpaceModel(
+    return linear_gaussian_ssm.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
         transition_matrix=tf.zeros([0, 0], dtype=dtype),
         transition_noise=dummy_mvndiag,

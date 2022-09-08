@@ -18,13 +18,12 @@
 # Dependency imports
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import joint_distribution_named as jdn
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.experimental.sequential import ensemble_adjustment_kalman_filter as eakf
+from tensorflow_probability.python.experimental.sequential import ensemble_kalman_filter as ekf
 from tensorflow_probability.python.internal import test_util
-
-
-tfd = tfp.distributions
-tfs = tfp.experimental.sequential
 
 
 @test_util.test_all_tf_execution_regimes
@@ -32,11 +31,11 @@ class EnsembleAdjustmentKalmanFilterTest(test_util.TestCase):
 
   def test_ensemble_adjustment_kalman_filter_expect_univariate(self):
 
-    state = tfs.EnsembleKalmanFilterState(step=0, particles=[1.], extra=None)
+    state = ekf.EnsembleKalmanFilterState(step=0, particles=[1.], extra=None)
 
     # Multivariate observations not implemented.
     with self.assertRaises(NotImplementedError):
-      state = tfs.ensemble_adjustment_kalman_filter_update(
+      state = eakf.ensemble_adjustment_kalman_filter_update(
           state,
           observation=[0., 1.],
           observation_fn=lambda t, p, e: ([p, p], e))
@@ -46,20 +45,21 @@ class EnsembleAdjustmentKalmanFilterTest(test_util.TestCase):
     # so we are estimating a constant.
 
     def transition_fn(_, particles, extra):
-      return tfd.MultivariateNormalDiag(
+      return mvn_diag.MultivariateNormalDiag(
           loc=particles, scale_diag=[1e-11]), extra
 
     def observation_fn(_, particles, extra):
-      return tfd.MultivariateNormalDiag(loc=particles, scale_diag=[1e-2]), extra
+      return mvn_diag.MultivariateNormalDiag(
+          loc=particles, scale_diag=[1e-2]), extra
 
     # Initialize the ensemble.
     particles = self.evaluate(tf.random.normal(
         shape=[100, 1], seed=test_util.test_seed()))
 
-    state = tfs.EnsembleKalmanFilterState(
+    state = ekf.EnsembleKalmanFilterState(
         step=0, particles=particles, extra={'unchanged': 1})
 
-    predicted_state = tfs.ensemble_kalman_filter_predict(
+    predicted_state = ekf.ensemble_kalman_filter_predict(
         state,
         transition_fn=transition_fn,
         inflate_fn=None,
@@ -72,7 +72,7 @@ class EnsembleAdjustmentKalmanFilterTest(test_util.TestCase):
     # Check that the state respected the constant dynamics.
     self.assertAllClose(state.particles, predicted_state.particles)
 
-    updated_state = tfs.ensemble_adjustment_kalman_filter_update(
+    updated_state = eakf.ensemble_adjustment_kalman_filter_update(
         predicted_state,
         # The observation is the constant 0.
         observation=[0.],
@@ -91,14 +91,16 @@ class EnsembleAdjustmentKalmanFilterTest(test_util.TestCase):
       particles = {'x': particles['x'] + particles['xdot'],
                    'xdot': particles['xdot']}
       extra['transition_count'] += 1
-      return tfd.JointDistributionNamed(dict(
-          x=tfd.MultivariateNormalDiag(particles['x'], scale_diag=[1e-09]),
-          xdot=tfd.MultivariateNormalDiag(
-              particles['xdot'], scale_diag=[1e-09]))), extra
+      return jdn.JointDistributionNamed(
+          dict(
+              x=mvn_diag.MultivariateNormalDiag(
+                  particles['x'], scale_diag=[1e-09]),
+              xdot=mvn_diag.MultivariateNormalDiag(
+                  particles['xdot'], scale_diag=[1e-09]))), extra
 
     def observation_fn(_, particles, extra):
       extra['observation_count'] += 1
-      return tfd.MultivariateNormalDiag(
+      return mvn_diag.MultivariateNormalDiag(
           loc=particles['x'], scale_diag=[1e-06]), extra
 
     # Initialize the ensemble.
@@ -109,12 +111,16 @@ class EnsembleAdjustmentKalmanFilterTest(test_util.TestCase):
             shape=[300, 5, 1], seed=test_util.test_seed()))
     }
 
-    state = tfs.EnsembleKalmanFilterState(
-        step=0, particles=particles, extra={
-            'observation_count': 0, 'transition_count': 0})
+    state = ekf.EnsembleKalmanFilterState(
+        step=0,
+        particles=particles,
+        extra={
+            'observation_count': 0,
+            'transition_count': 0
+        })
 
     for i in range(10):
-      state = tfs.ensemble_kalman_filter_predict(
+      state = ekf.ensemble_kalman_filter_predict(
           state,
           transition_fn=transition_fn,
           inflate_fn=None,
@@ -123,10 +129,8 @@ class EnsembleAdjustmentKalmanFilterTest(test_util.TestCase):
       self.assertIn('transition_count', state.extra)
       self.assertEqual(i + 1, state.extra['transition_count'])
 
-      state = tfs.ensemble_adjustment_kalman_filter_update(
-          state,
-          observation=[1. * i],
-          observation_fn=observation_fn)
+      state = eakf.ensemble_adjustment_kalman_filter_update(
+          state, observation=[1. * i], observation_fn=observation_fn)
 
       self.assertIn('observation_count', state.extra)
       self.assertEqual(i + 1, state.extra['observation_count'])

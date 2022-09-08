@@ -20,7 +20,9 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability import distributions as tfd
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import poisson
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.internal import vectorization_util
 
@@ -32,9 +34,12 @@ class VectorizationTest(test_util.TestCase):
 
     # Random fn using stateful samplers.
     def fn(key1, key2, seed=None):
-      return [tfd.Normal(0., 1.).sample([3, 2], seed=seed),
-              {key1: tfd.Poisson([1., 2., 3., 4.]).sample(seed=seed + 1),
-               key2: tfd.LogNormal(0., 1.).sample(seed=seed + 2)}]
+      return [
+          normal.Normal(0., 1.).sample([3, 2], seed=seed), {
+              key1: poisson.Poisson([1., 2., 3., 4.]).sample(seed=seed + 1),
+              key2: lognormal.LogNormal(0., 1.).sample(seed=seed + 2)
+          }
+      ]
     sample = self.evaluate(
         fn('a', key2='b', seed=test_util.test_seed(sampler_type='stateful')))
 
@@ -209,7 +214,7 @@ class VectorizationTest(test_util.TestCase):
 
   def test_rectifies_distribution_batch_shapes(self):
     def fn(scale):
-      d = tfd.Normal(loc=0, scale=[scale])
+      d = normal.Normal(loc=0, scale=[scale])
       x = d.sample()
       return d, x, d.log_prob(x)
 

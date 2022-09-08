@@ -30,7 +30,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math import numeric
-from tensorflow_probability.python.math import special as tfp_math
+from tensorflow_probability.python.math import special
 
 __all__ = [
     'TruncatedCauchy',
@@ -38,7 +38,7 @@ __all__ = [
 
 
 def _cauchy_cdf_diff(x, y):
-  return tfp_math.atan_difference(x, y) / np.pi
+  return special.atan_difference(x, y) / np.pi
 
 
 class TruncatedCauchy(distribution.AutoCompositeTensorDistribution):
@@ -266,7 +266,7 @@ class TruncatedCauchy(distribution.AutoCompositeTensorDistribution):
     # see http://parker.ad.siu.edu/Olive/ch4.pdf .
     t = (tf.math.log1p(tf.math.square(std_high))
          - tf.math.log1p(tf.math.square(std_low)))
-    t = t / (2 * tfp_math.atan_difference(std_high, std_low))
+    t = t / (2 * special.atan_difference(std_high, std_low))
     return loc + scale * t
 
   def _mode(self):
@@ -290,7 +290,7 @@ class TruncatedCauchy(distribution.AutoCompositeTensorDistribution):
 
     # Formula from David Olive, "Applied Robust Statistics" --
     # see http://parker.ad.siu.edu/Olive/ch4.pdf .
-    atan_diff = tfp_math.atan_difference(std_high, std_low)
+    atan_diff = special.atan_difference(std_high, std_low)
     t = (std_high - std_low - atan_diff) / atan_diff
     std_mean = ((tf.math.log1p(tf.math.square(std_high))
                  - tf.math.log1p(tf.math.square(std_low))) / (2 * atan_diff))
@@ -319,7 +319,7 @@ class TruncatedCauchy(distribution.AutoCompositeTensorDistribution):
     # quantile(p) = (low + tan(b)) / (1 - low * tan(b)) where
     # b = arctan_difference(high, low) * p.
 
-    tanb = tf.math.tan(tfp_math.atan_difference(std_high, std_low) * p)
+    tanb = tf.math.tan(special.atan_difference(std_high, std_low) * p)
     x = (std_low + tanb) / (1 - std_low * tanb)
     # Clip the answer to prevent it from falling numerically outside
     # the support.

@@ -16,8 +16,10 @@
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.sts import components as sts_components
 from tensorflow_probability.python.sts import structural_time_series
+from tensorflow_probability.python.sts.components import local_linear_trend
+from tensorflow_probability.python.sts.components import seasonal
+from tensorflow_probability.python.sts.components import sum as sum_lib
 from tensorflow_probability.python.sts.internal import seasonality_util
 from tensorflow_probability.python.sts.internal import util as sts_util
 
@@ -30,7 +32,7 @@ __all__ = [
 # TODO(davmre): before exposing publicly, consider simplifying this function
 # and/or renaming it to something like `auto_build_model`.
 def build_default_model(observed_time_series,
-                        base_component=sts_components.LocalLinearTrend,
+                        base_component=local_linear_trend.LocalLinearTrend,
                         name=None):
   """Builds a model with seasonality from a Pandas Series or DataFrame.
 
@@ -147,12 +149,14 @@ def build_default_model(observed_time_series,
 def model_from_seasonal_structure(seasonal_structure,
                                   observed_time_series,
                                   allow_drift=True):
-  return sts_components.Sum(
-      [
-          sts_components.Seasonal(num_seasons=season.num,  # pylint: disable=g-complex-comprehension
-                                  num_steps_per_season=season.duration,
-                                  allow_drift=allow_drift,
-                                  observed_time_series=observed_time_series,
-                                  name=str(season_type))
+  return sum_lib.Sum(
+      [  # pylint:disable=g-complex-comprehension
+          seasonal.Seasonal(
+              num_seasons=season.num,  # pylint: disable=g-complex-comprehension
+              num_steps_per_season=season.duration,
+              allow_drift=allow_drift,
+              observed_time_series=observed_time_series,
+              name=str(season_type))
           for season_type, season in seasonal_structure.items()
-      ], observed_time_series=observed_time_series)
+      ],
+      observed_time_series=observed_time_series)

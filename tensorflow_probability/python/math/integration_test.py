@@ -18,9 +18,9 @@ import hypothesis as hp
 from hypothesis import strategies as hps
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import integration
 
 
 @test_util.test_all_tf_execution_regimes
@@ -29,46 +29,46 @@ class TrapzTest(test_util.TestCase):
 
   def test_simple_use(self):
     y = tf.linspace(0., 10., 11)
-    integral = self.evaluate(tfp_math.trapz(y))
+    integral = self.evaluate(integration.trapz(y))
     self.assertAllClose(integral, 50.)
 
   def test_simple_use_with_x_arg(self):
     y = tf.linspace(0., 10., 11)
     x = tf.linspace(0., 10., 11)
-    integral = self.evaluate(tfp_math.trapz(y, x))
+    integral = self.evaluate(integration.trapz(y, x))
     self.assertAllClose(integral, 50.)
 
   def test_simple_use_with_dx_arg(self):
     y = tf.linspace(0., 10., 11)
     dx = 0.1
-    integral = self.evaluate(tfp_math.trapz(y, dx=dx))
+    integral = self.evaluate(integration.trapz(y, dx=dx))
     self.assertAllClose(integral, 5.0)
 
   def test_provide_multiple_axes_raises(self):
     with self.assertRaisesRegexp(
         ValueError, 'Only permitted to specify one axis'):
-      tfp_math.trapz(y=tf.ones((2, 3)), axis=[0, 1])
+      integration.trapz(y=tf.ones((2, 3)), axis=[0, 1])
 
   def test_non_scalar_dx_raises(self):
     with self.assertRaisesRegexp(
         ValueError, 'Expected dx to be a scalar'):
-      tfp_math.trapz(y=tf.ones((2, 3)), dx=[0.1, 0.2])
+      integration.trapz(y=tf.ones((2, 3)), dx=[0.1, 0.2])
 
   def test_provide_x_and_dx_args_raises(self):
     with self.assertRaisesWithLiteralMatch(
         ValueError, 'Not permitted to specify both x and dx input args.'):
-      tfp_math.trapz(y=[0, 0.1], x=[0, 0.1], dx=0.5)
+      integration.trapz(y=[0, 0.1], x=[0, 0.1], dx=0.5)
 
   def test_incompatible_x_y_shape_raises(self):
     with self.assertRaisesWithLiteralMatch(
         ValueError, 'Shapes (3,) and (2, 3) are incompatible'):
-      tfp_math.trapz(y=tf.ones((2, 3)), x=tf.ones((3,)))
+      integration.trapz(y=tf.ones((2, 3)), x=tf.ones((3,)))
 
   def test_multidim(self):
     y = tf.ones((4, 5, 6), dtype=tf.float32)
-    integral_0 = self.evaluate(tfp_math.trapz(y, axis=0))
-    integral_1 = self.evaluate(tfp_math.trapz(y, axis=1))
-    integral_2 = self.evaluate(tfp_math.trapz(y))
+    integral_0 = self.evaluate(integration.trapz(y, axis=0))
+    integral_1 = self.evaluate(integration.trapz(y, axis=1))
+    integral_2 = self.evaluate(integration.trapz(y))
     self.assertTupleEqual(integral_0.shape, (5, 6))
     self.assertTupleEqual(integral_1.shape, (4, 6))
     self.assertTupleEqual(integral_2.shape, (4, 5))
@@ -81,8 +81,8 @@ class TrapzTest(test_util.TestCase):
     v0 = tf.cast(tf.linspace(0., 1., 4), tf.float64)
     v1 = tf.cast(tf.linspace(0., 4.2, 5), tf.float64)
     x0, x1 = tf.meshgrid(v0, v1, indexing='ij')
-    integral_0 = self.evaluate(tfp_math.trapz(y, x0, axis=0))
-    integral_1 = self.evaluate(tfp_math.trapz(y, x1, axis=1))
+    integral_0 = self.evaluate(integration.trapz(y, x0, axis=0))
+    integral_1 = self.evaluate(integration.trapz(y, x1, axis=1))
     self.assertTupleEqual(integral_0.shape, (5,))
     self.assertTupleEqual(integral_1.shape, (4,))
     self.assertAllClose(integral_0, np.ones((5,)) * 1.0)
@@ -93,7 +93,7 @@ class TrapzTest(test_util.TestCase):
     y = tf.ones((3, 4), dtype=tf.float32)
     x = tf.constant([[0, 1, 2, 3], [0, 2, 4, 6], [0, 3, 6, 9]],
                     dtype=tf.float32)
-    integral = self.evaluate(tfp_math.trapz(y, x, axis=-1))
+    integral = self.evaluate(integration.trapz(y, x, axis=-1))
     self.assertTupleEqual(integral.shape, (3,))
     np.testing.assert_almost_equal(integral, [3, 6, 9])
 
@@ -102,7 +102,7 @@ class TrapzTest(test_util.TestCase):
     y = tf.ones((4, 5), dtype=tf.float64)
     x1 = tf.cast(tf.linspace(0., 4.2, 5), tf.float64)
     x = x1 * tf.ones((4, 5), dtype=tf.float64)
-    integral = self.evaluate(tfp_math.trapz(y, x, axis=1))
+    integral = self.evaluate(integration.trapz(y, x, axis=1))
     self.assertTupleEqual(integral.shape, (4,))
     self.assertAllClose(integral, np.ones((4,)) * 4.2)
 
@@ -114,7 +114,7 @@ class TrapzTest(test_util.TestCase):
       x = tf.cast(tf.linspace(x_min, x_max, n), tf.float32)
       y = tf.sin(pi * x)
       np.testing.assert_allclose(
-          self.evaluate(tfp_math.trapz(y, x)), expected, rtol=rtol)
+          self.evaluate(integration.trapz(y, x)), expected, rtol=rtol)
 
     with self.subTest('sin(2pi x) over [0, 1]'):
       # integral[sin(pi*x)] for x over [0, 1] is equal to 2 / pi.
@@ -137,7 +137,7 @@ class TrapzTest(test_util.TestCase):
       x = tf.convert_to_tensor(x_min + s * (x_max - x_min), tf.float32)
       y = tf.sin(pi * x)
       np.testing.assert_allclose(
-          self.evaluate(tfp_math.trapz(y, x)), expected, rtol=rtol)
+          self.evaluate(integration.trapz(y, x)), expected, rtol=rtol)
 
     with self.subTest('sin(2pi x) over [0, 1]'):
       # integral[sin(pi*x)] for x over [0, 1] is equal to 2 / pi.
@@ -174,7 +174,7 @@ class TrapzTest(test_util.TestCase):
         x=self.evaluate(x) if x is not None else None,  # cannot evaluate(None)
         dx=dx or 1.0,  # numpy default is 1.0
         axis=axis)
-    tf_soln = tfp_math.trapz(y, x, dx, axis)
+    tf_soln = integration.trapz(y, x, dx, axis)
     self.assertAllClose(np_soln, tf_soln)
 
   def test_jit(self):
@@ -182,7 +182,7 @@ class TrapzTest(test_util.TestCase):
     def f(y, x=None, dx=None, axis=-1, name=None):
       @tf.function(jit_compile=True)
       def g(y, x=None, dx=None):
-        return tfp_math.trapz(y, x=x, dx=dx, axis=axis, name=name)
+        return integration.trapz(y, x=x, dx=dx, axis=axis, name=name)
       return g(y, x=x, dx=dx)
     y = tf.ones((3, 4, 5), dtype=tf.float32, name='x')
     x = tf.ones((3, 4, 5), dtype=tf.float32, name='y')

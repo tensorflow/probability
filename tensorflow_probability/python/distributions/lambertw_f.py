@@ -17,8 +17,8 @@
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import identity as identity_bijector
+from tensorflow_probability.python.bijectors import lambertw_transform
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
@@ -119,9 +119,10 @@ class LambertWDistribution(transformed_distribution.TransformedDistribution):
       self._allow_nan_stats = allow_nan_stats
       super(LambertWDistribution, self).__init__(
           distribution=distribution,
-          bijector=tfb.LambertWTail(shift=shift, scale=scale,
-                                    tailweight=tailweight,
-                                    validate_args=validate_args),
+          bijector=lambertw_transform.LambertWTail(
+              shift=shift, scale=scale,
+              tailweight=tailweight,
+              validate_args=validate_args),
           parameters=parameters,
           validate_args=validate_args,
           name=name)

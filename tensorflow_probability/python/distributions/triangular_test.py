@@ -17,12 +17,10 @@ import numpy as np
 from scipy import stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.distributions import triangular
 
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
 
 
 class _TriangularTest(object):
@@ -33,7 +31,7 @@ class _TriangularTest(object):
         x, shape=x.shape if self._use_static_shape else None)
 
   def _create_triangular_dist(self, low, high, peak):
-    return tfd.Triangular(
+    return triangular.Triangular(
         low=self.make_tensor(low),
         high=self.make_tensor(high),
         peak=self.make_tensor(peak),
@@ -54,7 +52,8 @@ class _TriangularTest(object):
     low = self._dtype(0.)
     high = self._dtype(1.)
     peak = self._dtype(0.5)
-    tri = tfd.Triangular(low=low, high=high, peak=peak, validate_args=True)
+    tri = triangular.Triangular(
+        low=low, high=high, peak=peak, validate_args=True)
     self.assertAllEqual([], self.evaluate(tri.event_shape_tensor()))
     self.assertAllEqual([], self.evaluate(tri.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([]), tri.event_shape)
@@ -64,7 +63,8 @@ class _TriangularTest(object):
     low = np.zeros(shape=(2, 3), dtype=self._dtype)
     high = np.ones(shape=(1, 3), dtype=self._dtype)
     peak = self._dtype(0.5)
-    tri = tfd.Triangular(low=low, high=high, peak=peak, validate_args=True)
+    tri = triangular.Triangular(
+        low=low, high=high, peak=peak, validate_args=True)
     self.assertAllEqual([], self.evaluate(tri.event_shape_tensor()))
     self.assertAllEqual([2, 3], self.evaluate(tri.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([]), tri.event_shape)
@@ -81,20 +81,17 @@ class _TriangularTest(object):
 
   def testInvalidDistribution(self):
     with self.assertRaisesOpError('(low >= high||low >= peak)'):
-      tri = tfd.Triangular(
-          low=2., high=1., peak=0.5, validate_args=True)
+      tri = triangular.Triangular(low=2., high=1., peak=0.5, validate_args=True)
       self.evaluate(tri.mean())
     with self.assertRaisesOpError('low > peak'):
-      tri = tfd.Triangular(
-          low=0., high=1., peak=-1., validate_args=True)
+      tri = triangular.Triangular(low=0., high=1., peak=-1., validate_args=True)
       self.evaluate(tri.mean())
     with self.assertRaisesOpError('peak > high'):
-      tri = tfd.Triangular(
-          low=0., high=1., peak=2., validate_args=True)
+      tri = triangular.Triangular(low=0., high=1., peak=2., validate_args=True)
       self.evaluate(tri.mean())
 
   def testAssertValidSample(self):
-    tri = tfd.Triangular(low=2., high=5., peak=3.3, validate_args=True)
+    tri = triangular.Triangular(low=2., high=5., peak=3.3, validate_args=True)
     with self.assertRaisesOpError('must be greater than or equal to `low`'):
       self.evaluate(tri.cdf([2.3, 1.7, 4.]))
     with self.assertRaisesOpError('must be less than or equal to `high`'):
@@ -311,7 +308,8 @@ class _TriangularTest(object):
     low = np.array([np.arange(1, 21, dtype=self._dtype)])
     high = low + 3.
     peak = (high - low) / 3 + low
-    tri = tfd.Triangular(low=low, high=high, peak=peak, validate_args=True)
+    tri = triangular.Triangular(
+        low=low, high=high, peak=peak, validate_args=True)
     n = int(100e3)
     samples = tri.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
@@ -327,7 +325,8 @@ class _TriangularTest(object):
     low = np.array([np.arange(1, 21, dtype=self._dtype)])
     high = low + 3.
     peak = (high - low) / 3 + low
-    tri = tfd.Triangular(low=low, high=high, peak=peak, validate_args=True)
+    tri = triangular.Triangular(
+        low=low, high=high, peak=peak, validate_args=True)
     n = int(100e3)
     samples = tri.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
@@ -343,7 +342,8 @@ class _TriangularTest(object):
     low = self._dtype(0.)
     peak = self._dtype(1.)
     high = self._dtype(4.)
-    tri = tfd.Triangular(low=low, peak=peak, high=high, validate_args=True)
+    tri = triangular.Triangular(
+        low=low, peak=peak, high=high, validate_args=True)
     self.assertAllClose(self.evaluate(tri.prob([0., 1., 4.])), [0, 0.5, 0])
 
   def testModifiedVariableAssertion(self):
@@ -351,20 +351,20 @@ class _TriangularTest(object):
     peak = tf.Variable(0.5)
     high = tf.Variable(1.)
     self.evaluate([low.initializer, peak.initializer, high.initializer])
-    triangular = tfd.Triangular(
+    dist = triangular.Triangular(
         low=low, peak=peak, high=high, validate_args=True)
     with self.assertRaisesOpError('low > peak'):
       with tf.control_dependencies([low.assign(0.6)]):
-        self.evaluate(triangular.mean())
+        self.evaluate(dist.mean())
     with self.assertRaisesOpError('peak > high'):
       with tf.control_dependencies([low.assign(0.), peak.assign(1.2)]):
-        self.evaluate(triangular.mean())
+        self.evaluate(dist.mean())
 
   def testSupportBijectorOutsideRange(self):
     low = np.array([1., 2., 3.])
     peak = np.array([4., 4., 4.])
     high = np.array([6., 7., 6.])
-    dist = tfd.Triangular(low, high, peak, validate_args=False)
+    dist = triangular.Triangular(low, high, peak, validate_args=False)
     eps = 1e-6
     x = np.array([1. - eps, 1.5, 6. + eps])
     bijector_inverse_x = dist.experimental_default_event_space_bijector(

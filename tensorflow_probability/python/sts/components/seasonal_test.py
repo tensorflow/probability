@@ -19,10 +19,11 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import linear_gaussian_ssm
+from tensorflow_probability.python.distributions import mvn_diag
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.sts import ConstrainedSeasonalStateSpaceModel
-from tensorflow_probability.python.sts import SeasonalStateSpaceModel
+from tensorflow_probability.python.sts.components.seasonal import ConstrainedSeasonalStateSpaceModel
+from tensorflow_probability.python.sts.components.seasonal import SeasonalStateSpaceModel
 
 
 tfl = tf.linalg
@@ -44,19 +45,19 @@ class _SeasonalStateSpaceModelTest(test_util.TestCase):
         num_seasons=7,
         drift_scale=self._build_placeholder(drift_scale),
         observation_noise_scale=observation_noise_scale,
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             scale_diag=self._build_placeholder(np.ones([7]))),
         num_steps_per_season=1)
 
-    random_walk_model = tfd.LinearGaussianStateSpaceModel(
+    random_walk_model = linear_gaussian_ssm.LinearGaussianStateSpaceModel(
         num_timesteps=4,
         transition_matrix=self._build_placeholder([[1.]]),
-        transition_noise=tfd.MultivariateNormalDiag(
+        transition_noise=mvn_diag.MultivariateNormalDiag(
             scale_diag=self._build_placeholder([drift_scale])),
         observation_matrix=self._build_placeholder([[1.]]),
-        observation_noise=tfd.MultivariateNormalDiag(
+        observation_noise=mvn_diag.MultivariateNormalDiag(
             scale_diag=self._build_placeholder([observation_noise_scale])),
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             scale_diag=self._build_placeholder([1.])))
 
     sampled_time_series = day_of_week.sample(seed=seed)
@@ -106,7 +107,7 @@ class _SeasonalStateSpaceModelTest(test_util.TestCase):
         num_steps_per_season=num_days_per_month,
         drift_scale=self._build_placeholder(drift_scale),
         observation_noise_scale=observation_noise_scale,
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             loc=self._build_placeholder(monthly_effect_prior_means),
             scale_diag=self._build_placeholder(monthly_effect_prior_scales)),
         initial_step=initial_step)
@@ -174,7 +175,7 @@ class _SeasonalStateSpaceModelTest(test_util.TestCase):
         num_steps_per_season=num_days_per_month,
         drift_scale=self._build_placeholder(drift_scale),
         observation_noise_scale=observation_noise_scale,
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             loc=self._build_placeholder(monthly_effect_prior_means),
             scale_diag=self._build_placeholder(monthly_effect_prior_scales)),
         initial_step=initial_step)
@@ -223,7 +224,7 @@ class _SeasonalStateSpaceModelTest(test_util.TestCase):
     seed = test_util.test_seed(sampler_type='stateless')
 
     num_seasons = 24
-    initial_state_prior = tfd.MultivariateNormalDiag(
+    initial_state_prior = mvn_diag.MultivariateNormalDiag(
         scale_diag=self._build_placeholder(
             np.exp(np.random.randn(*(partial_batch_shape + [num_seasons])))))
     drift_scale = self._build_placeholder(
@@ -248,16 +249,17 @@ class _SeasonalStateSpaceModelTest(test_util.TestCase):
 
     # Next check that the broadcasting works as expected, and the batch log_prob
     # actually matches the log probs of independent models.
-    individual_ssms = [SeasonalStateSpaceModel(
-        num_timesteps=9,
-        num_seasons=num_seasons,
-        num_steps_per_season=2,
-        drift_scale=drift_scale[i, j, ...],
-        observation_noise_scale=observation_noise_scale[j, ...],
-        initial_state_prior=tfd.MultivariateNormalDiag(
-            scale_diag=initial_state_prior.scale.diag[j, ...]))
-                       for i in range(batch_shape[0])
-                       for j in range(batch_shape[1])]
+    individual_ssms = [
+        SeasonalStateSpaceModel(  # pylint:disable=g-complex-comprehension
+            num_timesteps=9,
+            num_seasons=num_seasons,
+            num_steps_per_season=2,
+            drift_scale=drift_scale[i, j, ...],
+            observation_noise_scale=observation_noise_scale[j, ...],
+            initial_state_prior=mvn_diag.MultivariateNormalDiag(
+                scale_diag=initial_state_prior.scale.diag[j, ...]))
+        for i in range(batch_shape[0])
+        for j in range(batch_shape[1])]
 
     batch_lps_ = self.evaluate(ssm.log_prob(y_)).flatten()
 
@@ -316,10 +318,10 @@ class _ConstrainedSeasonalStateSpaceModelTest(test_util.TestCase):
     seed = test_util.test_seed(sampler_type='stateless')
 
     num_seasons = 24
-    initial_state_prior = tfd.MultivariateNormalDiag(
+    initial_state_prior = mvn_diag.MultivariateNormalDiag(
         scale_diag=self._build_placeholder(
-            np.exp(np.random.randn(
-                *(partial_batch_shape + [num_seasons - 1])))))
+            np.exp(np.random.randn(*(partial_batch_shape +
+                                     [num_seasons - 1])))))
     drift_scale = self._build_placeholder(
         np.exp(np.random.randn(*batch_shape)))
     observation_noise_scale = self._build_placeholder(
@@ -345,14 +347,15 @@ class _ConstrainedSeasonalStateSpaceModelTest(test_util.TestCase):
     individual_ssms = []
     for i in range(batch_shape[0]):
       for j in range(batch_shape[1]):
-        individual_ssms.append(ConstrainedSeasonalStateSpaceModel(
-            num_timesteps=9,
-            num_seasons=num_seasons,
-            num_steps_per_season=2,
-            drift_scale=drift_scale[i, j, ...],
-            observation_noise_scale=observation_noise_scale[j, ...],
-            initial_state_prior=tfd.MultivariateNormalDiag(
-                scale_diag=initial_state_prior.scale.diag[j, ...])))
+        individual_ssms.append(
+            ConstrainedSeasonalStateSpaceModel(
+                num_timesteps=9,
+                num_seasons=num_seasons,
+                num_steps_per_season=2,
+                drift_scale=drift_scale[i, j, ...],
+                observation_noise_scale=observation_noise_scale[j, ...],
+                initial_state_prior=mvn_diag.MultivariateNormalDiag(
+                    scale_diag=initial_state_prior.scale.diag[j, ...])))
 
     batch_lps_ = self.evaluate(ssm.log_prob(y_)).flatten()
 

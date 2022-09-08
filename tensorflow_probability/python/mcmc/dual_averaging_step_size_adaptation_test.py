@@ -23,13 +23,24 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import sample as sample_dist_lib
+from tensorflow_probability.python.experimental.mcmc import preconditioned_nuts
+from tensorflow_probability.python.experimental.mcmc import sharded
 from tensorflow_probability.python.internal import distribute_lib
 from tensorflow_probability.python.internal import distribute_test_lib
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.mcmc.simple_step_size_adaptation import hmc_like_step_size_getter_fn
+from tensorflow_probability.python.math import generic
+from tensorflow_probability.python.mcmc import dual_averaging_step_size_adaptation as duassa
+from tensorflow_probability.python.mcmc import hmc
+from tensorflow_probability.python.mcmc import kernel as kernel_lib
+from tensorflow_probability.python.mcmc import nuts
+from tensorflow_probability.python.mcmc import sample
+from tensorflow_probability.python.mcmc import simple_step_size_adaptation as ssa
 
 
 JAX_MODE = False
@@ -50,7 +61,7 @@ FakeMHKernelResults = collections.namedtuple(
     'FakeMHKernelResults', 'accepted_results, log_accept_ratio')
 
 
-class FakeMHKernel(tfp.mcmc.TransitionKernel):
+class FakeMHKernel(kernel_lib.TransitionKernel):
 
   def __init__(self,
                inner_kernel,
@@ -94,7 +105,7 @@ FakeSteppedKernelResults = collections.namedtuple('FakeSteppedKernelResults',
                                                   'step_size')
 
 
-class FakeSteppedKernel(tfp.mcmc.TransitionKernel):
+class FakeSteppedKernel(kernel_lib.TransitionKernel):
 
   def __init__(self, step_size, store_parameters_in_results=False,
                experimental_shard_axis_names=None):
@@ -127,7 +138,7 @@ FakeWrapperKernelResults = collections.namedtuple('FakeWrapperKernelResults',
                                                   'inner_results')
 
 
-class FakeWrapperKernel(tfp.mcmc.TransitionKernel):
+class FakeWrapperKernel(kernel_lib.TransitionKernel):
 
   def __init__(self, inner_kernel):
     self.parameters = dict(inner_kernel=inner_kernel)
@@ -158,10 +169,8 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
     kernel = FakeWrapperKernel(FakeSteppedKernel(step_size=0.5))
     self.assertFalse(
         kernel.inner_kernel.parameters['store_parameters_in_results'])
-    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
-        kernel,
-        num_adaptation_steps=1,
-        validate_args=True)
+    kernel = duassa.DualAveragingStepSizeAdaptation(
+        kernel, num_adaptation_steps=1, validate_args=True)
     self.assertTrue(kernel.inner_kernel.inner_kernel
                     .parameters['store_parameters_in_results'])
 
@@ -172,10 +181,8 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
             [tf.math.log(0.74),
              tf.math.log(0.76),
              tf.math.log(0.76)]))
-    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
-        kernel,
-        num_adaptation_steps=1,
-        validate_args=True)
+    kernel = duassa.DualAveragingStepSizeAdaptation(
+        kernel, num_adaptation_steps=1, validate_args=True)
 
     kernel_results = kernel.bootstrap_results(tf.zeros(3))
     for _ in range(2):
@@ -196,10 +203,8 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
         # Just over the target_accept_prob.
         log_accept_ratio=tf.math.log(0.76))
     kernel = FakeWrapperKernel(kernel)
-    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
-        kernel,
-        num_adaptation_steps=1,
-        validate_args=True)
+    kernel = duassa.DualAveragingStepSizeAdaptation(
+        kernel, num_adaptation_steps=1, validate_args=True)
 
     init_state = tf.constant(0.)
     kernel_results = kernel.bootstrap_results(init_state)
@@ -218,10 +223,8 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
     kernel = FakeMHKernel(
         FakeSteppedKernel(step_size=0.1),
         log_accept_ratio=tf.convert_to_tensor(np.nan))
-    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
-        kernel,
-        num_adaptation_steps=1,
-        validate_args=True)
+    kernel = duassa.DualAveragingStepSizeAdaptation(
+        kernel, num_adaptation_steps=1, validate_args=True)
 
     init_state = tf.constant(0.)
     kernel_results = kernel.bootstrap_results(init_state)
@@ -239,7 +242,7 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
         FakeSteppedKernel(step_size=init_step),
         log_accept_ratio=tf.stack([tf.math.log(0.74),
                                    tf.math.log(0.76)]))
-    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+    kernel = duassa.DualAveragingStepSizeAdaptation(
         kernel,
         num_adaptation_steps=1,
         log_accept_prob_getter_fn=(
@@ -265,7 +268,7 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
         FakeSteppedKernel(step_size=init_step),
         log_accept_ratio=tf.stack([tf.math.log(0.74),
                                    tf.math.log(0.76)]))
-    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+    kernel = duassa.DualAveragingStepSizeAdaptation(
         kernel,
         num_adaptation_steps=1,
         log_accept_prob_getter_fn=(
@@ -295,7 +298,7 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
     def _impl():
       kernel = FakeMHKernel(
           FakeSteppedKernel(step_size=1.), log_accept_ratio=0.)
-      kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+      kernel = duassa.DualAveragingStepSizeAdaptation(
           kernel,
           num_adaptation_steps=1,
           target_accept_prob=target_accept_prob,
@@ -309,30 +312,30 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
       _impl()
 
   def testExample(self):
-    target_dist = tfd.JointDistributionSequential([
-        tfd.Normal(0., 1.5),
-        tfd.Independent(
-            tfd.Normal(tf.zeros([2, 5], dtype=tf.float32), 5.),
+    target_dist = jds.JointDistributionSequential([
+        normal.Normal(0., 1.5),
+        independent.Independent(
+            normal.Normal(tf.zeros([2, 5], dtype=tf.float32), 5.),
             reinterpreted_batch_ndims=2),
     ])
     num_burnin_steps = 500
     num_results = 500
     num_chains = 64
 
-    kernel = tfp.mcmc.HamiltonianMonteCarlo(
+    kernel = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=lambda *args: target_dist.log_prob(args),
         num_leapfrog_steps=2,
         step_size=target_dist.stddev())
-    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
-        inner_kernel=kernel, num_adaptation_steps=int(num_burnin_steps * 0.8),
+    kernel = duassa.DualAveragingStepSizeAdaptation(
+        inner_kernel=kernel,
+        num_adaptation_steps=int(num_burnin_steps * 0.8),
         # Cast to int32.  Not necessary for operation since we cast internally
         # to a float type.  This is done to check that we are able to pass in
         # integer types (since they are the natural type for this).
-        step_count_smoothing=tf.cast(10, tf.int32)
-    )
+        step_count_smoothing=tf.cast(10, tf.int32))
 
     seed_stream = test_util.test_seed_stream()
-    _, log_accept_ratio = tfp.mcmc.sample_chain(
+    _, log_accept_ratio = sample.sample_chain(
         num_results=num_results,
         num_burnin_steps=num_burnin_steps,
         current_state=target_dist.sample(num_chains, seed=seed_stream()),
@@ -345,7 +348,7 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
     self.assertAllClose(0.75, self.evaluate(p_accept), atol=0.15)
 
   def testShrinkageTargetDefaultsTo10xStepSize(self):
-    target_dist = tfd.Normal(0., 1.)
+    target_dist = normal.Normal(0., 1.)
 
     # Choose an initial_step_size that is too big.  We will make it even bigger
     # during the initial adaptation steps by using carefully selected
@@ -353,30 +356,29 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
     initial_step_size = 2.5
     expected_final_step_size = 1.5
 
-    hmc_kernel = tfp.mcmc.HamiltonianMonteCarlo(
+    hmc_kernel = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=target_dist.log_prob,
         # Small num_leapfrog_steps, to ensure stability even though we're doing
         # extreme stuff with the step size.
         num_leapfrog_steps=3,
         step_size=initial_step_size)
-    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+    kernel = duassa.DualAveragingStepSizeAdaptation(
         inner_kernel=hmc_kernel,
         num_adaptation_steps=500,
         step_count_smoothing=5.,
         target_accept_prob=0.75,
         shrinkage_target=None,  # Default
         # Huge exploration_shrinkage moves us close to the shrinkage_target.
-        exploration_shrinkage=1.,   # Default is 0.05, so this is huge.
+        exploration_shrinkage=1.,  # Default is 0.05, so this is huge.
     )
 
     def trace_fn(_, pkr):
-      return (pkr.log_shrinkage_target,
-              pkr.inner_results.log_accept_ratio,
-              hmc_like_step_size_getter_fn(pkr))
+      return (pkr.log_shrinkage_target, pkr.inner_results.log_accept_ratio,
+              ssa.hmc_like_step_size_getter_fn(pkr))
 
     stream = test_util.test_seed_stream()
     _, (log_shrinkage_target, log_accept_ratio,
-        step_size) = tfp.mcmc.sample_chain(
+        step_size) = sample.sample_chain(
             num_results=500,
             num_burnin_steps=0,
             current_state=target_dist.sample(64, seed=stream()),
@@ -408,19 +410,19 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
     self.assertAllGreater(step_size[3], 3 * initial_step_size)
 
   def testShrinkageTargetSetVeryLowMeansIntialStepSizeIsSmall(self):
-    target_dist = tfd.Normal(0., 1.)
+    target_dist = normal.Normal(0., 1.)
 
     expected_final_step_size = 1.5
     initial_step_size = expected_final_step_size
     shrinkage_target_kwarg = 0.1
 
-    hmc_kernel = tfp.mcmc.HamiltonianMonteCarlo(
+    hmc_kernel = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=target_dist.log_prob,
         # Small num_leapfrog_steps, to ensure stability even though we're doing
         # extreme stuff with the step size.
         num_leapfrog_steps=3,
         step_size=initial_step_size)
-    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+    kernel = duassa.DualAveragingStepSizeAdaptation(
         inner_kernel=hmc_kernel,
         num_adaptation_steps=500,
         step_count_smoothing=15.,
@@ -431,13 +433,12 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
     )
 
     def trace_fn(_, pkr):
-      return (pkr.log_shrinkage_target,
-              pkr.inner_results.log_accept_ratio,
-              hmc_like_step_size_getter_fn(pkr))
+      return (pkr.log_shrinkage_target, pkr.inner_results.log_accept_ratio,
+              ssa.hmc_like_step_size_getter_fn(pkr))
 
     stream = test_util.test_seed_stream()
     _, (log_shrinkage_target, log_accept_ratio, step_size) = (
-        tfp.mcmc.sample_chain(
+        sample.sample_chain(
             num_results=500,
             num_burnin_steps=0,
             current_state=target_dist.sample(64, seed=stream()),
@@ -486,13 +487,13 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
     # ratio.
     shrinkage_target_kwarg = [0.1, 0.2]
 
-    hmc_kernel = tfp.mcmc.HamiltonianMonteCarlo(
+    hmc_kernel = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=log_prob_fn,
         # Small num_leapfrog_steps, to ensure stability even though we're doing
         # extreme stuff with the step size.
         num_leapfrog_steps=3,
         step_size=initial_step_size)
-    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+    kernel = duassa.DualAveragingStepSizeAdaptation(
         inner_kernel=hmc_kernel,
         num_adaptation_steps=500,
         step_count_smoothing=15.,
@@ -503,13 +504,12 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
     )
 
     def trace_fn(_, pkr):
-      return (pkr.log_shrinkage_target,
-              pkr.inner_results.log_accept_ratio,
-              hmc_like_step_size_getter_fn(pkr))
+      return (pkr.log_shrinkage_target, pkr.inner_results.log_accept_ratio,
+              ssa.hmc_like_step_size_getter_fn(pkr))
 
     stream = test_util.test_seed_stream()
     _, (log_shrinkage_target, log_accept_ratio, step_size) = (
-        tfp.mcmc.sample_chain(
+        sample.sample_chain(
             num_results=500,
             num_burnin_steps=0,
             current_state=[
@@ -548,11 +548,11 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
   def testIsCalibrated(self):
     test_kernel = collections.namedtuple('TestKernel', 'is_calibrated')
     self.assertTrue(
-        tfp.mcmc.DualAveragingStepSizeAdaptation(test_kernel(True),
-                                                 1).is_calibrated)
+        duassa.DualAveragingStepSizeAdaptation(test_kernel(True),
+                                               1).is_calibrated)
     self.assertFalse(
-        tfp.mcmc.DualAveragingStepSizeAdaptation(test_kernel(False),
-                                                 1).is_calibrated)
+        duassa.DualAveragingStepSizeAdaptation(test_kernel(False),
+                                               1).is_calibrated)
 
   def testCustomReduceFn(self):
     log_accept_ratio = tf.constant(
@@ -566,7 +566,7 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
     kernel = FakeMHKernel(
         FakeSteppedKernel(step_size=old_step_size),
         log_accept_ratio=log_accept_ratio)
-    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+    kernel = duassa.DualAveragingStepSizeAdaptation(
         kernel,
         num_adaptation_steps=1,
         reduce_fn=tf.reduce_max,
@@ -583,7 +583,7 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
     self.assertAllClose(_UPDATE_01, step_size)
 
   def testShouldPropagateShardAxisNames(self):
-    test_kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+    test_kernel = duassa.DualAveragingStepSizeAdaptation(
         FakeMHKernel(FakeSteppedKernel(step_size=1.), log_accept_ratio=0.),
         num_adaptation_steps=1)
     self.assertIsNone(test_kernel.experimental_shard_axis_names)
@@ -653,7 +653,7 @@ class DualAveragingStepSizeAdaptationStaticBroadcastingTest(test_util.TestCase):
     kernel = FakeMHKernel(
         FakeSteppedKernel(step_size=old_step_size),
         log_accept_ratio=log_accept_ratio)
-    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+    kernel = duassa.DualAveragingStepSizeAdaptation(
         kernel,
         target_accept_prob=0.75,
         num_adaptation_steps=1,
@@ -684,11 +684,11 @@ class TfFunctionTest(test_util.TestCase):
     # There were some stray, implicit, float64 typed values cropping up, but
     # only when one_step was executed in a tf.function context. The fix was to
     # use the correct dtype in those spots; this test verifies the fix.
-    normal_2d = tfd.MultivariateNormalDiag([0., 0.], [1., 1.])
+    normal_2d = mvn_diag.MultivariateNormalDiag([0., 0.], [1., 1.])
 
-    kernel = tfp.mcmc.HamiltonianMonteCarlo(
+    kernel = hmc.HamiltonianMonteCarlo(
         normal_2d.log_prob, step_size=np.float32(1e-3), num_leapfrog_steps=3)
-    adaptive_kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+    adaptive_kernel = duassa.DualAveragingStepSizeAdaptation(
         kernel, num_adaptation_steps=100)
 
     seed_stream = test_util.test_seed_stream()
@@ -703,12 +703,12 @@ class TfFunctionTest(test_util.TestCase):
   def test_nuts_f64(self, preconditioned):
     target_log_prob_fn = lambda x: -x**2
     if preconditioned:
-      nuts_kernel = tfp.experimental.mcmc.PreconditionedNoUTurnSampler
+      nuts_kernel = preconditioned_nuts.PreconditionedNoUTurnSampler
     else:
-      nuts_kernel = tfp.mcmc.NoUTurnSampler
+      nuts_kernel = nuts.NoUTurnSampler
     kernel = nuts_kernel(target_log_prob_fn, step_size=1.)
-    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(kernel,
-                                                      num_adaptation_steps=50)
+    kernel = duassa.DualAveragingStepSizeAdaptation(
+        kernel, num_adaptation_steps=50)
     init = tf.constant(0., dtype=tf.float64)
     extra = kernel.bootstrap_results(init)
     seed_stream = test_util.test_seed_stream()
@@ -728,24 +728,24 @@ class DistributedDualAveragingStepSizeAdaptationTest(
       ('mean', reduce_mean),
       ('logmeanexp',
        functools.partial(
-           tfp.math.reduce_logmeanexp, experimental_allow_all_gather=True)))
+           generic.reduce_logmeanexp, experimental_allow_all_gather=True)))
   @test_util.numpy_disable_test_missing_functionality(
       'NumPy backend does not support distributed computation.')
   def test_kernel_can_shard_chains_across_devices(self, reduce_fn):
 
     def target_log_prob(a, b):
-      return (
-          tfd.Normal(0., 1.).log_prob(a)
-          + tfd.Sample(tfd.Normal(a, 1.), 4).log_prob(b))
+      return (normal.Normal(0., 1.).log_prob(a) +
+              sample_dist_lib.Sample(normal.Normal(a, 1.), 4).log_prob(b))
 
     def run(seed, log_accept_ratio):
-      kernel = tfp.mcmc.UncalibratedHamiltonianMonteCarlo(target_log_prob,
-                                                          step_size=1e-2,
-                                                          num_leapfrog_steps=2)
+      kernel = hmc.UncalibratedHamiltonianMonteCarlo(
+          target_log_prob, step_size=1e-2, num_leapfrog_steps=2)
       kernel = FakeMHKernel(kernel, log_accept_ratio)
-      sharded_kernel = tfp.experimental.mcmc.Sharded(
-          tfp.mcmc.DualAveragingStepSizeAdaptation(
-              kernel, 10, reduce_fn=reduce_fn,
+      sharded_kernel = sharded.Sharded(
+          duassa.DualAveragingStepSizeAdaptation(
+              kernel,
+              10,
+              reduce_fn=reduce_fn,
               target_accept_prob=0.5,
               experimental_reduce_chain_axis_names=self.axis_name),
           self.axis_name)
@@ -759,8 +759,10 @@ class DistributedDualAveragingStepSizeAdaptationTest(
       _, kr = sharded_kernel.one_step(state, kr, seed=sample_seed)
       return kr.new_step_size, kr.error_sum
 
-    seeds = self.shard_values(tf.stack(tfp.random.split_seed(
-        samplers.zeros_seed(), distribute_test_lib.NUM_DEVICES)), 0)
+    seeds = self.shard_values(
+        tf.stack(
+            samplers.split_seed(samplers.zeros_seed(),
+                                distribute_test_lib.NUM_DEVICES)), 0)
     log_accept_ratios = self.shard_values(tf.convert_to_tensor([
         -3., -2., -1., 0.
     ]))

@@ -22,10 +22,10 @@ from hypothesis import strategies as hps
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import experimental
 from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bhps
 from tensorflow_probability.python.bijectors import invert as invert_lib
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
@@ -104,8 +104,8 @@ def is_generalized_pareto(bijector):
 
 
 # TODO(b/141098791): Eliminate this.
-@experimental.auto_composite_tensor
-class CallableModule(tf.Module, experimental.AutoCompositeTensor):
+@auto_composite_tensor.auto_composite_tensor
+class CallableModule(tf.Module, auto_composite_tensor.AutoCompositeTensor):
   """Convenience object for capturing variables closed over by Inline."""
 
   def __init__(self, fn, varobj):

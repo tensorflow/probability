@@ -41,6 +41,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/optimizer/linesearch/internal",
     ],
 )
 
@@ -51,10 +52,10 @@ multi_substrate_py_test(
     numpy_tags = ["notap"],
     shard_count = 5,
     deps = [
+        ":hager_zhang",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

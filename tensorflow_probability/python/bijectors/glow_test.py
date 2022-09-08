@@ -18,15 +18,18 @@ import functools
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.bijectors import blockwise
+from tensorflow_probability.python.bijectors import chain
 from tensorflow_probability.python.bijectors import composition
+from tensorflow_probability.python.bijectors import glow
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.bijectors import pad
+from tensorflow_probability.python.bijectors import sigmoid
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.gradient import batch_jacobian
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
 
 
 @test_util.test_all_tf_execution_regimes
@@ -42,9 +45,9 @@ class GlowTest(test_util.TestCase):
 
   def _create_glow(self, actnorm=False):
 
-    glow_net = functools.partial(tfb.GlowDefaultNetwork, num_hidden=32)
-    glow_exit = tfb.GlowDefaultExitNetwork
-    glow_bijector = tfb.Glow(
+    glow_net = functools.partial(glow.GlowDefaultNetwork, num_hidden=32)
+    glow_exit = glow.GlowDefaultExitNetwork
+    glow_bijector = glow.Glow(
         output_shape=self.output_shape,
         num_glow_blocks=2,
         num_steps_per_block=1,
@@ -52,11 +55,9 @@ class GlowTest(test_util.TestCase):
         exit_bijector_fn=glow_exit,
         grab_after_block=[0.5, 0.5],
         use_actnorm=actnorm,
-        seed=tfp.util.SeedStream(seed=42, salt='glow'))
-    sigm = tfb.sigmoid.Sigmoid(
-        low=self.minval, high=self.maxval)
-    output = tfb.chain.Chain(
-        [sigm, glow_bijector])
+        seed=test_util.SeedStream(seed=42, salt='glow'))
+    sigm = sigmoid.Sigmoid(low=self.minval, high=self.maxval)
+    output = chain.Chain([sigm, glow_bijector])
     return output
 
   def _make_images(self):
@@ -121,7 +122,7 @@ class GlowTest(test_util.TestCase):
         x1, x2 = tf.split(x, splits[-2-nblocks], axis=-1)
 
         for bb in b.bijectors[0].bijectors:
-          if isinstance(bb, tfb.glow.ActivationNormalization):
+          if isinstance(bb, glow.ActivationNormalization):
             x1 = self.evaluate(bb.inverse(x1))
             mean = self.evaluate(tf.reduce_mean(x1, axis=(-4, -3, -2)))
             stddev = self.evaluate(tf.math.reduce_std(x1, axis=(-4, -3, -2)))
@@ -136,7 +137,7 @@ class GlowTest(test_util.TestCase):
       elif isinstance(b, composition.Composition):
         for bb in b.bijectors:
           x = self.evaluate(bb.inverse(x))
-          if isinstance(bb, tfb.glow.ActivationNormalization):
+          if isinstance(bb, glow.ActivationNormalization):
             mean = tf.reduce_mean(x, axis=(-4, -3, -2))
             stddev = tf.math.reduce_std(x, axis=(-4, -3, -2))
             self.assertAllClose(mean, tf.zeros_like(mean), atol=1e-5)
@@ -162,7 +163,7 @@ class GlowTest(test_util.TestCase):
         y1, y2 = tf.split(y, splits[nblocks], axis=-1)
 
         for bb in reversed(b.bijectors[0].bijectors):
-          if isinstance(bb, tfb.glow.ActivationNormalization):
+          if isinstance(bb, glow.ActivationNormalization):
             y1 = self.evaluate(bb.forward(y1))
             mean = self.evaluate(tf.reduce_mean(y1, axis=(-4, -3, -2)))
             stddev = self.evaluate(tf.math.reduce_std(y1, axis=(-4, -3, -2)))
@@ -177,7 +178,7 @@ class GlowTest(test_util.TestCase):
       elif isinstance(b, composition.Composition):
         for bb in reversed(b.bijectors):
           y = self.evaluate(bb.forward(y))
-          if isinstance(bb, tfb.glow.ActivationNormalization):
+          if isinstance(bb, glow.ActivationNormalization):
             mean = tf.reduce_mean(y, axis=(-4, -3, -2))
             stddev = tf.math.reduce_std(y, axis=(-4, -3, -2))
             self.assertAllClose(mean, tf.zeros_like(mean), atol=1e-5)
@@ -215,17 +216,17 @@ class GlowTest(test_util.TestCase):
     """
     def bad_glow_net(input_shape):
       del input_shape
-      return tfb.Pad()
+      return pad.Pad()
 
     x = self._make_images()
     x = tf.constant(x, tf.float32)
 
-    bijection = tfb.Glow(
+    bijection = glow.Glow(
         output_shape=self.output_shape,
         num_glow_blocks=2,
         num_steps_per_block=1,
         coupling_bijector_fn=bad_glow_net,
-        exit_bijector_fn=tfb.GlowDefaultExitNetwork,
+        exit_bijector_fn=glow.GlowDefaultExitNetwork,
         grab_after_block=[0.5, 0.5],
         use_actnorm=False)
     self.evaluate([v.initializer for v in bijection.variables])
@@ -244,17 +245,17 @@ class GlowTest(test_util.TestCase):
     """
     def other_bad_glow_net(input_shape):
       del input_shape
-      return lambda x: tfd.Normal(x, 0)
+      return lambda x: normal.Normal(x, 0)
 
     x = self._make_images()
     x = tf.constant(x, tf.float32)
 
-    bijection = tfb.Glow(
+    bijection = glow.Glow(
         output_shape=self.output_shape,
         num_glow_blocks=2,
         num_steps_per_block=1,
         coupling_bijector_fn=other_bad_glow_net,
-        exit_bijector_fn=tfb.GlowDefaultExitNetwork,
+        exit_bijector_fn=glow.GlowDefaultExitNetwork,
         grab_after_block=[0.5, 0.5],
         use_actnorm=False)
     self.evaluate([v.initializer for v in bijection.variables])
@@ -270,13 +271,13 @@ class GlowTest(test_util.TestCase):
     """This tests that the model can take samples in variable dimensions."""
     def dummy_glow_net(input_shape):
       del input_shape
-      return lambda x: tfb.Identity()
+      return lambda x: identity.Identity()
 
     def dummy_exit_net(input_shape, output_chan):
       del input_shape, output_chan
-      return lambda x: tfb.Identity()
+      return lambda x: identity.Identity()
 
-    bijection = tfb.Glow(
+    bijection = glow.Glow(
         output_shape=self.output_shape,
         num_glow_blocks=2,
         num_steps_per_block=1,
@@ -284,9 +285,10 @@ class GlowTest(test_util.TestCase):
         exit_bijector_fn=dummy_exit_net,
         grab_after_block=[0.5, 0.5],
         use_actnorm=False)
-    dist = bijection(tfd.Independent(
-        tfd.Normal(tf.zeros([16*16*3]), tf.ones(16*16*3)),
-        reinterpreted_batch_ndims=1))
+    dist = bijection(
+        independent.Independent(
+            normal.Normal(tf.zeros([16 * 16 * 3]), tf.ones(16 * 16 * 3)),
+            reinterpreted_batch_ndims=1))
 
     single_samp2 = dist.sample(1)
     single_samp3 = dist.sample([1, 1])
@@ -299,13 +301,13 @@ class GlowTest(test_util.TestCase):
     """This tests if the model runs with different batch shapes."""
     def dummy_glow_net(input_shape):
       del input_shape
-      return lambda x: tfb.Identity()
+      return lambda x: identity.Identity()
 
     def dummy_exit_net(input_shape, output_chan):
       del input_shape, output_chan
-      return lambda x: tfb.Identity()
+      return lambda x: identity.Identity()
 
-    bijection = tfb.Glow(
+    bijection = glow.Glow(
         output_shape=self.output_shape,
         num_glow_blocks=2,
         num_steps_per_block=1,
@@ -339,14 +341,13 @@ class GlowTest(test_util.TestCase):
           tf.keras.layers.Conv2D(
               2*output_chan, 3, padding='same', dtype=tf.float64)])
 
-    float64_bijection = tfb.Glow(
+    float64_bijection = glow.Glow(
         output_shape=self.output_shape,
         num_glow_blocks=2,
         num_steps_per_block=1,
         coupling_bijector_fn=float64_net,
         exit_bijector_fn=float64_exit,
-        grab_after_block=[0.5, 0.5]
-        )
+        grab_after_block=[0.5, 0.5])
     zf64 = float64_bijection.inverse(tf.cast(ims, tf.float64))
     self.evaluate([v.initializer for v in bijection.variables])
     self.evaluate([v.initializer for v in float64_bijection.variables])
@@ -369,14 +370,13 @@ class GlowTest(test_util.TestCase):
           tf.keras.layers.Conv2D(
               output_chan, 3, padding='same')])
 
-    shiftonlyglow = tfb.Glow(
+    shiftonlyglow = glow.Glow(
         output_shape=self.output_shape,
         num_glow_blocks=2,
         num_steps_per_block=1,
         coupling_bijector_fn=shiftfn,
         exit_bijector_fn=shiftexitfn,
-        grab_after_block=[0.5, 0.5]
-        )
+        grab_after_block=[0.5, 0.5])
     z = shiftonlyglow.inverse(ims)
     self.evaluate([v.initializer for v in shiftonlyglow.variables])
     self.assertAllFinite(self.evaluate(z))

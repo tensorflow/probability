@@ -975,7 +975,13 @@ def _batch_interp_with_gather_nd(x, x_idx_unclipped, y_ref, nd, fill_value,
   nan_idx = _expand_x_fn(nan_idx)
   t = tf.where(nan_idx, tf.constant(np.nan, dtype), t)
 
-  terms = []
+  # Initialize y and accumulate in a loop. An alternative would be to store
+  # summands in a list. However, without XLA compilation, the "list method"
+  # results in storage of 2^nd (possibly large) summands, which could OOM.
+  # Thus, if you are not XLA compiling, the method below is highly preferred.
+  # With XLA compilation, both methods are equivalent.
+  y = tf.zeros((), dtype=dtype)
+
   # Our work above has located x's fractional index inside a cube of above/below
   # indices. The distance to the below indices is t, and to the above indices
   # is s.
@@ -1027,9 +1033,7 @@ def _batch_interp_with_gather_nd(x, x_idx_unclipped, y_ref, nd, fill_value,
     y_ref_pt = tf.gather_nd(
         y_ref, tf.stack(gather_from_y_ref_idx, axis=-1), batch_dims=batch_ndims)
 
-    terms.append(y_ref_pt * opposite_volume)
-
-  y = tf.math.add_n(terms)
+    y = y + y_ref_pt * opposite_volume
 
   if tf.debugging.is_numeric_tensor(fill_value):
     # Recall x_idx_unclipped.shape = [D, nd],

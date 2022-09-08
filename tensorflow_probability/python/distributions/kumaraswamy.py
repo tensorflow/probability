@@ -18,7 +18,6 @@
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.bijectors import kumaraswamy_cdf
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
@@ -30,6 +29,8 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import generic
+from tensorflow_probability.python.math import special
 
 __all__ = [
     'Kumaraswamy',
@@ -201,7 +202,7 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
             tf.math.log(a) - tf.math.log(b))
 
   def _log_cdf(self, x):
-    return tfp_math.log1mexp(self.concentration0 * tf.math.log1p(
+    return generic.log1mexp(self.concentration0 * tf.math.log1p(
         -x ** self.concentration1))
 
   def _log_moment(self, n, concentration1=None, concentration0=None):
@@ -217,7 +218,7 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
                                               tf.shape(total_concentration))
     beta_arg = 1 + n / expanded_concentration1
     return (tf.math.log(expanded_concentration0) +
-            tfp_math.lbeta(beta_arg, expanded_concentration0))
+            special.lbeta(beta_arg, expanded_concentration0))
 
   def _mean(self):
     return tf.exp(self._log_moment(1))
@@ -229,7 +230,7 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
         2, concentration1=concentration1, concentration0=concentration0)
     log_moment1 = self._log_moment(
         1, concentration1=concentration1, concentration0=concentration0)
-    lswe, sign = tfp_math.reduce_weighted_logsumexp(
+    lswe, sign = generic.reduce_weighted_logsumexp(
         tf.stack([log_moment2, 2 * log_moment1], axis=-1),
         [1., -1],
         axis=-1,
