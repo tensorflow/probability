@@ -22,44 +22,65 @@ import numpy as np
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
-from tensorflow_probability.python.distributions import joint_distribution_sequential
+from tensorflow_probability.python.bijectors import scale
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.distributions import bernoulli
+from tensorflow_probability.python.distributions import beta as beta_lib
+from tensorflow_probability.python.distributions import dirichlet
+from tensorflow_probability.python.distributions import exponential
+from tensorflow_probability.python.distributions import gamma
+from tensorflow_probability.python.distributions import half_normal
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import joint_distribution_coroutine as jdc
+from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import multinomial
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import poisson
+from tensorflow_probability.python.distributions import sample
+from tensorflow_probability.python.distributions import student_t
+from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.util import deferred_tensor
 
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
-
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
 
 
 # Defer creating test dists (by hiding them in functions) until we know what
 # execution regime (eager/graph/tf-function) the test will run under.
 def basic_model_fn():
   return [
-      tfd.Normal(0., 1., name='a'),
-      tfd.Independent(tfd.Exponential(rate=[100, 120]),
-                      reinterpreted_batch_ndims=1),
-      lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1])
+      normal.Normal(0., 1., name='a'),
+      independent.Independent(
+          exponential.Exponential(rate=[100, 120]),
+          reinterpreted_batch_ndims=1),
+      lambda e: gamma.Gamma(concentration=e[..., 0], rate=e[..., 1])
   ]
 
 
 def nested_lists_model_fn():
   return [
-      tfd.JointDistributionSequential([
-          tfd.MultivariateNormalDiag([0., 0.], [1., 1.]),
-          tfd.JointDistributionSequential([
-              tfd.StudentT(3., -2., 5.),
-              tfd.Exponential(4.)])], name='abc'),
-      lambda abc: tfd.JointDistributionSequential([  # pylint: disable=g-long-lambda
-          tfd.Independent(
-              tfd.Normal(abc[0] * abc[1][0], abc[1][1]),
-              reinterpreted_batch_ndims=1),
-          tfd.Independent(
-              tfd.Normal(abc[0] + abc[1][0], abc[1][1]),
-              reinterpreted_batch_ndims=1)], name='de')
+      jds.JointDistributionSequential([
+          mvn_diag.MultivariateNormalDiag([0., 0.], [1., 1.]),
+          jds.JointDistributionSequential(
+              [student_t.StudentT(3., -2., 5.),
+               exponential.Exponential(4.)])
+      ],
+                                      name='abc'),
+      lambda abc: jds.JointDistributionSequential(  # pylint: disable=g-long-lambda
+          [
+              independent.Independent(
+                  normal.Normal(abc[0] * abc[1][0], abc[1][1]),
+                  reinterpreted_batch_ndims=1),
+              independent.Independent(
+                  normal.Normal(abc[0] + abc[1][0], abc[1][1]),
+                  reinterpreted_batch_ndims=1)
+          ],
+          name='de')
   ]
 
 
@@ -75,13 +96,15 @@ class Dummy(object):
 class JointDistributionSequentialTest(test_util.TestCase):
 
   def test_sample_log_prob(self):
-    d = tfd.JointDistributionSequential(
+    d = jds.JointDistributionSequential(
         [
-            tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
-            lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
-            tfd.Normal(loc=0, scale=2.),
-            tfd.Normal,  # Or, `lambda loc, scale: tfd.Normal(loc, scale)`.
-            lambda m: tfd.Sample(tfd.Bernoulli(logits=m), 12),
+            independent.Independent(
+                exponential.Exponential(rate=[100, 120]), 1),
+            lambda e: gamma.Gamma(concentration=e[..., 0], rate=e[..., 1]),
+            normal.Normal(loc=0, scale=2.),
+            normal
+            .Normal,  # Or, `lambda loc, scale: normal.Normal(loc, scale)`.
+            lambda m: sample.Sample(bernoulli.Bernoulli(logits=m), 12),
         ],
         validate_args=True)
 
@@ -102,11 +125,11 @@ class JointDistributionSequentialTest(test_util.TestCase):
 
     ds, _ = d.sample_distributions(value=xs, seed=test_util.test_seed())
     self.assertLen(ds, 5)
-    self.assertIsInstance(ds[0], tfd.Independent)
-    self.assertIsInstance(ds[1], tfd.Gamma)
-    self.assertIsInstance(ds[2], tfd.Normal)
-    self.assertIsInstance(ds[3], tfd.Normal)
-    self.assertIsInstance(ds[4], tfd.Sample)
+    self.assertIsInstance(ds[0], independent.Independent)
+    self.assertIsInstance(ds[1], gamma.Gamma)
+    self.assertIsInstance(ds[2], normal.Normal)
+    self.assertIsInstance(ds[3], normal.Normal)
+    self.assertIsInstance(ds[4], sample.Sample)
 
     # Static properties.
     self.assertAllEqual(
@@ -131,21 +154,19 @@ class JointDistributionSequentialTest(test_util.TestCase):
     self.assertAllEqual(*self.evaluate([expected_jlp, actual_jlp]))
 
   def test_kl_divergence(self):
-    d0 = tfd.JointDistributionSequential(
-        [
-            tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
-            tfd.Normal(loc=0, scale=2.),
-        ],
-        validate_args=True)
-    d1 = tfd.JointDistributionSequential(
-        [
-            tfd.Independent(tfd.Exponential(rate=[10, 12]), 1),
-            tfd.Normal(loc=1, scale=1.),
-        ],
-        validate_args=True)
-    expected_kl = sum(tfd.kl_divergence(d0_, d1_) for d0_, d1_
+    d0 = jds.JointDistributionSequential([
+        independent.Independent(exponential.Exponential(rate=[100, 120]), 1),
+        normal.Normal(loc=0, scale=2.),
+    ],
+                                         validate_args=True)
+    d1 = jds.JointDistributionSequential([
+        independent.Independent(exponential.Exponential(rate=[10, 12]), 1),
+        normal.Normal(loc=1, scale=1.),
+    ],
+                                         validate_args=True)
+    expected_kl = sum(kullback_leibler.kl_divergence(d0_, d1_) for d0_, d1_
                       in zip(d0.model, d1.model))
-    actual_kl = tfd.kl_divergence(d0, d1)
+    actual_kl = kullback_leibler.kl_divergence(d0, d1)
     other_actual_kl = d0.kl_divergence(d1)
     expected_kl_, actual_kl_, other_actual_kl_ = self.evaluate([
         expected_kl, actual_kl, other_actual_kl])
@@ -153,18 +174,16 @@ class JointDistributionSequentialTest(test_util.TestCase):
     self.assertNear(expected_kl_, other_actual_kl_, err=1e-5)
 
   def test_cross_entropy(self):
-    d0 = tfd.JointDistributionSequential(
-        [
-            tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
-            tfd.Normal(loc=0, scale=2.),
-        ],
-        validate_args=True)
-    d1 = tfd.JointDistributionSequential(
-        [
-            tfd.Independent(tfd.Exponential(rate=[10, 12]), 1),
-            tfd.Normal(loc=1, scale=1.),
-        ],
-        validate_args=True)
+    d0 = jds.JointDistributionSequential([
+        independent.Independent(exponential.Exponential(rate=[100, 120]), 1),
+        normal.Normal(loc=0, scale=2.),
+    ],
+                                         validate_args=True)
+    d1 = jds.JointDistributionSequential([
+        independent.Independent(exponential.Exponential(rate=[10, 12]), 1),
+        normal.Normal(loc=1, scale=1.),
+    ],
+                                         validate_args=True)
     expected_xent = sum(
         d0_.cross_entropy(d1_) for d0_, d1_
         in zip(d0.model, d1.model))
@@ -176,20 +195,20 @@ class JointDistributionSequentialTest(test_util.TestCase):
     """Test that only non-default args are passed through."""
     with self.assertRaisesWithPredicateMatch(
         ValueError, 'Must pass probs or logits, but not both.'):
-      d = tfd.JointDistributionSequential([tfd.Normal(0., 1.), tfd.Bernoulli])
+      d = jds.JointDistributionSequential(
+          [normal.Normal(0., 1.), bernoulli.Bernoulli])
       d.sample(seed=test_util.test_seed())
 
   def test_graph_resolution(self):
-    d = tfd.JointDistributionSequential(
-        [
-            tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
-            lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
-            tfd.HalfNormal(2.5),
-            lambda s: tfd.Normal(loc=0, scale=s),
-            tfd.Exponential(2),
-            lambda df, loc, _, scale: tfd.StudentT(df, loc, scale),
-        ],
-        validate_args=True)
+    d = jds.JointDistributionSequential([
+        independent.Independent(exponential.Exponential(rate=[100, 120]), 1),
+        lambda e: gamma.Gamma(concentration=e[..., 0], rate=e[..., 1]),
+        half_normal.HalfNormal(2.5),
+        lambda s: normal.Normal(loc=0, scale=s),
+        exponential.Exponential(2),
+        lambda df, loc, _, scale: student_t.StudentT(df, loc, scale),
+    ],
+                                        validate_args=True)
     self.assertEqual(
         (('e', ()),
          ('scale', ('e',)),
@@ -201,8 +220,9 @@ class JointDistributionSequentialTest(test_util.TestCase):
 
   @parameterized.parameters('mean', 'mode', 'stddev', 'variance')
   def test_summary_statistic(self, attr):
-    d = tfd.JointDistributionSequential(
-        [tfd.Normal(0., 1.), tfd.Bernoulli(logits=0.)],
+    d = jds.JointDistributionSequential(
+        [normal.Normal(0., 1.),
+         bernoulli.Bernoulli(logits=0.)],
         validate_args=True)
     expected = tuple(getattr(d_, attr)() for d_ in d.model)
     actual = getattr(d, attr)()
@@ -210,9 +230,10 @@ class JointDistributionSequentialTest(test_util.TestCase):
 
   @parameterized.parameters(('covariance',))
   def test_notimplemented_summary_statistic(self, attr):
-    d = tfd.JointDistributionSequential([tfd.Normal(0., 1.),
-                                         tfd.Bernoulli(probs=0.5)],
-                                        validate_args=True)
+    d = jds.JointDistributionSequential(
+        [normal.Normal(0., 1.),
+         bernoulli.Bernoulli(probs=0.5)],
+        validate_args=True)
     with self.assertRaisesWithPredicateMatch(
         NotImplementedError,
         attr + ' is not implemented: JointDistributionSequential'):
@@ -221,38 +242,39 @@ class JointDistributionSequentialTest(test_util.TestCase):
   @parameterized.parameters(
       'log_cdf', 'cdf', 'log_survival_function', 'survival_function')
   def test_notimplemented_evaluative_statistic(self, attr):
-    d = tfd.JointDistributionSequential([tfd.Normal(0., 1.),
-                                         tfd.Bernoulli(probs=0.5)],
-                                        validate_args=True)
+    d = jds.JointDistributionSequential(
+        [normal.Normal(0., 1.),
+         bernoulli.Bernoulli(probs=0.5)],
+        validate_args=True)
     with self.assertRaisesWithPredicateMatch(
         NotImplementedError,
         attr + ' is not implemented: JointDistributionSequential'):
       getattr(d, attr)([0.]*len(d.model))
 
   def test_notimplemented_quantile(self):
-    d = tfd.JointDistributionSequential([tfd.Normal(0., 1.),
-                                         tfd.Bernoulli(probs=0.5)],
-                                        validate_args=True)
+    d = jds.JointDistributionSequential(
+        [normal.Normal(0., 1.),
+         bernoulli.Bernoulli(probs=0.5)],
+        validate_args=True)
     with self.assertRaisesWithPredicateMatch(
         NotImplementedError,
         'quantile is not implemented: JointDistributionSequential'):
       d.quantile(0.5)
 
   def test_copy(self):
-    pgm = [tfd.Normal(0., 1.), tfd.Bernoulli(probs=0.5)]
-    d = tfd.JointDistributionSequential(pgm, validate_args=True)
+    pgm = [normal.Normal(0., 1.), bernoulli.Bernoulli(probs=0.5)]
+    d = jds.JointDistributionSequential(pgm, validate_args=True)
     d_copy = d.copy()
     self.assertAllEqual(d_copy.parameters['model'], pgm)
     self.assertAllEqual(d_copy.parameters['validate_args'], True)
 
   def test_batch_slicing(self):
-    d = tfd.JointDistributionSequential(
-        [
-            tfd.Exponential(rate=[10, 12, 14]),
-            lambda s: tfd.Normal(loc=0, scale=s),
-            lambda: tfd.Beta(concentration0=[3, 2, 1], concentration1=1),
-        ],
-        validate_args=True)
+    d = jds.JointDistributionSequential([
+        exponential.Exponential(rate=[10, 12, 14]),
+        lambda s: normal.Normal(loc=0, scale=s),
+        lambda: beta_lib.Beta(concentration0=[3, 2, 1], concentration1=1),
+    ],
+                                        validate_args=True)
 
     d0, d1 = d[:1], d[1:]
     x0 = d0.sample(seed=test_util.test_seed())
@@ -269,16 +291,15 @@ class JointDistributionSequentialTest(test_util.TestCase):
     self.assertEqual([2], x1[2].shape)
 
   def test_sample_shape_propagation_default_behavior(self):
-    d = tfd.JointDistributionSequential(
-        [
-            tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
-            lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
-            tfd.HalfNormal(2.5),
-            lambda s: tfd.Normal(loc=0, scale=s),
-            tfd.Exponential(2),
-            lambda df, loc, _, scale: tfd.StudentT(df, loc, scale),
-        ],
-        validate_args=True)
+    d = jds.JointDistributionSequential([
+        independent.Independent(exponential.Exponential(rate=[100, 120]), 1),
+        lambda e: gamma.Gamma(concentration=e[..., 0], rate=e[..., 1]),
+        half_normal.HalfNormal(2.5),
+        lambda s: normal.Normal(loc=0, scale=s),
+        exponential.Exponential(2),
+        lambda df, loc, _, scale: student_t.StudentT(df, loc, scale),
+    ],
+                                        validate_args=True)
     x = d.sample([2, 3], seed=test_util.test_seed())
     self.assertLen(x, 6)
     self.assertEqual((2, 3, 2), x[0].shape)
@@ -300,28 +321,33 @@ class JointDistributionSequentialTest(test_util.TestCase):
   def test_invalid_structure_raises_error(self):
     with self.assertRaisesWithPredicateMatch(
         TypeError, 'Unable to unflatten like `model` with type "model".'):
-      tfd.JointDistributionSequential(
-          collections.namedtuple('model',
-                                 'a b')(a=tfd.Normal(0, 1), b=tfd.Normal(1, 2)),
+      jds.JointDistributionSequential(
+          collections.namedtuple('model', 'a b')(
+              a=normal.Normal(0, 1), b=normal.Normal(1, 2)),
           validate_args=True)
 
   def test_simple_example_with_dynamic_shapes(self):
-    dist = tfd.JointDistributionSequential([
-        tfd.Normal(tf1.placeholder_with_default(0., shape=None),
-                   tf1.placeholder_with_default(1., shape=None)),
-        lambda a: tfd.Normal(a, 1.)], validate_args=True)
+    dist = jds.JointDistributionSequential([
+        normal.Normal(
+            tf1.placeholder_with_default(0., shape=None),
+            tf1.placeholder_with_default(1., shape=None)),
+        lambda a: normal.Normal(a, 1.)
+    ],
+                                           validate_args=True)
     lp = dist.log_prob(dist.sample(5, seed=test_util.test_seed()))
     self.assertAllEqual(self.evaluate(lp).shape, [5])
 
   def test_dist_fn_takes_varargs(self):
-    dist = tfd.JointDistributionSequential(
+    dist = jds.JointDistributionSequential(
         [
-            tfb.Scale(-1.)(tfd.Exponential(1.)),  # Negative.
-            lambda *args: tfd.Exponential(tf.exp(args[0])),  # Positive.
-            lambda *args: tfd.Normal(loc=args[1],  # pylint: disable=g-long-lambda
-                                     scale=args[0],  # Must be positive.
-                                     validate_args=True)
-        ], validate_args=True)
+            scale.Scale(-1.)(exponential.Exponential(1.)),  # Negative.
+            lambda *args: exponential.Exponential(tf.exp(args[0])),  # Positive.
+            lambda *args: normal.Normal(  # pylint: disable=g-long-lambda
+                loc=args[1],
+                scale=args[0],  # Must be positive.
+                validate_args=True)
+        ],
+        validate_args=True)
     lp = dist.log_prob(dist.sample(5, seed=test_util.test_seed()))
     self.assertAllEqual(lp.shape, [5])
 
@@ -331,18 +357,18 @@ class JointDistributionSequentialTest(test_util.TestCase):
        lambda d, **kwargs: d.experimental_sample_and_log_prob(**kwargs)[0]),
   )
   def test_nested_partial_value(self, sample_fn):
-    innermost = tfd.JointDistributionSequential((
-        tfd.Exponential(1.),
-        lambda a: tfd.Sample(tfd.LogNormal(a, a), [5]),
+    innermost = jds.JointDistributionSequential((
+        exponential.Exponential(1.),
+        lambda a: sample.Sample(lognormal.LogNormal(a, a), [5]),
     ))
 
-    inner = tfd.JointDistributionSequential((
-        tfd.Exponential(1.),
+    inner = jds.JointDistributionSequential((
+        exponential.Exponential(1.),
         innermost,
     ))
 
-    outer = tfd.JointDistributionSequential((
-        tfd.Exponential(1.),
+    outer = jds.JointDistributionSequential((
+        exponential.Exponential(1.),
         inner,
     ))
 
@@ -377,8 +403,7 @@ class JointDistributionSequentialTest(test_util.TestCase):
       ('basic', basic_model_fn),
       ('nested_lists', nested_lists_model_fn))
   def test_can_call_log_prob_with_args_and_kwargs(self, model_fn):
-    d = tfd.JointDistributionSequential(
-        model_fn(), validate_args=True)
+    d = jds.JointDistributionSequential(model_fn(), validate_args=True)
 
     # Destructure vector-valued Tensors into Python lists, to mimic the values
     # a user might type.
@@ -413,7 +438,7 @@ class JointDistributionSequentialTest(test_util.TestCase):
       d.log_prob(*value, extra_arg=27.)
 
   def test_can_call_prob_with_args_and_kwargs(self):
-    d = tfd.JointDistributionSequential(basic_model_fn(), validate_args=True)
+    d = jds.JointDistributionSequential(basic_model_fn(), validate_args=True)
     a, e, x = self.evaluate(d.sample([2, 3], seed=test_util.test_seed()))
     prob_value_positional = self.evaluate(d.prob([a, e, x]))
     prob_value_named = self.evaluate(d.prob(value=[a, e, x]))
@@ -429,12 +454,12 @@ class JointDistributionSequentialTest(test_util.TestCase):
     self.assertAllEqual(prob_value_positional, prob_args_then_kwargs)
 
   def test_uses_structure_to_convert_nested_lists(self):
-    joint = tfd.JointDistributionSequential([
-        tfd.MultivariateNormalDiag([0., 0.], [1., 1.]),
-        lambda a: tfd.JointDistributionSequential([  # pylint: disable=g-long-lambda
-            tfd.JointDistributionSequential([
-                tfd.Normal(a[..., 0], 1.)]),
-            tfd.Normal(a[..., 1], 1.)])
+    joint = jds.JointDistributionSequential([
+        mvn_diag.MultivariateNormalDiag([0., 0.], [1., 1.]),
+        lambda a: jds.JointDistributionSequential([  # pylint: disable=g-long-lambda
+            jds.JointDistributionSequential([normal.Normal(a[..., 0], 1.)]),
+            normal.Normal(a[..., 1], 1.)
+        ])
     ])
 
     x = [tf.convert_to_tensor([4., 2.]), [[1.], 3.]]
@@ -469,20 +494,24 @@ class JointDistributionSequentialTest(test_util.TestCase):
     item_trait_prior_scale = 10.
     observation_noise_prior_scale = 1.
 
-    dist = tfd.JointDistributionSequential([
-        tfd.Sample(tfd.Normal(loc=0.,
-                              scale=user_trait_prior_scale),
-                   sample_shape=[n_factors, n_users]),  # U
-
-        tfd.Sample(tfd.Normal(loc=0.,
-                              scale=item_trait_prior_scale),
-                   sample_shape=[n_factors, n_items]),  # V
-
-        lambda item_traits, user_traits: tfd.Independent(  # pylint: disable=g-long-lambda
-            tfd.Normal(loc=tf.matmul(user_traits, item_traits,  # R
-                                     adjoint_a=True),
-                       scale=observation_noise_prior_scale),
-            reinterpreted_batch_ndims=2)], validate_args=True)
+    dist = jds.JointDistributionSequential(
+        [
+            sample.Sample(
+                normal.Normal(loc=0., scale=user_trait_prior_scale),
+                sample_shape=[n_factors, n_users]),  # U
+            sample.Sample(
+                normal.Normal(loc=0., scale=item_trait_prior_scale),
+                sample_shape=[n_factors, n_items]),  # V
+            lambda item_traits, user_traits: independent.Independent(  # pylint: disable=g-long-lambda
+                normal.Normal(
+                    loc=tf.matmul(
+                        user_traits,
+                        item_traits,  # R
+                        adjoint_a=True),
+                    scale=observation_noise_prior_scale),
+                reinterpreted_batch_ndims=2)
+        ],
+        validate_args=True)
     self.assertAllEqual(dist.event_shape, [[2, 3], [2, 5], [3, 5]])
 
     z = dist.sample(seed=test_util.test_seed())
@@ -524,10 +553,11 @@ class JointDistributionSequentialTest(test_util.TestCase):
     num_topics = 3
     num_words = 10
     avg_doc_length = 5
-    u = tfd.Uniform(low=-1., high=1.)
-    alpha = tfp.util.TransformedVariable(
+    u = uniform.Uniform(low=-1., high=1.)
+    alpha = deferred_tensor.TransformedVariable(
         u.sample([num_topics], seed=test_util.test_seed()),
-        tfb.Softplus(), name='alpha')
+        softplus.Softplus(),
+        name='alpha')
     beta = tf.Variable(u.sample([num_topics, num_words],
                                 seed=test_util.test_seed()), name='beta')
 
@@ -535,13 +565,14 @@ class JointDistributionSequentialTest(test_util.TestCase):
     # Note near 1:1 with mathematical specification. The main distinction is the
     # use of Independent--this lets us easily aggregate multinomials across
     # topics (and in any "shape" of documents).
-    lda = tfd.JointDistributionSequential(
+    lda = jds.JointDistributionSequential(
         [
-            tfd.Poisson(rate=avg_doc_length),  # n
-            tfd.Dirichlet(concentration=alpha),  # theta
-            lambda theta, n: tfd.Multinomial(total_count=n, probs=theta),  # z
-            lambda z: tfd.Independent(  # x  pylint: disable=g-long-lambda
-                tfd.Multinomial(total_count=z, logits=beta),
+            poisson.Poisson(rate=avg_doc_length),  # n
+            dirichlet.Dirichlet(concentration=alpha),  # theta
+            lambda theta, n: multinomial.Multinomial(  # pylint: disable=g-long-lambda
+                total_count=n, probs=theta),  # z
+            lambda z: independent.Independent(  # x  pylint: disable=g-long-lambda
+                multinomial.Multinomial(total_count=z, logits=beta),
                 reinterpreted_batch_ndims=1),
         ],
         validate_args=True)
@@ -574,9 +605,10 @@ class JointDistributionSequentialTest(test_util.TestCase):
     n = [43, 31]
     count_data = tf.cast(
         tf.concat([
-            tfd.Poisson(rate=15.).sample(n[0], seed=seed()),
-            tfd.Poisson(rate=25.).sample(n[1], seed=seed()),
-        ], axis=0),
+            poisson.Poisson(rate=15.).sample(n[0], seed=seed()),
+            poisson.Poisson(rate=25.).sample(n[1], seed=seed()),
+        ],
+                  axis=0),
         dtype=tf.float32)
     count_data = self.evaluate(count_data)
     n = np.sum(n)
@@ -591,14 +623,16 @@ class JointDistributionSequentialTest(test_util.TestCase):
 
     alpha = tf.math.reciprocal(tf.reduce_mean(count_data))
 
-    joint = tfd.JointDistributionSequential([
-        tfd.Sample(tfd.Exponential(rate=alpha),
-                   sample_shape=[2]),
-        tfd.Uniform(),
-        lambda tau, lambda_: tfd.Independent(  # pylint: disable=g-long-lambda
-            tfd.Poisson(rate=gather(tau, lambda_)),
-            reinterpreted_batch_ndims=1),
-    ], validate_args=True)
+    joint = jds.JointDistributionSequential(
+        [
+            sample.Sample(
+                exponential.Exponential(rate=alpha), sample_shape=[2]),
+            uniform.Uniform(),
+            lambda tau, lambda_: independent.Independent(  # pylint: disable=g-long-lambda
+                poisson.Poisson(rate=gather(tau, lambda_)),
+                reinterpreted_batch_ndims=1),
+        ],
+        validate_args=True)
 
     # Verify model correctly "compiles".
     batch_shape = [3, 4]
@@ -613,12 +647,13 @@ class JointDistributionSequentialTest(test_util.TestCase):
     # bijector caching works.
     low = tf.constant([0., 0.], dtype=tf.float32)
     dist_fns = [
-        tfd.LogNormal(0., 1., validate_args=True),
-        lambda h: tfd.Independent(tfd.Uniform(low, h, validate_args=True)),
-        lambda s: tfd.Normal(0., s, validate_args=True)
+        lognormal.LogNormal(0., 1., validate_args=True),
+        lambda h: independent.Independent(  # pylint: disable=g-long-lambda
+            uniform.Uniform(low, h, validate_args=True)),
+        lambda s: normal.Normal(0., s, validate_args=True)
     ]
 
-    jd = tfd.JointDistributionSequential(dist_fns, validate_args=True)
+    jd = jds.JointDistributionSequential(dist_fns, validate_args=True)
     joint_bijector = jd.experimental_default_event_space_bijector()
 
     # define a sample in the unconstrained space and construct the component
@@ -710,10 +745,9 @@ class JointDistributionSequentialTest(test_util.TestCase):
       self.assertIs(a, b)
 
   def test_sample_kwargs(self):
-    joint = tfd.JointDistributionSequential([
-        tfd.Normal(0., 1.),
-        lambda a: tfd.Normal(a, 1.),
-        lambda b, a: tfd.Normal(a + b, 1.)
+    joint = jds.JointDistributionSequential([
+        normal.Normal(0., 1.), lambda a: normal.Normal(a, 1.),
+        lambda b, a: normal.Normal(a + b, 1.)
     ])
 
     seed = test_util.test_seed()
@@ -744,14 +778,15 @@ class JointDistributionSequentialTest(test_util.TestCase):
       joint.sample(seed=seed, a=1., value=[1., None, None])
 
   def test_creates_valid_coroutine(self):
-    joint = tfd.JointDistributionSequential(
+    joint = jds.JointDistributionSequential(
         [
-            tfd.Poisson(rate=100.),
-            tfd.Dirichlet(concentration=[1., 1.]),
-            lambda theta, n: tfd.Multinomial(total_count=n, probs=theta),
-            lambda z: tfd.Independent(  # pylint: disable=g-long-lambda
-                tfd.Multinomial(total_count=z, logits=[[0., 1., 2.],
-                                                       [3., 4., 5.]]),
+            poisson.Poisson(rate=100.),
+            dirichlet.Dirichlet(concentration=[1., 1.]),
+            lambda theta, n: multinomial.Multinomial(  # pylint: disable=g-long-lambda
+                total_count=n, probs=theta),
+            lambda z: independent.Independent(  # pylint: disable=g-long-lambda
+                multinomial.Multinomial(
+                    total_count=z, logits=[[0., 1., 2.], [3., 4., 5.]]),
                 reinterpreted_batch_ndims=1),
         ],
         validate_args=True)
@@ -759,10 +794,10 @@ class JointDistributionSequentialTest(test_util.TestCase):
         x.shape for x in joint._model_flatten(
             joint.sample([5], seed=test_util.test_seed()))]
 
-    jdc = tfd.JointDistributionCoroutine(joint._model_coroutine)
+    jd = jdc.JointDistributionCoroutine(joint._model_coroutine)
     jdc_sample_shapes = [
-        x.shape for x in jdc._model_flatten(
-            jdc.sample([5], seed=test_util.test_seed()))]
+        x.shape for x in jd._model_flatten(
+            jd.sample([5], seed=test_util.test_seed()))]
     self.assertAllEqualNested(sample_shapes, jdc_sample_shapes)
 
   def test_init_does_not_execute_model(self):
@@ -771,12 +806,11 @@ class JointDistributionSequentialTest(test_util.TestCase):
       model_traces.append(x)
       return x
 
-    model = tfd.JointDistributionSequential(
-        [
-            tfd.Normal(0., 1.),
-            lambda z: tfd.Normal(record_model_called(z), 1.)
-        ],
-        validate_args=True)
+    model = jds.JointDistributionSequential([
+        normal.Normal(0., 1.),
+        lambda z: normal.Normal(record_model_called(z), 1.)
+    ],
+                                            validate_args=True)
     # Model should not be called from init.
     self.assertLen(model_traces, 0)
     model.sample(seed=test_util.test_seed())
@@ -791,20 +825,22 @@ class JointDistributionSequentialTest(test_util.TestCase):
       disable_numpy=True,
       reason='Numpy has no notion of CompositeTensor/Pytree.')
   def testCompositeTensorOrPytree(self):
-    d = tfd.JointDistributionSequential(
+    d = jds.JointDistributionSequential(
         tuple([
-            tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
-            lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
-            tfd.Normal(loc=0, scale=2.),
-            tfd.Normal,  # Or, `lambda loc, scale: tfd.Normal(loc, scale)`.
-            lambda m: tfd.Sample(tfd.Bernoulli(logits=m), 12),
+            independent.Independent(
+                exponential.Exponential(rate=[100, 120]), 1),
+            lambda e: gamma.Gamma(concentration=e[..., 0], rate=e[..., 1]),
+            normal.Normal(loc=0, scale=2.),
+            normal
+            .Normal,  # Or, `lambda loc, scale: normal.Normal(loc, scale)`.
+            lambda m: sample.Sample(bernoulli.Bernoulli(logits=m), 12),
         ]),
         validate_args=True)
 
     flat = tf.nest.flatten(d, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(
         d, flat, expand_composites=True)
-    self.assertIsInstance(unflat, tfd.JointDistributionSequential)
+    self.assertIsInstance(unflat, jds.JointDistributionSequential)
     self.assertIs(type(d.model), type(unflat.model))
 
     x = self.evaluate(d.sample(3, seed=test_util.test_seed()))
@@ -822,11 +858,12 @@ class JointDistributionSequentialTest(test_util.TestCase):
       disable_numpy=True, disable_jax=True,
       reason='Numpy and JAX have no notion of type spec serialization.')
   def testCompositeTensorSerialization(self):
-    encodable_jd = tfd.JointDistributionSequential(  # no lambdas
+    encodable_jd = jds.JointDistributionSequential(  # no lambdas
         [
-            tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
-            tfd.Normal(loc=0, scale=2.),
-            tfd.Sample(tfd.Bernoulli(logits=0.), 12),
+            independent.Independent(
+                exponential.Exponential(rate=[100, 120]), 1),
+            normal.Normal(loc=0, scale=2.),
+            sample.Sample(bernoulli.Bernoulli(logits=0.), 12),
         ],
         validate_args=True)
 
@@ -834,12 +871,11 @@ class JointDistributionSequentialTest(test_util.TestCase):
     dec = tf.__internal__.saved_model.decode_proto(enc)
     self.assertEqual(dec, encodable_jd._type_spec)
 
-    non_ct_jd = tfd.JointDistributionSequential(
-        [
-            tfd.Normal(loc=0., scale=1.),
-            test_util.NonCompositeTensorExp()(tfd.Normal(loc=0., scale=1.)),
-        ],
-        validate_args=True)
+    non_ct_jd = jds.JointDistributionSequential([
+        normal.Normal(loc=0., scale=1.),
+        test_util.NonCompositeTensorExp()(normal.Normal(loc=0., scale=1.)),
+    ],
+                                                validate_args=True)
     self.assertNotIsInstance(non_ct_jd, tf.__internal__.CompositeTensor)
 
 
@@ -847,14 +883,14 @@ class ResolveDistributionNamesTest(test_util.TestCase):
 
   def test_dummy_names_are_unique(self):
 
-    dist_names = joint_distribution_sequential._resolve_distribution_names(
+    dist_names = jds._resolve_distribution_names(
         dist_fn_args=[None, None, None],
         dist_names=None,
         leaf_name='x',
         instance_names=[None, None, None])
     self.assertAllEqual(dist_names, ['x2', 'x1', 'x'])
 
-    dist_names = joint_distribution_sequential._resolve_distribution_names(
+    dist_names = jds._resolve_distribution_names(
         dist_fn_args=[None, None, None],
         dist_names=None,
         leaf_name='x',
@@ -864,7 +900,7 @@ class ResolveDistributionNamesTest(test_util.TestCase):
   def test_ignores_trivial_names(self):
 
     # Should ignore a trivial reference downstream of the real name `z`.
-    dist_names = joint_distribution_sequential._resolve_distribution_names(
+    dist_names = jds._resolve_distribution_names(
         dist_fn_args=[None, ['z'], ['w', '_']],
         dist_names=None,
         leaf_name='y',
@@ -872,7 +908,7 @@ class ResolveDistributionNamesTest(test_util.TestCase):
     self.assertAllEqual(dist_names, ['z', 'w', 'y'])
 
     # Trivial reference upstream of the real name `z`.
-    dist_names = joint_distribution_sequential._resolve_distribution_names(
+    dist_names = jds._resolve_distribution_names(
         dist_fn_args=[None, ['_'], ['w', 'z']],
         dist_names=None,
         leaf_name='y',
@@ -880,7 +916,7 @@ class ResolveDistributionNamesTest(test_util.TestCase):
     self.assertAllEqual(dist_names, ['z', 'w', 'y'])
 
     # The only direct reference is trivial, but we have an instance name.
-    dist_names = joint_distribution_sequential._resolve_distribution_names(
+    dist_names = jds._resolve_distribution_names(
         dist_fn_args=[None, ['_']],
         dist_names=None,
         leaf_name='y',
@@ -890,7 +926,7 @@ class ResolveDistributionNamesTest(test_util.TestCase):
   def test_inconsistent_names_raise_error(self):
     with self.assertRaisesRegexp(ValueError, 'Inconsistent names'):
       # Refers to first variable as both `z` and `x`.
-      joint_distribution_sequential._resolve_distribution_names(
+      jds._resolve_distribution_names(
           dist_fn_args=[None, ['z'], ['x', 'w']],
           dist_names=None,
           leaf_name='y',
@@ -898,7 +934,7 @@ class ResolveDistributionNamesTest(test_util.TestCase):
 
     with self.assertRaisesRegexp(ValueError, 'Inconsistent names'):
       # Refers to first variable as `x`, but it was explicitly named `z`.
-      joint_distribution_sequential._resolve_distribution_names(
+      jds._resolve_distribution_names(
           dist_fn_args=[None, ['x']],
           dist_names=None,
           leaf_name='y',

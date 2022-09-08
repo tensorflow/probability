@@ -19,10 +19,12 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.distributions import bernoulli
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import uniform
+from tensorflow_probability.python.glm import family
+from tensorflow_probability.python.glm import fisher_scoring
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
 
 
 @test_util.test_all_tf_execution_regimes
@@ -32,14 +34,14 @@ class FitTestFast(test_util.TestCase):
   fast = True
 
   def make_dataset(self, n, d, link, offset=None, scale=1.):
-    seed = tfp.util.SeedStream(
-        seed=213356351, salt='tfp.glm.fisher_scoring_test')
-    model_coefficients = tfd.Uniform(
-        low=np.array(-0.5, self.dtype),
-        high=np.array(0.5, self.dtype)).sample(d, seed=seed())
+    seed = test_util.test_seed_stream(
+        hardcoded_seed=213356351, salt='tfp.glm.fisher_scoring_test')
+    model_coefficients = uniform.Uniform(
+        low=np.array(-0.5, self.dtype), high=np.array(0.5, self.dtype)).sample(
+            d, seed=seed())
     radius = np.sqrt(2.)
     model_coefficients *= radius / tf.linalg.norm(tensor=model_coefficients)
-    model_matrix = tfd.Normal(
+    model_matrix = normal.Normal(
         loc=np.array(0, self.dtype),
         scale=np.array(1, self.dtype)).sample([n, d], seed=seed())
     scale = tf.convert_to_tensor(value=scale, dtype=self.dtype)
@@ -48,14 +50,14 @@ class FitTestFast(test_util.TestCase):
     if offset is not None:
       linear_response += offset
     if link == 'linear':
-      response = tfd.Normal(loc=linear_response, scale=scale).sample(
-          seed=seed())
+      response = normal.Normal(
+          loc=linear_response, scale=scale).sample(seed=seed())
     elif link == 'probit':
       response = tf.cast(
-          tfd.Normal(loc=linear_response, scale=scale).sample(seed=seed()) > 0,
-          self.dtype)
+          normal.Normal(loc=linear_response, scale=scale).sample(seed=seed()) >
+          0, self.dtype)
     elif link == 'logit':
-      response = tfd.Bernoulli(logits=linear_response).sample(seed=seed())
+      response = bernoulli.Bernoulli(logits=linear_response).sample(seed=seed())
     else:
       raise ValueError('unrecognized true link: {}'.format(link))
     return model_matrix, response, model_coefficients, linear_response
@@ -67,10 +69,10 @@ class FitTestFast(test_util.TestCase):
         model_coefficients_true,
         linear_response_true,
     ] = self.make_dataset(n=int(1e4), d=3, link='probit')
-    model_coefficients, linear_response, is_converged, num_iter = tfp.glm.fit(
+    model_coefficients, linear_response, is_converged, num_iter = fisher_scoring.fit(
         model_matrix,
         response,
-        tfp.glm.BernoulliNormalCDF(),
+        family.BernoulliNormalCDF(),
         fast_unsafe_numerics=self.fast,
         maximum_iterations=10)
     [
@@ -111,10 +113,10 @@ class FitTestFast(test_util.TestCase):
         model_coefficients_true,
         linear_response_true,
     ] = self.make_dataset(n=int(1e4), d=3, link='linear')
-    model_coefficients, linear_response, is_converged, num_iter = tfp.glm.fit(
+    model_coefficients, linear_response, is_converged, num_iter = fisher_scoring.fit(
         model_matrix,
         response,
-        tfp.glm.Normal(),
+        family.Normal(),
         fast_unsafe_numerics=self.fast,
         maximum_iterations=10)
     [
@@ -153,10 +155,10 @@ class FitTestFast(test_util.TestCase):
     responses = [model_1[1], model_2[1]]
 
     _, _, is_converged, _ = self.evaluate(
-        tfp.glm.fit(
+        fisher_scoring.fit(
             model_matrices,
             responses,
-            tfp.glm.Normal(),
+            family.Normal(),
             fast_unsafe_numerics=self.fast,
             maximum_iterations=10))
     self.assertTrue(is_converged)
@@ -171,10 +173,10 @@ class FitTestFast(test_util.TestCase):
         linear_response_true,
     ] = self.make_dataset(
         n=n, d=3, link='probit', offset=offset)
-    model_coefficients, linear_response, is_converged, _ = tfp.glm.fit(
+    model_coefficients, linear_response, is_converged, _ = fisher_scoring.fit(
         model_matrix,
         response,
-        tfp.glm.BernoulliNormalCDF(),
+        family.BernoulliNormalCDF(),
         offset=offset,
         fast_unsafe_numerics=self.fast,
         maximum_iterations=20)
@@ -212,19 +214,19 @@ class FitTestFast(test_util.TestCase):
     l2_regularizer = np.array(1e9 * n, model_matrix.dtype.as_numpy_dtype)
 
     model_coefficients_uniform_penalty, _, is_converged_uniform_penalty, _ = (
-        tfp.glm.fit(
+        fisher_scoring.fit(
             model_matrix,
             response,
-            tfp.glm.Normal(),
+            family.Normal(),
             l2_regularizer=l2_regularizer,
             fast_unsafe_numerics=self.fast,
             maximum_iterations=10))
 
     model_coefficients_penalty_factor, _, is_converged_penalty_factor, _ = (
-        tfp.glm.fit(
+        fisher_scoring.fit(
             model_matrix,
             response,
-            tfp.glm.Normal(),
+            family.Normal(),
             l2_regularizer=l2_regularizer,
             # only penalize (apply regularization to) second coefficient
             l2_regularization_penalty_factor=[0.0, 1.0],
@@ -277,10 +279,10 @@ class FitTestSlow(FitTestFast):
         expected_linear_response,
         expected_is_converged,
         expected_num_iter,
-    ] = tfp.glm.fit(
+    ] = fisher_scoring.fit(
         model_matrix,
         response,
-        tfp.glm.BernoulliNormalCDF(),
+        family.BernoulliNormalCDF(),
         l2_regularizer=l2_regularizer,
         fast_unsafe_numerics=True,
         maximum_iterations=10)
@@ -289,10 +291,10 @@ class FitTestSlow(FitTestFast):
         actual_linear_response,
         actual_is_converged,
         actual_num_iter,
-    ] = tfp.glm.fit(
+    ] = fisher_scoring.fit(
         model_matrix,
         response,
-        tfp.glm.BernoulliNormalCDF(),
+        family.BernoulliNormalCDF(),
         l2_regularizer=l2_regularizer,
         fast_unsafe_numerics=False,
         maximum_iterations=10)

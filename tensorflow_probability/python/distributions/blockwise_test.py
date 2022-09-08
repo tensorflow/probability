@@ -17,7 +17,17 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import blockwise
+from tensorflow_probability.python.distributions import exponential
+from tensorflow_probability.python.distributions import gamma
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import joint_distribution_coroutine as jdc
+from tensorflow_probability.python.distributions import joint_distribution_named as jdn
+from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import mvn_linear_operator
+from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import test_util
 
 
@@ -34,17 +44,17 @@ def _set_seed(seed):
 class BlockwiseTest(test_util.TestCase):
 
   def testDocstring1(self):
-    d = tfd.Blockwise(
+    d = blockwise.Blockwise(
         [
-            tfd.Independent(
-                tfd.Normal(
+            independent.Independent(
+                normal.Normal(
                     loc=tf1.placeholder_with_default(
                         tf.zeros(4, dtype=tf.float64),
                         shape=None,
                     ),
                     scale=1),
                 reinterpreted_batch_ndims=1),
-            tfd.MultivariateNormalTriL(
+            mvn_tril.MultivariateNormalTriL(
                 scale_tril=tf1.placeholder_with_default(
                     tf.eye(2, dtype=tf.float32), shape=None)),
         ],
@@ -63,16 +73,17 @@ class BlockwiseTest(test_util.TestCase):
         np.zeros((6,), dtype=np.float32), self.evaluate(d.mean()))
 
   def testDocstring2(self):
-    Root = tfd.JointDistributionCoroutine.Root  # pylint: disable=invalid-name
+    Root = jdc.JointDistributionCoroutine.Root  # pylint: disable=invalid-name
 
     def model():
-      e = yield Root(tfd.Independent(tfd.Exponential(rate=[100, 120]), 1))
-      g = yield tfd.Gamma(concentration=e[..., 0], rate=e[..., 1])
-      n = yield Root(tfd.Normal(loc=0, scale=2.))
-      yield tfd.Normal(loc=n, scale=g)
+      e = yield Root(
+          independent.Independent(exponential.Exponential(rate=[100, 120]), 1))
+      g = yield gamma.Gamma(concentration=e[..., 0], rate=e[..., 1])
+      n = yield Root(normal.Normal(loc=0, scale=2.))
+      yield normal.Normal(loc=n, scale=g)
 
-    joint = tfd.JointDistributionCoroutine(model)
-    d = tfd.Blockwise(joint, validate_args=True)
+    joint = jdc.JointDistributionCoroutine(model)
+    d = blockwise.Blockwise(joint, validate_args=True)
 
     x = d.sample([2, 1], seed=test_util.test_seed())
     y = d.log_prob(x)
@@ -83,16 +94,17 @@ class BlockwiseTest(test_util.TestCase):
     self.assertDTypeEqual(y, np.float32)
 
   def testSampleReproducible(self):
-    Root = tfd.JointDistributionCoroutine.Root  # pylint: disable=invalid-name
+    Root = jdc.JointDistributionCoroutine.Root  # pylint: disable=invalid-name
 
     def model():
-      e = yield Root(tfd.Independent(tfd.Exponential(rate=[100, 120]), 1))
-      g = yield tfd.Gamma(concentration=e[..., 0], rate=e[..., 1])
-      n = yield Root(tfd.Normal(loc=0, scale=2.))
-      yield tfd.Normal(loc=n, scale=g)
+      e = yield Root(
+          independent.Independent(exponential.Exponential(rate=[100, 120]), 1))
+      g = yield gamma.Gamma(concentration=e[..., 0], rate=e[..., 1])
+      n = yield Root(normal.Normal(loc=0, scale=2.))
+      yield normal.Normal(loc=n, scale=g)
 
-    joint = tfd.JointDistributionCoroutine(model)
-    d = tfd.Blockwise(joint, validate_args=True)
+    joint = jdc.JointDistributionCoroutine(model)
+    d = blockwise.Blockwise(joint, validate_args=True)
     seed = test_util.test_seed()
 
     tf.random.set_seed(seed)
@@ -105,10 +117,10 @@ class BlockwiseTest(test_util.TestCase):
   def testVaryingBatchShapeErrorStatic(self):
     with self.assertRaisesRegexp(
         ValueError, 'Distributions must have the same `batch_shape`'):
-      tfd.Blockwise(
+      blockwise.Blockwise(
           [
-              tfd.Normal(tf.zeros(2), tf.ones(2)),
-              tfd.Normal(0., 1.),
+              normal.Normal(tf.zeros(2), tf.ones(2)),
+              normal.Normal(0., 1.),
           ],
           validate_args=True,
       )
@@ -119,10 +131,10 @@ class BlockwiseTest(test_util.TestCase):
     with self.assertRaisesOpError(
         'Distributions must have the same `batch_shape`'):
       loc = tf1.placeholder_with_default(tf.zeros([2]), shape=None)
-      dist = tfd.Blockwise(
+      dist = blockwise.Blockwise(
           [
-              tfd.Normal(loc, tf.ones_like(loc)),
-              tfd.Independent(tfd.Normal(loc, tf.ones_like(loc)), 1),
+              normal.Normal(loc, tf.ones_like(loc)),
+              independent.Independent(normal.Normal(loc, tf.ones_like(loc)), 1),
           ],
           validate_args=True,
       )
@@ -135,10 +147,10 @@ class BlockwiseTest(test_util.TestCase):
         'Distributions must have the same `batch_shape`'):
       loc1 = tf1.placeholder_with_default(tf.zeros([1]), shape=None)
       loc2 = tf1.placeholder_with_default(tf.zeros([2]), shape=None)
-      dist = tfd.Blockwise(
+      dist = blockwise.Blockwise(
           [
-              tfd.Normal(loc1, tf.ones_like(loc1)),
-              tfd.Normal(loc2, tf.ones_like(loc2)),
+              normal.Normal(loc1, tf.ones_like(loc1)),
+              normal.Normal(loc2, tf.ones_like(loc2)),
           ],
           validate_args=True,
       )
@@ -147,10 +159,10 @@ class BlockwiseTest(test_util.TestCase):
   def testAssertValidSample(self):
     loc1 = tf1.placeholder_with_default(tf.zeros([2]), shape=None)
     loc2 = tf1.placeholder_with_default(tf.zeros([2]), shape=None)
-    dist = tfd.Blockwise(
+    dist = blockwise.Blockwise(
         [
-            tfd.Normal(loc1, tf.ones_like(loc1)),
-            tfd.Normal(loc2, tf.ones_like(loc2)),
+            normal.Normal(loc1, tf.ones_like(loc1)),
+            normal.Normal(loc2, tf.ones_like(loc2)),
         ],
         validate_args=True,
     )
@@ -161,29 +173,28 @@ class BlockwiseTest(test_util.TestCase):
 
   def testKlBlockwiseIsSum(self):
 
-    gamma0 = tfd.Gamma(concentration=[1., 2., 3.], rate=1.)
-    gamma1 = tfd.Gamma(concentration=[3., 4., 5.], rate=1.)
+    gamma0 = gamma.Gamma(concentration=[1., 2., 3.], rate=1.)
+    gamma1 = gamma.Gamma(concentration=[3., 4., 5.], rate=1.)
 
-    normal0 = tfd.Normal(loc=tf.zeros(3), scale=2.)
-    normal1 = tfd.Normal(loc=tf.ones(3), scale=[2., 3., 4.])
+    normal0 = normal.Normal(loc=tf.zeros(3), scale=2.)
+    normal1 = normal.Normal(loc=tf.ones(3), scale=[2., 3., 4.])
 
-    d0 = tfd.Blockwise([
-        tfd.Independent(gamma0, reinterpreted_batch_ndims=1),
-        tfd.Independent(normal0, reinterpreted_batch_ndims=1)
+    d0 = blockwise.Blockwise([
+        independent.Independent(gamma0, reinterpreted_batch_ndims=1),
+        independent.Independent(normal0, reinterpreted_batch_ndims=1)
     ],
-                       validate_args=True)
+                             validate_args=True)
 
-    d1 = tfd.Blockwise([
-        tfd.Independent(gamma1, reinterpreted_batch_ndims=1),
-        tfd.Independent(normal1, reinterpreted_batch_ndims=1)
+    d1 = blockwise.Blockwise([
+        independent.Independent(gamma1, reinterpreted_batch_ndims=1),
+        independent.Independent(normal1, reinterpreted_batch_ndims=1)
     ],
-                       validate_args=True)
+                             validate_args=True)
 
-    kl_sum = tf.reduce_sum(
-        (tfd.kl_divergence(gamma0, gamma1) +
-         tfd.kl_divergence(normal0, normal1)))
+    kl_sum = tf.reduce_sum((kullback_leibler.kl_divergence(gamma0, gamma1) +
+                            kullback_leibler.kl_divergence(normal0, normal1)))
 
-    blockwise_kl = tfd.kl_divergence(d0, d1)
+    blockwise_kl = kullback_leibler.kl_divergence(d0, d1)
 
     kl_sum_, blockwise_kl_ = self.evaluate([kl_sum, blockwise_kl])
 
@@ -195,17 +206,17 @@ class BlockwiseTest(test_util.TestCase):
     # the Blockwise ones.
     # In both cases the scale matrix has a block diag structure, owing to
     # independence of the component distributions.
-    d0 = tfd.Blockwise([
-        tfd.Independent(
-            tfd.Normal(loc=tf.zeros(4, dtype=tf.float64), scale=1.),
+    d0 = blockwise.Blockwise([
+        independent.Independent(
+            normal.Normal(loc=tf.zeros(4, dtype=tf.float64), scale=1.),
             reinterpreted_batch_ndims=1),
-        tfd.MultivariateNormalTriL(
+        mvn_tril.MultivariateNormalTriL(
             scale_tril=tf1.placeholder_with_default(
                 tf.eye(2, dtype=tf.float64), shape=None)),
     ],
-                       validate_args=True)
+                             validate_args=True)
 
-    d0_mvn = tfd.MultivariateNormalLinearOperator(
+    d0_mvn = mvn_linear_operator.MultivariateNormalLinearOperator(
         loc=np.float64([0.] * 6),
         scale=tf.linalg.LinearOperatorBlockDiag([
             tf.linalg.LinearOperatorIdentity(num_rows=4, dtype=tf.float64),
@@ -213,17 +224,17 @@ class BlockwiseTest(test_util.TestCase):
                 tf.eye(2, dtype=tf.float64))
         ]))
 
-    d1 = tfd.Blockwise([
-        tfd.Independent(
-            tfd.Normal(loc=tf.ones(4, dtype=tf.float64), scale=1),
+    d1 = blockwise.Blockwise([
+        independent.Independent(
+            normal.Normal(loc=tf.ones(4, dtype=tf.float64), scale=1),
             reinterpreted_batch_ndims=1),
-        tfd.MultivariateNormalTriL(
+        mvn_tril.MultivariateNormalTriL(
             loc=tf.ones(2, dtype=tf.float64),
             scale_tril=tf1.placeholder_with_default(
                 np.float64([[1., 0.], [2., 3.]]), shape=None)),
     ],
-                       validate_args=True)
-    d1_mvn = tfd.MultivariateNormalLinearOperator(
+                             validate_args=True)
+    d1_mvn = mvn_linear_operator.MultivariateNormalLinearOperator(
         loc=np.float64([1.] * 6),
         scale=tf.linalg.LinearOperatorBlockDiag([
             tf.linalg.LinearOperatorIdentity(num_rows=4, dtype=tf.float64),
@@ -231,14 +242,14 @@ class BlockwiseTest(test_util.TestCase):
                 np.float64([[1., 0.], [2., 3.]]))
         ]))
 
-    blockwise_kl = tfd.kl_divergence(d0, d1)
-    mvn_kl = tfd.kl_divergence(d0_mvn, d1_mvn)
+    blockwise_kl = kullback_leibler.kl_divergence(d0, d1)
+    mvn_kl = kullback_leibler.kl_divergence(d0_mvn, d1_mvn)
     blockwise_kl_, mvn_kl_ = self.evaluate([blockwise_kl, mvn_kl])
     self.assertAllClose(blockwise_kl_, mvn_kl_)
 
   def testUnconstrainingBijector(self):
-    dist = tfd.Exponential(rate=[1., 2., 6.], validate_args=True)
-    blockwise_dist = tfd.Blockwise(dist, validate_args=True)
+    dist = exponential.Exponential(rate=[1., 2., 6.], validate_args=True)
+    blockwise_dist = blockwise.Blockwise(dist, validate_args=True)
     x = self.evaluate(
         dist.experimental_default_event_space_bijector()(
             tf.ones(dist.batch_shape)))
@@ -261,21 +272,22 @@ class BlockwiseTestStaticParams(test_util.TestCase):
   @parameterized.named_parameters(
       (
           'Scalar',
-          lambda self: tfd.Normal(self._input(0.), self._input(1.)),
+          lambda self: normal.Normal(self._input(0.), self._input(1.)),
           1,
           [],
       ),
       (
           'Vector',
-          lambda self: tfd.Independent(  # pylint: disable=g-long-lambda
-              tfd.Normal(self._input(tf.zeros(2)), self._input(tf.ones(2))), 1),
+          lambda self: independent.Independent(  # pylint: disable=g-long-lambda
+              normal.Normal(self._input(tf.zeros(2)), self._input(tf.ones(2))),
+              1),
           2,
           [],
       ),
       (
           'Matrix',
-          lambda self: tfd.Independent(  # pylint: disable=g-long-lambda
-              tfd.Normal(
+          lambda self: independent.Independent(  # pylint: disable=g-long-lambda
+              normal.Normal(
                   self._input(tf.zeros([2, 3])), self._input(tf.ones([2, 3]))),
               2),
           6,
@@ -283,8 +295,8 @@ class BlockwiseTestStaticParams(test_util.TestCase):
       ),
       (
           'VectorBatch',
-          lambda self: tfd.Independent(  # pylint: disable=g-long-lambda
-              tfd.Normal(
+          lambda self: independent.Independent(  # pylint: disable=g-long-lambda
+              normal.Normal(
                   self._input(tf.zeros([2, 2])), self._input(tf.ones([2, 2]))),
               1),
           2,
@@ -295,7 +307,7 @@ class BlockwiseTestStaticParams(test_util.TestCase):
     """Checks that basic properties work with single Tensor distributions."""
     base = dist_fn(self)
 
-    flat = tfd.Blockwise(base, validate_args=True)
+    flat = blockwise.Blockwise(base, validate_args=True)
     if self.use_static_shape:
       self.assertAllEqual([num_elements], flat.event_shape)
     self.assertAllEqual([num_elements],
@@ -315,23 +327,24 @@ class BlockwiseTestStaticParams(test_util.TestCase):
     self.assertAllClose(base_log_prob, flat_log_prob)
 
   def _MakeModelFn(self):
-    Root = tfd.JointDistributionCoroutine.Root  # pylint: disable=invalid-name
+    Root = jdc.JointDistributionCoroutine.Root  # pylint: disable=invalid-name
 
     def model_fn():
-      yield Root(tfd.Normal(self._input(0.), self._input(1.)))
+      yield Root(normal.Normal(self._input(0.), self._input(1.)))
       yield Root(
-          tfd.Independent(
-              tfd.Normal(self._input(tf.zeros(2)), self._input(tf.ones(2))), 1))
+          independent.Independent(
+              normal.Normal(self._input(tf.zeros(2)), self._input(tf.ones(2))),
+              1))
 
     return model_fn
 
   @parameterized.named_parameters(
       (
           'Sequential',
-          lambda self: tfd.JointDistributionSequential([  # pylint: disable=g-long-lambda
-              tfd.Normal(self._input(0.), self._input(1.)),
-              tfd.Independent(
-                  tfd.Normal(self._input(tf.zeros(2)), self._input(tf.ones(2))),
+          lambda self: jds.JointDistributionSequential([  # pylint: disable=g-long-lambda
+              normal.Normal(self._input(0.), self._input(1.)),
+              independent.Independent(
+                  normal.Normal(self._input(tf.zeros(2)), self._input(tf.ones(2))),
                   1),
           ]),
           [1, 2],
@@ -339,12 +352,12 @@ class BlockwiseTestStaticParams(test_util.TestCase):
       ),
       (
           'Named',
-          lambda self: tfd.JointDistributionNamed({  # pylint: disable=g-long-lambda
+          lambda self: jdn.JointDistributionNamed({  # pylint: disable=g-long-lambda
               'a':
-                  tfd.Normal(self._input(0.), self._input(1.)),
+                  normal.Normal(self._input(0.), self._input(1.)),
               'b':
-                  tfd.Independent(
-                      tfd.Normal(
+                  independent.Independent(
+                      normal.Normal(
                           self._input(tf.zeros(2)), self._input(tf.ones(2))), 1
                   ),
           }),
@@ -353,16 +366,16 @@ class BlockwiseTestStaticParams(test_util.TestCase):
       ),
       (
           'Coroutine',
-          lambda self: tfd.JointDistributionCoroutine(self._MakeModelFn()),
+          lambda self: jdc.JointDistributionCoroutine(self._MakeModelFn()),
           [1, 2],
           [],
       ),
       (
           'SequentialMixedStaticShape',
-          lambda self: tfd.JointDistributionSequential([  # pylint: disable=g-long-lambda
-              tfd.Normal(0., 1.),
-              tfd.Independent(
-                  tfd.Normal(self._input(tf.zeros(2)), self._input(tf.ones(2))),
+          lambda self: jds.JointDistributionSequential([  # pylint: disable=g-long-lambda
+              normal.Normal(0., 1.),
+              independent.Independent(
+                  normal.Normal(self._input(tf.zeros(2)), self._input(tf.ones(2))),
                   1),
           ]),
           [1, 2],
@@ -370,10 +383,10 @@ class BlockwiseTestStaticParams(test_util.TestCase):
       ),
       (
           'SequentialBatch',
-          lambda self: tfd.JointDistributionSequential([  # pylint: disable=g-long-lambda
-              tfd.Normal(tf.zeros(2), tf.ones(2)),
-              tfd.Independent(
-                  tfd.Normal(
+          lambda self: jds.JointDistributionSequential([  # pylint: disable=g-long-lambda
+              normal.Normal(tf.zeros(2), tf.ones(2)),
+              independent.Independent(
+                  normal.Normal(
                       self._input(tf.zeros([2, 2])), self._input(
                           tf.ones([2, 2]))), 1),
           ]),
@@ -386,7 +399,7 @@ class BlockwiseTestStaticParams(test_util.TestCase):
     base = dist_fn(self)
     num_elements = sum(nums_elements)
 
-    flat = tfd.Blockwise(base, validate_args=True)
+    flat = blockwise.Blockwise(base, validate_args=True)
     if self.use_static_shape:
       self.assertAllEqual([num_elements], flat.event_shape)
     self.assertAllEqual([num_elements],
@@ -418,10 +431,10 @@ class BlockwiseTestStaticParams(test_util.TestCase):
       (
           'NoBatch',
           lambda self: [  # pylint: disable=g-long-lambda
-              tfd.Normal(self._input(0.), self._input(1.)),
-              tfd.Independent(
-                  tfd.Normal(self._input(tf.zeros(2)), self._input(tf.ones(2))),
-                  1),
+              normal.Normal(self._input(0.), self._input(1.)),
+              independent.Independent(
+                  normal.Normal(
+                      self._input(tf.zeros(2)), self._input(tf.ones(2))), 1),
           ],
           [1, 2],
           [],
@@ -429,10 +442,10 @@ class BlockwiseTestStaticParams(test_util.TestCase):
       (
           'MixedStaticShape',
           lambda self: [  # pylint: disable=g-long-lambda
-              tfd.Normal(0., 1.),
-              tfd.Independent(
-                  tfd.Normal(self._input(tf.zeros(2)), self._input(tf.ones(2))),
-                  1),
+              normal.Normal(0., 1.),
+              independent.Independent(
+                  normal.Normal(
+                      self._input(tf.zeros(2)), self._input(tf.ones(2))), 1),
           ],
           [1, 2],
           [],
@@ -440,9 +453,9 @@ class BlockwiseTestStaticParams(test_util.TestCase):
       (
           'Batch',
           lambda self: [  # pylint: disable=g-long-lambda
-              tfd.Normal(tf.zeros(2), tf.ones(2)),
-              tfd.Independent(
-                  tfd.Normal(
+              normal.Normal(tf.zeros(2), tf.ones(2)),
+              independent.Independent(
+                  normal.Normal(
                       self._input(tf.zeros([2, 2])), self._input(
                           tf.ones([2, 2]))), 1),
           ],
@@ -455,7 +468,7 @@ class BlockwiseTestStaticParams(test_util.TestCase):
     bases = dists_fn(self)
     num_elements = sum(nums_elements)
 
-    flat = tfd.Blockwise(bases, validate_args=True)
+    flat = blockwise.Blockwise(bases, validate_args=True)
     if self.use_static_shape:
       self.assertAllEqual([num_elements], flat.event_shape)
     self.assertAllEqual([num_elements],

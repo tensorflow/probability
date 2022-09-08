@@ -27,12 +27,12 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import loop_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
 
 JAX_MODE = False
 
@@ -159,7 +159,7 @@ class TraceScanTest(test_util.TestCase):
   @test_util.numpy_disable_test_missing_functionality('No expanding composites')
   def testComposite(self):
     auto_normal = auto_composite_tensor.auto_composite_tensor(
-        tfd.Normal, omit_kwargs=('name',))
+        normal.Normal, omit_kwargs=('name',))
 
     def _loop_fn(state, element):
       return state + element
@@ -178,7 +178,7 @@ class TraceScanTest(test_util.TestCase):
     self.assertAllClose([1, 3], trace[0])
     self.assertAllClose([2, 6], trace[1])
 
-    self.assertIsInstance(trace[2], tfd.Normal)
+    self.assertIsInstance(trace[2], normal.Normal)
     self.assertAllClose([1., 3.], trace[2].loc)
     self.assertAllClose([0.1, 0.1], trace[2].scale)
 
@@ -189,8 +189,10 @@ class TraceScanTest(test_util.TestCase):
                                   0.,
                                   tf.range(10),
                                   trace_fn=lambda x: x)[0]
-    xla_grad = tf.function(lambda v: tfp_math.value_and_gradient(loss_fn, v)[1],
-                           jit_compile=True)(0.)
+
+    xla_grad = tf.function(
+        lambda v: gradient.value_and_gradient(loss_fn, v)[1],
+        jit_compile=True)(0.)
     self.assertAllClose(xla_grad, 10.)
 
 if __name__ == '__main__':

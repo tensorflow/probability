@@ -22,7 +22,10 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import deterministic
+from tensorflow_probability.python.distributions import half_cauchy
+from tensorflow_probability.python.distributions import joint_distribution_auto_batched as jdab
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
@@ -524,18 +527,18 @@ class MapStructureCoroutineTest(test_util.TestCase):
     def _horseshoe(path, scale):
       # Auxiliary-variable representation of a horseshoe prior.
       name = ','.join(path)
-      z = yield tfd.HalfCauchy(loc=0, scale=scale, name=name + '_z')
-      w_noncentered = yield tfd.Normal(
+      z = yield half_cauchy.HalfCauchy(loc=0, scale=scale, name=name + '_z')
+      w_noncentered = yield normal.Normal(
           loc=0., scale=z, name=name + '_w_noncentered')
       return z * w_noncentered
 
-    @tfd.JointDistributionCoroutineAutoBatched
+    @jdab.JointDistributionCoroutineAutoBatched
     def model():
       weights = yield from nest_util.map_structure_coroutine(
           _horseshoe,
           scale={'a': tf.ones([5]) * 100., 'b': tf.ones([2]) * 1e-2},
           _with_tuple_paths=True)
-      yield tfd.Deterministic(
+      yield deterministic.Deterministic(
           tf.sqrt(tf.norm(weights['a'])**2 + tf.norm(weights['b'])**2),
           name='weights_norm')
     event_shape = model.event_shape

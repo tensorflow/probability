@@ -24,52 +24,74 @@ import numpy as np
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.bijectors import exp
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.distributions import bernoulli
+from tensorflow_probability.python.distributions import deterministic
+from tensorflow_probability.python.distributions import dirichlet
+from tensorflow_probability.python.distributions import exponential
+from tensorflow_probability.python.distributions import half_normal
+from tensorflow_probability.python.distributions import inverse_gamma
+from tensorflow_probability.python.distributions import joint_distribution_auto_batched as jdab
+from tensorflow_probability.python.distributions import joint_distribution_coroutine as jdc
+from tensorflow_probability.python.distributions import joint_distribution_named as jdn
+from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import multinomial
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import poisson
+from tensorflow_probability.python.distributions import sample as sample_lib
+from tensorflow_probability.python.distributions import student_t
 from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import test_util
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
+from tensorflow_probability.python.util import deferred_tensor
 
 
 JAX_MODE = False
-Root = tfd.JointDistributionCoroutineAutoBatched.Root
+Root = jdab.JointDistributionCoroutineAutoBatched.Root
 
 
 @test_util.test_all_tf_execution_regimes
 class JointDistributionAutoBatchedTest(test_util.TestCase):
 
   @parameterized.named_parameters(
-      {'testcase_name': 'coroutine',
-       'jd_class': tfd.JointDistributionCoroutineAutoBatched},
-      {'testcase_name': 'sequential',
-       'jd_class': tfd.JointDistributionSequentialAutoBatched},
-      {'testcase_name': 'named',
-       'jd_class': tfd.JointDistributionNamedAutoBatched})
+      {
+          'testcase_name': 'coroutine',
+          'jd_class': jdab.JointDistributionCoroutineAutoBatched
+      }, {
+          'testcase_name': 'sequential',
+          'jd_class': jdab.JointDistributionSequentialAutoBatched
+      }, {
+          'testcase_name': 'named',
+          'jd_class': jdab.JointDistributionNamedAutoBatched
+      })
   def test_batch_and_event_shape_with_plate(self, jd_class):
 
     models = {}
 
     def coroutine_model():
-      g = yield tfd.LogNormal(0., 1.)
-      df = yield tfd.Exponential(1.)
-      loc = yield tfd.Sample(tfd.Normal(0, g), 20)
-      yield tfd.StudentT(tf.expand_dims(df, -1), loc, 1)
-    models[tfd.JointDistributionCoroutineAutoBatched] = coroutine_model
+      g = yield lognormal.LogNormal(0., 1.)
+      df = yield exponential.Exponential(1.)
+      loc = yield sample_lib.Sample(normal.Normal(0, g), 20)
+      yield student_t.StudentT(tf.expand_dims(df, -1), loc, 1)
 
-    models[tfd.JointDistributionSequentialAutoBatched] = [
-        tfd.LogNormal(0., 1.),
-        tfd.Exponential(1.),
-        lambda _, g: tfd.Sample(tfd.Normal(0, g), 20),
-        lambda loc, df: tfd.StudentT(tf.expand_dims(df, -1), loc, 1)
+    models[jdab.JointDistributionCoroutineAutoBatched] = coroutine_model
+
+    models[jdab.JointDistributionSequentialAutoBatched] = [
+        lognormal.LogNormal(0., 1.),
+        exponential.Exponential(1.),
+        lambda _, g: sample_lib.Sample(normal.Normal(0, g), 20),
+        lambda loc, df: student_t.StudentT(tf.expand_dims(df, -1), loc, 1)
     ]
 
-    models[tfd.JointDistributionNamedAutoBatched] = collections.OrderedDict((
-        ('g', tfd.LogNormal(0., 1.)),
-        ('df', tfd.Exponential(1.)),
-        ('loc', lambda g: tfd.Sample(tfd.Normal(0, g), 20)),
-        ('x', lambda loc, df: tfd.StudentT(tf.expand_dims(df, -1), loc, 1))))
+    models[jdab.JointDistributionNamedAutoBatched] = collections.OrderedDict(
+        (('g', lognormal.LogNormal(0.,
+                                   1.)), ('df', exponential.Exponential(1.)),
+         ('loc', lambda g: sample_lib.Sample(normal.Normal(0, g), 20)),
+         ('x',
+          lambda loc, df: student_t.StudentT(tf.expand_dims(df, -1), loc, 1))))
 
     joint = jd_class(models[jd_class], validate_args=True)
 
@@ -104,33 +126,54 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     self.assertIs(type(joint.model), type(unflat.model))
 
   @parameterized.named_parameters(
-      *(dict(  # pylint: disable=g-complex-comprehension
-          testcase_name=jd_type + '_' + sampler_type,
-          jd_class=getattr(tfd, 'JointDistribution' + jd_type + 'AutoBatched'),
-          sampler_type=sampler_type)
-        for jd_type in ('Coroutine', 'Sequential', 'Named')
-        for sampler_type in ('stateful', 'stateless')))
+      {
+          'testcase_name': 'CoroutineStateless',
+          'sampler_type': 'stateless',
+          'jd_class': jdab.JointDistributionCoroutineAutoBatched
+      }, {
+          'testcase_name': 'CoroutineStateful',
+          'sampler_type': 'stateful',
+          'jd_class': jdab.JointDistributionCoroutineAutoBatched
+      }, {
+          'testcase_name': 'SequentialStateless',
+          'sampler_type': 'stateless',
+          'jd_class': jdab.JointDistributionSequentialAutoBatched
+      }, {
+          'testcase_name': 'SequentialStateful',
+          'sampler_type': 'stateful',
+          'jd_class': jdab.JointDistributionSequentialAutoBatched
+      }, {
+          'testcase_name': 'NamedStateful',
+          'sampler_type': 'stateful',
+          'jd_class': jdab.JointDistributionNamedAutoBatched
+      }, {
+          'testcase_name': 'NamedStateless',
+          'sampler_type': 'stateless',
+          'jd_class': jdab.JointDistributionNamedAutoBatched
+      })
   def test_model_with_nontrivial_batch_shape(self, jd_class, sampler_type):
     models = {}
     def coroutine_model():
-      g = yield tfd.LogNormal(0., [1., 2.])
-      df = yield tfd.Exponential([1., 2.])
-      loc = yield tfd.Sample(tfd.Normal(0, g), 20)
-      yield tfd.StudentT(tf.expand_dims(df, -1), loc, 1)
-    models[tfd.JointDistributionCoroutineAutoBatched] = coroutine_model
+      g = yield lognormal.LogNormal(0., [1., 2.])
+      df = yield exponential.Exponential([1., 2.])
+      loc = yield sample_lib.Sample(normal.Normal(0, g), 20)
+      yield student_t.StudentT(tf.expand_dims(df, -1), loc, 1)
 
-    models[tfd.JointDistributionSequentialAutoBatched] = [
-        tfd.LogNormal(0., [1., 2.]),
-        tfd.Exponential([1., 2.]),
-        lambda _, g: tfd.Sample(tfd.Normal(0, g), 20),
-        lambda loc, df: tfd.StudentT(tf.expand_dims(df, -1), loc, 1)
+    models[jdab.JointDistributionCoroutineAutoBatched] = coroutine_model
+
+    models[jdab.JointDistributionSequentialAutoBatched] = [
+        lognormal.LogNormal(0., [1., 2.]),
+        exponential.Exponential([1., 2.]),
+        lambda _, g: sample_lib.Sample(normal.Normal(0, g), 20),
+        lambda loc, df: student_t.StudentT(tf.expand_dims(df, -1), loc, 1)
     ]
 
-    models[tfd.JointDistributionNamedAutoBatched] = collections.OrderedDict((
-        ('g', tfd.LogNormal(0., [1., 2.])),
-        ('df', tfd.Exponential([1., 2.])),
-        ('loc', lambda g: tfd.Sample(tfd.Normal(0, g), 20)),
-        ('x', lambda loc, df: tfd.StudentT(tf.expand_dims(df, -1), loc, 1))))
+    models[jdab.JointDistributionNamedAutoBatched] = collections.OrderedDict(
+        (('g', lognormal.LogNormal(0., [1., 2.])),
+         ('df', exponential.Exponential([1., 2.])),
+         ('loc', lambda g: sample_lib.Sample(normal.Normal(0, g), 20)),
+         ('x',
+          lambda loc, df: student_t.StudentT(tf.expand_dims(df, -1), loc, 1))))
 
     joint = jd_class(models[jd_class], batch_ndims=1, validate_args=True)
 
@@ -158,12 +201,12 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
       self.skipTest('Dynamic shape.')
 
     def coroutine_model():
-      g = yield tfd.LogNormal(0., [1., 2.])
-      df = yield tfd.Exponential([1., 2.])
-      loc = yield tfd.Sample(tfd.Normal(0, g), 20)
-      yield tfd.StudentT(tf.expand_dims(df, -1), loc, 1)
+      g = yield lognormal.LogNormal(0., [1., 2.])
+      df = yield exponential.Exponential([1., 2.])
+      loc = yield sample_lib.Sample(normal.Normal(0, g), 20)
+      yield student_t.StudentT(tf.expand_dims(df, -1), loc, 1)
 
-    joint = tfd.JointDistributionCoroutineAutoBatched(
+    joint = jdab.JointDistributionCoroutineAutoBatched(
         coroutine_model,
         batch_ndims=tf1.placeholder_with_default(1, shape=[]),
         validate_args=True)
@@ -185,15 +228,19 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     self.assertAllEqual(lp.shape, [5, 2])
 
   @parameterized.named_parameters(
-      {'testcase_name': 'coroutine',
-       'base_jd_class': tfd.JointDistributionCoroutine,
-       'jda_class': tfd.JointDistributionCoroutineAutoBatched},
-      {'testcase_name': 'sequential',
-       'base_jd_class': tfd.JointDistributionSequential,
-       'jda_class': tfd.JointDistributionSequentialAutoBatched},
-      {'testcase_name': 'named',
-       'base_jd_class': tfd.JointDistributionNamed,
-       'jda_class': tfd.JointDistributionNamedAutoBatched})
+      {
+          'testcase_name': 'coroutine',
+          'base_jd_class': jdc.JointDistributionCoroutine,
+          'jda_class': jdab.JointDistributionCoroutineAutoBatched
+      }, {
+          'testcase_name': 'sequential',
+          'base_jd_class': jds.JointDistributionSequential,
+          'jda_class': jdab.JointDistributionSequentialAutoBatched
+      }, {
+          'testcase_name': 'named',
+          'base_jd_class': jdn.JointDistributionNamed,
+          'jda_class': jdab.JointDistributionNamedAutoBatched
+      })
   def test_broadcast_ragged_batch_shape(self, base_jd_class, jda_class):
 
     base_jd_models = {}
@@ -202,33 +249,35 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     # distribution over the second.
     # (though note, this model breaks `log_prob` with nontrivial sample shape).
     def coroutine():
-      x = yield Root(tfd.Normal(0., scale=1.))
-      yield tfd.Normal(x[..., tf.newaxis], [1., 2., 3., 4., 5.])
-    base_jd_models[tfd.JointDistributionCoroutine] = coroutine
-    base_jd_models[tfd.JointDistributionSequential] = [
-        tfd.Normal(0., scale=1.),
-        lambda x: tfd.Normal(x[..., tf.newaxis], [1., 2., 3., 4., 5.])
+      x = yield Root(normal.Normal(0., scale=1.))
+      yield normal.Normal(x[..., tf.newaxis], [1., 2., 3., 4., 5.])
+
+    base_jd_models[jdc.JointDistributionCoroutine] = coroutine
+    base_jd_models[jds.JointDistributionSequential] = [
+        normal.Normal(0., scale=1.),
+        lambda x: normal.Normal(x[..., tf.newaxis], [1., 2., 3., 4., 5.])
     ]
-    base_jd_models[tfd.JointDistributionNamed] = {
-        'x': tfd.Normal(0., scale=1.),
-        'y': lambda x: tfd.Normal(x[..., tf.newaxis], [1., 2., 3., 4., 5.])
+    base_jd_models[jdn.JointDistributionNamed] = {
+        'x': normal.Normal(0., scale=1.),
+        'y': lambda x: normal.Normal(x[..., tf.newaxis], [1., 2., 3., 4., 5.])
     }
 
     # But we can get equivalent behavior in a JDCA by expanding dims so that
     # the batch dimensions line up.
     jd_auto_models = {}
     def coroutine_auto():
-      x = yield tfd.Normal(0., scale=[1.])
-      yield tfd.Normal(x, [1., 2., 3., 4., 5.])
-    jd_auto_models[tfd.JointDistributionCoroutineAutoBatched] = coroutine_auto
-    jd_auto_models[tfd.JointDistributionSequentialAutoBatched] = [
-        tfd.Normal(0., scale=[1.]),
-        lambda x: tfd.Normal(x, [1., 2., 3., 4., 5.])
+      x = yield normal.Normal(0., scale=[1.])
+      yield normal.Normal(x, [1., 2., 3., 4., 5.])
+
+    jd_auto_models[jdab.JointDistributionCoroutineAutoBatched] = coroutine_auto
+    jd_auto_models[jdab.JointDistributionSequentialAutoBatched] = [
+        normal.Normal(0., scale=[1.]),
+        lambda x: normal.Normal(x, [1., 2., 3., 4., 5.])
     ]
-    jd_auto_models[tfd.JointDistributionNamedAutoBatched] = (
-        collections.OrderedDict((
-            ('x', tfd.Normal(0., scale=[1.])),
-            ('y', lambda x: tfd.Normal(x, [1., 2., 3., 4., 5.])))))
+    jd_auto_models[jdab.JointDistributionNamedAutoBatched] = (
+        collections.OrderedDict(
+            (('x', normal.Normal(0., scale=[1.])),
+             ('y', lambda x: normal.Normal(x, [1., 2., 3., 4., 5.])))))
 
     # Writing a JD with ragged batch shape will broadcast the first
     # distribution over the second.
@@ -278,32 +327,45 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     self.assertAllEqual(lp_jda_broadcast.shape, [2, 3, 5])
 
   @parameterized.named_parameters(
-      {'testcase_name': 'coroutine',
-       'jd_class': tfd.JointDistributionCoroutineAutoBatched},
-      {'testcase_name': 'sequential',
-       'jd_class': tfd.JointDistributionSequentialAutoBatched},
-      {'testcase_name': 'named',
-       'jd_class': tfd.JointDistributionNamedAutoBatched})
+      {
+          'testcase_name': 'coroutine',
+          'jd_class': jdab.JointDistributionCoroutineAutoBatched
+      }, {
+          'testcase_name': 'sequential',
+          'jd_class': jdab.JointDistributionSequentialAutoBatched
+      }, {
+          'testcase_name': 'named',
+          'jd_class': jdab.JointDistributionNamedAutoBatched
+      })
   def test_log_prob_and_prob_with_plate(self, jd_class):
 
     models = {}
     def coroutine_model():
-      a = yield tfd.Bernoulli(probs=0.5, dtype=tf.float32)
-      b = yield tfd.Sample(tfd.Bernoulli(probs=0.25 + 0.5*a,
-                                         dtype=tf.float32), 2)
-      yield tfd.Normal(loc=a, scale=1. + b)
-    models[tfd.JointDistributionCoroutineAutoBatched] = coroutine_model
-    models[tfd.JointDistributionSequentialAutoBatched] = [
-        tfd.Bernoulli(probs=0.5, dtype=tf.float32),
-        lambda a: tfd.Sample(tfd.Bernoulli(  # pylint: disable=g-long-lambda
-            probs=0.25 + 0.5*a, dtype=tf.float32), 2),
-        lambda b, a: tfd.Normal(loc=a, scale=1. + b)
+      a = yield bernoulli.Bernoulli(probs=0.5, dtype=tf.float32)
+      b = yield sample_lib.Sample(  # pylint: disable=g-long-lambda
+          bernoulli.Bernoulli(probs=0.25 + 0.5 * a, dtype=tf.float32), 2)
+      yield normal.Normal(loc=a, scale=1. + b)
+
+    models[jdab.JointDistributionCoroutineAutoBatched] = coroutine_model
+    models[jdab.JointDistributionSequentialAutoBatched] = [
+        bernoulli.Bernoulli(probs=0.5, dtype=tf.float32),
+        lambda a: sample_lib.Sample(  # pylint: disable=g-long-lambda
+            bernoulli.Bernoulli(
+                probs=0.25 + 0.5 * a,
+                dtype=tf.float32),
+            2),
+        lambda b, a: normal.Normal(loc=a, scale=1. + b)
     ]
-    models[tfd.JointDistributionNamedAutoBatched] = collections.OrderedDict((
-        ('a', tfd.Bernoulli(probs=0.5, dtype=tf.float32)),
-        ('b', lambda a: tfd.Sample(tfd.Bernoulli(  # pylint: disable=g-long-lambda
-            probs=0.25 + 0.5*a, dtype=tf.float32), 2)),
-        ('c', lambda b, a: tfd.Normal(loc=a, scale=1. + b))))
+    models[jdab.JointDistributionNamedAutoBatched] = collections.OrderedDict((
+        ('a', bernoulli.Bernoulli(probs=0.5, dtype=tf.float32)),
+        (
+            'b',
+            lambda a: sample_lib.Sample(  # pylint: disable=g-long-lambda
+                bernoulli.Bernoulli(
+                    probs=0.25 + 0.5 * a,
+                    dtype=tf.float32),
+                2)),
+        ('c', lambda b, a: normal.Normal(loc=a, scale=1. + b))))
 
     joint = jd_class(models[jd_class], validate_args=True)
 
@@ -324,32 +386,37 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     self.assertAllClose(prob, np.exp(expected_log_prob))
 
   @parameterized.named_parameters(
-      {'testcase_name': 'coroutine',
-       'jd_class': tfd.JointDistributionCoroutineAutoBatched},
-      {'testcase_name': 'sequential',
-       'jd_class': tfd.JointDistributionSequentialAutoBatched},
-      {'testcase_name': 'named',
-       'jd_class': tfd.JointDistributionNamedAutoBatched})
+      {
+          'testcase_name': 'coroutine',
+          'jd_class': jdab.JointDistributionCoroutineAutoBatched
+      }, {
+          'testcase_name': 'sequential',
+          'jd_class': jdab.JointDistributionSequentialAutoBatched
+      }, {
+          'testcase_name': 'named',
+          'jd_class': jdab.JointDistributionNamedAutoBatched
+      })
   def test_log_prob_multiple_samples(self, jd_class):
 
     models = {}
     def coroutine_model():
-      a = yield tfd.Bernoulli(probs=0.5, dtype=tf.float32)
-      b = yield tfd.Bernoulli(probs=0.25 + 0.5*a,
-                              dtype=tf.float32)
-      yield tfd.Normal(loc=a, scale=1. + b)
-    models[tfd.JointDistributionCoroutineAutoBatched] = coroutine_model
+      a = yield bernoulli.Bernoulli(probs=0.5, dtype=tf.float32)
+      b = yield bernoulli.Bernoulli(probs=0.25 + 0.5 * a, dtype=tf.float32)
+      yield normal.Normal(loc=a, scale=1. + b)
 
-    models[tfd.JointDistributionSequentialAutoBatched] = [
-        tfd.Bernoulli(probs=0.5, dtype=tf.float32),
-        lambda a: tfd.Bernoulli(probs=0.25 + 0.5*a, dtype=tf.float32),
-        lambda b, a: tfd.Normal(loc=a, scale=1. + b)
+    models[jdab.JointDistributionCoroutineAutoBatched] = coroutine_model
+
+    models[jdab.JointDistributionSequentialAutoBatched] = [
+        bernoulli.Bernoulli(probs=0.5, dtype=tf.float32),
+        lambda a: bernoulli.Bernoulli(probs=0.25 + 0.5 * a, dtype=tf.float32),
+        lambda b, a: normal.Normal(loc=a, scale=1. + b)
     ]
 
-    models[tfd.JointDistributionNamedAutoBatched] = collections.OrderedDict((
-        ('a', tfd.Bernoulli(probs=0.5, dtype=tf.float32)),
-        ('b', lambda a: tfd.Bernoulli(probs=0.25 + 0.5*a, dtype=tf.float32)),
-        ('c', lambda b, a: tfd.Normal(loc=a, scale=1. + b))))
+    models[jdab.JointDistributionNamedAutoBatched] = collections.OrderedDict((
+        ('a', bernoulli.Bernoulli(probs=0.5, dtype=tf.float32)),
+        ('b',
+         lambda a: bernoulli.Bernoulli(probs=0.25 + 0.5 * a, dtype=tf.float32)),
+        ('c', lambda b, a: normal.Normal(loc=a, scale=1. + b))))
 
     joint = jd_class(models[jd_class], validate_args=True)
 
@@ -370,18 +437,22 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     self.assertAllClose(*self.evaluate([log_prob, expected_log_prob]))
 
   @parameterized.named_parameters(
-      {'testcase_name': 'coroutine',
-       'jd_class': tfd.JointDistributionCoroutineAutoBatched},
-      {'testcase_name': 'sequential',
-       'jd_class': tfd.JointDistributionSequentialAutoBatched},
-      {'testcase_name': 'named',
-       'jd_class': tfd.JointDistributionNamedAutoBatched})
+      {
+          'testcase_name': 'coroutine',
+          'jd_class': jdab.JointDistributionCoroutineAutoBatched
+      }, {
+          'testcase_name': 'sequential',
+          'jd_class': jdab.JointDistributionSequentialAutoBatched
+      }, {
+          'testcase_name': 'named',
+          'jd_class': jdab.JointDistributionNamedAutoBatched
+      })
   def test_sample_and_log_prob(self, jd_class):
 
     # Define a bijector to detect if/when `inverse` is called.
     inverted_values = []
 
-    class InverseTracingExp(tfb.Exp):
+    class InverseTracingExp(exp.Exp):
 
       def _inverse(self, y):
         inverted_values.append(y)
@@ -390,24 +461,25 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     models = {}
 
     def coroutine_model():
-      g = yield InverseTracingExp()(tfd.Normal(0., 1.), name='g')
-      df = yield tfd.Exponential(1., name='df')
-      loc = yield tfd.Sample(tfd.Normal(0, g), 20, name='loc')
-      yield tfd.StudentT(df, loc, 1, name='x')
-    models[tfd.JointDistributionCoroutineAutoBatched] = coroutine_model
+      g = yield InverseTracingExp()(normal.Normal(0., 1.), name='g')
+      df = yield exponential.Exponential(1., name='df')
+      loc = yield sample_lib.Sample(normal.Normal(0, g), 20, name='loc')
+      yield student_t.StudentT(df, loc, 1, name='x')
 
-    models[tfd.JointDistributionSequentialAutoBatched] = [
-        InverseTracingExp()(tfd.Normal(0., 1.), name='g'),
-        tfd.Exponential(1., name='df'),
-        lambda _, g: tfd.Sample(tfd.Normal(0, g), 20, name='loc'),
-        lambda loc, df: tfd.StudentT(df, loc, 1, name='x')
+    models[jdab.JointDistributionCoroutineAutoBatched] = coroutine_model
+
+    models[jdab.JointDistributionSequentialAutoBatched] = [
+        InverseTracingExp()(normal.Normal(0., 1.), name='g'),
+        exponential.Exponential(1., name='df'),
+        lambda _, g: sample_lib.Sample(normal.Normal(0, g), 20, name='loc'),
+        lambda loc, df: student_t.StudentT(df, loc, 1, name='x')
     ]
 
-    models[tfd.JointDistributionNamedAutoBatched] = collections.OrderedDict((
-        ('g', InverseTracingExp()(tfd.Normal(0., 1.))),
-        ('df', tfd.Exponential(1.)),
-        ('loc', lambda g: tfd.Sample(tfd.Normal(0, g), 20)),
-        ('x', lambda loc, df: tfd.StudentT(df, loc, 1))))
+    models[jdab.JointDistributionNamedAutoBatched] = collections.OrderedDict(
+        (('g', InverseTracingExp()(normal.Normal(0., 1.))),
+         ('df', exponential.Exponential(1.)),
+         ('loc', lambda g: sample_lib.Sample(normal.Normal(0, g), 20)),
+         ('x', lambda loc, df: student_t.StudentT(df, loc, 1))))
 
     joint = jd_class(models[jd_class], validate_args=True)
 
@@ -431,11 +503,12 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
   @test_util.jax_disable_test_missing_functionality('b/157594634')
   def test_sample_distributions(self):
     def coroutine_model():
-      g = yield tfd.Normal(0., 1., name='g')
-      df = yield tfd.Exponential(1., name='df')
-      loc = yield tfd.Normal(tf.zeros([20]), g, name='loc')
-      yield tfd.StudentT(df, loc, 1, name='x')
-    joint = tfd.JointDistributionCoroutineAutoBatched(coroutine_model)
+      g = yield normal.Normal(0., 1., name='g')
+      df = yield exponential.Exponential(1., name='df')
+      loc = yield normal.Normal(tf.zeros([20]), g, name='loc')
+      yield student_t.StudentT(df, loc, 1, name='x')
+
+    joint = jdab.JointDistributionCoroutineAutoBatched(coroutine_model)
 
     ds, xs = joint.sample_distributions([4, 3], seed=test_util.test_seed())
     for d, x in zip(ds, xs):
@@ -446,10 +519,10 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
   @test_util.jax_disable_test_missing_functionality('b/201586404')
   def test_sample_distributions_not_composite_tensor_raises_error(self):
     def coroutine_model():
-      yield tfd.TransformedDistribution(tfd.Normal(0., 1.),
-                                        test_util.NonCompositeTensorExp(),
-                                        name='td')
-    joint = tfd.JointDistributionCoroutineAutoBatched(coroutine_model)
+      yield transformed_distribution.TransformedDistribution(
+          normal.Normal(0., 1.), test_util.NonCompositeTensorExp(), name='td')
+
+    joint = jdab.JointDistributionCoroutineAutoBatched(coroutine_model)
 
     # Sampling with trivial sample shape avoids the vmap codepath.
     ds, _ = joint.sample_distributions([], seed=test_util.test_seed())
@@ -463,33 +536,39 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
       joint.sample_distributions([4, 3], seed=test_util.test_seed())
 
   def test_sample_with_batch_value(self):
-    @tfd.JointDistributionCoroutineAutoBatched
+
+    @jdab.JointDistributionCoroutineAutoBatched
     def dist():
-      a = yield tfd.Sample(tfd.Normal(0, 1.), 2)
-      b = yield tfd.Sample(tfd.Normal(0, 1.), 3)
+      a = yield sample_lib.Sample(normal.Normal(0, 1.), 2)
+      b = yield sample_lib.Sample(normal.Normal(0, 1.), 3)
       # The following line fails if not autovectorized.
-      yield tfd.Normal(a[tf.newaxis, ...] * b[..., tf.newaxis], 1.)
+      yield normal.Normal(a[tf.newaxis, ...] * b[..., tf.newaxis], 1.)
     x = self.evaluate(dist.sample(123, seed=test_util.test_seed()))
     x2 = self.evaluate(dist.sample(value=x, seed=test_util.test_seed()))
     self.assertAllCloseNested(x, x2)
 
     # Also test a dict-type value (JDNamed).
-    dist = tfd.JointDistributionNamedAutoBatched({
-        'a': tfd.Sample(tfd.Normal(0, 1.), 2),
-        'b': tfd.Sample(tfd.Normal(0, 1.), 3),
-        'c': lambda a, b: tfd.Normal(  # pylint: disable=g-long-lambda
-            a[tf.newaxis, ...] * b[..., tf.newaxis], 1.)})
+    dist = jdab.JointDistributionNamedAutoBatched({
+        'a':
+            sample_lib.Sample(normal.Normal(0, 1.), 2),
+        'b':
+            sample_lib.Sample(normal.Normal(0, 1.), 3),
+        'c':
+            lambda a, b: normal.Normal(  # pylint: disable=g-long-lambda
+                a[tf.newaxis, ...] * b[..., tf.newaxis], 1.)
+    })
     x = self.evaluate(dist.sample(123, seed=test_util.test_seed()))
     x2 = self.evaluate(dist.sample(value=x, seed=test_util.test_seed()))
     self.assertAllCloseNested(x, x2)
 
   def test_sample_with_value_as_kwarg(self):
-    @tfd.JointDistributionCoroutineAutoBatched
+
+    @jdab.JointDistributionCoroutineAutoBatched
     def dist():
-      a = yield tfd.Sample(tfd.Normal(0, 1.), 2, name='a')
-      b = yield tfd.Sample(tfd.Normal(0, 1.), 3, name='b')
+      a = yield sample_lib.Sample(normal.Normal(0, 1.), 2, name='a')
+      b = yield sample_lib.Sample(normal.Normal(0, 1.), 3, name='b')
       # The following line fails if not autovectorized.
-      yield tfd.Normal(a[tf.newaxis, ...] * b[..., tf.newaxis], 1., name='c')
+      yield normal.Normal(a[tf.newaxis, ...] * b[..., tf.newaxis], 1., name='c')
 
     x = self.evaluate(dist.sample(4, seed=test_util.test_seed()))
     x2 = self.evaluate(dist.sample(seed=test_util.test_seed(), a=x.a))
@@ -505,13 +584,15 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     num_features = 5
 
     def dist():
-      scale_variance = yield tfd.InverseGamma(0.5, 0.5)
-      scale_noncentered = yield tfd.Sample(tfd.HalfNormal(1.), num_features)
+      scale_variance = yield inverse_gamma.InverseGamma(0.5, 0.5)
+      scale_noncentered = yield sample_lib.Sample(
+          half_normal.HalfNormal(1.), num_features)
       scale = scale_noncentered * scale_variance[..., None]**0.5
-      weights_noncentered = yield tfd.Sample(tfd.Normal(0., 1.), num_features)
-      yield tfd.Deterministic(weights_noncentered * scale)
+      weights_noncentered = yield sample_lib.Sample(
+          normal.Normal(0., 1.), num_features)
+      yield deterministic.Deterministic(weights_noncentered * scale)
 
-    joint = tfd.JointDistributionCoroutineAutoBatched(dist, validate_args=True)
+    joint = jdab.JointDistributionCoroutineAutoBatched(dist, validate_args=True)
 
     value_partial_batch_dim = 4
     value_ = (3.,
@@ -559,17 +640,16 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     num_rows = 4
     num_columns = 5
     def dist():
-      a = yield tfd.Sample(tfd.Normal(0., 1.), num_rows, name='a')
-      b = yield tfd.Sample(tfd.Normal(0., 1.), num_columns, name='b')
-      yield tfd.Normal(a[..., None] * b[None, ...], 1., name='c')
+      a = yield sample_lib.Sample(normal.Normal(0., 1.), num_rows, name='a')
+      b = yield sample_lib.Sample(normal.Normal(0., 1.), num_columns, name='b')
+      yield normal.Normal(a[..., None] * b[None, ...], 1., name='c')
 
-    tuple_joint = tfd.JointDistributionCoroutineAutoBatched(
+    tuple_joint = jdab.JointDistributionCoroutineAutoBatched(
         dist, validate_args=True)
-    namedtuple_joint = tfd.JointDistributionCoroutineAutoBatched(
+    namedtuple_joint = jdab.JointDistributionCoroutineAutoBatched(
         dist,
-        sample_dtype=collections.namedtuple(
-            'ModelSpec', ['a', 'b', 'c'])(
-                a=tf.float32, b=tf.float32, c=tf.float32),
+        sample_dtype=collections.namedtuple('ModelSpec', ['a', 'b', 'c'])(
+            a=tf.float32, b=tf.float32, c=tf.float32),
         validate_args=True)
 
     value_partial_batch_dim = 3
@@ -592,9 +672,10 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
 
   def test_unit_sample_shape_avoids_vectorization(self):
     xs = []  # Collect (possibly symbolic) Tensors sampled inside the model.
-    @tfd.JointDistributionCoroutineAutoBatched
+
+    @jdab.JointDistributionCoroutineAutoBatched
     def dist():
-      x = yield tfd.Normal(0., 1., name='x')
+      x = yield normal.Normal(0., 1., name='x')
       xs.append(x)
 
     # Try sampling with a variety of unit sample shapes.
@@ -616,10 +697,11 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
       self.assertEqual(x.shape, [])
 
   def test_unit_sample_shape(self):
-    @tfd.JointDistributionCoroutineAutoBatched
+
+    @jdab.JointDistributionCoroutineAutoBatched
     def dist():
-      x = yield tfd.Normal(loc=tf.zeros([3]), scale=1., name='x')
-      yield tfd.Bernoulli(logits=tf.einsum('n->', x), name='y')
+      x = yield normal.Normal(loc=tf.zeros([3]), scale=1., name='x')
+      yield bernoulli.Bernoulli(logits=tf.einsum('n->', x), name='y')
 
     for sample_shape in [(), 1, [1], [1, 1], [2]]:
       self.assertAllEqual(
@@ -633,13 +715,13 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     num_features = 4
 
     def dist():
-      scale_variance = yield Root(tfd.InverseGamma(0.5, 0.5))
+      scale_variance = yield Root(inverse_gamma.InverseGamma(0.5, 0.5))
       scale_noncentered = yield Root(
-          tfd.Sample(tfd.HalfNormal(1.), num_features))
+          sample_lib.Sample(half_normal.HalfNormal(1.), num_features))
       scale = scale_noncentered * scale_variance[..., None]**0.5
       weights_noncentered = yield Root(
-          tfd.Sample(tfd.Normal(0., 1.), num_features))
-      yield tfd.Deterministic(weights_noncentered * scale)
+          sample_lib.Sample(normal.Normal(0., 1.), num_features))
+      yield deterministic.Deterministic(weights_noncentered * scale)
 
     # Currently sample_dtype is only used for `tf.nest.pack_structure_as`. In
     # the future we may use it for error checking and/or casting.
@@ -649,7 +731,7 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
         'weights_noncentered',
         'weights',
     ])(*([None]*4))
-    joint = tfd.JointDistributionCoroutineAutoBatched(
+    joint = jdab.JointDistributionCoroutineAutoBatched(
         dist, sample_dtype=sample_dtype, validate_args=True)
     self.assertAllEqual(sorted(sample_dtype._fields),
                         sorted(joint.sample(
@@ -664,10 +746,10 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     sd = collections.namedtuple('Model', ['s', 'w'])(None, None)
 
     def dist():
-      s = yield tfd.Sample(tfd.InverseGamma(2, 2), 100)
-      yield tfd.Normal(0, s)
+      s = yield sample_lib.Sample(inverse_gamma.InverseGamma(2, 2), 100)
+      yield normal.Normal(0, s)
 
-    m = tfd.JointDistributionCoroutineAutoBatched(dist, sample_dtype=sd)
+    m = jdab.JointDistributionCoroutineAutoBatched(dist, sample_dtype=sd)
     self.assertEqual(
         ('<tfp.distributions.JointDistributionCoroutineAutoBatched'
          ' \'JointDistributionCoroutineAutoBatched\''
@@ -677,12 +759,16 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
         repr(m))
 
   @parameterized.named_parameters(
-      {'testcase_name': 'coroutine',
-       'jd_class': tfd.JointDistributionCoroutineAutoBatched},
-      {'testcase_name': 'sequential',
-       'jd_class': tfd.JointDistributionSequentialAutoBatched},
-      {'testcase_name': 'named',
-       'jd_class': tfd.JointDistributionNamedAutoBatched})
+      {
+          'testcase_name': 'coroutine',
+          'jd_class': jdab.JointDistributionCoroutineAutoBatched
+      }, {
+          'testcase_name': 'sequential',
+          'jd_class': jdab.JointDistributionSequentialAutoBatched
+      }, {
+          'testcase_name': 'named',
+          'jd_class': jdab.JointDistributionNamedAutoBatched
+      })
   @test_util.jax_disable_variable_test
   def test_latent_dirichlet_allocation(self, jd_class):  # pylint: disable=g-doc-args
     """Tests Latent Dirichlet Allocation joint model.
@@ -707,10 +793,9 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     num_topics = 3
     num_words = 10
     avg_doc_length = 5
-    u = tfd.Uniform(low=-1., high=1.)
-    alpha = tfp.util.TransformedVariable(
-        u.sample([num_topics], seed=seed()),
-        tfb.Softplus(), name='alpha')
+    u = uniform.Uniform(low=-1., high=1.)
+    alpha = deferred_tensor.TransformedVariable(
+        u.sample([num_topics], seed=seed()), softplus.Softplus(), name='alpha')
     beta = tf.Variable(u.sample([num_topics, num_words],
                                 seed=seed()), name='beta')
 
@@ -718,25 +803,29 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     # use of Independent--this lets us easily aggregate multinomials across
     # topics (and in any "shape" of documents).
     def lda_coroutine_model():
-      n = yield Root(tfd.Poisson(rate=avg_doc_length))
-      theta = yield Root(tfd.Dirichlet(concentration=alpha))
-      z = yield tfd.Multinomial(total_count=n, probs=theta)
-      yield tfd.Multinomial(total_count=z, logits=beta)
-    if jd_class is tfd.JointDistributionCoroutineAutoBatched:
+      n = yield Root(poisson.Poisson(rate=avg_doc_length))
+      theta = yield Root(dirichlet.Dirichlet(concentration=alpha))
+      z = yield multinomial.Multinomial(total_count=n, probs=theta)
+      yield multinomial.Multinomial(total_count=z, logits=beta)
+
+    if jd_class is jdab.JointDistributionCoroutineAutoBatched:
       model = lda_coroutine_model
-    elif jd_class is tfd.JointDistributionSequentialAutoBatched:
+    elif jd_class is jdab.JointDistributionSequentialAutoBatched:
       model = [
-          tfd.Poisson(rate=avg_doc_length),  # n
-          tfd.Dirichlet(concentration=alpha),  # theta
-          lambda theta, n: tfd.Multinomial(total_count=n, probs=theta),  # z
-          lambda z: tfd.Multinomial(total_count=z, logits=beta)
+          poisson.Poisson(rate=avg_doc_length),  # n
+          dirichlet.Dirichlet(concentration=alpha),  # theta
+          # z
+          lambda theta, n: multinomial.Multinomial(total_count=n, probs=theta),
+          lambda z: multinomial.Multinomial(total_count=z, logits=beta)
       ]
-    elif jd_class is tfd.JointDistributionNamedAutoBatched:
-      model = collections.OrderedDict((
-          ('n', tfd.Poisson(rate=avg_doc_length)),
-          ('theta', tfd.Dirichlet(concentration=alpha)),
-          ('z', lambda theta, n: tfd.Multinomial(total_count=n, probs=theta)),
-          ('X', lambda z: tfd.Multinomial(total_count=z, logits=beta))))
+    elif jd_class is jdab.JointDistributionNamedAutoBatched:
+      model = collections.OrderedDict(
+          (('n', poisson.Poisson(rate=avg_doc_length)),
+           ('theta', dirichlet.Dirichlet(concentration=alpha)),
+           ('z', lambda theta, n: multinomial.Multinomial(  # pylint: disable=g-long-lambda
+               total_count=n, probs=theta)),
+           ('X',
+            lambda z: multinomial.Multinomial(total_count=z, logits=beta))))
 
     # TODO(b/159842104): Enable autovectorization for Multinomial sampling.
     lda = jd_class(model, validate_args=True, use_vectorized_map=False)
@@ -764,32 +853,40 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     self.assertAllNotNone(grads)
 
   @parameterized.named_parameters(
-      {'testcase_name': 'coroutine',
-       'jd_class': tfd.JointDistributionCoroutineAutoBatched},
-      {'testcase_name': 'sequential',
-       'jd_class': tfd.JointDistributionSequentialAutoBatched},
-      {'testcase_name': 'named',
-       'jd_class': tfd.JointDistributionNamedAutoBatched})
+      {
+          'testcase_name': 'coroutine',
+          'jd_class': jdab.JointDistributionCoroutineAutoBatched
+      }, {
+          'testcase_name': 'sequential',
+          'jd_class': jdab.JointDistributionSequentialAutoBatched
+      }, {
+          'testcase_name': 'named',
+          'jd_class': jdab.JointDistributionNamedAutoBatched
+      })
   def test_default_event_space_bijector(self, jd_class):
 
     models = {}
     def coroutine_model():
-      high = yield tfd.LogNormal(0., [1.])
-      yield tfd.Uniform(low=[[-1., -2.]], high=high[..., tf.newaxis])
-      yield tfd.Deterministic([[0., 1., 2.]])
-    models[tfd.JointDistributionCoroutineAutoBatched] = coroutine_model
+      high = yield lognormal.LogNormal(0., [1.])
+      yield uniform.Uniform(low=[[-1., -2.]], high=high[..., tf.newaxis])
+      yield deterministic.Deterministic([[0., 1., 2.]])
 
-    models[tfd.JointDistributionSequentialAutoBatched] = [
-        tfd.LogNormal(0., [1.]),
-        lambda high: tfd.Uniform(low=[[-1., -2.]], high=high[..., tf.newaxis]),
-        tfd.Deterministic([[0., 1., 2.]])
+    models[jdab.JointDistributionCoroutineAutoBatched] = coroutine_model
+
+    models[jdab.JointDistributionSequentialAutoBatched] = [
+        lognormal.LogNormal(0., [1.]), lambda high: uniform.Uniform(  # pylint: disable=g-long-lambda
+            low=[[-1., -2.]], high=high[..., tf.newaxis]),
+        deterministic.Deterministic([[0., 1., 2.]])
     ]
 
-    models[tfd.JointDistributionNamedAutoBatched] = collections.OrderedDict((
-        ('high', tfd.LogNormal(0., [1.])),
-        ('x', lambda high: tfd.Uniform(low=[[-1., -2.]],  # pylint: disable=g-long-lambda
-                                       high=high[..., tf.newaxis])),
-        ('y', tfd.Deterministic([[0., 1., 2.]]))))
+    models[jdab.JointDistributionNamedAutoBatched] = collections.OrderedDict((
+        ('high', lognormal.LogNormal(0., [1.])),
+        (
+            'x',
+            lambda high: uniform.Uniform(  # pylint: disable=g-long-lambda
+                low=[[-1., -2.]],
+                high=high[..., tf.newaxis])),
+        ('y', deterministic.Deterministic([[0., 1., 2.]]))))
 
     joint = jd_class(models[jd_class], batch_ndims=1, validate_args=True)
     self.assertAllEqual(joint.batch_shape, [1])
@@ -820,25 +917,31 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     self.assertAllEqual(ildj.shape, joint.log_prob(unbatched_y).shape)
 
   @parameterized.named_parameters(
-      {'testcase_name': 'coroutine',
-       'jd_class': tfd.JointDistributionCoroutineAutoBatched},
-      {'testcase_name': 'sequential',
-       'jd_class': tfd.JointDistributionSequentialAutoBatched},
-      {'testcase_name': 'named',
-       'jd_class': tfd.JointDistributionNamedAutoBatched})
+      {
+          'testcase_name': 'coroutine',
+          'jd_class': jdab.JointDistributionCoroutineAutoBatched
+      }, {
+          'testcase_name': 'sequential',
+          'jd_class': jdab.JointDistributionSequentialAutoBatched
+      }, {
+          'testcase_name': 'named',
+          'jd_class': jdab.JointDistributionNamedAutoBatched
+      })
   def test_default_event_space_bijector_constant_jacobian(self, jd_class):
 
     models = {}
     def coroutine_model():
-      yield tfd.Normal(0., [1., 2.], name='x')
-    models[tfd.JointDistributionCoroutineAutoBatched] = coroutine_model
+      yield normal.Normal(0., [1., 2.], name='x')
 
-    models[tfd.JointDistributionSequentialAutoBatched] = [
-        tfd.Normal(0., [1., 2.], name='x')
+    models[jdab.JointDistributionCoroutineAutoBatched] = coroutine_model
+
+    models[jdab.JointDistributionSequentialAutoBatched] = [
+        normal.Normal(0., [1., 2.], name='x')
     ]
 
-    models[tfd.JointDistributionNamedAutoBatched] = {
-        'x': tfd.Normal(0., [1., 2.], name='x')}
+    models[jdab.JointDistributionNamedAutoBatched] = {
+        'x': normal.Normal(0., [1., 2.], name='x')
+    }
 
     joint = jd_class(models[jd_class], batch_ndims=1, validate_args=True)
     self.assertAllEqual(joint.batch_shape, [2])
@@ -857,19 +960,24 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     batch_shape = [2, 3]
 
     def inner_fn():
-      xy = yield tfd.JointDistributionNamedAutoBatched(
-          {'x': tfd.Normal(loc=tf.zeros(batch_shape),
-                           scale=tf.ones(batch_shape),
-                           name='x'),
-           'y': lambda x: tfd.Poisson(log_rate=x, name='y')},
+      xy = yield jdab.JointDistributionNamedAutoBatched(
+          {
+              'x':
+                  normal.Normal(
+                      loc=tf.zeros(batch_shape),
+                      scale=tf.ones(batch_shape),
+                      name='x'),
+              'y':
+                  lambda x: poisson.Poisson(log_rate=x, name='y')
+          },
           batch_ndims=2,
           name='xy')
-      _ = yield tfd.Normal(loc=0., scale=xy['y'], name='z')
+      _ = yield normal.Normal(loc=0., scale=xy['y'], name='z')
 
-    joint = tfd.JointDistributionSequentialAutoBatched([
-        tfd.JointDistributionCoroutineAutoBatched(inner_fn,
-                                                  batch_ndims=1,
-                                                  name='a')])
+    joint = jdab.JointDistributionSequentialAutoBatched([
+        jdab.JointDistributionCoroutineAutoBatched(
+            inner_fn, batch_ndims=1, name='a')
+    ])
     z = joint.sample(seed=test_util.test_seed())
 
     # Batch and event shape.
@@ -887,15 +995,19 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     z3 = joint.sample(value=z2, seed=test_util.test_seed())
     self.assertAllCloseNested(z2, z3)
 
+  # pylint: disable=g-complex-comprehension
+
   @parameterized.named_parameters(*[
-      dict(testcase_name='_{}{}'.format(jd_class.__name__,  # pylint: disable=g-complex-comprehension
-                                        '_jit' if jit else ''),
-           jd_class=jd_class, jit=jit)
-      for jd_class in (tfd.JointDistributionCoroutineAutoBatched,
-                       tfd.JointDistributionSequentialAutoBatched,
-                       tfd.JointDistributionNamedAutoBatched)
-      for jit in (False, True)
-  ])
+      dict(
+          testcase_name='_{}{}'.format(
+              jd_class.__name__,
+              '_jit' if jit else ''),
+          jd_class=jd_class,
+          jit=jit)
+      for jd_class in (jdab.JointDistributionCoroutineAutoBatched,
+                       jdab.JointDistributionSequentialAutoBatched,
+                       jdab.JointDistributionNamedAutoBatched)
+      for jit in (False, True)])
   def test_kahan_precision(self, jd_class, jit):
     maybe_jit = lambda f: f
     if jit:
@@ -907,19 +1019,21 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     def make_models(dtype):
       models = {}
       def mk_20k_poisson(log_rate):
-        return tfd.Poisson(log_rate=tf.broadcast_to(log_rate[..., tf.newaxis],
-                                                    log_rate.shape + (20_000,)))
+        return poisson.Poisson(
+            log_rate=tf.broadcast_to(log_rate[..., tf.newaxis], log_rate.shape +
+                                     (20_000,)))
       def coroutine_model():
-        log_rate = yield tfd.Normal(0., dtype(.2), name='log_rate')
+        log_rate = yield normal.Normal(0., dtype(.2), name='log_rate')
         yield mk_20k_poisson(log_rate).copy(name='x')
-      models[tfd.JointDistributionCoroutineAutoBatched] = coroutine_model
 
-      models[tfd.JointDistributionSequentialAutoBatched] = [
-          tfd.Normal(0., dtype(.2)), mk_20k_poisson
+      models[jdab.JointDistributionCoroutineAutoBatched] = coroutine_model
+
+      models[jdab.JointDistributionSequentialAutoBatched] = [
+          normal.Normal(0., dtype(.2)), mk_20k_poisson
       ]
 
-      models[tfd.JointDistributionNamedAutoBatched] = collections.OrderedDict((
-          ('log_rate', tfd.Normal(0., dtype(.2))), ('x', mk_20k_poisson)))
+      models[jdab.JointDistributionNamedAutoBatched] = collections.OrderedDict(
+          (('log_rate', normal.Normal(0., dtype(.2))), ('x', mk_20k_poisson)))
       return models
 
     joint = jd_class(make_models(np.float32)[jd_class], validate_args=True,
@@ -930,9 +1044,9 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     xs = self.evaluate(
         joint.sample(log_rate=tf.zeros([nsamp]), seed=stream()))
     if isinstance(xs, dict):
-      xs['log_rate'] = tfd.Normal(0, .2).sample(nsamp, seed=stream())
+      xs['log_rate'] = normal.Normal(0, .2).sample(nsamp, seed=stream())
     else:
-      xs = (tfd.Normal(0, .2).sample(nsamp, seed=stream()), xs[1])
+      xs = (normal.Normal(0, .2).sample(nsamp, seed=stream()), xs[1])
     xs64 = tf.nest.map_structure(lambda x: tf.cast(x, tf.float64), xs)
     lp = maybe_jit(joint.copy(validate_args=not jit).log_prob)(xs)
     lp64 = joint64.log_prob(xs64)
@@ -942,10 +1056,13 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
 
   def test_kahan_broadcasting_check(self):
     def model():
-      _ = yield tfd.Normal(0., 1.)  # Batch shape ()
-      _ = yield tfd.Normal([0., 1., 2.], 1.)  # Batch shape [3]
-    dist = tfd.JointDistributionCoroutineAutoBatched(
-        model, validate_args=True, experimental_use_kahan_sum=True,
+      _ = yield normal.Normal(0., 1.)  # Batch shape ()
+      _ = yield normal.Normal([0., 1., 2.], 1.)  # Batch shape [3]
+
+    dist = jdab.JointDistributionCoroutineAutoBatched(
+        model,
+        validate_args=True,
+        experimental_use_kahan_sum=True,
         batch_ndims=1)
     sample = self.evaluate(dist.sample(seed=test_util.test_seed(
         sampler_type='stateless')))

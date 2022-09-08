@@ -20,22 +20,24 @@ from absl.testing import parameterized
 import numpy as np
 from scipy import stats
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.bijectors import lambertw_transform
 from tensorflow_probability.python.distributions import lambertw_f
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import student_t
+from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import test_util
-
-
-tfd = tfp.distributions
-tfb = tfp.bijectors
+from tensorflow_probability.python.layers import distribution_layer
 
 
 @test_util.test_all_tf_execution_regimes
 class LambertWDistributionTest(test_util.TestCase):
 
   @parameterized.named_parameters(
-      ("Normal", tfd.Normal, {"loc": 0., "scale": 1.}),
-      ("T", tfd.StudentT, {"df": 5, "loc": 0., "scale": 1.}),
-      ("Uniform", tfd.Uniform, {"low": -math.sqrt(3.), "high": math.sqrt(3.)}))
+      ("Normal", normal.Normal, {"loc": 0., "scale": 1.}),
+      ("T", student_t.StudentT, {"df": 5, "loc": 0., "scale": 1.}),
+      ("Uniform", uniform.Uniform, {
+          "low": -math.sqrt(3.), "high": math.sqrt(3.)}))
   def testLambertWDistributionOutputType(self,
                                          distribution_constructor,
                                          distribution_kwargs):
@@ -49,7 +51,8 @@ class LambertWDistributionTest(test_util.TestCase):
         shift=shift,
         scale=scale,
         tailweight=tail)
-    self.assertIsInstance(lambertw_distribution, tfd.TransformedDistribution)
+    self.assertIsInstance(
+        lambertw_distribution, transformed_distribution.TransformedDistribution)
     samples = lambertw_distribution.sample(10, seed=test_util.test_seed())
     self.assertAllEqual(samples.shape, [10])
 
@@ -70,7 +73,7 @@ class LambertWNormalTest(test_util.TestCase):
 
   def testBatchSamplesAreIndependent(self):
     num_samples = 1000
-    lwn = tfd.LambertWNormal(loc=0., scale=1., tailweight=[0., 0.])
+    lwn = lambertw_f.LambertWNormal(loc=0., scale=1., tailweight=[0., 0.])
     xs = lwn.sample(num_samples, seed=test_util.test_seed())
     cov = 1. / num_samples * tf.matmul(xs, xs, transpose_a=True)
     self.assertAllClose(cov, tf.eye(2), atol=0.2)
@@ -84,7 +87,7 @@ class LambertWNormalTest(test_util.TestCase):
     samples = lwn.sample(100, seed=test_util.test_seed)
 
     self.assertAllEqual(samples.shape, [100])
-    gaussianized_samples = tfb.LambertWTail(
+    gaussianized_samples = lambertw_transform.LambertWTail(
         shift=loc, scale=scale, tailweight=tailweight).inverse(samples)
     _, p = stats.normaltest(self.evaluate(gaussianized_samples))
     self.assertGreater(p, .05)
@@ -96,7 +99,7 @@ class LambertWNormalTest(test_util.TestCase):
     scale = 3.
     lwn = lambertw_f.LambertWNormal(loc=loc, scale=scale, tailweight=tailweight)
     values = np.random.normal(loc=2., scale=3., size=10)
-    normal_pdf = tfd.Normal(loc, scale).prob(values)
+    normal_pdf = normal.Normal(loc, scale).prob(values)
     lambertw_normal_pdf = lwn.prob(values)
     self.assertAllClose(normal_pdf, lambertw_normal_pdf)
 
@@ -108,8 +111,8 @@ class LambertWNormalTest(test_util.TestCase):
     lwn = lambertw_f.LambertWNormal(loc=loc, scale=scale, tailweight=tailweight)
 
     values = np.random.uniform(low=0.0, high=1.0, size=10)
-    quantiles = tfd.Normal(loc, scale).quantile(values)
-    heavy_tailed_values = tfb.LambertWTail(
+    quantiles = normal.Normal(loc, scale).quantile(values)
+    heavy_tailed_values = lambertw_transform.LambertWTail(
         shift=loc, scale=scale, tailweight=tailweight)(quantiles)
     lambertw_normal_values = lwn.cdf(heavy_tailed_values)
     self.assertAllClose(values, lambertw_normal_values)
@@ -122,8 +125,8 @@ class LambertWNormalTest(test_util.TestCase):
     lwn = lambertw_f.LambertWNormal(loc=loc, scale=scale, tailweight=tailweight)
 
     values = np.random.uniform(low=0.0, high=1.0, size=5)
-    normal_quantiles = tfd.Normal(loc, scale).quantile(values)
-    transformed_normal_quantiles = tfb.LambertWTail(
+    normal_quantiles = normal.Normal(loc, scale).quantile(values)
+    transformed_normal_quantiles = lambertw_transform.LambertWTail(
         shift=loc, scale=scale, tailweight=tailweight)(normal_quantiles)
     lambertw_quantiles = lwn.quantile(values)
     self.assertAllClose(transformed_normal_quantiles, lambertw_quantiles)
@@ -186,7 +189,7 @@ class LambertWNormalTest(test_util.TestCase):
           scale=1e-3 + tf.math.softplus(t[..., 1:2]),
           tailweight=1e-3 + tf.math.softplus(t[..., 2:]))
 
-    dist_layer = tfp.layers.DistributionLambda(dist_lambda)
+    dist_layer = distribution_layer.DistributionLambda(dist_lambda)
     model = tf.keras.Sequential([
         tf.keras.layers.Dense(10, "relu"),
         tf.keras.layers.Dense(5, "selu"),

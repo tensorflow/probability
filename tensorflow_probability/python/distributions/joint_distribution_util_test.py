@@ -19,18 +19,21 @@ import collections
 # Dependency imports
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import dirichlet
+from tensorflow_probability.python.distributions import joint_distribution_named as jdn
+from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
+from tensorflow_probability.python.distributions import joint_distribution_util as jdu
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import poisson
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
 
 
 class JointDistributionUtilTest(test_util.TestCase):
 
   def _test_independent_joint_distribution_from_structure_helper(
       self, structure, expect_isinstance):
-    distribution = tfd.independent_joint_distribution_from_structure(structure)
+    distribution = jdu.independent_joint_distribution_from_structure(structure)
     self.assertIsInstance(distribution, expect_isinstance)
 
     self.assertEqual(
@@ -49,59 +52,59 @@ class JointDistributionUtilTest(test_util.TestCase):
 
   def test_independent_jd_from_distribution_input(self):
     self._test_independent_joint_distribution_from_structure_helper(
-        structure=tfd.Normal(0., 1.), expect_isinstance=tfd.Normal)
+        structure=normal.Normal(0., 1.), expect_isinstance=normal.Normal)
 
   def test_independent_jd_from_tuple_input(self):
     self._test_independent_joint_distribution_from_structure_helper(
-        structure=(tfd.Normal(0., 1.), tfd.Poisson(1.)),
-        expect_isinstance=tfd.JointDistributionSequential)
+        structure=(normal.Normal(0., 1.), poisson.Poisson(1.)),
+        expect_isinstance=jds.JointDistributionSequential)
 
   def test_independent_jd_from_dict_input(self):
     self._test_independent_joint_distribution_from_structure_helper(
-        structure={'a': tfd.Normal(0., 1.), 'b': tfd.Poisson(1.)},
-        expect_isinstance=tfd.JointDistributionNamed)
+        structure={'a': normal.Normal(0., 1.), 'b': poisson.Poisson(1.)},
+        expect_isinstance=jdn.JointDistributionNamed)
 
   def test_independent_jd_from_namedtuple_input(self):
     self._test_independent_joint_distribution_from_structure_helper(
         structure=collections.namedtuple('Pair', ['a', 'b'])(
-            a=tfd.Normal(0., 1.), b=tfd.Poisson(1.)),
-        expect_isinstance=tfd.JointDistributionNamed)
+            a=normal.Normal(0., 1.), b=poisson.Poisson(1.)),
+        expect_isinstance=jdn.JointDistributionNamed)
 
   def test_independent_jd_from_ordereddict_input(self):
     self._test_independent_joint_distribution_from_structure_helper(
-        structure=collections.OrderedDict((('a', tfd.Normal(0., 1.)),
-                                           ('b', tfd.Poisson(1.)))),
-        expect_isinstance=tfd.JointDistributionNamed)
+        structure=collections.OrderedDict((('a', normal.Normal(0., 1.)),
+                                           ('b', poisson.Poisson(1.)))),
+        expect_isinstance=jdn.JointDistributionNamed)
 
   def test_independent_jd_from_nested_input(self):
     self._test_independent_joint_distribution_from_structure_helper(
-        structure=[tfd.Normal(0., 1.),
-                   {'b': tfd.Poisson(1.),
-                    'c': (tfd.Dirichlet([1., 1.]),)}],
-        expect_isinstance=tfd.JointDistributionSequential)
+        structure=[normal.Normal(0., 1.),
+                   {'b': poisson.Poisson(1.),
+                    'c': (dirichlet.Dirichlet([1., 1.]),)}],
+        expect_isinstance=jds.JointDistributionSequential)
 
   def test_batch_ndims_nested_input(self):
-    dist = tfd.independent_joint_distribution_from_structure(
-        [tfd.Normal(0., tf.ones([5, 4])),
-         {'b': tfd.Poisson(tf.ones([5])),
-          'c': tfd.Dirichlet(tf.ones([5, 3]))}],
+    dist = jdu.independent_joint_distribution_from_structure(
+        [normal.Normal(0., tf.ones([5, 4])),
+         {'b': poisson.Poisson(tf.ones([5])),
+          'c': dirichlet.Dirichlet(tf.ones([5, 3]))}],
         batch_ndims=1)
     self.assertAllEqualNested(dist.event_shape, [[4], {'b': [], 'c': [3]}])
     self.assertAllEqual(dist.batch_shape, [5])
 
   def test_batch_ndims_single_distribution_input(self):
-    dist = tfd.independent_joint_distribution_from_structure(
-        tfd.Normal(0., tf.ones([5, 4])), batch_ndims=2)
+    dist = jdu.independent_joint_distribution_from_structure(
+        normal.Normal(0., tf.ones([5, 4])), batch_ndims=2)
     self.assertAllEqual(dist.event_shape, [])
     self.assertAllEqual(dist.batch_shape, [5, 4])
 
-    dist = tfd.independent_joint_distribution_from_structure(
-        tfd.Normal(0., tf.ones([5, 4])), batch_ndims=1)
+    dist = jdu.independent_joint_distribution_from_structure(
+        normal.Normal(0., tf.ones([5, 4])), batch_ndims=1)
     self.assertAllEqual(dist.event_shape, [4])
     self.assertAllEqual(dist.batch_shape, [5])
 
-    dist = tfd.independent_joint_distribution_from_structure(
-        tfd.Normal(0., tf.ones([5, 4])), batch_ndims=0)
+    dist = jdu.independent_joint_distribution_from_structure(
+        normal.Normal(0., tf.ones([5, 4])), batch_ndims=0)
     self.assertAllEqual(dist.event_shape, [5, 4])
     self.assertAllEqual(dist.batch_shape, [])
 

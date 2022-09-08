@@ -22,8 +22,16 @@ from absl.testing import absltest
 from absl.testing import parameterized
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.bijectors import reshape
+from tensorflow_probability.python.bijectors import scale
+from tensorflow_probability.python.bijectors import shift
+from tensorflow_probability.python.bijectors import transform_diagonal
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.experimental.distributions import mvn_precision_factor_linop as mvnpflo
 from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
@@ -40,25 +48,22 @@ FLAGS = flags.FLAGS
 
 TFP_PYTHON_DIR = 'tensorflow_probability/tensorflow_probability/python'
 
-tfb = tfp.bijectors
-tfd = tfp.distributions
 
-
-AutoIdentity = tfp.experimental.auto_composite_tensor(
+AutoIdentity = auto_composite_tensor.auto_composite_tensor(
     tf.linalg.LinearOperatorIdentity, non_identifying_kwargs=('name',))
-AutoDiag = tfp.experimental.auto_composite_tensor(
+AutoDiag = auto_composite_tensor.auto_composite_tensor(
     tf.linalg.LinearOperatorDiag, non_identifying_kwargs=('name',))
-AutoBlockDiag = tfp.experimental.auto_composite_tensor(
+AutoBlockDiag = auto_composite_tensor.auto_composite_tensor(
     tf.linalg.LinearOperatorBlockDiag, non_identifying_kwargs=('name',))
-AutoTriL = tfp.experimental.auto_composite_tensor(
+AutoTriL = auto_composite_tensor.auto_composite_tensor(
     tf.linalg.LinearOperatorLowerTriangular, non_identifying_kwargs=('name',))
 
-AutoNormal = tfp.experimental.auto_composite_tensor(
-    tfd.Normal, non_identifying_kwargs=('name',))
-AutoIndependent = tfp.experimental.auto_composite_tensor(
-    tfd.Independent, non_identifying_kwargs=('name',))
-AutoReshape = tfp.experimental.auto_composite_tensor(
-    tfb.Reshape, non_identifying_kwargs=('name',))
+AutoNormal = auto_composite_tensor.auto_composite_tensor(
+    normal.Normal, non_identifying_kwargs=('name',))
+AutoIndependent = auto_composite_tensor.auto_composite_tensor(
+    independent.Independent, non_identifying_kwargs=('name',))
+AutoReshape = auto_composite_tensor.auto_composite_tensor(
+    reshape.Reshape, non_identifying_kwargs=('name',))
 
 
 class Model(tf.Module):
@@ -66,16 +71,15 @@ class Model(tf.Module):
   def __init__(self):
     self.scale = tf.Variable([0., 1.], shape=[None])
 
-  @tf.function(input_signature=(
-      tfb.Scale([1., 2.], validate_args=True)._type_spec,))
+  @tf.function(
+      input_signature=(scale.Scale([1., 2.], validate_args=True)._type_spec,))
   def make_bij(self, b):
-    return tfb.Scale(
-        tf.convert_to_tensor(self.scale) + b.scale,
-        validate_args=True)
+    return scale.Scale(
+        tf.convert_to_tensor(self.scale) + b.scale, validate_args=True)
 
 
-@tfp.experimental.auto_composite_tensor
-class ThingWithCallableArg(tfp.experimental.AutoCompositeTensor):
+@auto_composite_tensor.auto_composite_tensor
+class ThingWithCallableArg(auto_composite_tensor.AutoCompositeTensor):
 
   def __init__(self, a, f):
     self.a = tf.convert_to_tensor(a, dtype_hint=tf.float32, name='a')
@@ -101,7 +105,9 @@ def tearDownModule():
 class AutoCompositeTensorTest(test_util.TestCase):
 
   def test_example(self):
-    @tfp.experimental.auto_composite_tensor(non_identifying_kwargs=('name',))
+
+    @auto_composite_tensor.auto_composite_tensor(
+        non_identifying_kwargs=('name',))
     class Adder(object):
 
       def __init__(self, x, y, name=None):
@@ -178,9 +184,8 @@ class AutoCompositeTensorTest(test_util.TestCase):
         is_self_adjoint=True,
         is_positive_definite=True)
 
-    tfed = tfp.experimental.distributions
-    auto_ct_mvn_prec_linop = tfp.experimental.auto_composite_tensor(
-        tfed.MultivariateNormalPrecisionFactorLinearOperator,
+    auto_ct_mvn_prec_linop = auto_composite_tensor.auto_composite_tensor(
+        mvnpflo.MultivariateNormalPrecisionFactorLinearOperator,
         non_identifying_kwargs=('name',))
     tril = AutoTriL(**cov_linop.cholesky().parameters)
     momentum_distribution = auto_ct_mvn_prec_linop(precision_factor=tril)
@@ -196,8 +201,8 @@ class AutoCompositeTensorTest(test_util.TestCase):
 
   def test_already_ct_subclass(self):
 
-    @tfp.experimental.auto_composite_tensor
-    class MyCT(tfp.experimental.AutoCompositeTensor):
+    @auto_composite_tensor.auto_composite_tensor
+    class MyCT(auto_composite_tensor.AutoCompositeTensor):
 
       def __init__(self, tensor_param, non_tensor_param, maybe_tensor_param):
         self._tensor_param = tf.convert_to_tensor(tensor_param)
@@ -227,8 +232,9 @@ class AutoCompositeTensorTest(test_util.TestCase):
 
   def test_parameters_lookup(self):
 
-    @tfp.experimental.auto_composite_tensor
-    class ThingWithParametersButNoAttrs(tfp.experimental.AutoCompositeTensor):
+    @auto_composite_tensor.auto_composite_tensor
+    class ThingWithParametersButNoAttrs(
+        auto_composite_tensor.AutoCompositeTensor):
 
       def __init__(self, a, b):
         self.a = tf.convert_to_tensor(a, dtype_hint=tf.float32, name='a')
@@ -253,8 +259,8 @@ class AutoCompositeTensorTest(test_util.TestCase):
         return f(*args, **kwargs)
       return wrapper
 
-    @tfp.experimental.auto_composite_tensor
-    class ThingWithWrappedInit(tfp.experimental.AutoCompositeTensor):
+    @auto_composite_tensor.auto_composite_tensor
+    class ThingWithWrappedInit(auto_composite_tensor.AutoCompositeTensor):
 
       @add_tag
       def __init__(self, value):
@@ -310,7 +316,7 @@ class AutoCompositeTensorTest(test_util.TestCase):
     tf.saved_model.save(m1, os.path.join(path, 'saved_model1'))
     m2 = tf.saved_model.load(os.path.join(path, 'saved_model1'))
     self.evaluate(m2.scale.initializer)
-    b = tfb.Scale([5., 9.], validate_args=True)
+    b = scale.Scale([5., 9.], validate_args=True)
     self.evaluate(m2.make_bij(b).forward(2.))
     self.evaluate(m2.scale.assign(m2.scale + [1., 2.]))
     self.evaluate(m2.make_bij(b).forward(2.))
@@ -331,7 +337,7 @@ class AutoCompositeTensorTest(test_util.TestCase):
 
     m = tf.saved_model.load(absolute_testdata_path)
     self.evaluate(m.scale.initializer)
-    b = tfb.Scale([5., 9.], validate_args=True)
+    b = scale.Scale([5., 9.], validate_args=True)
     self.assertAllClose(self.evaluate(m.make_bij(b).forward(2.)), [10., 20.])
     self.evaluate(m.scale.assign(m.scale + [1., 2.]))
     self.assertAllClose(self.evaluate(m.make_bij(b).forward(2.)), [12., 24.])
@@ -352,8 +358,8 @@ class AutoCompositeTensorTest(test_util.TestCase):
 
   def test_dict_arg(self):
 
-    @tfp.experimental.auto_composite_tensor
-    class Test(tfp.experimental.AutoCompositeTensor):
+    @auto_composite_tensor.auto_composite_tensor
+    class Test(auto_composite_tensor.AutoCompositeTensor):
 
       def __init__(self, var):
         self._var = var
@@ -381,8 +387,8 @@ class AutoCompositeTensorTest(test_util.TestCase):
     with self.assertRaisesRegex(ValueError, 'Cannot serialize'):
       tf.__internal__.saved_model.encode_structure(ct._type_spec)  # pylint: disable=protected-access
 
-    @tfp.experimental.auto_composite_tensor(module_name='my.module')
-    class F(tfp.experimental.AutoCompositeTensor):
+    @auto_composite_tensor.auto_composite_tensor(module_name='my.module')
+    class F(auto_composite_tensor.AutoCompositeTensor):
 
       def __call__(self, *args, **kwargs):
         return f(*args, **kwargs)
@@ -395,18 +401,18 @@ class AutoCompositeTensorTest(test_util.TestCase):
   def test_composite_tensor_callable_arg(self):
     # Parameters that are both `CompositeTensor` and callable should be
     # handled by the `_type_spec` as `CompositeTensor`.
-    inner_bij = tfb.Scale([[1., 3.]], validate_args=True)
-    bij = tfb.TransformDiagonal(inner_bij, validate_args=True)
+    inner_bij = scale.Scale([[1., 3.]], validate_args=True)
+    bij = transform_diagonal.TransformDiagonal(inner_bij, validate_args=True)
     self.assertLen(tf.nest.flatten(bij), 1)
     self.assertLen(bij._type_spec._callable_params, 0)  # pylint: disable=protected-access
     self.assertIn('diag_bijector', bij._type_spec._param_specs)  # pylint: disable=protected-access
 
   def test_subclass_with_inherited_type_spec_raises(self):
 
-    @tfp.experimental.auto_composite_tensor(
+    @auto_composite_tensor.auto_composite_tensor(
         omit_kwargs=('parameters',), non_identifying_kwargs=('name',))
-    class ParentBijector(
-        tfb.Bijector, tfp.experimental.AutoCompositeTensor):
+    class ParentBijector(bijector.Bijector,
+                         auto_composite_tensor.AutoCompositeTensor):
       """Minimal specification of a `Bijector`.
 
       We do not subclass `AutoCompositeTensorBijector` since its metaclass
@@ -432,8 +438,9 @@ class AutoCompositeTensorTest(test_util.TestCase):
         '`ChildBijector` has inherited the `_type_spec` of `ParentBijector`'):
       tf.nest.flatten(b, expand_composites=True)
 
-    AutoChildBijector = tfp.experimental.auto_composite_tensor(ChildBijector)  # pylint: disable=invalid-name
-    b_ct = AutoChildBijector(b=2)
+    auto_child_bijector = auto_composite_tensor.auto_composite_tensor(
+        ChildBijector)  # pylint: disable=invalid-name
+    b_ct = auto_child_bijector(b=2)
     self.assertLen(tf.nest.flatten(b_ct, expand_composites=True), 0)
 
   def test_names_preserved_through_flatten(self):
@@ -458,9 +465,8 @@ class AutoCompositeTensorTest(test_util.TestCase):
   def test_convert_variables_to_tensors(self):
     v = tf.Variable(0.)
     u = tf.Variable(1.)
-    var_td = tfd.TransformedDistribution(
-        tfd.Normal(v, 1.),
-        bijector=tfb.Shift(u))
+    var_td = transformed_distribution.TransformedDistribution(
+        normal.Normal(v, 1.), bijector=shift.Shift(u))
     tensor_td = var_td._convert_variables_to_tensors()
 
     self.evaluate([x.initializer for x in var_td.trainable_variables])
@@ -474,7 +480,7 @@ class AutoCompositeTensorTest(test_util.TestCase):
 
   def test_automatic_conversion_to_tensor(self):
     v = tf.Variable(tf.ones([5]))
-    d = tfd.Normal(tf.zeros([5]), v)
+    d = normal.Normal(tf.zeros([5]), v)
     x = tf.convert_to_tensor([3.])
 
     vectorized_log_prob = tf.vectorized_map(lambda z: z.log_prob(x), d)
@@ -485,9 +491,9 @@ class AutoCompositeTensorTest(test_util.TestCase):
     loc = tf.Variable(0.)
     self.evaluate(loc.initializer)
     cond_dist = tf.cond(
-        tf.convert_to_tensor(True),
-        lambda: tfd.Normal(loc, 1.), lambda: tfd.Normal(0., 1.))
-    self.assertIsInstance(cond_dist, tfd.Normal)
+        tf.convert_to_tensor(True), lambda: normal.Normal(loc, 1.),
+        lambda: normal.Normal(0., 1.))
+    self.assertIsInstance(cond_dist, normal.Normal)
 
 
 class _TestTypeSpec(auto_composite_tensor._AutoCompositeTensorTypeSpec):
@@ -525,14 +531,18 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
            prefer_static_value=('a',))),
       ('WithCallable',
        _TestTypeSpec(
-           param_specs={'a': tf.TensorSpec([3, None], tf.float32),
-                        'b': tfb.Scale(3.)._type_spec},
+           param_specs={
+               'a': tf.TensorSpec([3, None], tf.float32),
+               'b': scale.Scale(3.)._type_spec
+           },
            omit_kwargs=('name', 'foo'),
            prefer_static_value=('a',),
            callable_params={'f': tf.math.exp}),
        _TestTypeSpec(
-           param_specs={'a': tf.TensorSpec([3, None], tf.float32),
-                        'b': tfb.Scale(3.)._type_spec},
+           param_specs={
+               'a': tf.TensorSpec([3, None], tf.float32),
+               'b': scale.Scale(3.)._type_spec
+           },
            omit_kwargs=('name', 'foo'),
            prefer_static_value=('a',),
            callable_params={'f': tf.math.exp})),
@@ -545,7 +555,7 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
            param_specs={'x': tf.TensorSpec([], tf.float64)},
            non_tensor_params={'name': 'OtherAutoCT'},
            non_identifying_kwargs=('name'))),
-      )
+  )
   def testEquality(self, v1, v2):
     # pylint: disable=g-generic-assert
     self.assertEqual(v1, v2)
@@ -593,23 +603,33 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
       ('WithoutCallable',
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([4, 2], tf.float32)},
-           non_tensor_params={'validate_args': True, 'b': 3.},
+           non_tensor_params={
+               'validate_args': True,
+               'b': 3.
+           },
            omit_kwargs=('name',),
            prefer_static_value=('b',)),
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([4, None], tf.float32)},
-           non_tensor_params={'validate_args': True, 'b': 3.},
+           non_tensor_params={
+               'validate_args': True,
+               'b': 3.
+           },
            omit_kwargs=('name',),
            prefer_static_value=('b',))),
       ('WithCallable',
        _TestTypeSpec(
-           param_specs={'a': tf.TensorSpec([3, None], tf.float32),
-                        'b': tfb.Scale(3.)._type_spec},
+           param_specs={
+               'a': tf.TensorSpec([3, None], tf.float32),
+               'b': scale.Scale(3.)._type_spec
+           },
            omit_kwargs=('name', 'foo'),
            callable_params={'f': tf.math.exp}),
        _TestTypeSpec(
-           param_specs={'a': tf.TensorSpec([None, None], tf.float32),
-                        'b': tfb.Scale(2.)._type_spec},
+           param_specs={
+               'a': tf.TensorSpec([None, None], tf.float32),
+               'b': scale.Scale(2.)._type_spec
+           },
            omit_kwargs=('name', 'foo'),
            callable_params={'f': tf.math.exp})),
       ('DifferentNonIdentifyingKwargsValues',
@@ -621,7 +641,7 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
            param_specs={'x': tf.TensorSpec(None, tf.float64)},
            non_tensor_params={'name': 'MyAutoCT'},
            non_identifying_kwargs=('name'))),
-      )
+  )
   def testIsCompatibleWith(self, v1, v2):
     self.assertTrue(v1.is_compatible_with(v2))
     self.assertTrue(v2.is_compatible_with(v1))
@@ -632,12 +652,18 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
       ('IncompatibleTensorSpecs',
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([4, 2, 3], tf.float32)},
-           non_tensor_params={'validate_args': True, 'b': [3, 2]},
+           non_tensor_params={
+               'validate_args': True,
+               'b': [3, 2]
+           },
            omit_kwargs=('name',),
            prefer_static_value=('b',)),
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([4, None], tf.float32)},
-           non_tensor_params={'validate_args': True, 'b': [3, 2]},
+           non_tensor_params={
+               'validate_args': True,
+               'b': [3, 2]
+           },
            omit_kwargs=('name',),
            prefer_static_value=('b',))),
       ('DifferentMetadataSameCallables',
@@ -653,17 +679,19 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
            callable_params={'g': tf.math.softplus})),
       ('DifferentCallables',
        _TestTypeSpec(
-           param_specs={'a': tf.TensorSpec([3, None], tf.float32),
-                        'b': tfb.Scale(
-                            tf.Variable(2., shape=None))._type_spec},
+           param_specs={
+               'a': tf.TensorSpec([3, None], tf.float32),
+               'b': scale.Scale(tf.Variable(2., shape=None))._type_spec
+           },
            omit_kwargs=('name', 'foo'),
            callable_params={'f': tf.math.exp}),
        _TestTypeSpec(
-           param_specs={'a': tf.TensorSpec([3, None], tf.float32),
-                        'b': tfb.Scale(3.)._type_spec},
+           param_specs={
+               'a': tf.TensorSpec([3, None], tf.float32),
+               'b': scale.Scale(3.)._type_spec
+           },
            omit_kwargs=('name', 'foo'),
-           callable_params={'f': tf.math.sigmoid}))
-      )
+           callable_params={'f': tf.math.sigmoid})))
   def testIsNotCompatibleWith(self, v1, v2):
     self.assertFalse(v1.is_compatible_with(v2))
     self.assertFalse(v2.is_compatible_with(v1))
@@ -683,20 +711,24 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
            omit_kwargs=('name',))),
       ('WithCallable',
        _TestTypeSpec(
-           param_specs={'a': tf.TensorSpec(None, tf.float32),
-                        'b': tfb.Scale(
-                            tf.Variable(2., shape=None))._type_spec},
+           param_specs={
+               'a': tf.TensorSpec(None, tf.float32),
+               'b': scale.Scale(tf.Variable(2., shape=None))._type_spec
+           },
            callable_params={'f': tf.math.exp}),
        _TestTypeSpec(
-           param_specs={'a': tf.TensorSpec([3, None], tf.float32),
-                        'b': tfb.Scale(tf.Variable(3.))._type_spec},
+           param_specs={
+               'a': tf.TensorSpec([3, None], tf.float32),
+               'b': scale.Scale(tf.Variable(3.))._type_spec
+           },
            callable_params={'f': tf.math.exp}),
        _TestTypeSpec(
-           param_specs={'a': tf.TensorSpec(None, tf.float32),
-                        'b': tfb.Scale(
-                            tf.Variable(2., shape=None))._type_spec},
+           param_specs={
+               'a': tf.TensorSpec(None, tf.float32),
+               'b': scale.Scale(tf.Variable(2., shape=None))._type_spec
+           },
            callable_params={'f': tf.math.exp})),
-      )
+  )
   def testMostSpecificCommonSupertype(self, v1, v2, expected):
     self.assertEqual(v1.most_specific_common_supertype([v2]), expected)
     self.assertEqual(v2.most_specific_common_supertype([v1]), expected)
@@ -718,15 +750,18 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
            omit_kwargs=('bar',))),
       ('DifferentCallables',
        _TestTypeSpec(
-           param_specs={'a': tf.TensorSpec(None, tf.float32),
-                        'b': tfb.Scale(
-                            tf.Variable(2., shape=None))._type_spec},
+           param_specs={
+               'a': tf.TensorSpec(None, tf.float32),
+               'b': scale.Scale(tf.Variable(2., shape=None))._type_spec
+           },
            callable_params={'f': tf.math.exp}),
        _TestTypeSpec(
-           param_specs={'a': tf.TensorSpec([3, None], tf.float32),
-                        'b': tfb.Scale(tf.Variable(3.))._type_spec},
+           param_specs={
+               'a': tf.TensorSpec([3, None], tf.float32),
+               'b': scale.Scale(tf.Variable(3.))._type_spec
+           },
            callable_params={'f': tf.math.softplus})),
-      )
+  )
   def testMostSpecificCommonSupertypeNone(self, v1, v2):
     self.assertIsNone(v1.most_specific_common_supertype([v2]))
     self.assertIsNone(v2.most_specific_common_supertype([v1]))
@@ -735,14 +770,16 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
       ('WithoutCallable',
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([4, 2], tf.float32)},
-           omit_kwargs=('parameters',), non_identifying_kwargs=('name',))),
+           omit_kwargs=('parameters',),
+           non_identifying_kwargs=('name',))),
       ('WithCallable',
        _TestTypeSpec(
-           param_specs={'a': tf.TensorSpec(None, tf.float32),
-                        'b': tfb.Scale(
-                            tf.Variable(2., shape=None))._type_spec},
+           param_specs={
+               'a': tf.TensorSpec(None, tf.float32),
+               'b': scale.Scale(tf.Variable(2., shape=None))._type_spec
+           },
            callable_params={'f': tf.math.exp})),
-      )
+  )
   def testRepr(self, spec):
     spec_data = (auto_composite_tensor._AUTO_COMPOSITE_TENSOR_VERSION,
                  spec._param_specs, spec._non_tensor_params, spec._omit_kwargs,

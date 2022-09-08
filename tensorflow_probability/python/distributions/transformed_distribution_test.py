@@ -23,16 +23,45 @@ import numpy as np
 from scipy import stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import absolute_value
+from tensorflow_probability.python.bijectors import bijector as bijector_lib
+from tensorflow_probability.python.bijectors import chain as chain_lib
+from tensorflow_probability.python.bijectors import exp
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.bijectors import inline
+from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.bijectors import joint_map
+from tensorflow_probability.python.bijectors import reshape
+from tensorflow_probability.python.bijectors import restructure as restructure_lib
+from tensorflow_probability.python.bijectors import scale as scale_lib
+from tensorflow_probability.python.bijectors import scale_matvec_linear_operator
+from tensorflow_probability.python.bijectors import scale_matvec_tril
+from tensorflow_probability.python.bijectors import shift as shift_lib
+from tensorflow_probability.python.bijectors import sigmoid
+from tensorflow_probability.python.bijectors import softmax_centered
+from tensorflow_probability.python.bijectors import split
+from tensorflow_probability.python.bijectors import tanh
+from tensorflow_probability.python.distributions import beta
+from tensorflow_probability.python.distributions import exponential
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import joint_distribution_auto_batched as jdab
+from tensorflow_probability.python.distributions import joint_distribution_named as jdn
+from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import log_prob_ratio
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.distributions import normal as normal_lib
+from tensorflow_probability.python.distributions import sample as sample_lib
+from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.stats import sample_stats
 
 
-class DummyMatrixTransform(tfb.Bijector):
+class DummyMatrixTransform(bijector_lib.Bijector):
   """Tractable matrix transformation.
 
   This is a non-sensical bijector that has forward/inverse_min_event_ndims=2.
@@ -63,7 +92,7 @@ class DummyMatrixTransform(tfb.Bijector):
     return tf.linalg.det(x)
 
 
-class _ChooseLocation(tfb.Bijector):
+class _ChooseLocation(bijector_lib.Bijector):
   """A Bijector which chooses between one of two location parameters."""
 
   def __init__(self, loc, name='ChooseLocation'):
@@ -105,9 +134,9 @@ class TransformedDistributionTest(test_util.TestCase):
     sigma = 2.0
     # Note: the Jacobian callable only works for this example; more generally
     # you may or may not need a reduce_sum.
-    log_normal = tfd.TransformedDistribution(
-        distribution=tfd.Normal(loc=mu, scale=sigma),
-        bijector=tfb.Exp(),
+    log_normal = transformed_distribution.TransformedDistribution(
+        distribution=normal_lib.Normal(loc=mu, scale=sigma),
+        bijector=exp.Exp(),
         validate_args=True)
     sp_dist = stats.lognorm(s=sigma, scale=np.exp(mu))
 
@@ -135,9 +164,9 @@ class TransformedDistributionTest(test_util.TestCase):
   def testNonInjectiveTransformedDistribution(self):
     mu = 1.
     sigma = 2.0
-    abs_normal = tfd.TransformedDistribution(
-        distribution=tfd.Normal(loc=mu, scale=sigma),
-        bijector=tfb.AbsoluteValue(),
+    abs_normal = transformed_distribution.TransformedDistribution(
+        distribution=normal_lib.Normal(loc=mu, scale=sigma),
+        bijector=absolute_value.AbsoluteValue(),
         validate_args=True)
     sp_normal = stats.norm(mu, sigma)
 
@@ -167,9 +196,9 @@ class TransformedDistributionTest(test_util.TestCase):
         self.evaluate(abs_normal.log_prob(2.13)))
 
   def testQuantile(self):
-    logit_normal = tfd.TransformedDistribution(
-        distribution=tfd.Normal(loc=0., scale=1.),
-        bijector=tfb.Sigmoid(),
+    logit_normal = transformed_distribution.TransformedDistribution(
+        distribution=normal_lib.Normal(loc=0., scale=1.),
+        bijector=sigmoid.Sigmoid(),
         validate_args=True)
     grid = [0., 0.25, 0.5, 0.75, 1.]
     q = logit_normal.quantile(grid)
@@ -178,48 +207,48 @@ class TransformedDistributionTest(test_util.TestCase):
     self.assertAllClose(grid, cdf_, rtol=1e-6, atol=0.)
 
   def testCdfDescending(self):
-    td = tfd.TransformedDistribution(
-        distribution=tfd.Normal(loc=0., scale=[1., 1.]),
-        bijector=tfb.Shift(shift=1.)(tfb.Scale(scale=[2., -2.])),
+    td = transformed_distribution.TransformedDistribution(
+        distribution=normal_lib.Normal(loc=0., scale=[1., 1.]),
+        bijector=shift_lib.Shift(shift=1.)(scale_lib.Scale(scale=[2., -2.])),
         validate_args=True)
-    nd = tfd.Normal(loc=1., scale=2., validate_args=True)
+    nd = normal_lib.Normal(loc=1., scale=2., validate_args=True)
     self.assertAllEqual(tf.ones(td.batch_shape, dtype=tf.bool),
                         td.cdf(nd.quantile(.8)) < td.cdf(nd.quantile(.9)))
 
   def testCdfDescendingChained(self):
-    bij1 = tfb.Shift(shift=1.)(tfb.Scale(scale=[1., -2.]))
-    bij2 = tfb.Shift(shift=1.)(tfb.Scale(scale=[[3.], [-5.]]))
-    bij3 = tfb.Shift(shift=1.)(tfb.Scale(scale=[[[7.]], [[-11.]]]))
+    bij1 = shift_lib.Shift(shift=1.)(scale_lib.Scale(scale=[1., -2.]))
+    bij2 = shift_lib.Shift(shift=1.)(scale_lib.Scale(scale=[[3.], [-5.]]))
+    bij3 = shift_lib.Shift(shift=1.)(scale_lib.Scale(scale=[[[7.]], [[-11.]]]))
     for chain in bij2(bij1), bij3(bij2(bij1)):
-      td = tfd.TransformedDistribution(
-          distribution=tfd.Normal(loc=0., scale=tf.ones([2, 2, 2])),
+      td = transformed_distribution.TransformedDistribution(
+          distribution=normal_lib.Normal(loc=0., scale=tf.ones([2, 2, 2])),
           bijector=chain,
           validate_args=True)
-      nd = tfd.Normal(loc=1., scale=3., validate_args=True)
+      nd = normal_lib.Normal(loc=1., scale=3., validate_args=True)
       self.assertAllEqual(tf.ones(td.batch_shape, dtype=tf.bool),
                           td.cdf(nd.quantile(.4)) < td.cdf(nd.quantile(.6)),
                           msg=chain.name)
 
   def testSfDescending(self):
-    td = tfd.TransformedDistribution(
-        distribution=tfd.Normal(loc=0., scale=[1., 1.]),
-        bijector=tfb.Shift(shift=1.)(tfb.Scale(scale=[2., -2.])),
+    td = transformed_distribution.TransformedDistribution(
+        distribution=normal_lib.Normal(loc=0., scale=[1., 1.]),
+        bijector=shift_lib.Shift(shift=1.)(scale_lib.Scale(scale=[2., -2.])),
         validate_args=True)
-    nd = tfd.Normal(loc=1., scale=2., validate_args=True)
+    nd = normal_lib.Normal(loc=1., scale=2., validate_args=True)
     self.assertAllEqual(tf.ones(td.batch_shape, dtype=tf.bool),
                         td.survival_function(nd.quantile(.8)) >
                         td.survival_function(nd.quantile(.9)))
 
   def testQuantileDescending(self):
-    td = tfd.TransformedDistribution(
-        distribution=tfd.Normal(loc=0., scale=[1., 1.]),
-        bijector=tfb.Shift(shift=1.)(tfb.Scale(scale=[2., -2.])),
+    td = transformed_distribution.TransformedDistribution(
+        distribution=normal_lib.Normal(loc=0., scale=[1., 1.]),
+        bijector=shift_lib.Shift(shift=1.)(scale_lib.Scale(scale=[2., -2.])),
         validate_args=True)
     self.assertAllEqual(tf.ones(td.batch_shape, dtype=tf.bool),
                         td.quantile(.8) < td.quantile(.9))
 
   def testCachedSamples(self):
-    class ExpForwardOnly(tfb.Bijector):
+    class ExpForwardOnly(bijector_lib.Bijector):
 
       def __init__(self):
         parameters = dict(locals())
@@ -237,8 +266,8 @@ class TransformedDistributionTest(test_util.TestCase):
 
     mu = 3.0
     sigma = 0.02
-    log_normal = tfd.TransformedDistribution(
-        distribution=tfd.Normal(loc=mu, scale=sigma),
+    log_normal = transformed_distribution.TransformedDistribution(
+        distribution=normal_lib.Normal(loc=mu, scale=sigma),
         bijector=exp_forward_only,
         validate_args=True)
 
@@ -250,15 +279,15 @@ class TransformedDistributionTest(test_util.TestCase):
     self.assertAllClose(expected_log_pdf, log_pdf_val, rtol=1e-4, atol=0.)
 
     # Check that nesting TransformedDistributions preserves caching.
-    identity_log_normal = tfd.TransformedDistribution(
+    identity_log_normal = transformed_distribution.TransformedDistribution(
         distribution=log_normal,
-        bijector=tfb.Identity(),
+        bijector=identity.Identity(),
         validate_args=True)
     identity_log_normal.log_prob(
         identity_log_normal.sample([2, 3], seed=test_util.test_seed()))
 
   def testSampleAndLogprob(self):
-    class ExpForwardOnly(tfb.Bijector):
+    class ExpForwardOnly(bijector_lib.Bijector):
 
       def __init__(self):
         super(ExpForwardOnly, self).__init__(forward_min_event_ndims=0)
@@ -273,8 +302,8 @@ class TransformedDistributionTest(test_util.TestCase):
 
     mu = 3.0
     sigma = 0.02
-    log_normal = tfd.TransformedDistribution(
-        distribution=tfd.Normal(loc=mu, scale=sigma),
+    log_normal = transformed_distribution.TransformedDistribution(
+        distribution=normal_lib.Normal(loc=mu, scale=sigma),
         bijector=exp_forward_only)
 
     sample, log_pdf = self.evaluate(log_normal.experimental_sample_and_log_prob(
@@ -294,7 +323,7 @@ class TransformedDistributionTest(test_util.TestCase):
     self.assertAllClose(sample, sample2, rtol=1e-4)
 
   def testCachedSamplesInvert(self):
-    class ExpInverseOnly(tfb.Bijector):
+    class ExpInverseOnly(bijector_lib.Bijector):
 
       def __init__(self):
         parameters = dict(locals())
@@ -310,14 +339,14 @@ class TransformedDistributionTest(test_util.TestCase):
 
     exp_inverse_only = ExpInverseOnly()
 
-    log_forward_only = tfb.Invert(exp_inverse_only)
+    log_forward_only = invert.Invert(exp_inverse_only)
 
     # The log bijector isn't defined over the whole real line, so we make
     # sigma sufficiently small so that the draws are positive.
     mu = 2.
     sigma = 1e-2
-    exp_normal = tfd.TransformedDistribution(
-        distribution=tfd.Normal(loc=mu, scale=sigma),
+    exp_normal = transformed_distribution.TransformedDistribution(
+        distribution=normal_lib.Normal(loc=mu, scale=sigma),
         bijector=log_forward_only,
         validate_args=True)
 
@@ -330,9 +359,9 @@ class TransformedDistributionTest(test_util.TestCase):
     self.assertAllClose(expected_log_pdf, log_pdf_val, atol=0., rtol=1e-5)
 
   def testShapeChangingBijector(self):
-    softmax = tfb.SoftmaxCentered()
-    standard_normal = tfd.MultivariateNormalDiag(loc=0., scale_diag=[1.])
-    multi_logit_normal = tfd.TransformedDistribution(
+    softmax = softmax_centered.SoftmaxCentered()
+    standard_normal = mvn_diag.MultivariateNormalDiag(loc=0., scale_diag=[1.])
+    multi_logit_normal = transformed_distribution.TransformedDistribution(
         distribution=standard_normal,
         bijector=softmax,
         validate_args=True)
@@ -356,15 +385,15 @@ class TransformedDistributionTest(test_util.TestCase):
     """Test log_prob when Jacobian and log_prob dtypes do not match."""
 
     # Create an identity bijector whose jacobians have dtype int32
-    int_identity = tfb.Inline(
+    int_identity = inline.Inline(
         forward_fn=tf.identity,
         inverse_fn=tf.identity,
         inverse_log_det_jacobian_fn=(lambda y: tf.cast(0, tf.int32)),
         forward_log_det_jacobian_fn=(lambda x: tf.cast(0, tf.int32)),
         forward_min_event_ndims=0,
         is_constant_jacobian=True)
-    normal = tfd.TransformedDistribution(
-        distribution=tfd.Normal(loc=0., scale=1.),
+    normal = transformed_distribution.TransformedDistribution(
+        distribution=normal_lib.Normal(loc=0., scale=1.),
         bijector=int_identity,
         validate_args=True)
 
@@ -375,12 +404,13 @@ class TransformedDistributionTest(test_util.TestCase):
     self.evaluate(normal.entropy())
 
   def testMode(self):
-    dist = tfd.TransformedDistribution(
-        tfd.Beta(
+    dist = transformed_distribution.TransformedDistribution(
+        beta.Beta(
             concentration1=[5., 10.],
             concentration0=15.,
             validate_args=True),
-        tfb.Shift(2., validate_args=True)(tfb.Scale(10., validate_args=True)),
+        shift_lib.Shift(
+            2., validate_args=True)(scale_lib.Scale(10., validate_args=True)),
         validate_args=True)
     self.assertAllClose(2. + 10. * dist.distribution.mode(),
                         self.evaluate(dist.mode()),
@@ -389,14 +419,14 @@ class TransformedDistributionTest(test_util.TestCase):
   def testMean(self):
     shift = np.array([[-1, 0, 1], [-1, -2, -3]], dtype=np.float32)
     diag = np.array([[1, 2, 3], [2, 3, 2]], dtype=np.float32)
-    fake_mvn = tfd.TransformedDistribution(
-        tfd.MultivariateNormalDiag(
+    fake_mvn = transformed_distribution.TransformedDistribution(
+        mvn_diag.MultivariateNormalDiag(
             loc=tf.zeros_like(shift),
             scale_diag=tf.ones_like(diag),
             validate_args=True),
-        tfb.Chain([
-            tfb.Shift(shift=shift),
-            tfb.ScaleMatvecLinearOperator(
+        chain_lib.Chain([
+            shift_lib.Shift(shift=shift),
+            scale_matvec_linear_operator.ScaleMatvecLinearOperator(
                 scale=tf.linalg.LinearOperatorDiag(diag, is_non_singular=True))
         ], validate_args=True),
         validate_args=True)
@@ -407,29 +437,30 @@ class TransformedDistributionTest(test_util.TestCase):
     shift = np.array([[-1, 0, 1], [-1, -2, -3]], dtype=np.float32)
     scale = np.array([[1, -2, 3], [2, -3, 2]], dtype=np.float32)
     expected_stddev = tf.abs(base_stddev * scale)
-    normal = tfd.TransformedDistribution(
-        distribution=tfd.Normal(loc=tf.zeros_like(shift),
-                                scale=base_stddev * tf.ones_like(scale),
-                                validate_args=True),
-        bijector=tfb.Chain([tfb.Shift(shift=shift),
-                            tfb.Scale(scale=scale)],
-                           validate_args=True),
-        validate_args=True)
+    normal = transformed_distribution.TransformedDistribution(
+        distribution=normal_lib.Normal(loc=tf.zeros_like(shift),
+                                       scale=base_stddev * tf.ones_like(scale),
+                                       validate_args=True),
+        bijector=chain_lib.Chain([shift_lib.Shift(shift=shift),
+                                  scale_lib.Scale(scale=scale)],
+                                 validate_args=True), validate_args=True)
     self.assertAllClose(expected_stddev, normal.stddev())
     self.assertAllClose(expected_stddev**2, normal.variance())
 
-    split_normal = tfd.TransformedDistribution(
-        distribution=tfd.Independent(normal, reinterpreted_batch_ndims=1),
-        bijector=tfb.Split(3),
+    split_normal = transformed_distribution.TransformedDistribution(
+        distribution=independent.Independent(
+            normal, reinterpreted_batch_ndims=1),
+        bijector=split.Split(3),
         validate_args=True)
     self.assertAllCloseNested(tf.split(expected_stddev,
                                        num_or_size_splits=3,
                                        axis=-1),
                               split_normal.stddev())
 
-    scaled_normal = tfd.TransformedDistribution(
-        distribution=tfd.Independent(normal, reinterpreted_batch_ndims=1),
-        bijector=tfb.ScaleMatvecTriL([[1., 0.], [-1., 2.]]),
+    scaled_normal = transformed_distribution.TransformedDistribution(
+        distribution=independent.Independent(
+            normal, reinterpreted_batch_ndims=1),
+        bijector=scale_matvec_tril.ScaleMatvecTriL([[1., 0.], [-1., 2.]]),
         validate_args=True)
     with self.assertRaisesRegex(
         NotImplementedError, 'is a multivariate transformation'):
@@ -442,13 +473,13 @@ class TransformedDistributionTest(test_util.TestCase):
     shift = np.array([[-1., 0.], [-1., -2.], [4., 5.]], dtype=np.float32)
     scale = np.array([[1., -2.], [2., -3.], [0.1, -2.]], dtype=np.float32)
     scale_matvec = np.array([[0.5, 0.], [-2., 0.7]], dtype=np.float32)
-    normal = tfd.TransformedDistribution(
-        distribution=tfd.MultivariateNormalTriL(
+    normal = transformed_distribution.TransformedDistribution(
+        distribution=mvn_tril.MultivariateNormalTriL(
             loc=[0., 0.], scale_tril=base_scale_tril, validate_args=True),
-        bijector=tfb.Chain([tfb.ScaleMatvecTriL(scale_matvec),
-                            tfb.Shift(shift=shift),
-                            tfb.Scale(scale=scale)],
-                           validate_args=True),
+        bijector=chain_lib.Chain([
+            scale_matvec_tril.ScaleMatvecTriL(scale_matvec),
+            shift_lib.Shift(shift=shift),
+            scale_lib.Scale(scale=scale)], validate_args=True),
         validate_args=True)
 
     overall_scale = tf.matmul(scale_matvec, tf.linalg.diag(scale))
@@ -459,7 +490,7 @@ class TransformedDistributionTest(test_util.TestCase):
   def testCovarianceIdentityShortCircuit(self):
     cov_canary = tf.eye(2)
 
-    class MyMVN(tfd.MultivariateNormalDiag):
+    class MyMVN(mvn_diag.MultivariateNormalDiag):
 
       def __init__(self):
         super().__init__(loc=[0., 0.], scale_diag=[1., 1.])
@@ -467,38 +498,39 @@ class TransformedDistributionTest(test_util.TestCase):
       def _covariance(self):
         return cov_canary
 
-    identity_transformed = tfd.TransformedDistribution(distribution=MyMVN(),
-                                                       bijector=tfb.Identity())
+    identity_transformed = transformed_distribution.TransformedDistribution(
+        distribution=MyMVN(), bijector=identity.Identity())
     self.assertIs(identity_transformed.covariance(), cov_canary)
 
   def testCovarianceNotImplemented(self):
-    mvn = tfd.MultivariateNormalDiag(loc=[0., 0.], scale_diag=[1., 2.])
+    mvn = mvn_diag.MultivariateNormalDiag(loc=[0., 0.], scale_diag=[1., 2.])
 
     # Non-affine bijector.
     with self.assertRaisesRegex(
         NotImplementedError, '`covariance` is not implemented'):
-      tfd.TransformedDistribution(
-          distribution=mvn, bijector=tfb.Exp()).covariance()
+      transformed_distribution.TransformedDistribution(
+          distribution=mvn, bijector=exp.Exp()).covariance()
 
     # Non-injective bijector.
     with self.assertRaisesRegex(
         NotImplementedError, '`covariance` is not implemented'):
-      tfd.TransformedDistribution(
-          distribution=mvn, bijector=tfb.AbsoluteValue()).covariance()
+      transformed_distribution.TransformedDistribution(
+          distribution=mvn,
+          bijector=absolute_value.AbsoluteValue()).covariance()
 
     # Non-vector event shape.
     with self.assertRaisesRegex(
         NotImplementedError, '`covariance` is only implemented'):
-      tfd.TransformedDistribution(
+      transformed_distribution.TransformedDistribution(
           distribution=mvn,
-          bijector=tfb.Reshape(event_shape_out=[2, 1],
-                               event_shape_in=[2])).covariance()
+          bijector=reshape.Reshape(event_shape_out=[2, 1],
+                                   event_shape_in=[2])).covariance()
 
     # Multipart bijector.
     with self.assertRaisesRegex(
         NotImplementedError, '`covariance` is only implemented'):
-      tfd.TransformedDistribution(
-          distribution=mvn, bijector=tfb.Split(2)).covariance()
+      transformed_distribution.TransformedDistribution(
+          distribution=mvn, bijector=split.Split(2)).covariance()
 
   def testEntropy(self):
     shift = np.array([[-1, 0, 1], [-1, -2, -3]], dtype=np.float32)
@@ -506,23 +538,23 @@ class TransformedDistributionTest(test_util.TestCase):
     actual_mvn_entropy = np.concatenate(
         [[stats.multivariate_normal(shift[i], np.diag(diag[i]**2)).entropy()]
          for i in range(len(diag))])
-    fake_mvn = tfd.TransformedDistribution(
-        tfd.MultivariateNormalDiag(
+    fake_mvn = transformed_distribution.TransformedDistribution(
+        mvn_diag.MultivariateNormalDiag(
             loc=tf.zeros_like(shift),
             scale_diag=tf.ones_like(diag),
             validate_args=True),
-        tfb.Chain([
-            tfb.Shift(shift=shift),
-            tfb.ScaleMatvecLinearOperator(
+        chain_lib.Chain([
+            shift_lib.Shift(shift=shift),
+            scale_matvec_linear_operator.ScaleMatvecLinearOperator(
                 scale=tf.linalg.LinearOperatorDiag(diag, is_non_singular=True))
         ], validate_args=True),
         validate_args=True)
     self.assertAllClose(actual_mvn_entropy, self.evaluate(fake_mvn.entropy()))
 
   def testScalarBatchScalarEventIdentityScale(self):
-    exp2 = tfd.TransformedDistribution(
-        tfd.Exponential(rate=0.25),
-        bijector=tfb.Scale(scale=2.),
+    exp2 = transformed_distribution.TransformedDistribution(
+        exponential.Exponential(rate=0.25),
+        bijector=scale_lib.Scale(scale=2.),
         validate_args=True)
     log_prob = exp2.log_prob(1.)
     log_prob_ = self.evaluate(log_prob)
@@ -531,17 +563,17 @@ class TransformedDistributionTest(test_util.TestCase):
     self.assertAllClose(base_log_prob - ildj, log_prob_, rtol=1e-6, atol=0.)
 
   def testTransformedKLDifferentBijectorFails(self):
-    d1 = tfd.TransformedDistribution(
-        tfd.Exponential(rate=0.25),
-        bijector=tfb.Scale(scale=2.),
+    d1 = transformed_distribution.TransformedDistribution(
+        exponential.Exponential(rate=0.25),
+        bijector=scale_lib.Scale(scale=2.),
         validate_args=True)
-    d2 = tfd.TransformedDistribution(
-        tfd.Exponential(rate=0.25),
-        bijector=tfb.Scale(scale=3.),
+    d2 = transformed_distribution.TransformedDistribution(
+        exponential.Exponential(rate=0.25),
+        bijector=scale_lib.Scale(scale=3.),
         validate_args=True)
     with self.assertRaisesRegex(
         NotImplementedError, r'their bijectors are not equal'):
-      tfd.kl_divergence(d1, d2)
+      kullback_leibler.kl_divergence(d1, d2)
 
   def testTransformedNormalNormalKL(self):
     batch_size = 6
@@ -550,27 +582,27 @@ class TransformedDistributionTest(test_util.TestCase):
     mu_b = np.array([-3.0] * batch_size).astype(np.float32)
     sigma_b = np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0]).astype(np.float32)
 
-    n_a = tfd.Normal(loc=mu_a, scale=sigma_a, validate_args=True)
-    n_b = tfd.Normal(loc=mu_b, scale=sigma_b, validate_args=True)
+    n_a = normal_lib.Normal(loc=mu_a, scale=sigma_a, validate_args=True)
+    n_b = normal_lib.Normal(loc=mu_b, scale=sigma_b, validate_args=True)
 
     kl_expected = ((mu_a - mu_b)**2 / (2 * sigma_b**2) + 0.5 * (
         (sigma_a**2 / sigma_b**2) - 1 - 2 * np.log(sigma_a / sigma_b)))
 
-    bij1 = tfb.Shift(shift=1.)(tfb.Scale(scale=2.))
-    bij2 = (tfb.Shift(shift=np.array(2., dtype=np.float32))
-            (tfb.Scale(scale=np.array(3., dtype=np.float32))))
-    bij3 = tfb.Tanh()
+    bij1 = shift_lib.Shift(shift=1.)(scale_lib.Scale(scale=2.))
+    bij2 = (shift_lib.Shift(shift=np.array(2., dtype=np.float32))
+            (scale_lib.Scale(scale=np.array(3., dtype=np.float32))))
+    bij3 = tanh.Tanh()
     for chain in bij2(bij1), bij3(bij2(bij1)):
-      td_a = tfd.TransformedDistribution(
+      td_a = transformed_distribution.TransformedDistribution(
           distribution=n_a,
           bijector=chain,
           validate_args=True)
-      td_b = tfd.TransformedDistribution(
+      td_b = transformed_distribution.TransformedDistribution(
           distribution=n_b,
           bijector=copy.copy(chain),
           validate_args=True)
 
-      kl = tfd.kl_divergence(td_a, td_b)
+      kl = kullback_leibler.kl_divergence(td_a, td_b)
       kl_val = self.evaluate(kl)
 
       x = td_a.sample(int(1e5), seed=test_util.test_seed())
@@ -586,18 +618,18 @@ class TransformedDistributionTest(test_util.TestCase):
     nsamp = 5
     nbatch = 3
     dim = 5000
-    d0 = tfd.MultivariateNormalDiag(tf.fill([nbatch, dim], 0.),
-                                    tf.fill([dim], .1))
-    d1 = tfd.MultivariateNormalDiag(tf.fill([nbatch, dim], 1e-5),
-                                    d0.scale.diag)
+    d0 = mvn_diag.MultivariateNormalDiag(tf.fill([nbatch, dim], 0.),
+                                         tf.fill([dim], .1))
+    d1 = mvn_diag.MultivariateNormalDiag(tf.fill([nbatch, dim], 1e-5),
+                                         d0.scale.diag)
     strm = test_util.test_seed_stream()
     x0 = self.evaluate(  # overdispersed
-        tfd.Normal(0, 2).sample([nsamp, nbatch, dim], seed=strm()))
+        normal_lib.Normal(0, 2).sample([nsamp, nbatch, dim], seed=strm()))
     x1 = self.evaluate(  # overdispersed + perturbed
-        x0 + tfd.Normal(0, 1e-6).sample(x0.shape, seed=strm()))
-    d0_64 = tfd.MultivariateNormalDiag(
+        x0 + normal_lib.Normal(0, 1e-6).sample(x0.shape, seed=strm()))
+    d0_64 = mvn_diag.MultivariateNormalDiag(
         tf.cast(d0.loc, tf.float64), tf.cast(d0.scale.diag, tf.float64))
-    d1_64 = tfd.MultivariateNormalDiag(
+    d1_64 = mvn_diag.MultivariateNormalDiag(
         tf.cast(d1.loc, tf.float64), tf.cast(d1.scale.diag, tf.float64))
     oracle_64 = (d0_64.log_prob(tf.cast(x0, tf.float64)) -
                  d1_64.log_prob(tf.cast(x1, tf.float64)))
@@ -605,7 +637,7 @@ class TransformedDistributionTest(test_util.TestCase):
     self.assertNotAllZero(d0.log_prob(x0) < -1_000_000.)
     self.assertAllClose(
         oracle_64,
-        tfp.experimental.distributions.log_prob_ratio(d0, x0, d1, x1),
+        log_prob_ratio.log_prob_ratio(d0, x0, d1, x1),
         rtol=0., atol=0.007)
     # In contrast, this test fails with max-abs-error around 0.05 to 0.1
     # self.assertAllClose(
@@ -623,9 +655,9 @@ class TransformedDistributionTest(test_util.TestCase):
 class ScalarToMultiTest(test_util.TestCase):
 
   def testNormalBatchBroadcasting(self):
-    td = tfd.TransformedDistribution(
-        distribution=tfd.Normal(0., 1.),
-        bijector=tfb.Shift([1., 1., 1.]))
+    td = transformed_distribution.TransformedDistribution(
+        distribution=normal_lib.Normal(0., 1.),
+        bijector=shift_lib.Shift([1., 1., 1.]))
 
     self.assertAllEqual(td.event_shape, [])
     self.assertAllEqual(td.event_shape_tensor(), [])
@@ -681,15 +713,16 @@ class ScalarToMultiTest(test_util.TestCase):
       as_tensor = lambda v, name: tf1.placeholder_with_default(  # pylint: disable=g-long-lambda
           v, shape=None, name='dynamic_' + name)
 
-    fake_mvn = tfd.TransformedDistribution(
-        distribution=tfd.Sample(
-            tfd.Normal(loc=as_tensor(0., name='loc'),
-                       scale=as_tensor(1., name='scale'),
-                       validate_args=True),
+    fake_mvn = transformed_distribution.TransformedDistribution(
+        distribution=sample_lib.Sample(
+            normal_lib.Normal(loc=as_tensor(0., name='loc'),
+                              scale=as_tensor(1., name='scale'),
+                              validate_args=True),
             sample_shape=as_tensor(np.int32(event_shape), name='event_shape')),
-        bijector=tfb.Chain(
-            [tfb.Shift(shift=as_tensor(shift, name='shift')),
-             tfb.ScaleMatvecTriL(scale_tril=as_tensor(tril, name='scale_tril'))
+        bijector=chain_lib.Chain(
+            [shift_lib.Shift(shift=as_tensor(shift, name='shift')),
+             scale_matvec_tril.ScaleMatvecTriL(
+                 scale_tril=as_tensor(tril, name='scale_tril'))
              ]), validate_args=True)
 
     base_dist = fake_mvn.distribution
@@ -716,7 +749,7 @@ class ScalarToMultiTest(test_util.TestCase):
     x = y[0:5, ...]
     self.assertAllMeansClose(y, expected_mean, axis=0,
                              atol=0.1, rtol=0.1)
-    self.assertAllClose(expected_cov, tfp.stats.covariance(y, sample_axis=0),
+    self.assertAllClose(expected_cov, sample_stats.covariance(y, sample_axis=0),
                         atol=0., rtol=0.1)
 
     self.assertAllEqual(event_shape, fake_mvn.event_shape_tensor())
@@ -737,10 +770,10 @@ class ScalarToMultiTest(test_util.TestCase):
 
     loc = 0.
     scale = 2.
-    fake_mvn = tfd.TransformedDistribution(
-        distribution=tfd.Sample(
-            tfd.Normal(loc=as_tensor([loc] * 2, name='loc'),
-                       scale=as_tensor(scale, name='scale')),
+    fake_mvn = transformed_distribution.TransformedDistribution(
+        distribution=sample_lib.Sample(
+            normal_lib.Normal(loc=as_tensor([loc] * 2, name='loc'),
+                              scale=as_tensor(scale, name='scale')),
             sample_shape=as_tensor(np.int32([2, 3, 3]), name='event_shape')),
         bijector=DummyMatrixTransform(),
         validate_args=True)
@@ -801,7 +834,7 @@ class ScalarToMultiTest(test_util.TestCase):
           scale_diag, shape=tf.TensorShape(None), name='dynamic_scale_diag')
       self.evaluate([loc.initializer, scale_diag.initializer])
 
-    mvn = tfd.MultivariateNormalDiag(loc=loc, scale_diag=scale_diag)
+    mvn = mvn_diag.MultivariateNormalDiag(loc=loc, scale_diag=scale_diag)
 
     self.assertAllEqual(self.evaluate(mvn.event_shape_tensor()),
                         event_shape)
@@ -823,8 +856,8 @@ class ScalarToMultiTest(test_util.TestCase):
           np.zeros(sample_shape + batch_shape))
 
   def testConditioning(self):
-    conditional_normal = tfd.TransformedDistribution(
-        distribution=tfd.Normal(loc=0., scale=1.),
+    conditional_normal = transformed_distribution.TransformedDistribution(
+        distribution=normal_lib.Normal(loc=0., scale=1.),
         bijector=_ChooseLocation(loc=[-100., 100.]))
     z = [-1, +1, -1, -1, +1]
     self.assertAllClose(
@@ -835,9 +868,9 @@ class ScalarToMultiTest(test_util.TestCase):
                     bijector_kwargs={'z': z}))), z)
 
   def testSupportBijectorOutsideRange(self):
-    log_normal = tfd.TransformedDistribution(
-        distribution=tfd.Normal(loc=1., scale=2.),
-        bijector=tfb.Exp(),
+    log_normal = transformed_distribution.TransformedDistribution(
+        distribution=normal_lib.Normal(loc=1., scale=2.),
+        bijector=exp.Exp(),
         validate_args=True)
     x = np.array([-4.2, -1e-6, -1.3])
     bijector_inverse_x = (
@@ -847,22 +880,22 @@ class ScalarToMultiTest(test_util.TestCase):
   def test_unknown_event_rank(self):
     if tf.executing_eagerly():
       self.skipTest('Eager execution.')
-    unknown_rank_dist = tfd.Independent(
-        tfd.Normal(loc=tf.ones([2, 1, 3]), scale=2.),
+    unknown_rank_dist = independent.Independent(
+        normal_lib.Normal(loc=tf.ones([2, 1, 3]), scale=2.),
         reinterpreted_batch_ndims=tf1.placeholder_with_default(1, shape=[]))
-    td = tfd.TransformedDistribution(
+    td = transformed_distribution.TransformedDistribution(
         distribution=unknown_rank_dist,
-        bijector=tfb.Scale(1.),
+        bijector=scale_lib.Scale(1.),
         validate_args=True)
     self.assertEqual(td.batch_shape, tf.TensorShape(None))
     self.assertEqual(td.event_shape, tf.TensorShape(None))
     self.assertAllEqual(td.batch_shape_tensor(), [2, 1])
     self.assertAllEqual(td.event_shape_tensor(), [3])
 
-    joint_td = tfd.TransformedDistribution(
-        distribution=tfd.JointDistributionSequentialAutoBatched(
+    joint_td = transformed_distribution.TransformedDistribution(
+        distribution=jdab.JointDistributionSequentialAutoBatched(
             [unknown_rank_dist, unknown_rank_dist]),
-        bijector=tfb.Invert(tfb.Split(2)),
+        bijector=invert.Invert(split.Split(2)),
         validate_args=True)
     # Note that the current behavior is conservative; we could also correctly
     # return a batch shape of `[]` in this case.
@@ -906,9 +939,10 @@ class ExcessiveConcretizationTest(test_util.TestCase):
         tf.Variable(2., name='scale', dtype=tf.float32, **shape_kwargs))
     bij_scale = tfp_hps.defer_and_count_usage(
         tf.Variable(2., name='bij_scale', dtype=tf.float32, **shape_kwargs))
-    dist = tfd.TransformedDistribution(
-        distribution=tfd.Normal(loc=loc, scale=scale, validate_args=True),
-        bijector=tfb.Scale(scale=bij_scale, validate_args=True),
+    dist = transformed_distribution.TransformedDistribution(
+        distribution=normal_lib.Normal(
+            loc=loc, scale=scale, validate_args=True),
+        bijector=scale_lib.Scale(scale=bij_scale, validate_args=True),
         validate_args=True)
 
     for method in ('mean', 'entropy', 'event_shape_tensor',
@@ -969,17 +1003,18 @@ class MultipartBijectorsTest(test_util.TestCase):
     # Create a joint distribution with parts of the specified sizes.
     seed = test_util.test_seed_stream()
     component_dists = tf.nest.map_structure(
-        lambda size: tfd.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
+        lambda size: mvn_diag.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
             loc=tf.random.normal(batch_shape + [size], seed=seed()),
             scale_diag=tf.exp(
                 tf.random.normal(batch_shape + [size], seed=seed()))),
         true_split_sizes)
-    base_dist = tfd.JointDistributionSequential(component_dists)
+    base_dist = jds.JointDistributionSequential(component_dists)
 
     # Transform to a vector-valued distribution by concatenating the parts.
-    bijector = tfb.Invert(tfb.Split(known_split_sizes, axis=-1))
+    bijector = invert.Invert(split.Split(known_split_sizes, axis=-1))
 
-    concat_dist = tfd.TransformedDistribution(base_dist, bijector)
+    concat_dist = transformed_distribution.TransformedDistribution(
+        base_dist, bijector)
     self.assertAllEqual(concat_dist.event_shape, [sum(true_split_sizes)])
     self.assertAllEqual(self.evaluate(concat_dist.event_shape_tensor()),
                         [sum(true_split_sizes)])
@@ -1024,14 +1059,15 @@ class MultipartBijectorsTest(test_util.TestCase):
     true_split_sizes = [1, 3, 2]
 
     base_event_size = sum(true_split_sizes)
-    base_dist = tfd.MultivariateNormalDiag(
+    base_dist = mvn_diag.MultivariateNormalDiag(
         loc=tf.random.normal(
             batch_shape + [base_event_size], seed=test_util.test_seed()),
         scale_diag=tf.exp(tf.random.normal(
             batch_shape + [base_event_size], seed=test_util.test_seed())))
 
-    bijector = tfb.Split(known_split_sizes, axis=-1)
-    split_dist = tfd.TransformedDistribution(base_dist, bijector)
+    bijector = split.Split(known_split_sizes, axis=-1)
+    split_dist = transformed_distribution.TransformedDistribution(
+        base_dist, bijector)
 
     self.assertRegex(
         str(split_dist),
@@ -1088,29 +1124,30 @@ class MultipartBijectorsTest(test_util.TestCase):
     # Build a joint distribution with parts of the specified sizes.
     seed = test_util.test_seed_stream()
     component_dists = tf.nest.map_structure(
-        lambda size, batch_shape: tfd.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
+        lambda size, batch_shape: mvn_diag.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
             loc=tf.random.normal(batch_shape + [size], seed=seed()),
             scale_diag=tf.random.uniform(
                 minval=1., maxval=2.,
                 shape=batch_shape + [size], seed=seed())),
         split_sizes, dist_batch_shape)
     if isinstance(split_sizes, dict):
-      base_dist = tfd.JointDistributionNamed(component_dists)
+      base_dist = jdn.JointDistributionNamed(component_dists)
     else:
-      base_dist = tfd.JointDistributionSequential(component_dists)
+      base_dist = jds.JointDistributionSequential(component_dists)
 
     # Transform the distribution by applying a separate bijector to each part.
-    bijectors = [tfb.Exp(),
-                 tfb.Scale(
+    bijectors = [exp.Exp(),
+                 scale_lib.Scale(
                      tf.random.uniform(
                          minval=1., maxval=2.,
                          shape=bijector_batch_shape, seed=seed())),
-                 tfb.Reshape([2, 1])]
-    bijector = tfb.JointMap(tf.nest.pack_sequence_as(split_sizes, bijectors),
-                            validate_args=True)
+                 reshape.Reshape([2, 1])]
+    bijector = joint_map.JointMap(
+        tf.nest.pack_sequence_as(split_sizes, bijectors), validate_args=True)
 
     # Transform a joint distribution that has different batch shape components
-    transformed_dist = tfd.TransformedDistribution(base_dist, bijector)
+    transformed_dist = transformed_distribution.TransformedDistribution(
+        base_dist, bijector)
 
     self.assertRegex(
         str(transformed_dist),
@@ -1146,30 +1183,31 @@ class MultipartBijectorsTest(test_util.TestCase):
     # Build a joint distribution with parts of the specified sizes.
     seed = test_util.test_seed_stream()
     component_dists = tf.nest.map_structure(
-        lambda size, batch_shape: tfd.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
+        lambda size, batch_shape: mvn_diag.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
             loc=tf.random.normal(batch_shape + [size], seed=seed()),
             scale_diag=tf.random.uniform(
                 minval=1., maxval=2.,
                 shape=batch_shape + [size], seed=seed())),
         split_sizes, dist_batch_shape)
     if isinstance(split_sizes, dict):
-      base_dist = tfd.JointDistributionNamedAutoBatched(
+      base_dist = jdab.JointDistributionNamedAutoBatched(
           component_dists, batch_ndims=2)
     else:
-      base_dist = tfd.JointDistributionSequentialAutoBatched(
+      base_dist = jdab.JointDistributionSequentialAutoBatched(
           component_dists, batch_ndims=2)
 
     # Transform the distribution by applying a separate bijector to each part.
-    bijectors = [tfb.Exp(),
-                 tfb.Scale(
+    bijectors = [exp.Exp(),
+                 scale_lib.Scale(
                      tf.random.uniform(
                          minval=1., maxval=2.,
                          shape=bijector_batch_shape, seed=seed())),
-                 tfb.Reshape([2, 1])]
-    bijector = tfb.JointMap(tf.nest.pack_sequence_as(split_sizes, bijectors),
-                            validate_args=True)
+                 reshape.Reshape([2, 1])]
+    bijector = joint_map.JointMap(
+        tf.nest.pack_sequence_as(split_sizes, bijectors), validate_args=True)
 
-    transformed_dist = tfd.TransformedDistribution(base_dist, bijector)
+    transformed_dist = transformed_distribution.TransformedDistribution(
+        base_dist, bijector)
 
     self.assertRegex(
         str(transformed_dist),
@@ -1220,8 +1258,8 @@ class MultipartBijectorsTest(test_util.TestCase):
                   else range(num_components))
     output_keys = [str(i) for i in range(num_components)]
     output_structure = {k: v for k, v in zip(output_keys, input_keys)}
-    restructure = tfb.Restructure(output_structure)
-    restructured_dist = tfd.TransformedDistribution(
+    restructure = restructure_lib.Restructure(output_structure)
+    restructured_dist = transformed_distribution.TransformedDistribution(
         base_dist, bijector=restructure, validate_args=True)
 
     # Check that attributes of the restructured distribution have the same
@@ -1251,19 +1289,19 @@ class MultipartBijectorsTest(test_util.TestCase):
 
     base_event_size = sum(true_split_sizes)
     # Base dist with no batch shape (will require broadcasting).
-    base_dist = tfd.MultivariateNormalDiag(
+    base_dist = mvn_diag.MultivariateNormalDiag(
         loc=tf.random.normal([base_event_size], seed=test_util.test_seed()),
         scale_diag=tf.exp(tf.random.normal([base_event_size],
                                            seed=test_util.test_seed())))
 
     # Bijector with batch shape in one part.
-    bijector = tfb.Chain([tfb.JointMap([tfb.Identity(),
-                                        tfb.Identity(),
-                                        tfb.Shift(
-                                            tf.ones(batch_shape +
-                                                    [true_split_sizes[-1]]))]),
-                          tfb.Split(true_split_sizes, axis=-1)])
-    split_dist = tfd.TransformedDistribution(base_dist, bijector)
+    bijector = chain_lib.Chain([joint_map.JointMap([
+        identity.Identity(),
+        identity.Identity(),
+        shift_lib.Shift(tf.ones(batch_shape + [true_split_sizes[-1]]))]),
+                                split.Split(true_split_sizes, axis=-1)])
+    split_dist = transformed_distribution.TransformedDistribution(
+        base_dist, bijector)
     self.assertAllEqual(split_dist.batch_shape, batch_shape)
 
     # Because one branch of the split has batch shape, TD should feed batches

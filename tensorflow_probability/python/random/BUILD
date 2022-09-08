@@ -51,11 +51,12 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["random_ops_test.py"],
     deps = [
+        ":random_ops",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/stats:sample_stats",
         # tensorflow/compiler/jit dep,
     ],
 )

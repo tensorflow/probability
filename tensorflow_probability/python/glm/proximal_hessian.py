@@ -23,11 +23,11 @@ information matrix.
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
 from tensorflow_probability.python.glm import fisher_scoring
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matvecmul
+from tensorflow_probability.python.optimizer import proximal_hessian_sparse
 
 
 __all__ = [
@@ -207,7 +207,7 @@ def fit_sparse_one_step(model_matrix,
     g, h_middle = _grad_neg_log_likelihood_and_fim(
         model_matrix, predicted_linear_response, response, model)
 
-    return tfp.optimizer.proximal_hessian_sparse_one_step(
+    return proximal_hessian_sparse.minimize_one_step(
         gradient_unregularized_loss=g,
         hessian_unregularized_loss_outer=model_matrix,
         hessian_unregularized_loss_middle=h_middle,
@@ -452,7 +452,7 @@ def fit_sparse(model_matrix,
           model_matrix, predicted_linear_response, response, model)
       return g, model_matrix, h_middle
 
-    return tfp.optimizer.proximal_hessian_sparse_minimize(
+    return proximal_hessian_sparse.minimize(
         _grad_neg_log_likelihood_and_fim_fn,
         x_start=model_coefficients_start,
         l1_regularizer=l1_regularizer,
@@ -491,7 +491,7 @@ def _fit_sparse_exact_hessian(  # pylint: disable = missing-docstring
       hessian_chol = tf.linalg.cholesky(hessian_loss)
       return grad_loss, hessian_chol, tf.ones_like(grad_loss)
 
-    return tfp.optimizer.proximal_hessian_sparse_minimize(
+    return proximal_hessian_sparse.minimize(
         _grad_and_hessian_loss_fn,
         x_start=model_coefficients_start,
         l1_regularizer=l1_regularizer,

@@ -23,63 +23,99 @@ from absl.testing import parameterized
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.bijectors import exp
+from tensorflow_probability.python.bijectors import ldj_ratio
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.distributions import bernoulli
+from tensorflow_probability.python.distributions import beta_binomial
+from tensorflow_probability.python.distributions import deterministic
+from tensorflow_probability.python.distributions import dirichlet
+from tensorflow_probability.python.distributions import exponential
+from tensorflow_probability.python.distributions import gamma
+from tensorflow_probability.python.distributions import half_normal
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import inverse_gamma
+from tensorflow_probability.python.distributions import joint_distribution_coroutine as jdc
+from tensorflow_probability.python.distributions import joint_distribution_named as jdn
+from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
+from tensorflow_probability.python.distributions import logistic
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import multinomial
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import poisson
+from tensorflow_probability.python.distributions import sample as sample_lib
+from tensorflow_probability.python.distributions import student_t
+from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
+from tensorflow_probability.python.math import special
+from tensorflow_probability.python.util import deferred_tensor
 
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
-
-
-Root = tfd.JointDistributionCoroutine.Root
+Root = jdc.JointDistributionCoroutine.Root
 
 
 def basic_model_fn():
-  yield Root(tfd.Normal(0., 1.))
-  e = yield Root(tfd.Independent(
-      tfd.Exponential(rate=[100, 120]),
-      reinterpreted_batch_ndims=1, name='e'))
-  yield tfd.Gamma(concentration=e[..., 0], rate=e[..., 1])
+  yield Root(normal.Normal(0., 1.))
+  e = yield Root(
+      independent.Independent(
+          exponential.Exponential(rate=[100, 120]),
+          reinterpreted_batch_ndims=1,
+          name='e'))
+  yield gamma.Gamma(concentration=e[..., 0], rate=e[..., 1])
 
 
 def basic_model_with_names_fn():
-  yield Root(tfd.Normal(0., 1., name='a'))
-  e = yield Root(tfd.Independent(
-      tfd.Exponential(rate=[100, 120]),
-      reinterpreted_batch_ndims=1, name='e'))
-  yield tfd.Gamma(concentration=e[..., 0], rate=e[..., 1], name='x')
+  yield Root(normal.Normal(0., 1., name='a'))
+  e = yield Root(
+      independent.Independent(
+          exponential.Exponential(rate=[100, 120]),
+          reinterpreted_batch_ndims=1,
+          name='e'))
+  yield gamma.Gamma(concentration=e[..., 0], rate=e[..., 1], name='x')
 
 
 def nested_lists_with_names_model_fn():
-  abc = yield Root(tfd.JointDistributionSequential([
-      tfd.MultivariateNormalDiag([0., 0.], [1., 1.]),
-      tfd.JointDistributionSequential([
-          tfd.StudentT(3., -2., 5.),
-          tfd.Exponential(4.)])], name='abc'))
+  abc = yield Root(
+      jds.JointDistributionSequential([
+          mvn_diag.MultivariateNormalDiag([0., 0.], [1., 1.]),
+          jds.JointDistributionSequential(
+              [student_t.StudentT(3., -2., 5.),
+               exponential.Exponential(4.)])
+      ],
+                                      name='abc'))
   a, (b, c) = abc
-  yield tfd.JointDistributionSequential(
-      [tfd.Independent(tfd.Normal(a * b, c),
-                       reinterpreted_batch_ndims=1),
-       tfd.Independent(tfd.Normal(a + b, c),
-                       reinterpreted_batch_ndims=1)], name='de')
+  yield jds.JointDistributionSequential([
+      independent.Independent(
+          normal.Normal(a * b, c), reinterpreted_batch_ndims=1),
+      independent.Independent(
+          normal.Normal(a + b, c), reinterpreted_batch_ndims=1)
+  ],
+                                        name='de')
 
 
 def singleton_normal_model_fn():
-  yield Root(tfd.Normal(0., 1., name='x'))
+  yield Root(normal.Normal(0., 1., name='x'))
 
 
 def singleton_jds_model_fn():
-  yield Root(tfd.JointDistributionSequential(
-      [tfd.Normal(0., 1.), lambda x: tfd.Poisson(tf.exp(x))], name='x'))
+  yield Root(
+      jds.JointDistributionSequential(
+          [normal.Normal(0., 1.), lambda x: poisson.Poisson(tf.exp(x))],
+          name='x'))
 
 
 def singleton_jdn_model_fn():
-  yield Root(tfd.JointDistributionNamed(
-      {'z': tfd.Normal(0., 1.), 'y': lambda z: tfd.Poisson(tf.exp(z))},
-      name='x'))
+  yield Root(
+      jdn.JointDistributionNamed(
+          {
+              'z': normal.Normal(0., 1.),
+              'y': lambda z: poisson.Poisson(tf.exp(z))
+          },
+          name='x'))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -101,13 +137,11 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     root = Root if use_root else lambda x: x
 
     def dist():
-      a = yield root(tfd.Bernoulli(probs=0.5,
-                                   dtype=tf.float32))
-      b = yield tfd.Bernoulli(probs=0.25 + 0.5*a,
-                              dtype=tf.float32)
-      yield tfd.Normal(loc=a, scale=1. + b)
+      a = yield root(bernoulli.Bernoulli(probs=0.5, dtype=tf.float32))
+      b = yield bernoulli.Bernoulli(probs=0.25 + 0.5 * a, dtype=tf.float32)
+      yield normal.Normal(loc=a, scale=1. + b)
 
-    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
+    joint = jdc.JointDistributionCoroutine(dist, validate_args=True)
 
     # Properties `event_shape` and `batch_shape` should be defined
     # even before any sampling calls have occurred.
@@ -116,9 +150,9 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     ds, _ = joint.sample_distributions(seed=test_util.test_seed())
     self.assertLen(ds, 3)
-    self.assertIsInstance(ds[0], tfd.Bernoulli)
-    self.assertIsInstance(ds[1], tfd.Bernoulli)
-    self.assertIsInstance(ds[2], tfd.Normal)
+    self.assertIsInstance(ds[0], bernoulli.Bernoulli)
+    self.assertIsInstance(ds[1], bernoulli.Bernoulli)
+    self.assertIsInstance(ds[2], normal.Normal)
 
     is_event_scalar = joint.is_scalar_event()
     self.assertAllEqual(is_event_scalar[0], True)
@@ -158,12 +192,13 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     root = Root if use_root else lambda x: x
 
     def dist():
-      g = yield root(tfd.Gamma(2, 2))
-      df = yield root(tfd.Exponential(1.))
-      loc = yield tfd.Sample(tfd.Normal(0, g), 20)
-      yield tfd.Independent(tfd.StudentT(tf.expand_dims(df, -1), loc, 1), 1)
+      g = yield root(gamma.Gamma(2, 2))
+      df = yield root(exponential.Exponential(1.))
+      loc = yield sample_lib.Sample(normal.Normal(0, g), 20)
+      yield independent.Independent(
+          student_t.StudentT(tf.expand_dims(df, -1), loc, 1), 1)
 
-    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
+    joint = jdc.JointDistributionCoroutine(dist, validate_args=True)
 
     # Properties `event_shape` and `batch_shape` should be defined
     # even before any sampling calls have occurred.
@@ -172,10 +207,10 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     ds, _ = joint.sample_distributions(seed=test_util.test_seed())
     self.assertLen(ds, 4)
-    self.assertIsInstance(ds[0], tfd.Gamma)
-    self.assertIsInstance(ds[1], tfd.Exponential)
-    self.assertIsInstance(ds[2], tfd.Sample)
-    self.assertIsInstance(ds[3], tfd.Independent)
+    self.assertIsInstance(ds[0], gamma.Gamma)
+    self.assertIsInstance(ds[1], exponential.Exponential)
+    self.assertIsInstance(ds[2], sample_lib.Sample)
+    self.assertIsInstance(ds[3], independent.Independent)
 
     is_scalar = joint.is_scalar_event()
     self.assertAllEqual(is_scalar[0], True)
@@ -211,13 +246,11 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     #      `->-(c)
 
     def dist():
-      a = yield Root(tfd.Bernoulli(probs=0.5,
-                                   dtype=tf.float32))
-      b = yield tfd.Bernoulli(probs=0.25 + 0.5*a,
-                              dtype=tf.float32)
-      yield tfd.Normal(loc=a, scale=1. + b)
+      a = yield Root(bernoulli.Bernoulli(probs=0.5, dtype=tf.float32))
+      b = yield bernoulli.Bernoulli(probs=0.25 + 0.5 * a, dtype=tf.float32)
+      yield normal.Normal(loc=a, scale=1. + b)
 
-    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
+    joint = jdc.JointDistributionCoroutine(dist, validate_args=True)
 
     z = joint.sample(seed=test_util.test_seed())
 
@@ -249,12 +282,13 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     #       +--------20-+
 
     def dist():
-      g = yield Root(tfd.Gamma(2, 2))
-      df = yield Root(tfd.Exponential(1.))
-      loc = yield tfd.Sample(tfd.Normal(0, g), 20)
-      yield tfd.Independent(tfd.StudentT(tf.expand_dims(df, -1), loc, 1), 1)
+      g = yield Root(gamma.Gamma(2, 2))
+      df = yield Root(exponential.Exponential(1.))
+      loc = yield sample_lib.Sample(normal.Normal(0, g), 20)
+      yield independent.Independent(
+          student_t.StudentT(tf.expand_dims(df, -1), loc, 1), 1)
 
-    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
+    joint = jdc.JointDistributionCoroutine(dist, validate_args=True)
 
     z = joint.sample(seed=test_util.test_seed())
 
@@ -287,13 +321,11 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     #      `->-(c)
 
     def dist():
-      a = yield Root(tfd.Bernoulli(probs=0.5,
-                                   dtype=tf.float32))
-      b = yield tfd.Bernoulli(probs=0.25 + 0.5*a,
-                              dtype=tf.float32)
-      yield tfd.Normal(loc=a, scale=1. + b)
+      a = yield Root(bernoulli.Bernoulli(probs=0.5, dtype=tf.float32))
+      b = yield bernoulli.Bernoulli(probs=0.25 + 0.5 * a, dtype=tf.float32)
+      yield normal.Normal(loc=a, scale=1. + b)
 
-    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
+    joint = jdc.JointDistributionCoroutine(dist, validate_args=True)
 
     z = joint.sample(seed=test_util.test_seed())
 
@@ -322,13 +354,12 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     #       +---------2-+
 
     def dist():
-      a = yield Root(tfd.Bernoulli(probs=0.5,
-                                   dtype=tf.float32))
-      b = yield tfd.Sample(tfd.Bernoulli(probs=0.25 + 0.5*a,
-                                         dtype=tf.float32), 2)
-      yield tfd.Independent(tfd.Normal(loc=a, scale=1. + b), 1)
+      a = yield Root(bernoulli.Bernoulli(probs=0.5, dtype=tf.float32))
+      b = yield sample_lib.Sample(
+          bernoulli.Bernoulli(probs=0.25 + 0.5 * a, dtype=tf.float32), 2)
+      yield independent.Independent(normal.Normal(loc=a, scale=1. + b), 1)
 
-    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
+    joint = jdc.JointDistributionCoroutine(dist, validate_args=True)
 
     z = joint.sample(seed=test_util.test_seed())
     a, b, c = z  # pylint: disable=unbalanced-tuple-unpacking
@@ -350,20 +381,21 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     # Define a bijector to detect if/when `inverse` is called.
     inverted_values = []
 
-    class InverseTracingExp(tfb.Exp):
+    class InverseTracingExp(exp.Exp):
 
       def _inverse(self, y):
         inverted_values.append(y)
         return tf.math.log(y)
 
     def coroutine_model():
-      g = yield Root(InverseTracingExp()(tfd.Normal(0., 1.), name='g'))
-      df = yield Root(tfd.Exponential(1., name='df'))
-      loc = yield tfd.Sample(tfd.Normal(0, g), 20, name='loc')
-      yield tfd.Independent(tfd.StudentT(df[..., tf.newaxis], loc, 1, name='x'),
-                            reinterpreted_batch_ndims=1)
+      g = yield Root(InverseTracingExp()(normal.Normal(0., 1.), name='g'))
+      df = yield Root(exponential.Exponential(1., name='df'))
+      loc = yield sample_lib.Sample(normal.Normal(0, g), 20, name='loc')
+      yield independent.Independent(
+          student_t.StudentT(df[..., tf.newaxis], loc, 1, name='x'),
+          reinterpreted_batch_ndims=1)
 
-    joint = tfd.JointDistributionCoroutine(coroutine_model, validate_args=True)
+    joint = jdc.JointDistributionCoroutine(coroutine_model, validate_args=True)
 
     seed = test_util.test_seed(sampler_type='stateless')
     for sample_shape in ([], [5]):
@@ -397,12 +429,12 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     #       +---------2-+
 
     def dist():
-      a = yield tfd.Bernoulli(probs=0.5, dtype=tf.float32)  # Missing root
-      b = yield tfd.Sample(tfd.Bernoulli(probs=0.25 + 0.5*a,
-                                         dtype=tf.float32), 2)
-      yield tfd.Independent(tfd.Normal(loc=a, scale=1. + b), 1)
+      a = yield bernoulli.Bernoulli(probs=0.5, dtype=tf.float32)  # Missing root
+      b = yield sample_lib.Sample(
+          bernoulli.Bernoulli(probs=0.25 + 0.5 * a, dtype=tf.float32), 2)
+      yield independent.Independent(normal.Normal(loc=a, scale=1. + b), 1)
 
-    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
+    joint = jdc.JointDistributionCoroutine(dist, validate_args=True)
 
     with self.assertRaisesRegexp(
         Exception,
@@ -414,7 +446,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
       ('nested_lists', nested_lists_with_names_model_fn),
       ('basic_unnamed', basic_model_fn))
   def test_can_call_log_prob_with_args_and_kwargs(self, model_fn):
-    d = tfd.JointDistributionCoroutine(model_fn, validate_args=True)
+    d = jdc.JointDistributionCoroutine(model_fn, validate_args=True)
 
     # Destructure vector-valued Tensors into Python lists, to mimic the values
     # a user might type.
@@ -449,7 +481,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
       d.log_prob(*value, extra_arg=27.)
 
   def test_log_prob_with_manual_kwargs(self):
-    d = tfd.JointDistributionCoroutine(basic_model_fn, validate_args=True)
+    d = jdc.JointDistributionCoroutine(basic_model_fn, validate_args=True)
     x = d.sample(seed=test_util.test_seed())
     lp1 = d.log_prob(var0=x[0], e=x[1], var2=x[2])
     lp2 = d.log_prob(x)
@@ -458,10 +490,10 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
   def test_duplicate_names_error(self):
 
-    @tfd.JointDistributionCoroutine
+    @jdc.JointDistributionCoroutine
     def dist():
-      yield Root(tfd.Normal(0., 1., name='a'))
-      yield Root(tfd.Normal(0., 1., name='a'))
+      yield Root(normal.Normal(0., 1., name='a'))
+      yield Root(normal.Normal(0., 1., name='a'))
 
     with self.assertRaisesRegexp(ValueError, 'Duplicated distribution name: a'):
       dist.log_prob((1, 2))
@@ -471,7 +503,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
       ('singleton_tuple', singleton_jds_model_fn),
       ('singleton_dict', singleton_jdn_model_fn))
   def test_singleton_model_works_with_args_and_kwargs(self, model_fn):
-    d = tfd.JointDistributionCoroutine(model_fn)
+    d = jdc.JointDistributionCoroutine(model_fn)
 
     xs = self.evaluate(
         d.sample(seed=test_util.test_seed()))  # `xs` is a one-element list.
@@ -488,16 +520,17 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
   def test_check_sample_rank(self):
     def dist():
-      g = yield Root(tfd.Gamma(2, 2))
+      g = yield Root(gamma.Gamma(2, 2))
       # The following line lacks a `Root` so that if a shape [3, 5]
       # sample is requested the distribution below will produce
       # samples that have too low a rank to be consistent with
       # the shape.
-      df = yield tfd.Exponential(1.)
-      loc = yield tfd.Sample(tfd.Normal(0, g), 20)
-      yield tfd.Independent(tfd.StudentT(tf.expand_dims(df, -1), loc, 1), 1)
+      df = yield exponential.Exponential(1.)
+      loc = yield sample_lib.Sample(normal.Normal(0, g), 20)
+      yield independent.Independent(
+          student_t.StudentT(tf.expand_dims(df, -1), loc, 1), 1)
 
-    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
+    joint = jdc.JointDistributionCoroutine(dist, validate_args=True)
 
     with self.assertRaisesRegexp(
         Exception,
@@ -506,16 +539,17 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
   def test_check_sample_shape(self):
     def dist():
-      g = yield Root(tfd.Gamma(2, 2))
+      g = yield Root(gamma.Gamma(2, 2))
       # The following line lacks a `Root` so that if a shape [3, 5]
       # sample is requested the following line will yield samples
       # with an appropriate rank but whose shape starts with [2, 2]
       # rather than [3, 5].
-      df = yield tfd.Exponential([[1., 2.], [3., 4.]])
-      loc = yield tfd.Sample(tfd.Normal(0, g), 20)
-      yield tfd.Independent(tfd.StudentT(tf.expand_dims(df, -1), loc, 1), 1)
+      df = yield exponential.Exponential([[1., 2.], [3., 4.]])
+      loc = yield sample_lib.Sample(normal.Normal(0, g), 20)
+      yield independent.Independent(
+          student_t.StudentT(tf.expand_dims(df, -1), loc, 1), 1)
 
-    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
+    joint = jdc.JointDistributionCoroutine(dist, validate_args=True)
 
     with self.assertRaisesRegexp(
         Exception,
@@ -532,13 +566,11 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     #      `->-(c)
 
     def dist():
-      a = yield Root(tfd.Bernoulli(probs=0.5,
-                                   dtype=tf.float32))
-      b = yield tfd.Bernoulli(probs=0.25 + 0.5*a,
-                              dtype=tf.float32)
-      yield tfd.Normal(loc=a, scale=1. + b)
+      a = yield Root(bernoulli.Bernoulli(probs=0.5, dtype=tf.float32))
+      b = yield bernoulli.Bernoulli(probs=0.25 + 0.5 * a, dtype=tf.float32)
+      yield normal.Normal(loc=a, scale=1. + b)
 
-    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
+    joint = jdc.JointDistributionCoroutine(dist, validate_args=True)
 
     z = joint.sample(4, seed=test_util.test_seed())
 
@@ -566,13 +598,11 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     #      `->-(c)
 
     def dist():
-      a = yield Root(tfd.Bernoulli(probs=0.5,
-                                   dtype=tf.float32))
-      b = yield tfd.Bernoulli(probs=0.25 + 0.5*a,
-                              dtype=tf.float32)
-      yield tfd.Normal(loc=a, scale=1. + b)
+      a = yield Root(bernoulli.Bernoulli(probs=0.5, dtype=tf.float32))
+      b = yield bernoulli.Bernoulli(probs=0.25 + 0.5 * a, dtype=tf.float32)
+      yield normal.Normal(loc=a, scale=1. + b)
 
-    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
+    joint = jdc.JointDistributionCoroutine(dist, validate_args=True)
 
     z = joint.sample(4, seed=test_util.test_seed())
 
@@ -602,12 +632,12 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     #       +---------2-+
 
     def dist():
-      a = yield Root(tfd.Exponential(1.))
-      b = yield tfd.Sample(tfd.Normal(a, 1.), 20)
-      c = yield Root(tfd.Exponential(1.))
-      yield tfd.Independent(tfd.Normal(b, tf.expand_dims(c, -1)), 1)
+      a = yield Root(exponential.Exponential(1.))
+      b = yield sample_lib.Sample(normal.Normal(a, 1.), 20)
+      c = yield Root(exponential.Exponential(1.))
+      yield independent.Independent(normal.Normal(b, tf.expand_dims(c, -1)), 1)
 
-    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
+    joint = jdc.JointDistributionCoroutine(dist, validate_args=True)
 
     z = joint.sample(seed=test_util.test_seed())
 
@@ -638,12 +668,12 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     #       +---------2-+
 
     def dist():
-      a = yield Root(tfd.Exponential(1.))
-      b = yield tfd.Sample(tfd.Normal(a, 1.), 20)
-      c = yield Root(tfd.Exponential(1.))
-      yield tfd.Independent(tfd.Normal(b, tf.expand_dims(c, -1)), 1)
+      a = yield Root(exponential.Exponential(1.))
+      b = yield sample_lib.Sample(normal.Normal(a, 1.), 20)
+      c = yield Root(exponential.Exponential(1.))
+      yield independent.Independent(normal.Normal(b, tf.expand_dims(c, -1)), 1)
 
-    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
+    joint = jdc.JointDistributionCoroutine(dist, validate_args=True)
 
     z = joint.sample([3, 5], seed=test_util.test_seed())
 
@@ -667,15 +697,15 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
   def test_sample_dtype_structures_output(self):
     def noncentered_horseshoe_prior(num_features):
-      scale_variance = yield Root(
-          tfd.InverseGamma(0.5, 0.5))
+      scale_variance = yield Root(inverse_gamma.InverseGamma(0.5, 0.5))
       scale_noncentered = yield Root(
-          tfd.Sample(tfd.HalfNormal(1.), num_features))
+          sample_lib.Sample(half_normal.HalfNormal(1.), num_features))
       scale = scale_noncentered * scale_variance[..., None]**0.5
       weights_noncentered = yield Root(
-          tfd.Sample(tfd.Normal(0., 1.), num_features))
-      yield tfd.Independent(tfd.Deterministic(weights_noncentered * scale),
-                            reinterpreted_batch_ndims=1)
+          sample_lib.Sample(normal.Normal(0., 1.), num_features))
+      yield independent.Independent(
+          deterministic.Deterministic(weights_noncentered * scale),
+          reinterpreted_batch_ndims=1)
 
     # Currently sample_dtype is only used for `tf.nest.pack_structure_as`. In
     # the future we may use it for error checking and/or casting.
@@ -685,7 +715,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
         'weights_noncentered',
         'weights',
     ])(*([None]*4))
-    joint = tfd.JointDistributionCoroutine(
+    joint = jdc.JointDistributionCoroutine(
         lambda: noncentered_horseshoe_prior(4),
         sample_dtype=sample_dtype,
         validate_args=True)
@@ -700,7 +730,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     # Check that a list dtype doesn't get corrupted by `tf.Module` wrapping.
     sample_dtype = [None, None, None, None]
-    joint = tfd.JointDistributionCoroutine(
+    joint = jdc.JointDistributionCoroutine(
         lambda: noncentered_horseshoe_prior(4),
         sample_dtype=sample_dtype,
         validate_args=True)
@@ -712,11 +742,11 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
   def test_repr_with_custom_sample_dtype(self):
     def model():
-      s = yield tfd.JointDistributionCoroutine.Root(
-          tfd.Sample(tfd.InverseGamma(2, 2), 100))
-      yield tfd.Independent(tfd.Normal(0, s), 1)
+      s = yield jdc.JointDistributionCoroutine.Root(
+          sample_lib.Sample(inverse_gamma.InverseGamma(2, 2), 100))
+      yield independent.Independent(normal.Normal(0, s), 1)
     sd = collections.namedtuple('Model', ['s', 'w'])(None, None)
-    m = tfd.JointDistributionCoroutine(
+    m = jdc.JointDistributionCoroutine(
         model, sample_dtype=sd, validate_args=True)
     self.assertEqual(
         ('tfp.distributions.JointDistributionCoroutine('
@@ -735,12 +765,13 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
   def test_converts_nested_lists_to_tensor(self):
     def dist():
-      a = yield Root(tfd.MultivariateNormalDiag([0., 0.], [1., 1.]))
-      yield tfd.JointDistributionSequential([
-          tfd.JointDistributionSequential([
-              tfd.Normal(a[..., 0], 1.)]),
-          tfd.Normal(a[..., 1], 1.)])
-    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
+      a = yield Root(mvn_diag.MultivariateNormalDiag([0., 0.], [1., 1.]))
+      yield jds.JointDistributionSequential([
+          jds.JointDistributionSequential([normal.Normal(a[..., 0], 1.)]),
+          normal.Normal(a[..., 1], 1.)
+      ])
+
+    joint = jdc.JointDistributionCoroutine(dist, validate_args=True)
 
     x = [tf.convert_to_tensor([4., 2.]), [[1.], 3.]]
     x_with_tensor_as_list = [[4., 2.], [[1.], 3.]]
@@ -777,23 +808,24 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
       # U in paper
       user_traits = yield Root(
-          tfd.Sample(tfd.Normal(loc=0.,
-                                scale=user_trait_prior_scale),
-                     sample_shape=[n_factors, n_users]))
+          sample_lib.Sample(
+              normal.Normal(loc=0., scale=user_trait_prior_scale),
+              sample_shape=[n_factors, n_users]))
 
       # V in paper
       item_traits = yield Root(
-          tfd.Sample(tfd.Normal(loc=0.,
-                                scale=item_trait_prior_scale),
-                     sample_shape=[n_factors, n_items]))
+          sample_lib.Sample(
+              normal.Normal(loc=0., scale=item_trait_prior_scale),
+              sample_shape=[n_factors, n_items]))
 
       # R in paper
-      yield tfd.Independent(
-          tfd.Normal(loc=tf.matmul(user_traits, item_traits,
-                                   adjoint_a=True),
-                     scale=observation_noise_prior_scale),
+      yield independent.Independent(
+          normal.Normal(
+              loc=tf.matmul(user_traits, item_traits, adjoint_a=True),
+              scale=observation_noise_prior_scale),
           reinterpreted_batch_ndims=2)
-    dist = tfd.JointDistributionCoroutine(model)
+
+    dist = jdc.JointDistributionCoroutine(model)
     self.assertAllEqual(dist.event_shape, [[2, 3], [2, 5], [3, 5]])
 
     z = dist.sample(seed=test_util.test_seed())
@@ -835,9 +867,9 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     num_topics = 3
     num_words = 10
     avg_doc_length = 5
-    u = tfd.Uniform(low=-1., high=1.)
-    alpha = tfp.util.TransformedVariable(
-        u.sample([num_topics]), tfb.Softplus(), name='alpha')
+    u = uniform.Uniform(low=-1., high=1.)
+    alpha = deferred_tensor.TransformedVariable(
+        u.sample([num_topics]), softplus.Softplus(), name='alpha')
     beta = tf.Variable(u.sample([num_topics, num_words]), name='beta')
 
     # LDA Model.
@@ -845,13 +877,14 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     # use of Independent--this lets us easily aggregate multinomials across
     # topics (and in any "shape" of documents).
     def lda_model():
-      n = yield Root(tfd.Poisson(rate=avg_doc_length))
-      theta = yield Root(tfd.Dirichlet(concentration=alpha))
-      z = yield tfd.Multinomial(total_count=n, probs=theta)
-      yield tfd.Independent(tfd.Multinomial(total_count=z, logits=beta),
-                            reinterpreted_batch_ndims=1)
+      n = yield Root(poisson.Poisson(rate=avg_doc_length))
+      theta = yield Root(dirichlet.Dirichlet(concentration=alpha))
+      z = yield multinomial.Multinomial(total_count=n, probs=theta)
+      yield independent.Independent(
+          multinomial.Multinomial(total_count=z, logits=beta),
+          reinterpreted_batch_ndims=1)
 
-    lda = tfd.JointDistributionCoroutine(lda_model, validate_args=True)
+    lda = jdc.JointDistributionCoroutine(lda_model, validate_args=True)
 
     # Now, let's sample some "documents" and compute the log-prob of each.
     docs_shape = [2, 4]  # That is, 8 docs in the shape of [2, 4].
@@ -884,9 +917,9 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     def dist():
       random_rank = tf.cast(3.5 + tf.random.uniform(
           [], seed=test_util.test_seed()), tf.int32)
-      yield Root(tfd.Normal(loc=0., scale=tf.ones([random_rank])))
+      yield Root(normal.Normal(loc=0., scale=tf.ones([random_rank])))
 
-    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
+    joint = jdc.JointDistributionCoroutine(dist, validate_args=True)
 
     @tf.function(autograph=False)
     def get_batch_shapes():
@@ -902,12 +935,12 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
   def test_default_event_space_bijector(self):
     def dists():
-      a = yield Root(tfd.Exponential(1., validate_args=True))
-      b = yield tfd.Independent(
-          tfd.Uniform([-1., -2.], a, validate_args=True))
-      yield tfd.Logistic(b, a, validate_args=True)
+      a = yield Root(exponential.Exponential(1., validate_args=True))
+      b = yield independent.Independent(
+          uniform.Uniform([-1., -2.], a, validate_args=True))
+      yield logistic.Logistic(b, a, validate_args=True)
 
-    jd = tfd.JointDistributionCoroutine(dists, validate_args=True)
+    jd = jdc.JointDistributionCoroutine(dists, validate_args=True)
     joint_bijector = jd.experimental_default_event_space_bijector()
 
     def _finite_difference_ldj(bijectors, transform_direction, xs, delta):
@@ -999,16 +1032,17 @@ class JointDistributionCoroutineTest(test_util.TestCase):
   def test_default_event_space_bijector_ratio(self, sample_shape):
 
     def dists():
-      a = yield Root(tfd.Exponential(1., validate_args=True))
-      b = yield tfd.Independent(
-          tfd.Uniform([-1., -2.], a[..., tf.newaxis], validate_args=True), 1)
-      yield tfd.Independent(
-          tfd.Logistic(b, a[..., tf.newaxis], validate_args=True), 1)
+      a = yield Root(exponential.Exponential(1., validate_args=True))
+      b = yield independent.Independent(
+          uniform.Uniform([-1., -2.], a[..., tf.newaxis], validate_args=True),
+          1)
+      yield independent.Independent(
+          logistic.Logistic(b, a[..., tf.newaxis], validate_args=True), 1)
 
-    jd = tfd.JointDistributionCoroutine(dists, validate_args=True)
+    jd = jdc.JointDistributionCoroutine(dists, validate_args=True)
     joint_bijector = jd.experimental_default_event_space_bijector()
 
-    seed1, seed2 = tfp.random.split_seed(
+    seed1, seed2 = samplers.split_seed(
         test_util.test_seed(sampler_type='stateless'), 2)
     x1 = jd.sample(sample_shape, seed=seed1)
     x2 = jd.sample(sample_shape, seed=seed2)
@@ -1022,15 +1056,17 @@ class JointDistributionCoroutineTest(test_util.TestCase):
         joint_bijector.forward_log_det_jacobian(z2, event_ndims))
     self.assertAllClose(
         true_fldj_ratio,
-        tfp.experimental.bijectors.forward_log_det_jacobian_ratio(
-            joint_bijector, z1, joint_bijector, z2, event_ndims))
+        ldj_ratio.forward_log_det_jacobian_ratio(joint_bijector, z1,
+                                                 joint_bijector, z2,
+                                                 event_ndims))
     true_ildj_ratio = (
         joint_bijector.inverse_log_det_jacobian(x1, event_ndims) -
         joint_bijector.inverse_log_det_jacobian(x2, event_ndims))
     self.assertAllClose(
         true_ildj_ratio,
-        tfp.experimental.bijectors.inverse_log_det_jacobian_ratio(
-            joint_bijector, x1, joint_bijector, x2, event_ndims))
+        ldj_ratio.inverse_log_det_jacobian_ratio(joint_bijector, x1,
+                                                 joint_bijector, x2,
+                                                 event_ndims))
 
   @parameterized.named_parameters(
       ('_sample', lambda d, **kwargs: d.sample(**kwargs)),
@@ -1038,19 +1074,20 @@ class JointDistributionCoroutineTest(test_util.TestCase):
        lambda d, **kwargs: d.experimental_sample_and_log_prob(**kwargs)[0]),
   )
   def test_nested_partial_value(self, sample_fn):
-    @tfd.JointDistributionCoroutine
-    def innermost():
-      a = yield Root(tfd.Exponential(1., name='a'))
-      yield tfd.Sample(tfd.LogNormal(a, a), [5], name='b')
 
-    @tfd.JointDistributionCoroutine
+    @jdc.JointDistributionCoroutine
+    def innermost():
+      a = yield Root(exponential.Exponential(1., name='a'))
+      yield sample_lib.Sample(lognormal.LogNormal(a, a), [5], name='b')
+
+    @jdc.JointDistributionCoroutine
     def inner():
-      yield Root(tfd.Exponential(1., name='c'))
+      yield Root(exponential.Exponential(1., name='c'))
       yield Root(innermost.copy(name='d'))
 
-    @tfd.JointDistributionCoroutine
+    @jdc.JointDistributionCoroutine
     def outer():
-      yield Root(tfd.Exponential(1., name='e'))
+      yield Root(exponential.Exponential(1., name='e'))
       yield Root(inner.copy(name='f'))
 
     seed = test_util.test_seed(sampler_type='stateless')
@@ -1076,12 +1113,13 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     self.assertAllCloseNested(true_xs, xs)
 
   def test_default_event_space_bijector_nested(self):
-    @tfd.JointDistributionCoroutine
-    def inner():
-      a = yield Root(tfd.Exponential(1., name='a'))
-      yield tfd.Sample(tfd.LogNormal(a, a), [5], name='b')
 
-    @tfd.JointDistributionCoroutine
+    @jdc.JointDistributionCoroutine
+    def inner():
+      a = yield Root(exponential.Exponential(1., name='a'))
+      yield sample_lib.Sample(lognormal.LogNormal(a, a), [5], name='b')
+
+    @jdc.JointDistributionCoroutine
     def outer():
       yield Root(inner)
       yield Root(inner)
@@ -1101,11 +1139,11 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
   def test_sample_kwargs(self):
 
-    @tfd.JointDistributionCoroutine
+    @jdc.JointDistributionCoroutine
     def joint():
-      a = yield Root(tfd.Normal(0., 1., name='a'))
-      b = yield tfd.Normal(a, 1., name='b')
-      yield tfd.Normal(a + b, 1., name='c')
+      a = yield Root(normal.Normal(0., 1., name='a'))
+      b = yield normal.Normal(a, 1., name='b')
+      yield normal.Normal(a + b, 1., name='c')
 
     seed = test_util.test_seed()
     tf.random.set_seed(seed)
@@ -1138,12 +1176,11 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     """Test using names for component distributions."""
 
     def model_fn():
-      c = yield Root(tfd.LogNormal(0., 1., name='c'))
-      b = yield tfd.Normal(c, 1., name='b')
-      yield tfd.Normal(c + b, 1e-3, name='a')
+      c = yield Root(lognormal.LogNormal(0., 1., name='c'))
+      b = yield normal.Normal(c, 1., name='b')
+      yield normal.Normal(c + b, 1e-3, name='a')
 
-    model = tfd.JointDistributionCoroutine(
-        model_fn, validate_args=True)
+    model = jdc.JointDistributionCoroutine(model_fn, validate_args=True)
 
     seed = test_util.test_seed_stream()
 
@@ -1210,13 +1247,12 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     """Test leaving some distributions unnamed."""
 
     def model_fn():
-      c = yield Root(tfd.LogNormal(0., 1., name='c'))
-      b = yield tfd.Normal(c, 1.)
-      b = yield Root(tfd.Normal(c, 1., name='a'))
-      yield tfd.Normal(c + b, 1.)
+      c = yield Root(lognormal.LogNormal(0., 1., name='c'))
+      b = yield normal.Normal(c, 1.)
+      b = yield Root(normal.Normal(c, 1., name='a'))
+      yield normal.Normal(c + b, 1.)
 
-    model = tfd.JointDistributionCoroutine(
-        model_fn, validate_args=True)
+    model = jdc.JointDistributionCoroutine(model_fn, validate_args=True)
 
     sample = self.evaluate(model.sample(seed=test_util.test_seed()))
     self.assertEqual(['c', 'var1', 'a', 'var3'], list(sample._asdict().keys()))
@@ -1225,11 +1261,11 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     """Test the construction `target_log_prob_fn` from a joint distribution."""
 
     def model_fn():
-      c = yield Root(tfd.LogNormal(0., 1., name='c'))
-      b = yield tfd.Normal(c, 1., name='b')
-      yield tfd.Normal(c + b, 1., name='a')
+      c = yield Root(lognormal.LogNormal(0., 1., name='c'))
+      b = yield normal.Normal(c, 1., name='b')
+      yield normal.Normal(c + b, 1., name='a')
 
-    model = tfd.JointDistributionCoroutine(model_fn, validate_args=True)
+    model = jdc.JointDistributionCoroutine(model_fn, validate_args=True)
 
     def target_log_prob_fn(*args):
       return model.log_prob(args + (1.,))
@@ -1249,7 +1285,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
   @test_util.numpy_disable_test_missing_functionality('stateful samplers')
   def test_legacy_dists(self):
 
-    class StatefulNormal(tfd.Normal):
+    class StatefulNormal(normal.Normal):
 
       def _sample_n(self, n, seed=None):
         return self.loc + self.scale * tf.random.normal(
@@ -1258,14 +1294,15 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     def dist():
       e = yield Root(
-          tfd.Independent(tfd.Exponential(rate=[100, 120]), 1, name='e'))
+          independent.Independent(
+              exponential.Exponential(rate=[100, 120]), 1, name='e'))
       loc = yield Root(StatefulNormal(loc=0, scale=2., name='loc'))
-      scale = yield tfd.Gamma(
+      scale = yield gamma.Gamma(
           concentration=e[..., 0], rate=e[..., 1], name='scale')
-      m = yield tfd.Normal(loc, scale, name='m')
-      yield tfd.Sample(tfd.Bernoulli(logits=m), 12, name='x')
+      m = yield normal.Normal(loc, scale, name='m')
+      yield sample_lib.Sample(bernoulli.Bernoulli(logits=m), 12, name='x')
 
-    d = tfd.JointDistributionCoroutine(dist, validate_args=True)
+    d = jdc.JointDistributionCoroutine(dist, validate_args=True)
 
     warnings.simplefilter('always')
     with warnings.catch_warnings(record=True) as w:
@@ -1281,7 +1318,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
   @test_util.numpy_disable_test_missing_functionality('stateful samplers')
   def test_legacy_dists_stateless_seed_raises(self):
 
-    class StatefulNormal(tfd.Normal):
+    class StatefulNormal(normal.Normal):
 
       def _sample_n(self, n, seed=None):
         return self.loc + self.scale * tf.random.normal(
@@ -1290,14 +1327,15 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     def dist():
       e = yield Root(
-          tfd.Independent(tfd.Exponential(rate=[100, 120]), 1, name='e'))
+          independent.Independent(
+              exponential.Exponential(rate=[100, 120]), 1, name='e'))
       loc = yield Root(StatefulNormal(loc=0, scale=2., name='loc'))
-      scale = yield tfd.Gamma(
+      scale = yield gamma.Gamma(
           concentration=e[..., 0], rate=e[..., 1], name='scale')
-      m = yield tfd.Normal(loc, scale, name='m')
-      yield tfd.Sample(tfd.Bernoulli(logits=m), 12, name='x')
+      m = yield normal.Normal(loc, scale, name='m')
+      yield sample_lib.Sample(bernoulli.Bernoulli(logits=m), 12, name='x')
 
-    d = tfd.JointDistributionCoroutine(dist, validate_args=True)
+    d = jdc.JointDistributionCoroutine(dist, validate_args=True)
 
     with self.assertRaisesRegexp(TypeError, r'Expected int for argument'):
       d.sample(seed=samplers.zeros_seed())
@@ -1306,11 +1344,11 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     """Test pinning a component distribution."""
 
     def model_fn():
-      c = yield Root(tfd.LogNormal(0., 1., name='c'))
-      b = yield tfd.Normal(c, 1., name='b')
-      yield tfd.Normal(c + b, 1e-3, name='a')
+      c = yield Root(lognormal.LogNormal(0., 1., name='c'))
+      b = yield normal.Normal(c, 1., name='b')
+      yield normal.Normal(c + b, 1e-3, name='a')
 
-    d = tfd.JointDistributionCoroutine(model_fn, validate_args=True)
+    d = jdc.JointDistributionCoroutine(model_fn, validate_args=True)
     samp = self.evaluate(d.experimental_pin(b=1.5).sample_unpinned(
         seed=test_util.test_seed()))
     self.assertEqual(('c', 'a'), samp._fields)
@@ -1327,12 +1365,15 @@ class JointDistributionCoroutineTest(test_util.TestCase):
   @test_util.numpy_disable_gradient_test
   def test_unnormalized_log_prob(self):
     def model_fn():
-      c1 = yield Root(tfd.Gamma(1.2, 1.3, name='c1'))
-      c0 = yield Root(tfd.Gamma(1.4, 1.5, name='c0'))
-      yield tfd.BetaBinomial(concentration1=c1, concentration0=c0,
-                             total_count=100, name='successes')
+      c1 = yield Root(gamma.Gamma(1.2, 1.3, name='c1'))
+      c0 = yield Root(gamma.Gamma(1.4, 1.5, name='c0'))
+      yield beta_binomial.BetaBinomial(
+          concentration1=c1,
+          concentration0=c0,
+          total_count=100,
+          name='successes')
 
-    d = tfd.JointDistributionCoroutine(model_fn, validate_args=True)
+    d = jdc.JointDistributionCoroutine(model_fn, validate_args=True)
 
     c1 = tf.constant(2.1)
     c0 = tf.constant(3.1)
@@ -1341,25 +1382,24 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     def desired_unnorm_lp(c1, c0):
       c1_unnorm = tf.math.xlogy(1.2 - 1., c1) - 1.3 * c1
       c0_unnorm = tf.math.xlogy(1.4 - 1., c0) - 1.5 * c0
-      bb_unnorm = (tfp.math.lbeta(c1 + successes, 100 + c0 - successes)
-                   - tfp.math.lbeta(c1, c0))
+      bb_unnorm = (
+          special.lbeta(c1 + successes, 100 + c0 - successes) -
+          special.lbeta(c1, c0))
       return c1_unnorm + c0_unnorm + bb_unnorm
 
     self.assertAllCloseNested(
-        tfp.math.value_and_gradient(
+        gradient.value_and_gradient(
             lambda c1, c0: d.log_prob(c1, c0, successes), (c1, c0))[1],
-        tfp.math.value_and_gradient(
-            desired_unnorm_lp, (c1, c0))[1])
+        gradient.value_and_gradient(desired_unnorm_lp, (c1, c0))[1])
 
     # TODO(b/187925322): This portion is aspirational.
     # actual = d.unnormalized_log_prob(c1=c1, c0=c0, successes=successes)
     # self.assertAllClose(desired_unnorm_lp(c1, c0), actual)
 
     self.assertAllCloseNested(
-        tfp.math.value_and_gradient(
-            lambda c1, c0: d.log_prob(c1, c0, successes),
-            (c1, c0))[1],
-        tfp.math.value_and_gradient(
+        gradient.value_and_gradient(
+            lambda c1, c0: d.log_prob(c1, c0, successes), (c1, c0))[1],
+        gradient.value_and_gradient(
             lambda c1, c0: d.unnormalized_log_prob(c1, c0, successes),
             (c1, c0))[1])
 
@@ -1367,21 +1407,24 @@ class JointDistributionCoroutineTest(test_util.TestCase):
   def test_unnormalized_log_prob_trainable_prior(self):
 
     def model_fn(cprior):
-      c1 = yield Root(tfd.Gamma(cprior, 1.3, name='c1'))
-      c0 = yield Root(tfd.Gamma(cprior, 1.5, name='c0'))
-      yield tfd.BetaBinomial(concentration1=c1, concentration0=c0,
-                             total_count=100, name='successes')
+      c1 = yield Root(gamma.Gamma(cprior, 1.3, name='c1'))
+      c0 = yield Root(gamma.Gamma(cprior, 1.5, name='c0'))
+      yield beta_binomial.BetaBinomial(
+          concentration1=c1,
+          concentration0=c0,
+          total_count=100,
+          name='successes')
 
     successes = tf.constant(30.)  # Treated as conditioning.
 
     def lp_fn(cprior, c1, c0):
-      d = tfd.JointDistributionCoroutine(functools.partial(model_fn, cprior),
-                                         validate_args=True)
+      d = jdc.JointDistributionCoroutine(
+          functools.partial(model_fn, cprior), validate_args=True)
       return d.log_prob(c1, c0, successes)
 
     def ulp_fn(cprior, c1, c0):
-      d = tfd.JointDistributionCoroutine(functools.partial(model_fn, cprior),
-                                         validate_args=True)
+      d = jdc.JointDistributionCoroutine(
+          functools.partial(model_fn, cprior), validate_args=True)
       return d.unnormalized_log_prob(c1, c0, successes)
 
     cprior = tf.constant(1.2)
@@ -1389,36 +1432,38 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     c0 = tf.constant(3.1)
 
     def desired_unnorm_lp(cprior, c1, c0):
-      c1_unnorm = tfd.Gamma(cprior, 1.3).log_prob(c1)
-      c0_unnorm = tfd.Gamma(cprior, 1.5).log_prob(c0)
-      bb_unnorm = (tfp.math.lbeta(c1 + successes, 100 + c0 - successes)
-                   - tfp.math.lbeta(c1, c0))
+      c1_unnorm = gamma.Gamma(cprior, 1.3).log_prob(c1)
+      c0_unnorm = gamma.Gamma(cprior, 1.5).log_prob(c0)
+      bb_unnorm = (
+          special.lbeta(c1 + successes, 100 + c0 - successes) -
+          special.lbeta(c1, c0))
       return c1_unnorm + c0_unnorm + bb_unnorm
 
     self.assertAllCloseNested(
-        tfp.math.value_and_gradient(lp_fn, (cprior, c1, c0))[1],
-        tfp.math.value_and_gradient(desired_unnorm_lp, (cprior, c1, c0))[1])
+        gradient.value_and_gradient(lp_fn, (cprior, c1, c0))[1],
+        gradient.value_and_gradient(desired_unnorm_lp, (cprior, c1, c0))[1])
 
     # TODO(b/187925322): This portion is aspirational.
     # actual = d.unnormalized_log_prob(c1=c1, c0=c0, successes=successes)
     # self.assertAllClose(desired_unnorm_lp(cprior, c1, c0), actual)
 
     self.assertAllCloseNested(
-        tfp.math.value_and_gradient(lp_fn, (cprior, c1, c0))[1],
-        tfp.math.value_and_gradient(ulp_fn, (cprior, c1, c0))[1])
+        gradient.value_and_gradient(lp_fn, (cprior, c1, c0))[1],
+        gradient.value_and_gradient(ulp_fn, (cprior, c1, c0))[1])
 
   @test_util.numpy_disable_test_missing_functionality('symbolic tracing')
   @test_util.jax_disable_test_missing_functionality(
       'https://github.com/google/jax/issues/7011')
   def test_symbolic_trace_dtype(self):
     # A model that will definitely OOM. (1 billion squared floats).
-    @tfd.JointDistributionCoroutine
+    @jdc.JointDistributionCoroutine
     def model():
-      x = yield Root(tfd.MultivariateNormalDiag(
-          tf.zeros(int(1e9)), tf.ones(int(1e9)), name='x'))
+      x = yield Root(
+          mvn_diag.MultivariateNormalDiag(
+              tf.zeros(int(1e9)), tf.ones(int(1e9)), name='x'))
       loc = tf.einsum('i,j->ij', x, x)
-      yield tfd.Independent(
-          tfd.MultivariateNormalDiag(loc, tf.ones(int(1e9))),
+      yield independent.Independent(
+          mvn_diag.MultivariateNormalDiag(loc, tf.ones(int(1e9))),
           reinterpreted_batch_ndims=1,
           name='y')
     self.assertEqual((tf.float32, tf.float32), model.dtype)
@@ -1427,10 +1472,10 @@ class JointDistributionCoroutineTest(test_util.TestCase):
   def test_symbolic_trace_is_cached(self):
     model_executions = []
 
-    @tfd.JointDistributionCoroutine
+    @jdc.JointDistributionCoroutine
     def model():
-      x = yield Root(tfd.Normal(0., 1., name='x'))
-      y = yield tfd.Normal(x, 1., name='y')
+      x = yield Root(normal.Normal(0., 1., name='x'))
+      y = yield normal.Normal(x, 1., name='y')
       model_executions.append(y)
 
     self.assertAllEqual(((), ()), model.event_shape)
@@ -1444,17 +1489,20 @@ class JointDistributionCoroutineTest(test_util.TestCase):
       reason='Numpy and JAX have no notion of CompositeTensor.')
   def testCompositeTensor(self):
     def model_fn():
-      c1 = yield Root(tfd.Gamma(1.2, 1.3, name='c1'))
-      c0 = yield Root(tfd.Gamma(1.4, 1.5, name='c0'))
-      yield tfd.BetaBinomial(concentration1=c1, concentration0=c0,
-                             total_count=100, name='successes')
+      c1 = yield Root(gamma.Gamma(1.2, 1.3, name='c1'))
+      c0 = yield Root(gamma.Gamma(1.4, 1.5, name='c0'))
+      yield beta_binomial.BetaBinomial(
+          concentration1=c1,
+          concentration0=c0,
+          total_count=100,
+          name='successes')
 
-    d = tfd.JointDistributionCoroutine(model_fn, validate_args=True)
+    d = jdc.JointDistributionCoroutine(model_fn, validate_args=True)
 
     flat = tf.nest.flatten(d, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(
         d, flat, expand_composites=True)
-    self.assertIsInstance(unflat, tfd.JointDistributionCoroutine)
+    self.assertIsInstance(unflat, jdc.JointDistributionCoroutine)
 
     x = self.evaluate(d.sample(3, seed=test_util.test_seed()))
     actual = self.evaluate(d.log_prob(x))

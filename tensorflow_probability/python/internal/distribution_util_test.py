@@ -20,11 +20,11 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.distributions import Categorical
-from tensorflow_probability.python.distributions import Mixture
-from tensorflow_probability.python.distributions import MixtureSameFamily
-from tensorflow_probability.python.distributions import MultivariateNormalDiag
-from tensorflow_probability.python.distributions import Normal
+from tensorflow_probability.python.distributions.categorical import Categorical
+from tensorflow_probability.python.distributions.mixture import Mixture
+from tensorflow_probability.python.distributions.mixture_same_family import MixtureSameFamily
+from tensorflow_probability.python.distributions.mvn_diag import MultivariateNormalDiag
+from tensorflow_probability.python.distributions.normal import Normal
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util

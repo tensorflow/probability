@@ -21,12 +21,24 @@ import hypothesis.strategies as hps
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python import random
+from tensorflow_probability.python.distributions import batch_broadcast
+from tensorflow_probability.python.distributions import bernoulli
+from tensorflow_probability.python.distributions import beta
+from tensorflow_probability.python.distributions import categorical
+from tensorflow_probability.python.distributions import dirichlet
 from tensorflow_probability.python.distributions import hypothesis_testlib as tfd_hps
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import mixture_same_family
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import sample as sample_lib
+from tensorflow_probability.python.distributions import uniform
+from tensorflow_probability.python.distributions import von_mises_fisher
+from tensorflow_probability.python.distributions import wishart
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.random import random_ops
 
 
 @test_util.test_all_tf_execution_regimes
@@ -42,7 +54,7 @@ class _BatchBroadcastTest(object):
     if not self.is_static_shape:
       bcast_arg = tf.Variable(bcast_arg)
       self.evaluate(bcast_arg.initializer)
-    dist = tfd.BatchBroadcast(underlying, bcast_arg)
+    dist = batch_broadcast.BatchBroadcast(underlying, bcast_arg)
     if self.is_static_shape:
       self.assertEqual(batch_shape, dist.batch_shape)
       self.assertEqual(underlying.event_shape, dist.event_shape)
@@ -57,7 +69,7 @@ class _BatchBroadcastTest(object):
     bcast_arg, dist_batch_shp = data.draw(
         tfp_hps.broadcasting_shapes(batch_shape, 2))
 
-    underlying = tfd.Normal(
+    underlying = normal.Normal(
         loc=tf.reshape(
             tf.range(float(np.prod(tensorshape_util.as_list(dist_batch_shp)))),
             dist_batch_shp),
@@ -66,7 +78,7 @@ class _BatchBroadcastTest(object):
     if not self.is_static_shape:
       bcast_arg = tf.Variable(bcast_arg)
       self.evaluate(bcast_arg.initializer)
-    dist = tfd.BatchBroadcast(underlying, bcast_arg)
+    dist = batch_broadcast.BatchBroadcast(underlying, bcast_arg)
     sample_shape = data.draw(hps.one_of(hps.integers(0, 13), tfp_hps.shapes()))
     sample_batch_event = tf.concat([np.int32(sample_shape).reshape([-1]),
                                     batch_shape,
@@ -103,7 +115,7 @@ class _BatchBroadcastTest(object):
     bcast_arg, dist_batch_shp = data.draw(
         tfp_hps.broadcasting_shapes(batch_shape, 2))
 
-    underlying = tfd.Normal(
+    underlying = normal.Normal(
         loc=tf.reshape(
             tf.range(float(np.prod(tensorshape_util.as_list(dist_batch_shp)))),
             dist_batch_shp),
@@ -112,7 +124,7 @@ class _BatchBroadcastTest(object):
     if not self.is_static_shape:
       bcast_arg = tf.Variable(bcast_arg)
       self.evaluate(bcast_arg.initializer)
-    dist = tfd.BatchBroadcast(underlying, bcast_arg)
+    dist = batch_broadcast.BatchBroadcast(underlying, bcast_arg)
     sample_shape = data.draw(hps.one_of(hps.integers(0, 13), tfp_hps.shapes()))
     sample_batch_event = tf.concat([np.int32(sample_shape).reshape([-1]),
                                     batch_shape,
@@ -123,35 +135,37 @@ class _BatchBroadcastTest(object):
     self.assertAllTrue(dist.log_prob(obsv) > dist.log_prob(obsv + .5))
 
   def test_mean(self):
-    d = tfd.BatchBroadcast(tfd.Independent(tfd.Normal([0., 1, 2], .5),
-                                           reinterpreted_batch_ndims=1),
-                           [2])
+    d = batch_broadcast.BatchBroadcast(
+        independent.Independent(
+            normal.Normal([0., 1, 2], .5), reinterpreted_batch_ndims=1), [2])
     expected = tf.broadcast_to(tf.constant([0., 1, 2]), [2, 3])
     self.assertAllEqual(expected, d.mean())
 
   def test_stddev(self):
-    self.assertAllEqual(tf.fill([2, 3], .5),
-                        tfd.BatchBroadcast(tfd.Normal(0., .5), [2, 3]).stddev())
+    self.assertAllEqual(
+        tf.fill([2, 3], .5),
+        batch_broadcast.BatchBroadcast(normal.Normal(0., .5), [2, 3]).stddev())
 
   def test_entropy(self):
-    u = tfd.Sample(tfd.Normal(0., .5), 4)
+    u = sample_lib.Sample(normal.Normal(0., .5), 4)
     self.assertAllEqual(
         tf.fill([2, 3], u.entropy()),
-        tfd.BatchBroadcast(u, [2, 3]).entropy())
+        batch_broadcast.BatchBroadcast(u, [2, 3]).entropy())
 
   def test_var(self):
-    d = tfd.BatchBroadcast(tfd.Normal(0., [[.5], [1.]]), [2, 3])
+    d = batch_broadcast.BatchBroadcast(normal.Normal(0., [[.5], [1.]]), [2, 3])
     expected = tf.broadcast_to(tf.constant([[.25], [1.]]), [2, 3])
     self.assertAllEqual(expected, d.variance())
 
   def test_cov(self):
-    d = tfd.BatchBroadcast(tfd.MultivariateNormalDiag(tf.zeros(2), [.5, 1.]),
-                           [5, 3])
+    d = batch_broadcast.BatchBroadcast(
+        mvn_diag.MultivariateNormalDiag(tf.zeros(2), [.5, 1.]), [5, 3])
     expected = tf.broadcast_to(tf.constant([[.25, 0], [0, 1]]), [5, 3, 2, 2])
     self.assertAllEqual(expected, d.covariance())
 
   def test_quantile(self):
-    d = tfd.BatchBroadcast(tfd.Normal(loc=[0., 1, 2], scale=.5), [2, 1])
+    d = batch_broadcast.BatchBroadcast(
+        normal.Normal(loc=[0., 1, 2], scale=.5), [2, 1])
     expected = tf.broadcast_to(tf.constant([0., 1, 2]), [2, 3])
     self.assertAllEqual(expected, d.quantile(.5))
     x = d.quantile([[.45], [.55]])
@@ -164,22 +178,24 @@ class _BatchBroadcastTest(object):
 
     stream = test_util.test_seed_stream()
     weight = self.evaluate(
-        tfd.Sample(tfd.Dirichlet([0.25, 0.25]), n_item).sample(seed=stream()))
-    mixture_dist = tfd.Categorical(probs=weight)  # batch_shape=[50]
+        sample_lib.Sample(dirichlet.Dirichlet([0.25, 0.25]),
+                          n_item).sample(seed=stream()))
+    mixture_dist = categorical.Categorical(probs=weight)  # batch_shape=[50]
 
     rater_sensitivity = self.evaluate(
-        tfd.Sample(tfd.Beta(5., 1.), n_rater).sample(seed=stream()))
+        sample_lib.Sample(beta.Beta(5., 1.), n_rater).sample(seed=stream()))
     rater_specificity = self.evaluate(
-        tfd.Sample(tfd.Beta(2., 5.), n_rater).sample(seed=stream()))
+        sample_lib.Sample(beta.Beta(2., 5.), n_rater).sample(seed=stream()))
 
     probs = tf.stack([rater_sensitivity, rater_specificity])[None, ...]
 
-    components_dist = tfd.BatchBroadcast(  # batch_shape=[50, 2]
-        tfd.Independent(tfd.Bernoulli(probs=probs),
-                        reinterpreted_batch_ndims=1),
+    components_dist = batch_broadcast.BatchBroadcast(  # batch_shape=[50, 2]
+        independent.Independent(
+            bernoulli.Bernoulli(probs=probs), reinterpreted_batch_ndims=1),
         [50, 2])
 
-    obs_dist = tfd.MixtureSameFamily(mixture_dist, components_dist)
+    obs_dist = mixture_same_family.MixtureSameFamily(mixture_dist,
+                                                     components_dist)
 
     observed = self.evaluate(obs_dist.sample(seed=stream()))
     mixture_logp = obs_dist.log_prob(observed)
@@ -191,27 +207,30 @@ class _BatchBroadcastTest(object):
     self.assertAllClose(expected_logp, mixture_logp)
 
   def test_docstring_shapes(self):
-    d = tfd.BatchBroadcast(tfd.Normal(tf.range(3.), 1.), [2, 3])
+    d = batch_broadcast.BatchBroadcast(normal.Normal(tf.range(3.), 1.), [2, 3])
     self.assertEqual([2, 3], d.batch_shape)
     self.assertEqual([3], d.distribution.batch_shape)
     self.assertEqual([], d.event_shape)
 
-    df = tfd.Uniform(4., 5.).sample([10, 1], seed=test_util.test_seed())
-    d = tfd.BatchBroadcast(tfd.WishartTriL(df=df, scale_tril=tf.eye(3)), [2])
+    df = uniform.Uniform(4., 5.).sample([10, 1], seed=test_util.test_seed())
+    d = batch_broadcast.BatchBroadcast(
+        wishart.WishartTriL(df=df, scale_tril=tf.eye(3)), [2])
     self.assertEqual([10, 2], d.batch_shape)
     self.assertEqual([10, 1], d.distribution.batch_shape)
     self.assertEqual([3, 3], d.event_shape)
 
   def test_docstring_example(self):
     stream = test_util.test_seed_stream()
-    loc = random.spherical_uniform([10], 3, seed=stream())
-    components_dist = tfd.VonMisesFisher(mean_direction=loc, concentration=50.)
-    mixture_dist = tfd.Categorical(
+    loc = random_ops.spherical_uniform([10], 3, seed=stream())
+    components_dist = von_mises_fisher.VonMisesFisher(
+        mean_direction=loc, concentration=50.)
+    mixture_dist = categorical.Categorical(
         logits=tf.random.uniform([500, 10], seed=stream()))
-    obs_dist = tfd.MixtureSameFamily(
-        mixture_dist, tfd.BatchBroadcast(components_dist, [500, 10]))
-    test_sites = random.spherical_uniform([20], 3, seed=stream())
-    lp = tfd.Sample(obs_dist, 20).log_prob(test_sites)
+    obs_dist = mixture_same_family.MixtureSameFamily(
+        mixture_dist, batch_broadcast.BatchBroadcast(components_dist,
+                                                     [500, 10]))
+    test_sites = random_ops.spherical_uniform([20], 3, seed=stream())
+    lp = sample_lib.Sample(obs_dist, 20).log_prob(test_sites)
     self.assertEqual([500], lp.shape)
     self.evaluate(lp)
 
@@ -229,7 +248,7 @@ class _BatchBroadcastTest(object):
     if not self.is_static_shape:
       bcast_arg = tf.Variable(bcast_arg)
       self.evaluate(bcast_arg.initializer)
-    dist = tfd.BatchBroadcast(underlying, bcast_arg)
+    dist = batch_broadcast.BatchBroadcast(underlying, bcast_arg)
     bijector = dist.experimental_default_event_space_bijector()
     hp.assume(bijector is not None)
     shp = bijector.inverse_event_shape_tensor(
@@ -242,36 +261,37 @@ class _BatchBroadcastTest(object):
 
   def test_bcast_to_errors(self):
     with self.assertRaisesRegexp(ValueError, 'is incompatible with'):
-      tfd.BatchBroadcast(tfd.Normal(tf.range(3.), 0.), to_shape=[2, 1])
+      batch_broadcast.BatchBroadcast(
+          normal.Normal(tf.range(3.), 0.), to_shape=[2, 1])
 
     shp = tf.Variable([2, 1])
     self.evaluate(shp.initializer)
     with self.assertRaisesOpError('is incompatible with underlying'):
       self.evaluate(
-          tfd.BatchBroadcast(
-              tfd.Normal(tf.range(3.), 0.),
-              to_shape=shp,
+          batch_broadcast.BatchBroadcast(
+              normal.Normal(tf.range(3.), 0.), to_shape=shp,
               validate_args=True).log_prob(0.))
 
   def test_bcast_with_errors(self):
     with self.assertRaisesRegexp(ValueError, 'Incompatible shapes'):
-      tfd.BatchBroadcast(tfd.Normal(tf.range(3.), 0.), with_shape=[2, 4])
+      batch_broadcast.BatchBroadcast(
+          normal.Normal(tf.range(3.), 0.), with_shape=[2, 4])
 
     shp = tf.Variable([2, 4])
     self.evaluate(shp.initializer)
     with self.assertRaisesOpError('Incompatible shapes'):
       self.evaluate(
-          tfd.BatchBroadcast(
-              tfd.Normal(tf.range(3.), 0.),
+          batch_broadcast.BatchBroadcast(
+              normal.Normal(tf.range(3.), 0.),
               with_shape=shp,
               validate_args=True).log_prob(0.))
 
   def test_bcast_both_error(self):
     with self.assertRaisesRegexp(ValueError, 'Exactly one of'):
-      tfd.BatchBroadcast(tfd.Normal(0., 1.), [3], to_shape=[3])
+      batch_broadcast.BatchBroadcast(normal.Normal(0., 1.), [3], to_shape=[3])
 
     with self.assertRaisesRegexp(ValueError, 'Exactly one of'):
-      tfd.BatchBroadcast(tfd.Normal(0., 1.))
+      batch_broadcast.BatchBroadcast(normal.Normal(0., 1.))
 
 
 @test_util.test_all_tf_execution_regimes

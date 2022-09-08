@@ -18,7 +18,6 @@
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import stats as tfp_stats
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
@@ -31,6 +30,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.stats import quantiles
 
 
 __all__ = [
@@ -210,7 +210,7 @@ class Laplace(distribution.AutoCompositeTensorDistribution):
 
   @classmethod
   def _maximum_likelihood_parameters(cls, value):
-    median = tfp_stats.percentile(value, 50., axis=0, interpolation='linear')
+    median = quantiles.percentile(value, 50., axis=0, interpolation='linear')
     return {'loc': median,
             'scale': tf.reduce_mean(tf.abs(value - median), axis=0)}
 

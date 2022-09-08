@@ -38,7 +38,6 @@ from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.internal.backend import numpy as nptf
 from tensorflow_probability.python.internal.backend.numpy import functional_ops as np_pfor
-import tensorflow_probability.substrates.numpy as tfp
 from tensorflow.python.ops import parallel_for as tf_pfor  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -1670,6 +1669,8 @@ class NumpyTest(test_util.TestCase):
     if not JAX_MODE:
       self.skipTest('Cannot take gradients in NumPy.')
 
+    from tensorflow_probability.substrates.numpy.math import gradient  # pylint: disable=g-import-not-at-top
+
     def _fn(x):
 
       def _cond_fn(i, _):
@@ -1682,7 +1683,7 @@ class NumpyTest(test_util.TestCase):
           cond=_cond_fn, body=_body_fn, loop_vars=(0, x),
           maximum_iterations=5)[1]
 
-    _, grad = tfp.math.value_and_gradient(_fn, 0.)
+    _, grad = gradient.value_and_gradient(_fn, 0.)
     self.assertIsNotNone(grad)
 
   def test_scan_no_initializer(self):

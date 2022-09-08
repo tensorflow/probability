@@ -19,7 +19,6 @@ import numpy as np
 from scipy import special as sp_special
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import stats as tfp_stats
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import power_spherical
 from tensorflow_probability.python.distributions import spherical_uniform
@@ -28,6 +27,7 @@ from tensorflow_probability.python.distributions import von_mises_fisher
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.stats import sample_stats
 
 
 class _PowerSphericalTest(object):
@@ -276,7 +276,7 @@ class _PowerSphericalTest(object):
 
     # Verify the covariance.
     samples = pspherical.sample(int(7e4), seed=test_util.test_seed())
-    sample_cov = tfp_stats.covariance(samples, sample_axis=0)
+    sample_cov = sample_stats.covariance(samples, sample_axis=0)
     true_cov, sample_cov = self.evaluate([
         pspherical.covariance(), sample_cov])
     self.assertAllClose(true_cov, sample_cov, rtol=0.15, atol=1.5e-3)
@@ -305,7 +305,7 @@ class _PowerSphericalTest(object):
         validate_args=True,
         allow_nan_stats=False)
     samples = ps.sample(num_samples, seed=test_util.test_seed())
-    sample_cov = tfp_stats.covariance(samples, sample_axis=0)
+    sample_cov = sample_stats.covariance(samples, sample_axis=0)
     true_cov, sample_cov = self.evaluate([
         ps.covariance(), sample_cov])
     self.assertAllClose(true_cov, sample_cov, rtol=0.15, atol=1.5e-3)

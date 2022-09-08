@@ -19,12 +19,12 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import stats as tfp_stats
 from tensorflow_probability.python.distributions import beta
 from tensorflow_probability.python.distributions import spherical_uniform
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.stats import sample_stats
 
 
 class _SphericalUniformTest(object):
@@ -149,8 +149,8 @@ class _SphericalUniformTest(object):
         validate_args=True,
         allow_nan_stats=False)
     samples = uniform.sample(num_samples, seed=test_util.test_seed())
-    sample_cov = tfp_stats.covariance(samples, sample_axis=0)
-    sample_variance = tfp_stats.variance(samples, sample_axis=0)
+    sample_cov = sample_stats.covariance(samples, sample_axis=0)
+    sample_variance = sample_stats.variance(samples, sample_axis=0)
     true_cov, sample_cov, sample_variance = self.evaluate([
         uniform.covariance(), sample_cov, sample_variance])
     self.assertAllClose(

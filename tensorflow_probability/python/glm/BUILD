@@ -52,9 +52,13 @@ py_test(
     size = "small",
     srcs = ["fisher_scoring_test.py"],
     deps = [
+        ":family",
+        ":fisher_scoring",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:bernoulli",
+        "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/distributions:uniform",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -68,6 +72,7 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/math:linalg",
+        "//tensorflow_probability/python/optimizer:proximal_hessian_sparse",
     ],
 )
 
@@ -77,10 +82,15 @@ py_test(
     srcs = ["proximal_hessian_test.py"],
     shard_count = 4,
     deps = [
+        ":family",
+        ":proximal_hessian",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:bernoulli",
+        "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/distributions:uniform",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:sparse",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )
@@ -91,6 +101,14 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:bijector",
+        "//tensorflow_probability/python/distributions:bernoulli",
+        "//tensorflow_probability/python/distributions:binomial",
+        "//tensorflow_probability/python/distributions:gamma",
+        "//tensorflow_probability/python/distributions:lognormal",
+        "//tensorflow_probability/python/distributions:negative_binomial",
+        "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/distributions:poisson",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:name_util",
         "//tensorflow_probability/python/util:deferred_tensor",
@@ -102,9 +120,16 @@ py_test(
     size = "small",
     srcs = ["family_test.py"],
     deps = [
+        ":family",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:bernoulli",
+        "//tensorflow_probability/python/distributions:binomial",
+        "//tensorflow_probability/python/distributions:gamma",
+        "//tensorflow_probability/python/distributions:lognormal",
+        "//tensorflow_probability/python/distributions:negative_binomial",
+        "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/distributions:poisson",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

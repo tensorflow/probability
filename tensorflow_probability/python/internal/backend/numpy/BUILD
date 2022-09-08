@@ -431,7 +431,6 @@ py_library(
         # hypothesis dep,
         # six dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:test_util",
     ],

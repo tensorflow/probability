@@ -151,7 +151,6 @@ py_test(
         # hypothesis dep,
         # jax dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -169,9 +168,9 @@ py_test(
         # hypothesis dep,
         # jax dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient.jax",
     ],
 )
 

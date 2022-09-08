@@ -21,15 +21,22 @@ import numpy as np
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.bijectors import joint_map
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.distributions import deterministic
+from tensorflow_probability.python.distributions import joint_distribution_auto_batched as jdab
+from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.internal import trainable_state_util
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
+from tensorflow_probability.python.math.minimize import minimize
+from tensorflow_probability.python.math.minimize import minimize_stateless
 
 JAX_MODE = False
 
@@ -46,10 +53,15 @@ def seed_generator():
   # Bare value in place of callable.
   d = yield trainable_state_util.Parameter(tf.ones([1, 1]))
   # Distribution sample method.
-  e = yield trainable_state_util.Parameter(tfd.LogNormal([-1., 1.], 1.).sample)
-  return tfd.JointDistributionSequential(
-      [tfd.Deterministic(a), tfd.Deterministic(b), tfd.Deterministic(c),
-       tfd.Deterministic(d), tfd.Deterministic(e)])
+  e = yield trainable_state_util.Parameter(
+      lognormal.LogNormal([-1., 1.], 1.).sample)
+  return jds.JointDistributionSequential([
+      deterministic.Deterministic(a),
+      deterministic.Deterministic(b),
+      deterministic.Deterministic(c),
+      deterministic.Deterministic(d),
+      deterministic.Deterministic(e)
+  ])
 
 
 def normal_generator(shape):
@@ -57,12 +69,12 @@ def normal_generator(shape):
   loc = yield trainable_state_util.Parameter(
       init_fn=functools.partial(samplers.normal, shape=shape),
       name='loc')
-  bij = tfb.Softplus()
+  bij = softplus.Softplus()
   scale = yield trainable_state_util.Parameter(
       init_fn=lambda seed: bij.forward(samplers.normal(shape, seed=seed)),
       constraining_bijector=bij,
       name='scale')
-  return tfd.Normal(loc=loc, scale=scale, validate_args=True)
+  return normal.Normal(loc=loc, scale=scale, validate_args=True)
 
 
 def joint_normal_nested_generator(shapes):
@@ -70,16 +82,21 @@ def joint_normal_nested_generator(shapes):
   for shape in shapes:
     dist = yield from normal_generator(shape)
     dists.append(dist)
-  return tfd.JointDistributionSequentialAutoBatched(dists)
+  return jdab.JointDistributionSequentialAutoBatched(dists)
 
 
 def yields_structured_parameter():
   dict_loc_scale = yield trainable_state_util.Parameter(
-      init_fn=lambda: {'scale': tf.ones([2]), 'loc': tf.zeros([2])},
+      init_fn=lambda: {  # pylint:disable=g-long-lambda
+          'scale': tf.ones([2]),
+          'loc': tf.zeros([2])
+      },
       name='dict_loc_scale',
-      constraining_bijector=tfb.JointMap(
-          {'scale': tfb.Softplus(), 'loc': tfb.Identity()}))
-  return tfd.Normal(**dict_loc_scale)
+      constraining_bijector=joint_map.JointMap({
+          'scale': softplus.Softplus(),
+          'loc': identity.Identity()
+      }))
+  return normal.Normal(**dict_loc_scale)
 
 
 def yields_never():
@@ -92,7 +109,7 @@ def yields_none():
 
 
 def yields_distribution():
-  yield tfd.Normal(0., 1.)
+  yield normal.Normal(0., 1.)
 
 
 def yields_non_callable_init_fn():
@@ -151,7 +168,7 @@ class TestWrapGeneratorAsStateless(test_util.TestCase):
     self.assertAllEqualNested(shape, tf.nest.map_structure(ps.shape, x))
 
     # Check that gradients are defined.
-    _, grad = tfp.math.value_and_gradient(
+    _, grad = gradient.value_and_gradient(
         lambda *params: apply_fn(*params).log_prob(x), params)
     self.assertLen(grad, expected_num_params)
     self.assertAllNotNone(grad)
@@ -199,10 +216,10 @@ class TestWrapGeneratorAsStateless(test_util.TestCase):
     init_fn, apply_fn = trainable_state_util.as_stateless_builder(
         yields_structured_parameter)()
     params = init_fn(test_util.test_seed(sampler_type='stateless'))
-    self.assertAllEqualNested(
-        params.dict_loc_scale,
-        {'scale': tfb.Softplus().inverse(tf.ones([2])),
-         'loc': tf.zeros([2])})
+    self.assertAllEqualNested(params.dict_loc_scale, {
+        'scale': softplus.Softplus().inverse(tf.ones([2])),
+        'loc': tf.zeros([2])
+    })
     dist = apply_fn(params)
     self.assertAllEqual(dist.loc, tf.zeros([2]))
     self.assertAllEqual(dist.scale, tf.ones([2]))
@@ -217,7 +234,7 @@ class TestWrapGeneratorAsStateless(test_util.TestCase):
 
   def test_raises_when_generator_is_not_a_generator(self):
     init_fn, apply_fn = trainable_state_util.as_stateless_builder(
-        lambda: tfd.Normal(0., 1.))()
+        lambda: normal.Normal(0., 1.))()
     error_msg = 'must contain at least one `yield` statement'
     with self.assertRaisesRegex(ValueError, error_msg):
       init_fn()
@@ -238,8 +255,8 @@ class TestWrapGeneratorAsStateless(test_util.TestCase):
         normal_generator)(shape=[2])
     good_params = init_fn(seed=test_util.test_seed(sampler_type='stateless'))
     # Check that both calling styles are supported.
-    self.assertIsInstance(apply_fn(good_params), tfd.Normal)
-    self.assertIsInstance(apply_fn(*good_params), tfd.Normal)
+    self.assertIsInstance(apply_fn(good_params), normal.Normal)
+    self.assertIsInstance(apply_fn(*good_params), normal.Normal)
 
     with self.assertRaisesRegex(ValueError, 'Insufficient parameters'):
       apply_fn()
@@ -271,7 +288,7 @@ class TestWrapGeneratorAsStateless(test_util.TestCase):
 
     # Find the maximum likelihood distribution given observed data.
     x_observed = [3., -2., 1.7]
-    mle_parameters, _ = tfp.math.minimize_stateless(
+    mle_parameters, _ = minimize_stateless(
         loss_fn=lambda *params: -apply_fn(*params).log_prob(x_observed),
         init=init_fn(seed=test_util.test_seed(sampler_type='stateless')),
         optimizer=optax.adam(1.0),
@@ -333,7 +350,7 @@ class TestWrapGeneratorAsStateful(test_util.TestCase):
     optimizer = tf.optimizers.Adam(1.0)
     # Find the maximum likelihood distribution given observed data.
     x_observed = [3., -2., 1.7]
-    losses = tfp.math.minimize(
+    losses = minimize(
         loss_fn=lambda: -trainable_dist.log_prob(x_observed),
         optimizer=optimizer,
         num_steps=300)

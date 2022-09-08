@@ -14,19 +14,16 @@
 # ============================================================================
 """Tests for tensorflow_probability.python.internal.empirical_statistical_testing."""
 
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import empirical_statistical_testing as emp
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
 
 
 class EmpiricalStatisticalTestingTest(test_util.TestCase):
 
   def test_ok(self):
     # True mean is 0, true stddev is 0.001
-    samples = tfd.Normal(0., 1.).sample(1000000, seed=test_util.test_seed())
+    samples = normal.Normal(0., 1.).sample(1000000, seed=test_util.test_seed())
     # TODO(axch): Add seeds for the randomness inside the bootstrap this does.
     results = emp._evaluate_means_assertion(
         self.evaluate(samples), expected=0, axis=0, atol=0.003, rtol=1e-6)
@@ -54,7 +51,7 @@ class EmpiricalStatisticalTestingTest(test_util.TestCase):
     self.assertIsInstance(emp._format_full_report(results), str)
 
   def test_out_of_bounds(self):
-    samples = tfd.Normal(10., 0.1).sample(10000, seed=test_util.test_seed())
+    samples = normal.Normal(10., 0.1).sample(10000, seed=test_util.test_seed())
     results = emp._evaluate_means_assertion(
         self.evaluate(samples), expected=0, axis=0, atol=0.003, rtol=1e-6)
     result = results[0]
@@ -71,7 +68,7 @@ class EmpiricalStatisticalTestingTest(test_util.TestCase):
     self.assertTrue(suggestion.out_of_bounds)
 
   def test_batch(self):
-    samples = tfd.Normal(0., 0.1).sample(100, seed=test_util.test_seed())
+    samples = normal.Normal(0., 0.1).sample(100, seed=test_util.test_seed())
     results = emp._evaluate_means_assertion(
         self.evaluate(samples), expected=[[0], [1], [2]], axis=0,
         atol=[0.003, 0.004, 0.005], rtol=1e-6)
