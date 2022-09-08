@@ -273,6 +273,62 @@ def infer_trajectories(observations,
     return trajectories, incremental_log_marginal_likelihoods
 
 
+def sequential_monte_carlo(
+        initial_state,
+        propose_and_update_log_weights_fn,
+        condition_fn,
+        resample_fn,
+        resample_criterion_fn,
+        num_timesteps,
+        unbiased_gradients=True,
+        trace_fn=_default_trace_fn,
+        trace_criterion_fn=_always_trace,
+        static_trace_allocation_size=None,
+        parallel_iterations=1,
+        seed=None,
+        name=None
+):
+    init_seed, loop_seed = samplers.split_seed(seed, salt='particle_filter')
+    # If trace criterion is `None`, we'll return only the final results.
+    never_trace = lambda *_: False
+    kernel = smc_kernel.SequentialMonteCarlo(
+        propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
+        resample_fn=resample_fn,
+        resample_criterion_fn=resample_criterion_fn,
+        unbiased_gradients=unbiased_gradients)
+
+    # Use `trace_scan` rather than `sample_chain` directly because the latter
+    # would force us to trace the state history (with or without thinning),
+    # which is not always appropriate.
+    def seeded_one_step(seed_state_results, _):
+      seed, state, results = seed_state_results
+      one_step_seed, next_seed = samplers.split_seed(seed)
+      next_state, next_results = kernel.one_step(
+          state, results, seed=one_step_seed)
+      return next_seed, next_state, next_results
+
+    final_seed_state_result, traced_results = loop_util.trace_scan(
+        loop_fn=seeded_one_step,
+        initial_state=(loop_seed,
+                       initial_state,
+                       kernel.bootstrap_results(initial_state)),
+        elems=tf.ones([num_timesteps]),
+        trace_fn=lambda seed_state_results: trace_fn(*seed_state_results[1:]),
+        trace_criterion_fn=(
+            lambda seed_state_results: trace_criterion_fn(  # pylint: disable=g-long-lambda
+                *seed_state_results[1:])),
+        static_trace_allocation_size=static_trace_allocation_size,
+        parallel_iterations=parallel_iterations,
+        condition_fn=condition_fn
+    )
+
+    if trace_criterion_fn is never_trace:
+      # Return results from just the final step.
+      traced_results = trace_fn(*final_seed_state_result[1:])
+
+    return traced_results
+
+
 @docstring_util.expand_docstring(
     particle_filter_arg_str=particle_filter_arg_str.format(scibor_ref_idx=1))
 def particle_filter(observations,
@@ -341,8 +397,6 @@ def particle_filter(observations,
       Filtering without Modifying the Forward Pass. _arXiv preprint
       arXiv:2106.10314_, 2021. https://arxiv.org/abs/2106.10314
   """
-
-  init_seed, loop_seed = samplers.split_seed(seed, salt='particle_filter')
   with tf.name_scope(name or 'particle_filter'):
     num_observation_steps = ps.size0(tf.nest.flatten(observations)[0])
     num_timesteps = (
@@ -354,19 +408,121 @@ def particle_filter(observations,
       static_trace_allocation_size = 0
       trace_criterion_fn = never_trace
 
-    if initial_state_proposal is None:
-        initial_state_proposal = initial_state_prior
-
-    # Initializing particles and weights
-    initial_particles, initial_log_weights = \
-        initial_state_proposal.experimental_sample_and_log_prob(
-            [num_particles], seed=seed
-        )
-    initial_log_weights = (
-            initial_state_prior.log_prob(initial_particles) -
-            initial_state_proposal.log_prob(initial_particles)
+    initial_particles = _particle_filter_initial_weighted_particles(
+        observations,
+        observation_fn,
+        initial_state_prior,
+        initial_state_proposal,
+        num_particles,
+        seed=None
     )
 
+    propose_and_update_log_weights_fn = (
+        _particle_filter_propose_and_update_log_weights_fn(
+            observations=observations,
+            transition_fn=transition_fn,
+            proposal_fn=proposal_fn,
+            observation_fn=observation_fn,
+            num_transitions_per_observation=num_transitions_per_observation))
+
+    traced_results = sequential_monte_carlo(
+        # Weighted particles weighted also considering the observations.
+        initial_state=initial_particles,
+        propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
+        condition_fn=lambda step, state, num_traced, trace: step < ps.size0(observations),
+        resample_fn=resample_fn,
+        resample_criterion_fn=resample_criterion_fn,
+        # rejuvenation_fn=...,
+        # rejuvenation_criterion_fn=...,
+        trace_fn=trace_fn,
+        num_timesteps=num_timesteps
+    )
+
+    return traced_results
+
+
+def _particle_filter_initial_weighted_particles(observations,
+                                                observation_fn,
+                                                initial_state_prior,
+                                                initial_state_proposal,
+                                                num_particles,
+                                                seed=None):
+  """Initialize a set of weighted particles including the first observation."""
+  # Propose an initial state.
+  if initial_state_proposal is None:
+      initial_particles = initial_state_prior.sample(num_particles, seed=seed)
+      initial_log_weights = ps.zeros_like(
+          initial_state_prior.log_prob(initial_particles)
+      )
+  else:
+      initial_particles = initial_state_proposal.sample(num_partiles, seed=seed)
+      initial_log_weights = (
+              initial_state_prior.log_prob(initial_particles) -
+              initial_state_proposal.log_prob(initial_particles)
+      )
+
+  # Normalize the initial weights. If we used a proposal, the weights are
+  # normalized in expectation, but actually normalizing them reduces variance.
+  initial_log_weights = tf.nn.log_softmax(initial_log_weights, axis=0)
+
+  # Return particles weighted by the initial observation.
+  return smc_kernel.WeightedParticles(
+      particles=initial_particles,
+      log_weights=initial_log_weights + _compute_observation_log_weights(
+          step=0,
+          particles=initial_particles,
+          observations=observations,
+          observation_fn=observation_fn))
+
+
+def _propose_and_update_log_weights_fn(
+        observations,
+        transition_fn,
+        proposal_fn,
+        observation_fn,
+        step,
+        state,
+        seed,
+        num_transitions_per_observation=1):
+    """Particle filter propose and update for single steps"""
+    particles, log_weights = (
+        proposal_fn(step, state.particles).experimental_sample_and_log_prob(seed=seed)
+    )
+
+    assertions = _assert_batch_shape_matches_weights(
+        distribution=transition_fn(step, particles),
+        weights_shape=ps.shape(log_weights),
+        diststr='transition'
+    )
+    if proposal_fn(step, particles) != transition_fn(step, particles):
+        assertions += _assert_batch_shape_matches_weights(
+            distribution=transition_fn(step, particles),
+            weights_shape=ps.shape(log_weights),
+            diststr='proposal'
+        )
+
+    log_weights = (
+            observation_fn(step, state.particles).log_prob(tf.gather(observations, step))
+            + transition_fn(step, state.particles).log_prob(particles)
+            - log_weights)
+
+    log_weights = tf.nn.log_softmax(log_weights, axis=0)
+    with tf.control_dependencies(assertions):
+        return smc_kernel.WeightedParticles(
+            particles=particles,
+            log_weights=log_weights + _compute_observation_log_weights(
+                step + 1, particles, observations, observation_fn,
+                num_transitions_per_observation=num_transitions_per_observation)
+        )
+
+
+def _particle_filter_propose_and_update_log_weights_fn(
+        observations,
+        transition_fn,
+        proposal_fn,
+        observation_fn,
+        num_transitions_per_observation=1):
+    """Build a function specifying a particle filter update step."""
     if proposal_fn is None:
         proposal_fn = transition_fn
 
@@ -376,79 +532,32 @@ def particle_filter(observations,
             proposal_fn(step, state.particles).experimental_sample_and_log_prob(seed=seed)
         )
 
+        assertions = _assert_batch_shape_matches_weights(
+            distribution=transition_fn(step, particles),
+            weights_shape=ps.shape(log_weights),
+            diststr='transition'
+        )
+        if proposal_fn(step, particles) != transition_fn(step, particles):
+            assertions += _assert_batch_shape_matches_weights(
+                distribution=transition_fn(step, particles),
+                weights_shape=ps.shape(log_weights),
+                diststr='proposal'
+            )
+
         log_weights = (
                 observation_fn(step, state.particles).log_prob(tf.gather(observations, step))
                 + transition_fn(step, state.particles).log_prob(particles)
                 - log_weights)
-        return smc_kernel.WeightedParticles(particles, log_weights)
 
-
-    def sequential_monte_carlo(
-            initial_state,
-            propose_and_update_log_weights_fn,
-            condition_fn,
-            resample_fn,
-            resample_criterion_fn
-    ):
-        kernel = smc_kernel.SequentialMonteCarlo(
-            propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
-            resample_fn=resample_fn,
-            resample_criterion_fn=resample_criterion_fn,
-            unbiased_gradients=unbiased_gradients)
-
-        # Use `trace_scan` rather than `sample_chain` directly because the latter
-        # would force us to trace the state history (with or without thinning),
-        # which is not always appropriate.
-        def seeded_one_step(seed_state_results, _):
-          seed, state, results = seed_state_results
-          one_step_seed, next_seed = samplers.split_seed(seed)
-          next_state, next_results = kernel.one_step(
-              state, results, seed=one_step_seed)
-          return next_seed, next_state, next_results
-
-
-        final_seed_state_result, traced_results = loop_util.trace_scan(
-            loop_fn=seeded_one_step,
-            initial_state=(loop_seed,
-                           initial_state,
-                           kernel.bootstrap_results(initial_state)),
-            elems=tf.ones([num_timesteps]),
-            trace_fn=lambda seed_state_results: trace_fn(*seed_state_results[1:]),
-            trace_criterion_fn=(
-                lambda seed_state_results: trace_criterion_fn(  # pylint: disable=g-long-lambda
-                    *seed_state_results[1:])),
-            static_trace_allocation_size=static_trace_allocation_size,
-            parallel_iterations=parallel_iterations,
-            condition_fn=condition_fn
-        )
-
-        if trace_criterion_fn is never_trace:
-          # Return results from just the final step.
-          traced_results = trace_fn(*final_seed_state_result[1:])
-
-        return traced_results
-
-
-    traced_results = sequential_monte_carlo(
-        # Weighted particles weighted also considering the observations.
-        initial_state=smc_kernel.WeightedParticles(
-            particles=initial_particles,
-            log_weights=initial_log_weights + _compute_observation_log_weights(
-                step=0,
-                particles=initial_particles,
-                observations=observations,
-                observation_fn=observation_fn)
-        ),
-        propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
-        condition_fn=lambda step, state, num_traced, trace: step < len(observations),
-        resample_fn=resample_fn,
-        resample_criterion_fn=resample_criterion_fn,
-        # rejuvenation_fn=...,
-        # rejuvenation_criterion_fn=...,
-        # trace_fn=...,
-    )
-
-    return traced_results
+        log_weights = tf.nn.log_softmax(log_weights, axis=0)
+        with tf.control_dependencies(assertions):
+            return smc_kernel.WeightedParticles(
+                particles=particles,
+                log_weights=log_weights + _compute_observation_log_weights(
+                    step + 1, particles, observations, observation_fn,
+                    num_transitions_per_observation=num_transitions_per_observation)
+            )
+    return propose_and_update_log_weights_fn
 
 
 def _compute_observation_log_weights(step,
