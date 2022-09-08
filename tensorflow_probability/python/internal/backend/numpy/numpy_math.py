@@ -185,6 +185,12 @@ def _astuple(x):
   return x
 
 
+def _default_index_type():
+  if JAX_MODE and not jax.config.read('jax_enable_x64'):
+    return np.int32
+  return np.int64
+
+
 def _bincount(arr, weights=None, minlength=None, maxlength=None,  # pylint: disable=unused-argument
               dtype=np.int32, name=None):  # pylint: disable=unused-argument
   """Counts number of occurences of each value in `arr`."""
@@ -467,16 +473,16 @@ angle = utils.copy_docstring(
 
 argmax = utils.copy_docstring(
     'tf.math.argmax',
-    lambda input, axis=None, output_type=np.int64, name=None: (  # pylint: disable=g-long-lambda
+    lambda input, axis=None, output_type=None, name=None: (  # pylint: disable=g-long-lambda
         np.argmax(input, axis=0 if axis is None else int(axis))
-        .astype(utils.numpy_dtype(output_type))))
+        .astype(utils.numpy_dtype(output_type or _default_index_type()))))
 
 argmin = utils.copy_docstring(
     'tf.math.argmin',
-    lambda input, axis=None, output_type=np.int64, name=None: (  # pylint: disable=g-long-lambda
+    lambda input, axis=None, output_type=None, name=None: (  # pylint: disable=g-long-lambda
         np.argmin(_convert_to_tensor(
             input), axis=0 if axis is None else int(axis))
-        .astype(utils.numpy_dtype(output_type))))
+        .astype(utils.numpy_dtype(output_type or _default_index_type()))))
 
 asin = utils.copy_docstring(
     'tf.math.asin',
@@ -542,8 +548,9 @@ cosh = utils.copy_docstring(
 
 count_nonzero = utils.copy_docstring(
     'tf.math.count_nonzero',
-    lambda input, axis=None, keepdims=None, dtype=np.int64, name=None: (  # pylint: disable=g-long-lambda
-        utils.numpy_dtype(dtype)(np.count_nonzero(input, axis))))
+    lambda input, axis=None, keepdims=None, dtype=None, name=None: (  # pylint: disable=g-long-lambda
+        utils.numpy_dtype(dtype or _default_index_type())(
+            np.count_nonzero(input, axis))))
 
 cumprod = utils.copy_docstring(
     'tf.math.cumprod',
