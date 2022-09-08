@@ -17,7 +17,7 @@
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.internal.backend.numpy import tf_inspect
+from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [

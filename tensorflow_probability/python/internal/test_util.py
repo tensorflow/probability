@@ -34,7 +34,6 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import empirical_statistical_testing
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_combinations
-from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 from tensorflow_probability.python.util.deferred_tensor import TransformedVariable
 from tensorflow_probability.python.util.seed_stream import SeedStream
@@ -868,7 +867,7 @@ def numpy_disable_test_missing_functionality(issue_link):
     """Decorator."""
     if JAX_MODE:
       return test_fn_or_class
-    if tf.Variable != ops.NumpyVariable:
+    if not NUMPY_MODE:
       return test_fn_or_class
 
     reason = 'Test disabled for Numpy missing functionality: {}'.format(
@@ -912,7 +911,7 @@ def tf_tape_safety_test(test_fn):
   """Only run a test of TF2 tape safety against the TF backend."""
 
   def new_test(self, *args, **kwargs):
-    if JAX_MODE or (tf.Variable == ops.NumpyVariable):
+    if JAX_MODE or NUMPY_MODE:
       self.skipTest('Tape-safety tests are only run against TensorFlow.')
     return test_fn(self, *args, **kwargs)
 

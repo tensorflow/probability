@@ -181,7 +181,6 @@ multi_substrate_py_library(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tensor_util",
-        "//tensorflow_probability/python/internal/backend/numpy:tf_inspect",
     ],
 )
 
