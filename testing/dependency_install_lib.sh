@@ -49,6 +49,7 @@ for release, release_info in package_data['releases'].items():
 
   # Make sure there's a manylinux wheel file for given python_version.
   if not any(('manylinux' in wheel_info['filename'] and
+              'x86_64' in wheel_info['filename'] and
               wheel_info['python_version'] in pypi_version_str)
              for wheel_info in release_info):
     continue
