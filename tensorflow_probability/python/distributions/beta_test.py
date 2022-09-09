@@ -291,7 +291,7 @@ class BetaTest(test_util.TestCase):
 
   @parameterized.parameters((np.float32, 5e-3), (np.float64, 1e-4))
   def testBetaCdf(self, dt, rtol):
-    shape = (30, 40, 50)
+    shape = (30, 4, 5)
     a = 10. * np.random.random(shape).astype(dt)
     b = 10. * np.random.random(shape).astype(dt)
     x = np.random.random(shape).astype(dt)
@@ -305,8 +305,26 @@ class BetaTest(test_util.TestCase):
     self.assertAllEqual([0., 1.], self.evaluate(cdf))
 
   @parameterized.parameters((np.float32, 5e-3), (np.float64, 1e-4))
+  def testBetaQuantile(self, dt, rtol):
+    shape = (30, 4, 5)
+    a = 5. * np.random.random(shape).astype(dt)
+    b = 5. * np.random.random(shape).astype(dt)
+    p = np.random.uniform(low=0., high=1., size=shape).astype(dt)
+    quantile = tf.function(beta.Beta(a, b).quantile)
+    actual = self.evaluate(quantile(p))
+    # Pass f64 values to avoid errors in scipy.
+    self.assertAllClose(
+        sp_stats.beta.ppf(
+            p.astype(np.float64),
+            a.astype(np.float64),
+            b.astype(np.float64)),
+        actual,
+        rtol=rtol,
+        atol=1e-10)
+
+  @parameterized.parameters((np.float32, 5e-3), (np.float64, 1e-4))
   def testBetaLogCdf(self, dt, rtol):
-    shape = (30, 40, 50)
+    shape = (30, 4, 5)
     a = 10. * np.random.random(shape).astype(dt)
     b = 10. * np.random.random(shape).astype(dt)
     x = np.random.random(shape).astype(dt)

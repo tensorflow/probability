@@ -42,10 +42,10 @@ class StudentTTest(test_util.TestCase):
     student = student_t.StudentT(df, loc=mu, scale=-sigma, validate_args=True)
 
     log_pdf = student.log_prob(t)
-    self.assertEquals(log_pdf.shape, (6,))
+    self.assertAllEqual(log_pdf.shape, (6,))
     log_pdf_values = self.evaluate(log_pdf)
     pdf = student.prob(t)
-    self.assertEquals(pdf.shape, (6,))
+    self.assertAllEqual(pdf.shape, (6,))
     pdf_values = self.evaluate(pdf)
 
     expected_log_pdf = sp_stats.t.logpdf(t, df_v, loc=mu_v, scale=sigma_v)
@@ -92,10 +92,10 @@ class StudentTTest(test_util.TestCase):
     student = student_t.StudentT(df, loc=mu, scale=sigma, validate_args=True)
 
     log_cdf = student.log_cdf(t)
-    self.assertEquals(log_cdf.shape, (6,))
+    self.assertAllEqual(log_cdf.shape, (6,))
     log_cdf_values = self.evaluate(log_cdf)
     cdf = student.cdf(t)
-    self.assertEquals(cdf.shape, (6,))
+    self.assertAllEqual(cdf.shape, (6,))
     cdf_values = self.evaluate(cdf)
 
     expected_log_cdf = sp_stats.t.logcdf(t, df_v, loc=mu_v, scale=sigma_v)
@@ -106,6 +106,23 @@ class StudentTTest(test_util.TestCase):
     self.assertAllClose(expected_cdf, cdf_values, atol=0., rtol=1e-5)
     self.assertAllClose(
         np.exp(expected_log_cdf), cdf_values, atol=0., rtol=1e-5)
+
+  def testStudentQuantile(self):
+    batch_shape = (40, 1)
+    df = np.random.uniform(
+        low=0.5, high=10., size=batch_shape).astype(np.float32)
+    mu = 7. * np.ones(batch_shape, dtype=np.float32)
+    sigma = -8.
+    p = np.logspace(-4., -0.01, 20).astype(np.float32)
+    student = student_t.StudentT(
+        df, loc=mu, scale=sigma, validate_args=True)
+
+    quantile = student.quantile(p)
+    self.assertAllEqual(quantile.shape, (40, 20))
+    quantile_values = self.evaluate(quantile)
+
+    expected_quantile = sp_stats.t.ppf(p, df, loc=mu, scale=np.abs(sigma))
+    self.assertAllClose(expected_quantile, quantile_values, rtol=5e-4)
 
   def testStudentEntropy(self):
     df_v = np.array([[2., 3., 7.]])  # 1x3

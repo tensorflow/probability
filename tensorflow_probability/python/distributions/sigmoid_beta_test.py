@@ -176,6 +176,20 @@ class SigmoidBetaTest(test_util.TestCase):
         bijector=invert.Invert(sigmoid.Sigmoid())).cdf(x)
     self.assertAllClose(cdf, expected_cdf)
 
+  def testQuantile(self):
+    batch_shape = [6, 1]
+    a = 2. * np.ones(batch_shape, dtype=np.float32)
+    b = 3. * np.ones(batch_shape, dtype=np.float32)
+    p = np.logspace(-4., -0.01, 20).astype(np.float32)
+    dist = sigmoid_beta.SigmoidBeta(a, b, validate_args=True)
+    quantile = dist.quantile(p)
+    self.assertEqual(quantile.shape, (6, 20))
+
+    expected_quantile = transformed_distribution.TransformedDistribution(
+        distribution=beta.Beta(a, b),
+        bijector=invert.Invert(sigmoid.Sigmoid())).quantile(p)
+    self.assertAllClose(quantile, expected_quantile)
+
   def testMode(self):
     a = tf.constant(1.0)
     b = tf.constant(2.0)
