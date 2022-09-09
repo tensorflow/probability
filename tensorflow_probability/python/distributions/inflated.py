@@ -102,7 +102,7 @@ class _Inflated(mixture.Mixture):
             lambda logit: tf.stack([logit, -logit], axis=-1),
             dtype=self._inflated_loc_logits.dtype,
             shape=self._inflated_loc_logits.shape + (2,))
-        categorical_dist = categorical.Categorical(
+        self._categorical_dist = categorical.Categorical(
             logits=cat_logits,
             validate_args=validate_args,
             allow_nan_stats=allow_nan_stats)
@@ -116,14 +116,14 @@ class _Inflated(mixture.Mixture):
             dtype=self._inflated_loc_probs.dtype,
             shape=self._inflated_loc_probs.shape + (2,)
         )
-        categorical_dist = categorical.Categorical(
+        self._categorical_dist = categorical.Categorical(
             probs=cat_probs,
             validate_args=validate_args,
             allow_nan_stats=allow_nan_stats)
         probs_or_logits = self._inflated_loc_probs
 
       super(_Inflated, self).__init__(
-          cat=categorical_dist,
+          cat=self._categorical_dist,
           components=[
               deterministic.Deterministic(
                   DeferredTensor(
@@ -150,6 +150,24 @@ class _Inflated(mixture.Mixture):
             is_preferred=False
         ),
         inflated_loc=parameter_properties.ParameterProperties())
+
+  def _log_prob(self, x):
+    # We override the log_prob implementation from Mixture in the case
+    # where we are inflating a continuous distribution, because we have
+    # found that this "censored" version gives a good maximum likelihood
+    # estimate of the continuous distribution's parameters but the
+    # default implementation doesn't.  This follows the proposal in
+    # https://arxiv.org/pdf/2010.09647.pdf for summing distributions of
+    # different Hausdorff dimension.
+    if isinstance(self._distribution,
+                  distribution_lib.DiscreteDistributionMixin):
+      return super(_Inflated, self)._log_prob(x)
+    else:
+      return tf.where(
+          tf.equal(x, self._inflated_loc),
+          self._categorical_dist.log_prob(0),
+          self._categorical_dist.log_prob(1) +
+          self._distribution.log_prob(x))
 
   @property
   def distribution(self):

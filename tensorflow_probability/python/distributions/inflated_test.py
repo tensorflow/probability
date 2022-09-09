@@ -59,6 +59,18 @@ class DistributionsTest(test_util.TestCase):
     samples = zinb.sample(seed=test_util.test_seed())
     self.assertEqual((5,), samples.shape)
 
+  def test_inflated_continuous_log_prob(self):
+    spike_and_slab = inflated.Inflated(
+        normal.Normal(loc=1.0, scale=2.0), inflated_loc_probs=0.1)
+    self.assertEqual(self.evaluate(tf.math.log(0.1)),
+                     self.evaluate(spike_and_slab.log_prob(0.0)))
+    self.assertNear(
+        self.evaluate(tf.math.log(0.9) + normal.Normal(
+            loc=1.0, scale=2.0).log_prob(2.0)),
+        self.evaluate(spike_and_slab.log_prob(2.0)),
+        1e-6
+    )
+
   def test_inflated_factory(self):
     spike_and_slab_class = inflated.inflated_factory('SpikeAndSlab',
                                                      normal.Normal, 0.0)
