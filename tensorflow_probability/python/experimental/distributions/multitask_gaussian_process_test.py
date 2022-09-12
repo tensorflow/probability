@@ -382,6 +382,33 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
         self.evaluate(actual_multitask_var),
         self.evaluate(multitask_var), rtol=4e-3)
 
+  def testLogProbValidateArgs(self):
+    index_points = np.linspace(-4., 4., 10, dtype=np.float32)
+    index_points = np.reshape(index_points, [-1, 2])
+
+    observation_noise_variance = 1e-4
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic()
+    multi_task_kernel = multitask_kernel.Independent(
+        num_tasks=3, base_kernel=kernel)
+    multitask_gp = multitask_gaussian_process.MultiTaskGaussianProcess(
+        multi_task_kernel,
+        index_points,
+        observation_noise_variance=observation_noise_variance,
+        validate_args=True)
+
+    with self.assertRaisesRegexp(ValueError, 'match the number of tasks'):
+      observations = np.linspace(-1., 1., 15).astype(np.float32)
+      multitask_gp.log_prob(observations)
+
+    with self.assertRaisesRegexp(ValueError, 'match the number of tasks'):
+      observations = np.linspace(-1., 1., 20).reshape(5, 4).astype(np.float32)
+      multitask_gp.log_prob(observations)
+
+    with self.assertRaisesRegexp(
+        ValueError, 'match the second to last dimension'):
+      observations = np.linspace(-1., 1., 18).reshape(6, 3).astype(np.float32)
+      multitask_gp.log_prob(observations)
+
   def testLogProbMatchesGP(self):
     # Check that the independent kernel parameterization matches using a
     # single-task GP.

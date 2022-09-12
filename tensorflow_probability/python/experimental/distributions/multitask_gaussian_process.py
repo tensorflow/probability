@@ -32,6 +32,7 @@ from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 def _vec(x):
@@ -447,7 +448,45 @@ class MultiTaskGaussianProcess(distribution.AutoCompositeTensorDistribution):
     return tf.convert_to_tensor(
         index_points if index_points is not None else self._index_points)
 
+  def _check_observations_valid(self, observations, index_points):
+    observation_rank = tensorshape_util.rank(observations.shape)
+
+    if observation_rank is None:
+      return
+
+    if observation_rank >= 1:
+      # Check that the last dimension of observations matches the number of
+      # tasks.
+      num_observations = tf.compat.dimension_value(observations.shape[-1])
+      if (num_observations is not None and
+          num_observations != 1 and
+          num_observations != self.kernel.num_tasks):
+        raise ValueError(
+            f'Expected the number of observations {num_observations} '
+            f'to broadcast / match the number of tasks '
+            f'{self.kernel.num_tasks}')
+
+    if observation_rank >= 2:
+      num_index_points = tf.compat.dimension_value(observations.shape[-2])
+
+      expected_num_index_points = index_points.shape[
+          -(self.kernel.feature_ndims + 1)]
+      if (num_index_points is not None and
+          expected_num_index_points is not None and
+          num_index_points != 1 and
+          num_index_points != expected_num_index_points):
+        raise ValueError(
+            f'Expected number of index points '
+            f'{expected_num_index_points} to broadcast / match the second '
+            f'to last dimension of `observations` {num_index_points}')
+
   def _log_prob(self, value, index_points=None):
+    # Check that observations with at least 2 dimensions have
+    # shape that's broadcastable to `[N, T]`, where `N` is the number
+    # of index points, and T the number of tasks.
+    index_points = self._get_index_points(index_points)
+    self._check_observations_valid(value, index_points)
+
     return self._get_flattened_marginal_distribution(
         index_points=index_points).log_prob(_vec(value))
 
