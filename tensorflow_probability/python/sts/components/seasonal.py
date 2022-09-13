@@ -304,10 +304,12 @@ class ConstrainedSeasonalStateSpaceModel(
     we've defined the invertible linear reparameterization `Z = R E`, where
 
     ```
-    R = [1 - 1/N, -1/N,    ..., -1/N
-         -1/N,    1 - 1/N, ..., -1/N,
+    R = [1 - 1/N, -1/N,    ..., -1/N,      -1/N
+         -1/N,    1 - 1/N, ..., -1/N,      -1/N
          ...
-         1/N,     1/N,     ...,  1/N]
+         -1/N,    -1/N,    ...,  1/ - 1/N, -1/N
+         1/N,     1/N,     ...,  1/N,       1/N]
+    E = [e_1, ..., e_(N-1), z_N]
     ```
 
     represents the change of basis from 'effect coordinates' E to
