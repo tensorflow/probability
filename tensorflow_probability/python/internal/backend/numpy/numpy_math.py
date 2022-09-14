@@ -964,7 +964,7 @@ softsign = utils.copy_docstring(
 
 sqrt = utils.copy_docstring(
     'tf.math.sqrt',
-    lambda x, name=None: np.sqrt(x))
+    lambda x, name=None: np.sqrt(_convert_to_tensor(x)))
 
 square = utils.copy_docstring(
     'tf.math.square',

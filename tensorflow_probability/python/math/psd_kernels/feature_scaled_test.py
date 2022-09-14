@@ -19,6 +19,7 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic
 from tensorflow_probability.python.math.psd_kernels import feature_scaled
@@ -50,7 +51,7 @@ class _FeatureScaledTest(test_util.TestCase):
     # Use 3 feature_ndims.
     kernel = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude, inner_length_scale, feature_ndims=3)
-    scale_diag = tf.ones([20, 1, 2, 1, 1, 1])
+    scale_diag = tf.ones([20, 1, 2, 1, 1, 1], dtype=self.dtype)
     ard_kernel = feature_scaled.FeatureScaled(kernel, scale_diag=scale_diag)
     self.assertAllEqual([20, 10, 2], ard_kernel.batch_shape)
     self.assertAllEqual(
@@ -77,6 +78,7 @@ class _FeatureScaledTest(test_util.TestCase):
         2, 5, size=([3, 1, 2] + input_shape)).astype(self.dtype)
 
     ard_kernel = feature_scaled.FeatureScaled(kernel, scale_diag=length_scale)
+    self.assertIs(dtype_util.as_numpy_dtype(ard_kernel.dtype), self.dtype)
 
     x = np.random.uniform(-1, 1, size=input_shape).astype(self.dtype)
     y = np.random.uniform(-1, 1, size=input_shape).astype(self.dtype)
