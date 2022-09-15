@@ -14,8 +14,7 @@
 # ============================================================================
 """Adaptive MALT implementation."""
 
-from collections.abc import Mapping
-from typing import Any, Dict, Optional, NamedTuple, Tuple, Union
+from typing import Any, Dict, Optional, Mapping, NamedTuple, Tuple, Union
 
 import gin
 import immutabledict
