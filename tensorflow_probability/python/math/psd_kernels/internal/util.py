@@ -204,7 +204,7 @@ def pairwise_square_distance_matrix(x1, x2, feature_ndims):
 
   The latter term can be written as a matmul between `x1` and `x2`.
   This reduces the memory from the naive approach of computing the
-  squared difference of `x1` and `x2` by a factor of `(prod_k D_k) ** 2`.
+  squared difference of `x1` and `x2` by a factor of `prod_k D_k`.
   This is at the cost of the computation being more numerically unstable.
 
   Args:
