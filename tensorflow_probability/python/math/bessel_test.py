@@ -71,8 +71,8 @@ class BesselIvRatioTest(test_util.TestCase):
 
   def testBesselIvRatioVAndZSmall(self):
     seed_stream = test_util.test_seed_stream()
-    z = tf.random.uniform([int(1e5)], seed=seed_stream())
-    v = tf.random.uniform([int(1e5)], seed=seed_stream())
+    z = tf.random.uniform([int(1e3)], seed=seed_stream())
+    v = tf.random.uniform([int(1e3)], seed=seed_stream())
     # When both values are small, both the scipy ratio and
     # the computation become numerically unstable.
     # Anecdotally (when comparing to mpmath) the computation is more often
@@ -90,16 +90,16 @@ class BesselIvRatioTest(test_util.TestCase):
 
   def testBesselIvRatioVAndZMedium(self):
     seed_stream = test_util.test_seed_stream()
-    z = tf.random.uniform([int(1e5)], 1., 10., seed=seed_stream())
-    v = tf.random.uniform([int(1e5)], 1., 10., seed=seed_stream())
+    z = tf.random.uniform([int(1e3)], 1., 10., seed=seed_stream())
+    v = tf.random.uniform([int(1e3)], 1., 10., seed=seed_stream())
     self.VerifyBesselIvRatio(v, z, rtol=7e-6)
 
   def testBesselIvRatioVAndZLarge(self):
     seed_stream = test_util.test_seed_stream()
     # Use 50 as a cap. It's been observed that for v > 50, that
     # the scipy ratio can be quite wrong compared to mpmath.
-    z = tf.random.uniform([int(1e5)], 10., 50., seed=seed_stream())
-    v = tf.random.uniform([int(1e5)], 10., 50., seed=seed_stream())
+    z = tf.random.uniform([int(1e3)], 10., 50., seed=seed_stream())
+    v = tf.random.uniform([int(1e3)], 10., 50., seed=seed_stream())
 
     # For large v, z, scipy can return NaN values. Filter those out.
     bessel_iv_ratio, v, z = self.evaluate([bessel.bessel_iv_ratio(v, z), v, z])
@@ -120,16 +120,16 @@ class BesselIvRatioTest(test_util.TestCase):
 
   def testBesselIvRatioVLessThanZ(self):
     seed_stream = test_util.test_seed_stream()
-    z = tf.random.uniform([int(1e5)], 1., 10., seed=seed_stream())
+    z = tf.random.uniform([int(1e3)], 1., 10., seed=seed_stream())
     # Make v randomly less than z
-    v = z * tf.random.uniform([int(1e5)], 0.1, 0.5, seed=seed_stream())
+    v = z * tf.random.uniform([int(1e3)], 0.1, 0.5, seed=seed_stream())
     self.VerifyBesselIvRatio(v, z, rtol=6e-6)
 
   def testBesselIvRatioVGreaterThanZ(self):
     seed_stream = test_util.test_seed_stream()
-    v = tf.random.uniform([int(1e5)], 1., 10., seed=seed_stream())
+    v = tf.random.uniform([int(1e3)], 1., 10., seed=seed_stream())
     # Make z randomly less than v
-    z = v * tf.random.uniform([int(1e5)], 0.1, 0.5, seed=seed_stream())
+    z = v * tf.random.uniform([int(1e3)], 0.1, 0.5, seed=seed_stream())
     self.VerifyBesselIvRatio(v, z, rtol=1e-6)
 
   @test_util.numpy_disable_gradient_test
@@ -208,8 +208,8 @@ class BesselIveTest(test_util.TestCase):
   )
   def testBesselIveVAndZSmall(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
-    z = tf.random.uniform([int(1e5)], seed=seed_stream(), dtype=dtype)
-    v = tf.random.uniform([int(1e5)], seed=seed_stream(), dtype=dtype)
+    z = tf.random.uniform([int(1e3)], seed=seed_stream(), dtype=dtype)
+    v = tf.random.uniform([int(1e3)], seed=seed_stream(), dtype=dtype)
     self.VerifyBesselIve(v, z, rtol=rtol)
 
   @parameterized.named_parameters(
@@ -219,8 +219,8 @@ class BesselIveTest(test_util.TestCase):
   def testBesselIveZTiny(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
     z = tf.random.uniform(
-        [int(1e5)], 1e-13, 1e-6, seed=seed_stream(), dtype=dtype)
-    v = tf.random.uniform([int(1e5)], 0., 10., seed=seed_stream(), dtype=dtype)
+        [int(1e3)], 1e-13, 1e-6, seed=seed_stream(), dtype=dtype)
+    v = tf.random.uniform([int(1e3)], 0., 10., seed=seed_stream(), dtype=dtype)
     self.VerifyBesselIve(v, z, rtol=rtol, atol=1e-7)
 
   @parameterized.named_parameters(
@@ -229,8 +229,8 @@ class BesselIveTest(test_util.TestCase):
   )
   def testBesselIveVAndZMedium(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
-    z = tf.random.uniform([int(1e5)], 1., 10., seed=seed_stream(), dtype=dtype)
-    v = tf.random.uniform([int(1e5)], 1., 10., seed=seed_stream(), dtype=dtype)
+    z = tf.random.uniform([int(1e3)], 1., 10., seed=seed_stream(), dtype=dtype)
+    v = tf.random.uniform([int(1e3)], 1., 10., seed=seed_stream(), dtype=dtype)
     self.VerifyBesselIve(v, z, rtol=rtol)
 
   @parameterized.named_parameters(
@@ -239,8 +239,8 @@ class BesselIveTest(test_util.TestCase):
   )
   def testBesselIveVAndZLarge(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
-    z = tf.random.uniform([int(1e5)], 10., 50., seed=seed_stream(), dtype=dtype)
-    v = tf.random.uniform([int(1e5)], 10., 50., seed=seed_stream(), dtype=dtype)
+    z = tf.random.uniform([int(1e3)], 10., 50., seed=seed_stream(), dtype=dtype)
+    v = tf.random.uniform([int(1e3)], 10., 50., seed=seed_stream(), dtype=dtype)
     self.VerifyBesselIve(v, z, rtol=rtol)
 
   @parameterized.named_parameters(
@@ -250,9 +250,9 @@ class BesselIveTest(test_util.TestCase):
   def testBesselIveVAndZVeryLarge(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
     z = tf.random.uniform(
-        [int(1e5)], 50., 100., seed=seed_stream(), dtype=dtype)
+        [int(1e3)], 50., 100., seed=seed_stream(), dtype=dtype)
     v = tf.random.uniform(
-        [int(1e5)], 50., 100., seed=seed_stream(), dtype=dtype)
+        [int(1e3)], 50., 100., seed=seed_stream(), dtype=dtype)
     self.VerifyBesselIve(v, z, rtol=rtol)
 
   @parameterized.named_parameters(
@@ -261,10 +261,10 @@ class BesselIveTest(test_util.TestCase):
   )
   def testBesselIveVLessThanZ(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
-    z = tf.random.uniform([int(1e5)], 1., 10., seed=seed_stream(), dtype=dtype)
+    z = tf.random.uniform([int(1e3)], 1., 10., seed=seed_stream(), dtype=dtype)
     # Make v randomly less than z
     v = z * tf.random.uniform(
-        [int(1e5)], 0.1, 0.5, seed=seed_stream(), dtype=dtype)
+        [int(1e3)], 0.1, 0.5, seed=seed_stream(), dtype=dtype)
     self.VerifyBesselIve(v, z, rtol=rtol)
 
   @parameterized.named_parameters(
@@ -273,10 +273,10 @@ class BesselIveTest(test_util.TestCase):
   )
   def testBesselIveVGreaterThanZ(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
-    v = tf.random.uniform([int(1e5)], 1., 10., seed=seed_stream(), dtype=dtype)
+    v = tf.random.uniform([int(1e3)], 1., 10., seed=seed_stream(), dtype=dtype)
     # Make z randomly less than v
     z = v * tf.random.uniform(
-        [int(1e5)], 0.1, 0.5, seed=seed_stream(), dtype=dtype)
+        [int(1e3)], 0.1, 0.5, seed=seed_stream(), dtype=dtype)
     self.VerifyBesselIve(v, z, rtol=rtol)
 
   @parameterized.named_parameters(
@@ -286,8 +286,8 @@ class BesselIveTest(test_util.TestCase):
   def testBesselIveVNegative(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
     v = tf.random.uniform(
-        [int(1e5)], -10., -1., seed=seed_stream(), dtype=dtype)
-    z = tf.random.uniform([int(1e5)], 1., 15., seed=seed_stream(), dtype=dtype)
+        [int(1e3)], -10., -1., seed=seed_stream(), dtype=dtype)
+    z = tf.random.uniform([int(1e3)], 1., 15., seed=seed_stream(), dtype=dtype)
     self.VerifyBesselIve(v, z, rtol=rtol)
 
   @parameterized.named_parameters(
@@ -297,7 +297,7 @@ class BesselIveTest(test_util.TestCase):
   def testBesselIveVZero(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
     v = tf.constant(0., dtype=dtype)
-    z = tf.random.uniform([int(1e5)], 1., 15., seed=seed_stream(), dtype=dtype)
+    z = tf.random.uniform([int(1e3)], 1., 15., seed=seed_stream(), dtype=dtype)
     self.VerifyBesselIve(v, z, rtol=rtol)
 
   @parameterized.named_parameters(
@@ -307,9 +307,9 @@ class BesselIveTest(test_util.TestCase):
   def testBesselIveLargeZ(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
     v = tf.random.uniform(
-        [int(1e5)], minval=0., maxval=0.5, seed=seed_stream(), dtype=dtype)
+        [int(1e3)], minval=0., maxval=0.5, seed=seed_stream(), dtype=dtype)
     z = tf.random.uniform(
-        [int(1e5)], minval=100., maxval=10000., seed=seed_stream(), dtype=dtype)
+        [int(1e3)], minval=100., maxval=10000., seed=seed_stream(), dtype=dtype)
     self.VerifyBesselIve(v, z, rtol=rtol)
 
   @test_util.numpy_disable_gradient_test
@@ -343,9 +343,9 @@ class BesselIveTest(test_util.TestCase):
   def testLogBesselIveCorrect(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
     v = tf.random.uniform(
-        [int(1e5)], minval=0.1, maxval=0.5, seed=seed_stream(), dtype=dtype)
+        [int(1e3)], minval=0.1, maxval=0.5, seed=seed_stream(), dtype=dtype)
     z = tf.random.uniform(
-        [int(1e5)], minval=1., maxval=10., seed=seed_stream(), dtype=dtype)
+        [int(1e3)], minval=1., maxval=10., seed=seed_stream(), dtype=dtype)
     _, _, log_bessel_ive_expected_, log_bessel_ive_actual_ = self.evaluate([
         v, z,
         tf.math.log(bessel.bessel_ive(v, z)),
@@ -464,8 +464,8 @@ class BesselKveTest(test_util.TestCase):
   )
   def testBesselKveVAndZSmall(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
-    z = tf.random.uniform([int(1e5)], seed=seed_stream(), dtype=dtype)
-    v = tf.random.uniform([int(1e5)], seed=seed_stream(), dtype=dtype)
+    z = tf.random.uniform([int(1e3)], seed=seed_stream(), dtype=dtype)
+    v = tf.random.uniform([int(1e3)], seed=seed_stream(), dtype=dtype)
     self.VerifyBesselKve(v, z, rtol=rtol)
 
   @parameterized.named_parameters(
@@ -474,8 +474,8 @@ class BesselKveTest(test_util.TestCase):
   )
   def testBesselKveVAndZMedium(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
-    z = tf.random.uniform([int(1e5)], 1., 10., seed=seed_stream(), dtype=dtype)
-    v = tf.random.uniform([int(1e5)], 1., 10., seed=seed_stream(), dtype=dtype)
+    z = tf.random.uniform([int(1e3)], 1., 10., seed=seed_stream(), dtype=dtype)
+    v = tf.random.uniform([int(1e3)], 1., 10., seed=seed_stream(), dtype=dtype)
     self.VerifyBesselKve(v, z, rtol=rtol)
 
   @parameterized.named_parameters(
@@ -484,8 +484,8 @@ class BesselKveTest(test_util.TestCase):
   )
   def testBesselKveVAndZLarge(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
-    z = tf.random.uniform([int(1e5)], 10., 50., seed=seed_stream(), dtype=dtype)
-    v = tf.random.uniform([int(1e5)], 10., 50., seed=seed_stream(), dtype=dtype)
+    z = tf.random.uniform([int(1e3)], 10., 50., seed=seed_stream(), dtype=dtype)
+    v = tf.random.uniform([int(1e3)], 10., 50., seed=seed_stream(), dtype=dtype)
     self.VerifyBesselKve(v, z, rtol=rtol)
 
   @parameterized.named_parameters(
@@ -494,10 +494,10 @@ class BesselKveTest(test_util.TestCase):
   )
   def testBesselKveVLessThanZ(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
-    z = tf.random.uniform([int(1e5)], 1., 10., seed=seed_stream(), dtype=dtype)
+    z = tf.random.uniform([int(1e3)], 1., 10., seed=seed_stream(), dtype=dtype)
     # Make v randomly less than z
     v = z * tf.random.uniform(
-        [int(1e5)], 0.1, 0.5, seed=seed_stream(), dtype=dtype)
+        [int(1e3)], 0.1, 0.5, seed=seed_stream(), dtype=dtype)
     self.VerifyBesselKve(v, z, rtol=rtol)
 
   @parameterized.named_parameters(
@@ -506,10 +506,10 @@ class BesselKveTest(test_util.TestCase):
   )
   def testBesselKveVGreaterThanZ(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
-    v = tf.random.uniform([int(1e5)], 1., 10., seed=seed_stream(), dtype=dtype)
+    v = tf.random.uniform([int(1e3)], 1., 10., seed=seed_stream(), dtype=dtype)
     # Make z randomly less than v
     z = v * tf.random.uniform(
-        [int(1e5)], 0.1, 0.5, seed=seed_stream(), dtype=dtype)
+        [int(1e3)], 0.1, 0.5, seed=seed_stream(), dtype=dtype)
     self.VerifyBesselKve(v, z, rtol=rtol)
 
   @parameterized.named_parameters(
@@ -519,8 +519,8 @@ class BesselKveTest(test_util.TestCase):
   def testBesselKveVNegative(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
     v = tf.random.uniform(
-        [int(1e5)], -10., -1., seed=seed_stream(), dtype=dtype)
-    z = tf.random.uniform([int(1e5)], 1., 15., seed=seed_stream(), dtype=dtype)
+        [int(1e3)], -10., -1., seed=seed_stream(), dtype=dtype)
+    z = tf.random.uniform([int(1e3)], 1., 15., seed=seed_stream(), dtype=dtype)
     self.VerifyBesselKve(v, z, rtol=rtol)
 
   @parameterized.named_parameters(
@@ -530,9 +530,9 @@ class BesselKveTest(test_util.TestCase):
   def testBesselKveLargeZ(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
     v = tf.random.uniform(
-        [int(1e5)], minval=0., maxval=0.5, seed=seed_stream(), dtype=dtype)
+        [int(1e3)], minval=0., maxval=0.5, seed=seed_stream(), dtype=dtype)
     z = tf.random.uniform(
-        [int(1e5)], minval=100., maxval=10000., seed=seed_stream(), dtype=dtype)
+        [int(1e3)], minval=100., maxval=10000., seed=seed_stream(), dtype=dtype)
     self.VerifyBesselKve(v, z, rtol=rtol)
 
   @test_util.numpy_disable_gradient_test
@@ -555,9 +555,9 @@ class BesselKveTest(test_util.TestCase):
   def testLogBesselKveCorrect(self, dtype, rtol, atol=1e-6):
     seed_stream = test_util.test_seed_stream()
     v = tf.random.uniform(
-        [int(1e5)], minval=0.1, maxval=0.5, seed=seed_stream(), dtype=dtype)
+        [int(1e3)], minval=0.1, maxval=0.5, seed=seed_stream(), dtype=dtype)
     z = tf.random.uniform(
-        [int(1e5)], minval=1., maxval=10., seed=seed_stream(), dtype=dtype)
+        [int(1e3)], minval=1., maxval=10., seed=seed_stream(), dtype=dtype)
     _, _, log_bessel_kve_expected_, log_bessel_kve_actual_ = self.evaluate([
         v, z,
         tf.math.log(bessel.bessel_kve(v, z)),

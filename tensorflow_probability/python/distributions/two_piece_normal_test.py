@@ -17,6 +17,7 @@
 import itertools
 
 # Dependency imports
+from absl.testing import parameterized
 import numpy as np
 
 import tensorflow.compat.v2 as tf
@@ -28,7 +29,7 @@ from tensorflow.python.framework import test_util as tf_test_util  # pylint: dis
 
 
 @test_util.test_all_tf_execution_regimes
-class _TwoPieceNormalTest(object):
+class _TwoPieceNormalTest(parameterized.TestCase):
 
   def make_two_piece_normal(self):
     if self.dtype is np.float32:
@@ -280,7 +281,8 @@ class _TwoPieceNormalTest(object):
     self.assertAllClose(mode, expected_mode)
 
   @test_util.numpy_disable_gradient_test
-  def testFiniteGradientAtDifficultPoints(self):
+  @parameterized.parameters(0.75, 1., 1.33)
+  def testFiniteGradientAtDifficultPoints(self, skewness):
     def make_fn(attr):
       x = np.array([-100, -20, -5., 0., 5., 20, 100]).astype(self.dtype)
       return lambda m, s, g: getattr(  # pylint: disable=g-long-lambda
@@ -300,19 +302,19 @@ class _TwoPieceNormalTest(object):
     # * Implementing the cdf method using the Gamma distribution function; and
     # * Implementing the cdf method using the Student's t distribution function
     #   when value < loc.
-    for skewness in [0.75, 1., 1.33]:
-      for attr in ('prob', 'cdf', 'survival_function', 'log_prob'):
-        value, grads = self.evaluate(
-            gradient.value_and_gradient(
-                make_fn(attr),
-                [loc, scale, tf.constant(skewness, self.dtype)]))
-        self.assertAllFinite(value)
-        self.assertAllFinite(grads[0])  # d/d loc
-        self.assertAllFinite(grads[1])  # d/d scale
-        self.assertAllFinite(grads[2])  # d/d skewness
+    for attr in ('prob', 'cdf', 'survival_function', 'log_prob'):
+      value, grads = self.evaluate(
+          gradient.value_and_gradient(
+              make_fn(attr),
+              [loc, scale, tf.constant(skewness, self.dtype)]))
+      self.assertAllFinite(value)
+      self.assertAllFinite(grads[0])  # d/d loc
+      self.assertAllFinite(grads[1])  # d/d scale
+      self.assertAllFinite(grads[2])  # d/d skewness
 
   @test_util.numpy_disable_gradient_test
-  def testQuantileFiniteGradientAtDifficultPoints(self):
+  @parameterized.parameters(0.75, 1., 1.33)
+  def testQuantileFiniteGradientAtDifficultPoints(self, skewness):
     def quantile(loc, scale, skewness, probs):
       dist = two_piece_normal.TwoPieceNormal(
           loc, scale=scale, skewness=skewness, validate_args=True)
@@ -325,18 +327,18 @@ class _TwoPieceNormalTest(object):
         [np.exp(x), np.exp(-2.), 1. - np.exp(-2.), 1. - np.exp(x)],
         dtype=self.dtype)
 
-    for skewness in [0.75, 1., 1.33]:
-      value, grads = gradient.value_and_gradient(
-          quantile,
-          [loc, scale, tf.constant(skewness, self.dtype), probs])
-      self.assertAllFinite(value)
-      self.assertAllFinite(grads[0])  # d/d loc
-      self.assertAllFinite(grads[1])  # d/d scale
-      self.assertAllFinite(grads[2])  # d/d skewness
-      self.assertAllFinite(grads[3])  # d/d probs
+    value, grads = gradient.value_and_gradient(
+        quantile,
+        [loc, scale, tf.constant(skewness, self.dtype), probs])
+    self.assertAllFinite(value)
+    self.assertAllFinite(grads[0])  # d/d loc
+    self.assertAllFinite(grads[1])  # d/d scale
+    self.assertAllFinite(grads[2])  # d/d skewness
+    self.assertAllFinite(grads[3])  # d/d probs
 
   @test_util.numpy_disable_gradient_test
-  def testFullyReparameterized(self):
+  @parameterized.parameters(0.75, 1., 1.33)
+  def testFullyReparameterized(self, skewness):
     n = 100
     def sampler(loc, scale, skewness):
       dist = two_piece_normal.TwoPieceNormal(
@@ -346,18 +348,18 @@ class _TwoPieceNormalTest(object):
     loc = tf.constant(0., self.dtype)
     scale = tf.constant(1., self.dtype)
 
-    for skewness in [0.75, 1., 1.33]:
-      _, grads = gradient.value_and_gradient(
-          sampler, [loc, scale, tf.constant(skewness, self.dtype)])
-      self.assertIsNotNone(grads[0])  # d/d loc
-      self.assertIsNotNone(grads[1])  # d/d scale
-      self.assertIsNotNone(grads[2])  # d/d skewness
+    _, grads = gradient.value_and_gradient(
+        sampler, [loc, scale, tf.constant(skewness, self.dtype)])
+    self.assertIsNotNone(grads[0])  # d/d loc
+    self.assertIsNotNone(grads[1])  # d/d scale
+    self.assertIsNotNone(grads[2])  # d/d skewness
 
   @test_util.numpy_disable_gradient_test
-  def testDifferentiableSampleNumerically(self):
+  @parameterized.parameters(0.75, 1., 1.33)
+  def testDifferentiableSampleNumerically(self, skewness):
     """Test the gradients of the samples w.r.t. skewness."""
-    sample_shape = [int(2e5)]
-    seed = test_util.test_seed()
+    sample_shape = [int(2e3)]
+    seed = test_util.test_seed(sampler_type='stateless')
 
     def get_abs_sample_mean(skewness):
       loc = tf.constant(0., self.dtype)
@@ -366,15 +368,15 @@ class _TwoPieceNormalTest(object):
           loc, scale=scale, skewness=skewness, validate_args=True)
       return tf.reduce_mean(tf.abs(dist.sample(sample_shape, seed=seed)))
 
-    for skewness in [0.75, 1., 1.33]:
-      err = self.compute_max_gradient_error(
-          get_abs_sample_mean, [tf.constant(skewness, self.dtype)], delta=0.1)
-      self.assertLess(err, 0.05)
+    err = self.compute_max_gradient_error(
+        get_abs_sample_mean, [tf.constant(skewness, self.dtype)], delta=1e-1)
+    maxerr = 0.05 if self.dtype == np.float64 else 0.09
+    self.assertLess(err, maxerr)
 
   @test_util.numpy_disable_gradient_test
   def testDifferentiableSampleAnalytically(self):
     """Test the gradients of the samples w.r.t. loc and scale."""
-    n = 100
+    n = 10
     sample_shape = [n, n]
     n_samples = np.prod(sample_shape)
 
@@ -453,7 +455,7 @@ class _TwoPieceNormalTest(object):
         tf.ones([2, 3], dtype=self.dtype), shape=tf.TensorShape(None))
     self.evaluate(skewness.initializer)
 
-    with self.assertRaisesRegexp(Exception, r'compatible shapes'):
+    with self.assertRaisesRegex(Exception, r'compatible shapes'):
       dist = two_piece_normal.TwoPieceNormal(
           loc=tf.zeros([4, 1], dtype=self.dtype),
           scale=tf.ones([4, 1], dtype=self.dtype),
@@ -504,6 +506,8 @@ class TwoPieceNormalTestDynamicShapeFloat64(test_util.TestCase,
                                             _TwoPieceNormalTest):
   dtype = np.float64
   use_static_shape = False
+
+del _TwoPieceNormalTest
 
 
 if __name__ == '__main__':

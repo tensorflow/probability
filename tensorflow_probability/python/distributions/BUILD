@@ -4503,8 +4503,10 @@ multi_substrate_py_test(
     name = "two_piece_normal_test",
     size = "medium",
     srcs = ["two_piece_normal_test.py"],
+    shard_count = 4,
     deps = [
         ":two_piece_normal",
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",

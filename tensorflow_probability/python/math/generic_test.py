@@ -625,7 +625,6 @@ class SoftSortingMatrixTest(test_util.TestCase):
     self.assertAllClose(expected_sort, actual_sort_)
 
 
-@test_util.test_all_tf_execution_regimes
 class _KahanSumTest(test_util.TestCase):
 
   @parameterized.named_parameters(
@@ -693,6 +692,7 @@ class KahanSumJitTest(_KahanSumTest):
   jit = True
 
 
+@test_util.test_all_tf_execution_regimes
 class KahanSumTest(_KahanSumTest):
   jit = False
 

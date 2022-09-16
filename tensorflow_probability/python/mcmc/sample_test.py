@@ -48,6 +48,7 @@ from tensorflow_probability.python.mcmc.sample import sample_chain
 from tensorflow_probability.python.random.random_ops import rayleigh
 
 
+JAX_MODE = False
 NUMPY_MODE = False
 
 TestTransitionKernelResults = collections.namedtuple(
@@ -109,6 +110,12 @@ class SampleChainTest(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test('HMC')
   def testChainWorksCorrelatedMultivariate(self):
+
+    # Disabling this test in eager mode as it is very slow.
+    # Other tests check eager behavior, so we can safely disable this test.
+    if tf.executing_eagerly() and not JAX_MODE:
+      return
+
     dtype = np.float32
     true_mean = dtype([0, 0])
     true_cov = dtype([[1, 0.5],
@@ -135,8 +142,7 @@ class SampleChainTest(test_util.TestCase):
         num_steps_between_results=1,
         trace_fn=None,
         seed=test_util.test_seed())
-    if not tf.executing_eagerly():
-      self.assertAllEqual(dict(target_calls=2), counter)
+    self.assertAllEqual(dict(target_calls=2), counter)
     states = tf.stack(states, axis=-1)
     self.assertEqual(num_results, tf.compat.dimension_value(states.shape[0]))
     sample_mean = tf.reduce_mean(states, axis=0)

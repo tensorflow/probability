@@ -514,31 +514,12 @@ class BetaincTest(test_util.TestCase):
     def betainc_partials(a, b, x):
       return gradient.value_and_gradient(special.betainc, [a, b, x])[1]
 
-    def betainc_partials_of_partial_a(a, b, x):
-      return gradient.value_and_gradient(
-          lambda a, b, x: betainc_partials(a, b, x)[0], [a, b, x])[1]
+    # Wrap in tf.function for faster computations.
+    @tf.function(autograph=False)
+    def betainc_partials_of_partials(a, b, x):
+      return gradient.value_and_gradient(betainc_partials, [a, b, x])[1]
 
-    def betainc_partials_of_partial_b(a, b, x):
-      return gradient.value_and_gradient(
-          lambda a, b, x: betainc_partials(a, b, x)[1], [a, b, x])[1]
-
-    def betainc_partials_of_partial_x(a, b, x):
-      return gradient.value_and_gradient(
-          lambda a, b, x: betainc_partials(a, b, x)[2], [a, b, x])[1]
-
-    betainc_partials_of_partials = [
-        betainc_partials_of_partial_a,
-        betainc_partials_of_partial_b,
-        betainc_partials_of_partial_x]
-
-    # Wrap in tf.function and compile for faster computations.
-    betainc_partials_of_partials = [
-        tf.function(partial_fn, autograph=False, jit_compile=True)
-        for partial_fn in betainc_partials_of_partials]
-
-    partials_of_partials = [
-        partial_fn(a, b, x) for partial_fn in betainc_partials_of_partials]
-
+    partials_of_partials = betainc_partials_of_partials(a, b, x)
     self.assertAllFinite(self.evaluate(partials_of_partials))
 
 
@@ -559,7 +540,7 @@ class BetaincinvTest(test_util.TestCase):
     b = uniform.Uniform(low=tiny, high=dtype(b_high)).sample(n, strm())
     y = uniform.Uniform(low=tiny, high=dtype(1.)).sample(n, strm())
 
-    # Wrap in tf.function and compile for faster computations.
+    # Wrap in tf.function for faster computations.
     betaincinv = tf.function(special.betaincinv, autograph=False)
 
     result, a, b, y = self.evaluate(
@@ -618,7 +599,7 @@ class BetaincinvTest(test_util.TestCase):
     b = np.array([0.6, 0.6, -1., 0., 0.6, 0.6], dtype=dtype)
     y = np.array([0.5, 0.5, 0.5, 0.5, -1., 2.], dtype=dtype)
 
-    # Wrap in tf.function and compile for faster computations.
+    # Wrap in tf.function for faster computations.
     betaincinv = tf.function(special.betaincinv, autograph=False)
 
     result = self.evaluate(special.betaincinv(a, b, y))
@@ -778,31 +759,12 @@ class BetaincinvTest(test_util.TestCase):
     def betaincinv_partials(a, b, y):
       return gradient.value_and_gradient(special.betaincinv, [a, b, y])[1]
 
-    def betaincinv_partials_of_partial_a(a, b, y):
-      return gradient.value_and_gradient(
-          lambda a, b, y: betaincinv_partials(a, b, y)[0], [a, b, y])[1]
-
-    def betaincinv_partials_of_partial_b(a, b, y):
-      return gradient.value_and_gradient(
-          lambda a, b, y: betaincinv_partials(a, b, y)[1], [a, b, y])[1]
-
-    def betaincinv_partials_of_partial_y(a, b, y):
-      return gradient.value_and_gradient(
-          lambda a, b, y: betaincinv_partials(a, b, y)[2], [a, b, y])[1]
-
-    betaincinv_partials_of_partials = [
-        betaincinv_partials_of_partial_a,
-        betaincinv_partials_of_partial_b,
-        betaincinv_partials_of_partial_y]
-
     # Wrap in tf.function for faster computations.
-    betaincinv_partials_of_partials = [
-        tf.function(partial_fn, autograph=False)
-        for partial_fn in betaincinv_partials_of_partials]
+    @tf.function(autograph=False)
+    def betaincinv_partials_of_partials(a, b, y):
+      return gradient.value_and_gradient(betaincinv_partials, [a, b, y])[1]
 
-    partials_of_partials = [
-        partial_fn(a, b, y) for partial_fn in betaincinv_partials_of_partials]
-
+    partials_of_partials = betaincinv_partials_of_partials(a, b, y)
     self.assertAllFinite(self.evaluate(partials_of_partials))
 
 

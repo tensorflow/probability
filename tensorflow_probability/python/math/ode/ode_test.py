@@ -404,7 +404,7 @@ class StiffTest(test_util.TestCase):
 
 
 @test_util.numpy_disable_gradient_test
-@test_util.test_all_tf_execution_regimes
+@test_util.test_graph_mode_only
 @parameterized.named_parameters(_test_cases())
 class GradientTest(test_util.TestCase):
 
