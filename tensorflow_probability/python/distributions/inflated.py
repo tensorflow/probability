@@ -28,10 +28,16 @@ from tensorflow_probability.python.distributions import negative_binomial
 from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 __all__ = ['Inflated', 'inflated_factory', 'ZeroInflatedNegativeBinomial']
+
+
+def _safe_value_for_distribution(dist):
+  """Returns an x for which it is safe to differentiate dist.logprob(x)."""
+  return dist.sample(seed=samplers.zeros_seed())
 
 
 class _Inflated(mixture.Mixture):
@@ -53,6 +59,8 @@ class _Inflated(mixture.Mixture):
                inflated_loc_logits=None,
                inflated_loc_probs=None,
                inflated_loc=0.0,
+               inflated_loc_atol=None,
+               inflated_loc_rtol=None,
                validate_args=False,
                allow_nan_stats=True,
                name='Inflated'):
@@ -71,6 +79,12 @@ class _Inflated(mixture.Mixture):
         `inflated_loc_logits` should be passed in.
       inflated_loc: A scalar or tensor containing the locations of the point
         mass component of the mixture.
+      inflated_loc_atol:  Non-negative `Tensor` of same `dtype` as
+        `inflated_loc` and broadcastable shape.  The absolute tolerance for
+        comparing closeness to `inflated_loc`.  Default is `0`.
+      inflated_loc_rtol:  Non-negative `Tensor` of same `dtype` as
+        `inflated_loc` and broadcastable shape.  The relative tolerance for
+        comparing closeness to `inflated_loc`.  Default is `0`.
       validate_args: If true, inconsistent batch or event sizes raise a runtime
         error.
       allow_nan_stats: If false, any undefined statistics for any batch memeber
@@ -95,6 +109,12 @@ class _Inflated(mixture.Mixture):
           inflated_loc_probs, dtype=dtype, name='inflated_loc_probs')
       self._inflated_loc = tensor_util.convert_nonref_to_tensor(
           inflated_loc, dtype=dtype, name='inflated_loc')
+      self._inflated_loc_atol = tensor_util.convert_nonref_to_tensor(
+          0 if inflated_loc_atol is None else inflated_loc_atol,
+          dtype=dtype, name='inflated_loc_atol')
+      self._inflated_loc_rtol = tensor_util.convert_nonref_to_tensor(
+          0 if inflated_loc_rtol is None else inflated_loc_rtol,
+          dtype=dtype, name='inflated_loc_rtol')
 
       if inflated_loc_probs is None:
         cat_logits = DeferredTensor(
@@ -122,17 +142,23 @@ class _Inflated(mixture.Mixture):
             allow_nan_stats=allow_nan_stats)
         probs_or_logits = self._inflated_loc_probs
 
+      self._deterministic = deterministic.Deterministic(
+          DeferredTensor(
+              probs_or_logits,
+              # pylint: disable=g-long-lambda
+              lambda _: tf.broadcast_to(self._inflated_loc,
+                                        tf.shape(probs_or_logits))
+              # pylint: enable=g-long-lambda
+          ),
+          atol=self._inflated_loc_atol,
+          rtol=self._inflated_loc_rtol,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats)
+
       super(_Inflated, self).__init__(
           cat=self._categorical_dist,
           components=[
-              deterministic.Deterministic(
-                  DeferredTensor(
-                      probs_or_logits,
-                      lambda x: tf.constant(  # pylint: disable=g-long-lambda
-                          inflated_loc, dtype=distribution.dtype,
-                          shape=probs_or_logits.shape)),
-                  validate_args=validate_args,
-                  allow_nan_stats=allow_nan_stats),
+              self._deterministic,
               distribution
           ],
           validate_args=validate_args,
@@ -151,6 +177,12 @@ class _Inflated(mixture.Mixture):
         ),
         inflated_loc=parameter_properties.ParameterProperties())
 
+  def _almost_inflated_loc(self, x):
+    # pylint: disable=protected-access
+    return tf.abs(x - self._inflated_loc) <= self._deterministic._slack(
+        self._inflated_loc)
+    # pylint: enable=protected-access
+
   def _log_prob(self, x):
     # We override the log_prob implementation from Mixture in the case
     # where we are inflating a continuous distribution, because we have
@@ -163,11 +195,19 @@ class _Inflated(mixture.Mixture):
                   distribution_lib.DiscreteDistributionMixin):
       return super(_Inflated, self)._log_prob(x)
     else:
+      # Enable non-NaN gradients of the log_prob, even if the gradient of
+      # the continuous distribution is NaN at _inflated_loc.  See
+      # https://github.com/tensorflow/probability/blob/main/discussion/where-nan.pdf
+      # for details.
+      safe_x = tf.where(
+          self._almost_inflated_loc(x),
+          _safe_value_for_distribution(self._distribution),
+          x)
       return tf.where(
-          tf.equal(x, self._inflated_loc),
+          self._almost_inflated_loc(x),
           self._categorical_dist.log_prob(0),
           self._categorical_dist.log_prob(1) +
-          self._distribution.log_prob(x))
+          self._distribution.log_prob(safe_x))
 
   @property
   def distribution(self):

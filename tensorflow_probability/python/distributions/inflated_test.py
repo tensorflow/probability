@@ -16,12 +16,15 @@
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.distributions import gamma
 from tensorflow_probability.python.distributions import inflated
+from tensorflow_probability.python.distributions import lognormal
 from tensorflow_probability.python.distributions import negative_binomial
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.experimental import util
 from tensorflow_probability.python.experimental.util import trainable
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
 
 
 class DistributionsTest(test_util.TestCase):
@@ -113,6 +116,36 @@ class DistributionsTest(test_util.TestCase):
         0.1, total_count=10.0, probs=0.4)
     comp_zinb = util.as_composite(zinb)
     unused_as_tensors = tf.nest.flatten(comp_zinb)
+
+  @test_util.disable_test_for_backend(
+      disable_numpy=True,
+      reason='Only TF has gradient tape')
+  def test_safe_value_for_distribution(self):
+    x = self.evaluate(inflated._safe_value_for_distribution(
+        gamma.Gamma(concentration=3.0, rate=2.0)))
+    lp, grad = gradient.value_and_gradient(
+        lambda p: gamma.Gamma(concentration=p, rate=2.0).log_prob(x),
+        3.0)
+    self.assertAllFinite(lp)
+    self.assertAllFinite(grad)
+
+  @test_util.disable_test_for_backend(
+      disable_numpy=True,
+      reason='Only TF has gradient tape')
+  def test_log_prob_for_inflated_lognormal_is_diffable(self):
+    x = tf.constant([0.0, 1.0])
+
+    # pylint: disable=g-long-lambda
+    lp, grad = gradient.value_and_gradient(
+        lambda loc: inflated.Inflated(
+            lognormal.LogNormal(loc=loc, scale=1.0),
+            inflated_loc_probs=0.5,
+        ).log_prob(x),
+        5.0,
+    )
+    # pylint: enable=g-long-lambda
+    self.assertAllFinite(lp)
+    self.assertAllFinite(grad)
 
 
 if __name__ == '__main__':

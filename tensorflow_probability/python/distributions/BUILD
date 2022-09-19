@@ -1014,6 +1014,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/util:deferred_tensor",
     ],
@@ -3255,13 +3256,16 @@ multi_substrate_py_test(
     name = "inflated_test",
     srcs = ["inflated_test.py"],
     deps = [
+        ":gamma",
         ":inflated",
+        ":lognormal",
         ":negative_binomial",
         ":normal",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/experimental/util",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
     ],
 )
 
