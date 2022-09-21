@@ -148,7 +148,8 @@ class _Inflated(mixture.Mixture):
               probs_or_logits,
               # pylint: disable=g-long-lambda
               lambda _: tf.broadcast_to(self._inflated_loc,
-                                        ps.shape(probs_or_logits))),
+                                        ps.shape(probs_or_logits)),
+              shape=probs_or_logits.shape),
           atol=self._inflated_loc_atol,
           rtol=self._inflated_loc_rtol,
           validate_args=validate_args,
