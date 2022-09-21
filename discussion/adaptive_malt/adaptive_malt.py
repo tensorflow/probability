@@ -14,12 +14,15 @@
 # ============================================================================
 """Adaptive MALT implementation."""
 
+import os
 from typing import Any, Dict, Optional, Mapping, NamedTuple, Tuple, Union
 
+from etils import epath
 import gin
 import immutabledict
 import jax
 import jax.numpy as jnp
+import numpy as np
 from fun_mc import using_jax as fun_mc
 from inference_gym import using_jax as gym
 import tensorflow_probability.substrates.jax as tfp
@@ -30,6 +33,82 @@ try:
   from fun_mc.dynamic.backend_jax import malt as malt_lib
 except ImportError:
   pass
+
+tfd = tfp.distributions
+tfb = tfp.bijectors
+
+
+class TestGaussian(gym.targets.Model):
+  """Test Gaussian."""
+
+  def __init__(
+      self,
+      ndims=200,
+      name='test_gaussian',
+      pretty_name='Test-Gaussian',
+  ):
+    sigma = np.sqrt(np.linspace(1., 1 / ndims, ndims)).astype(np.float32)
+
+    gaussian = tfd.MultivariateNormalDiag(
+        loc=jnp.zeros(ndims), scale_diag=sigma)
+
+    sample_transformations = {
+        'identity':
+            gym.targets.Model.SampleTransformation(
+                fn=lambda params: params,
+                pretty_name='Identity',
+                ground_truth_mean=np.zeros(ndims),
+                ground_truth_standard_deviation=sigma,
+            )
+    }
+
+    self._gaussian = gaussian
+
+    super().__init__(
+        default_event_space_bijector=tfb.Identity(),
+        event_shape=gaussian.event_shape,
+        dtype=gaussian.dtype,
+        name=name,
+        pretty_name=pretty_name,
+        sample_transformations=sample_transformations,
+    )
+
+  def _unnormalized_log_prob(self, value):
+    return self._gaussian.log_prob(value)
+
+  def sample(self, sample_shape=(), seed=None, name='sample'):
+    return self._gaussian.sample(sample_shape, seed=seed, name=name)
+
+
+def get_target(name: str) -> gym.targets.Model:
+  """Return the target name."""
+  if name == 'german_credit_numeric_logistic_regression':
+    return gym.targets.VectorModel(
+        gym.targets.GermanCreditNumericLogisticRegression())
+  elif name == 'german_credit_numeric_sparse_logistic_regression':
+    return gym.targets.VectorModel(
+        gym.targets.GermanCreditNumericSparseLogisticRegression(
+            positive_constraint_fn='softplus'))
+  elif name == 'brownian_motion':
+    return gym.targets.VectorModel(
+        gym.targets.BrownianMotionUnknownScalesMissingMiddleObservations(
+            use_markov_chain=True))
+  elif name == 'item_response_theory':
+    return gym.targets.VectorModel(gym.targets.SyntheticItemResponseTheory())
+  elif name == 'radon_indiana':
+    return gym.targets.VectorModel(gym.targets.RadonContextualEffectsIndiana())
+  elif name == 'stochastic_volatility':
+    return gym.targets.VectorModel(
+        gym.targets.VectorizedStochasticVolatilitySP500())
+  elif name == 'test_gaussian_1':
+    return TestGaussian()
+  else:
+    raise ValueError(f'Unknown target. {name}')
+
+
+def load_inits(name: str, directory: str) -> dict[str, np.ndarray]:
+  with epath.Path(os.path.join(directory, name + '.npz')).open('rb') as f:
+    return dict(np.load(f))
 
 
 def ccipca(sample: jnp.ndarray, r: jnp.ndarray) -> jnp.ndarray:
@@ -190,6 +269,7 @@ class AdaptiveMCMCExtra(NamedTuple):
   log_trajectory_length_opt_extra: fun_mc.AdamExtra
   num_integrator_steps: jnp.ndarray
   damping: jnp.ndarray
+  extra: Any
 
 
 def halton(float_index: jnp.ndarray, max_bits: int = 10) -> jnp.ndarray:
@@ -204,6 +284,7 @@ def adaptive_mcmc_init(state: jnp.ndarray,
                        target_log_prob_fn: fun_mc.PotentialFn,
                        init_step_size: jnp.ndarray,
                        init_trajectory_length: jnp.ndarray,
+                       rvar_smoothing: int,
                        method='hmc') -> AdaptiveMCMCState:
   """Initializes the adaptive MCMC algorithm.
 
@@ -212,6 +293,7 @@ def adaptive_mcmc_init(state: jnp.ndarray,
     target_log_prob_fn: Target log prob function.
     init_step_size: Initial scalar step size.
     init_trajectory_length: Initial trajectory length.
+    rvar_smoothing: Smoothing points.
     method: MCMC method. Either 'hmc' or 'malt'.
 
   Returns:
@@ -233,9 +315,12 @@ def adaptive_mcmc_init(state: jnp.ndarray,
       principal_rmean_state=fun_mc.running_mean_init(
           state.shape[1:], state.dtype)._replace(
               mean=jax.random.normal(
-                  jax.random.PRNGKey(0), state.shape[1:], state.dtype)),
-      rvar_state=fun_mc.running_variance_init(state.shape[1:], state.dtype),
-      proj_rautocov_state=fun_mc.running_covariance_init([2], state.dtype),
+                  jax.random.PRNGKey(0), state.shape[1:], state.dtype),
+              num_points=rvar_smoothing),
+      rvar_state=fun_mc.running_variance_init(
+          state.shape[1:], state.dtype)._replace(num_points=rvar_smoothing),
+      proj_rautocov_state=fun_mc.running_covariance_init(
+          [2], state.dtype)._replace(num_points=rvar_smoothing),
       log_step_size_opt_state=fun_mc.adam_init(jnp.log(init_step_size)),
       log_trajectory_length_opt_state=fun_mc.adam_init(
           jnp.log(init_trajectory_length)),
@@ -267,9 +352,12 @@ def adaptive_mcmc_step(
     trajectory_length_adaptation_rate: float = 0.05,
     damping_factor: float = 1.,
     principal_mean_method: str = 'running_mean',
-    min_preconditioning_points: int = 64,
     state_grad_estimator: str = 'two_dir',
     adapt_normalization_power: bool = False,
+    mix_state_mean_in_snaper: bool = False,
+    step_size_adaptation_rate_decay: str = 'none',
+    trajectory_length_adaptation_rate_decay: str = 'none',
+    rvar_smoothing: int = 0,
     trajectory_opt_kwargs: Mapping[str, Any] = immutabledict.immutabledict({}),
     step_size_opt_kwargs: Mapping[str, Any] = immutabledict.immutabledict({}),
 ):
@@ -298,13 +386,18 @@ def adaptive_mcmc_step(
     trajectory_length_adaptation_rate: Trajectory length adaptation rate.
     damping_factor: Factor for computing the damping coefficient.
     principal_mean_method: Method for computing principal mean. Either
-      'running_mean' or 'state_mean'.
-    min_preconditioning_points: Minimum number of points to intake before using
-      the running mean for preconditioning:
+      'running_mean' or 'state_mean'. the running mean for preconditioning:
     state_grad_estimator: State grad estimator to use. Can be 'one_dir' or
       'two_dir'.
     adapt_normalization_power: Whether to adapt the power used for trajectory
       length normalization term in the snaper criterion.
+    mix_state_mean_in_snaper: Whether to mix in the current state mean when
+      computing the criterion.
+    step_size_adaptation_rate_decay: How to decay the adaptation rate. One of
+      'none' or 'linear'.
+    trajectory_length_adaptation_rate_decay: How to decay the adaptation rate.
+      One of 'none' or 'linear'.
+    rvar_smoothing: Smoothing points.
     trajectory_opt_kwargs: Extra arguments to the trajectory length optimizer.
     step_size_opt_kwargs: Extra arguments to the step size optimizer.
 
@@ -327,14 +420,14 @@ def adaptive_mcmc_step(
   if vector_step_size is None:
     vector_step_size = jnp.sqrt(amcmc_state.rvar_state.variance)
     vector_step_size = vector_step_size / vector_step_size.max()
-    vector_step_size = jnp.where(
-        amcmc_state.rvar_state.num_points > min_preconditioning_points,
-        vector_step_size, jnp.ones_like(vector_step_size))
 
   if power is None:
     if adapt_normalization_power:
-      power = ((1. + amcmc_state.proj_rautocov_state.covariance[0, 1] /
-                amcmc_state.proj_rautocov_state.covariance[0, 0]) / 2.)
+      var = 0.5 * (
+          amcmc_state.proj_rautocov_state.covariance[0, 0] +
+          amcmc_state.proj_rautocov_state.covariance[1, 1])
+      cov = amcmc_state.proj_rautocov_state.covariance[1, 0]
+      power = 0.5 * (1. + cov / var)
     else:
       power = 1.
 
@@ -354,9 +447,6 @@ def adaptive_mcmc_step(
     mean_trajectory_length = jnp.where(
         adapt, jnp.exp(amcmc_state.log_trajectory_length_opt_state.state),
         amcmc_state.trajectory_length_rmean_state.mean)
-  mean_trajectory_length = jnp.where(mala, scalar_step_size,
-                                     mean_trajectory_length)
-
   trajectory_length = traj_factor * mean_trajectory_length
   num_integrator_steps = jnp.ceil(trajectory_length / scalar_step_size)
   num_integrator_steps = jnp.where(
@@ -377,7 +467,7 @@ def adaptive_mcmc_step(
     proposed_state = mcmc_extra.proposed_hmc_state.state
   elif method == 'malt':
     if damping is None:
-      damping = damping_factor / max_eigenvalue
+      damping = damping_factor / (1e-10 + jnp.sqrt(max_eigenvalue))
     mcmc_state, mcmc_extra = fun_mc.prefab.metropolis_adjusted_langevin_trajectories_step(
         amcmc_state.mcmc_state,
         target_log_prob_fn=target_log_prob_fn,
@@ -408,16 +498,14 @@ def adaptive_mcmc_step(
       amcmc_state.rvar_state,
       mcmc_state.state,
       axis=0,
-      window_size=jnp.maximum(1, num_chains * amcmc_state.step // rvar_factor))
+      window_size=rvar_smoothing + num_chains * amcmc_state.step // rvar_factor)
   rvar_state = fun_mc.choose(adapt, cand_rvar_state, amcmc_state.rvar_state)
 
   # Adjust trajectory length.
   def log_trajectory_length_surrogate_loss_fn(log_trajectory_length):
     log_trajectory_length = fun_mc.clip_grads(log_trajectory_length, 1e6)
     mean_trajectory_length = jnp.exp(log_trajectory_length)
-    mean_trajectory_length = jnp.where(mala, scalar_step_size,
-                                       traj_factor * mean_trajectory_length)
-    trajectory_length = mean_trajectory_length
+    trajectory_length = traj_factor * mean_trajectory_length
 
     if state_grad_estimator == 'one_dir':
       start_end_grads = [
@@ -440,6 +528,12 @@ def adaptive_mcmc_step(
       end_state_with_action = (
           end_state + action - jax.lax.stop_gradient(action))
 
+      if mix_state_mean_in_snaper:
+        state_mean_weight = (amcmc_state.rvar_state.num_points) / (
+            amcmc_state.rvar_state.num_points + num_chains)
+      else:
+        state_mean_weight = 1.
+
       criterion, extra = snaper_criterion(
           previous_state=start_state,
           proposed_state=end_state_with_action,
@@ -449,20 +543,27 @@ def adaptive_mcmc_step(
           power=power,
           # These two expressions are a bit weird for the reverse direction...
           state_mean=amcmc_state.rvar_state.mean,
-          state_mean_weight=(amcmc_state.rvar_state.num_points) /
-          (amcmc_state.rvar_state.num_points + num_chains),
+          state_mean_weight=state_mean_weight,
       )
       criteria.append(criterion)
       extras.append(extra)
     return -jnp.array(criteria).mean(), extras
 
+  cur_adaptation_rate = jnp.where(adapt, trajectory_length_adaptation_rate, 0.)
+  if trajectory_length_adaptation_rate_decay == 'linear':
+    cur_adaptation_rate = (
+        (1. - 0.95 * amcmc_state.step / num_adaptation_steps) *
+        cur_adaptation_rate)
   (log_trajectory_length_opt_state, log_trajectory_length_opt_extra) = (
       fun_mc.adam_step(
           amcmc_state.log_trajectory_length_opt_state,
           log_trajectory_length_surrogate_loss_fn,
-          jnp.where(adapt, trajectory_length_adaptation_rate, 0.),
+          cur_adaptation_rate,
           **trajectory_opt_kwargs,
       ))
+  log_trajectory_length_opt_state = log_trajectory_length_opt_state._replace(
+      state=jnp.where(mala, jnp.log(scalar_step_size),
+                      log_trajectory_length_opt_state.state))
 
   # Adjust step size.
   log_accept_ratio = mcmc_extra.log_accept_ratio
@@ -477,11 +578,16 @@ def adaptive_mcmc_step(
   log_step_size_surrogate_loss_fn = fun_mc.make_surrogate_loss_fn(
       lambda _: (target_accept_prob - accept_prob, ()))
 
+  cur_adaptation_rate = jnp.where(adapt, step_size_adaptation_rate, 0.)
+  if step_size_adaptation_rate_decay == 'linear':
+    cur_adaptation_rate = (
+        (1. - 0.95 * amcmc_state.step / num_adaptation_steps) *
+        cur_adaptation_rate)
   (log_step_size_opt_state, _) = (
       fun_mc.adam_step(
           amcmc_state.log_step_size_opt_state,
           log_step_size_surrogate_loss_fn,
-          jnp.where(adapt, step_size_adaptation_rate, 0.),
+          cur_adaptation_rate,
           **step_size_opt_kwargs,
       ))
 
@@ -500,7 +606,7 @@ def adaptive_mcmc_step(
   cand_principal_rmean_state, _ = fun_mc.running_mean_step(
       amcmc_state.principal_rmean_state,
       ccipca(mcmc_state.state - mean, amcmc_state.principal_rmean_state.mean),
-      window_size=amcmc_state.step // principal_factor,
+      window_size=rvar_smoothing + amcmc_state.step // principal_factor,
   )
   principal_rmean_state = fun_mc.choose(adapt, cand_principal_rmean_state,
                                         amcmc_state.principal_rmean_state)
@@ -509,11 +615,13 @@ def adaptive_mcmc_step(
   cand_proj_rautocov_state, _ = fun_mc.running_covariance_step(
       amcmc_state.proj_rautocov_state,
       jnp.stack([
-          log_trajectory_length_opt_extra.loss_extra[0]['proposed_projection'],
-          log_trajectory_length_opt_extra.loss_extra[0]['previous_projection']
+          log_trajectory_length_opt_extra.loss_extra[0]['proposed_projection']**
+          2,
+          log_trajectory_length_opt_extra.loss_extra[0]['previous_projection']**
+          2,
       ], -1),
       axis=0,
-      window_size=jnp.maximum(1, num_chains * amcmc_state.step // rvar_factor))
+      window_size=rvar_smoothing + num_chains * amcmc_state.step // rvar_factor)
   proj_rautocov_state = fun_mc.choose(adapt, cand_proj_rautocov_state,
                                       amcmc_state.proj_rautocov_state)
 
@@ -535,6 +643,9 @@ def adaptive_mcmc_step(
       adapt, cand_trajectory_length_rmean_state,
       amcmc_state.trajectory_length_rmean_state)
 
+  proposed_projection2 = ((proposed_state - mean) * principal).sum(-1)
+  previous_projection2 = ((amcmc_state.mcmc_state.state - mean) *
+                          principal).sum(-1)
   amcmc_state = amcmc_state._replace(
       mcmc_state=mcmc_state,
       rvar_state=rvar_state,
@@ -557,6 +668,24 @@ def adaptive_mcmc_step(
       mean_trajectory_length=mean_trajectory_length,
       log_trajectory_length_opt_extra=log_trajectory_length_opt_extra,
       num_integrator_steps=num_integrator_steps,
+      extra={
+          'rautocov':
+              proj_rautocov_state.covariance,
+          'proposed_projection':
+              log_trajectory_length_opt_extra.loss_extra[0]
+              ['proposed_projection'],
+          'previous_projection':
+              log_trajectory_length_opt_extra.loss_extra[0]
+              ['previous_projection'],
+          'proposed_projection2':
+              proposed_projection2,
+          'previous_projection2':
+              previous_projection2,
+          'mean':
+              mean,
+          'principal_rmean':
+              principal_rmean_state.mean,
+      },
   )
   return amcmc_state, amcmc_extra
 
@@ -665,6 +794,11 @@ def run_adaptive_mcmc_on_target(
     num_results: int,
     seed: jax.random.KeyArray,
     num_mala_steps: int = 100,
+    rvar_smoothing: int = 0,
+    trajectory_opt_kwargs: Mapping[str, Any] = immutabledict.immutabledict({
+        'beta_1': 0.,
+        'beta_2': 0.95
+    }),
     **amcmc_kwargs: Any,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
   """Does a run of adaptive MCMC.
@@ -678,6 +812,8 @@ def run_adaptive_mcmc_on_target(
     num_results: Number of post-adaptation results.
     seed: Random seed.
     num_mala_steps: Number of initial steps to be MALA.
+    rvar_smoothing: Smoothing points.
+    trajectory_opt_kwargs: Kwargs sent to the trajectory length optimizer.
     **amcmc_kwargs: Extra kwargs to pass to Adaptive MCMC.
 
   Returns:
@@ -701,12 +837,9 @@ def run_adaptive_mcmc_on_target(
         num_mala_steps=num_mala_steps,
         num_adaptation_steps=num_adaptation_steps,
         seed=mcmc_seed,
-        min_preconditioning_points=64,
         method=method,
-        trajectory_opt_kwargs={
-            'beta_1': 0.,
-            'beta_2': 0.95
-        },
+        trajectory_opt_kwargs=trajectory_opt_kwargs,
+        rvar_smoothing=rvar_smoothing,
         **amcmc_kwargs,
     )
 
@@ -723,6 +856,7 @@ def run_adaptive_mcmc_on_target(
         'num_integrator_steps': amcmc_extra.num_integrator_steps,
         'traj_loss': amcmc_extra.log_trajectory_length_opt_extra.loss,
         'damping': amcmc_extra.damping,
+        'extra': amcmc_extra.extra,
     }
 
     return (amcmc_state, seed), traced
@@ -732,6 +866,7 @@ def run_adaptive_mcmc_on_target(
       target_log_prob_fn,
       init_step_size=init_step_size,
       init_trajectory_length=init_step_size,
+      rvar_smoothing=rvar_smoothing,
       method=method,
   )
 
@@ -749,6 +884,118 @@ def run_adaptive_mcmc_on_target(
           compute_stats(
               state=warmed_up_state,
               num_grads=trace['num_integrator_steps'][-warmed_up_steps:].sum(),
+              mean=warmed_up_state.mean((0, 1)),
+              principal=principal,
+          ),
+      'final_x':
+          target.default_event_space_bijector(trace['state'][-1]),
+  }
+  return trace, final
+
+
+@gin.configurable
+def run_fixed_mcmc_on_target(
+    target: gym.targets.Model,
+    init_x: jnp.ndarray,
+    method: str,
+    seed: jax.random.KeyArray,
+    num_warmup_steps: int,
+    num_results: int,
+    scalar_step_size: jnp.ndarray,
+    vector_step_size: jnp.ndarray,
+    num_integrator_steps: jnp.ndarray,
+    damping: Optional[jnp.ndarray] = None,
+):
+  """Run a fixed-hyperparameter MCMC.
+
+  Args:
+    target: Target model.
+    init_x: Initial constrained chain state.
+    method: MCMC method. Either 'hmc' or 'malt'.
+    seed: Random seed.
+    num_warmup_steps: Number of warmup steps.
+    num_results: Number of post-warmup results.
+    scalar_step_size: Scalar step size.
+    vector_step_size: Vector step size.
+    num_integrator_steps: Number of integrator steps.
+    damping: Damping.
+
+  Returns:
+     A tuple of final and traced results.
+  """
+  init_z = target.default_event_space_bijector.inverse(init_x)
+
+  def target_log_prob_fn(x):
+    return target.unnormalized_log_prob(x), ()
+
+  target_log_prob_fn = fun_mc.transform_log_prob_fn(
+      target_log_prob_fn, target.default_event_space_bijector)
+
+  def kernel(mcmc_state, seed):
+    seed, jitter_seed, mcmc_seed = jax.random.split(seed, 3)
+
+    if method == 'hmc':
+      cur_num_integrator_steps = jax.random.randint(jitter_seed, [], 1,
+                                                    num_integrator_steps + 1)
+      mcmc_state, mcmc_extra = fun_mc.hamiltonian_monte_carlo_step(
+          mcmc_state,
+          target_log_prob_fn=target_log_prob_fn,
+          step_size=scalar_step_size * vector_step_size,
+          num_integrator_steps=cur_num_integrator_steps,
+          seed=mcmc_seed,
+      )
+    elif method == 'malt':
+      cur_num_integrator_steps = num_integrator_steps
+      mcmc_state, mcmc_extra = fun_mc.prefab.metropolis_adjusted_langevin_trajectories_step(
+          mcmc_state,
+          target_log_prob_fn=target_log_prob_fn,
+          step_size=scalar_step_size * vector_step_size,
+          momentum_refresh_fn=lambda m, seed:  # pylint: disable=g-long-lambda
+          (
+              malt_lib._gaussian_momentum_refresh_fn(  # pylint: disable=protected-access
+                  m,
+                  damping=damping,
+                  step_size=scalar_step_size,
+                  seed=seed,
+              )),
+          num_integrator_steps=cur_num_integrator_steps,
+          damping=damping,
+          seed=mcmc_seed,
+      )
+
+    traced = {
+        'state': mcmc_state.state,
+        'is_accepted': mcmc_extra.is_accepted,
+        'log_accept_ratio': mcmc_extra.log_accept_ratio,
+        'num_integrator_steps': cur_num_integrator_steps,
+    }
+
+    return (mcmc_state, seed), traced
+
+  if method == 'hmc':
+    mcmc_state = fun_mc.hamiltonian_monte_carlo_init(
+        state=init_z,
+        target_log_prob_fn=target_log_prob_fn,
+    )
+  elif method == 'malt':
+    mcmc_state = fun_mc.prefab.metropolis_adjusted_langevin_trajectories_init(
+        state=init_z,
+        target_log_prob_fn=target_log_prob_fn,
+    )
+
+  _, trace = fun_mc.trace((mcmc_state, seed), kernel,
+                          num_warmup_steps + num_results)
+
+  warmed_up_state = trace['state'][num_warmup_steps:]
+  cov = jnp.cov(
+      warmed_up_state.reshape([-1, warmed_up_state.shape[-1]]), rowvar=False)
+  principal = jnp.linalg.eigh(cov)[1][:, -1]
+
+  final = {
+      'stats':
+          compute_stats(
+              state=warmed_up_state,
+              num_grads=trace['num_integrator_steps'][-num_warmup_steps:].sum(),
               mean=warmed_up_state.mean((0, 1)),
               principal=principal,
           )
