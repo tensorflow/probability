@@ -408,6 +408,14 @@ class _StsTestHarness(object):
       self.assertIsNotNone(sum_model.init_parameters['observed_time_series'])
       self.assertIsNotNone(ledom_mus.init_parameters['observed_time_series'])
 
+  def test_get_parameter(self):
+    model = self._build_sts()
+    for (name, _, _) in model.parameters:
+      self.assertEqual(model.get_parameter(name).name, name)
+    with self.assertRaises(KeyError):
+      # Unexpected keys should raise an error.
+      model.get_parameter('fake_parameter_name')
+
 
 @test_util.test_all_tf_execution_regimes
 class AutoregressiveTest(test_util.TestCase, _StsTestHarness):

@@ -106,7 +106,8 @@ class GibbsSamplerTests(test_util.TestCase):
     observation_noise_variance_prior = prior_class(
         concentration=tf.cast(0.01, dtype),
         scale=tf.cast(0.01 * 0.01, dtype))
-    observation_noise_variance_prior.upper_bound = 100.0
+    observation_noise_variance_prior.upper_bound = tf.constant(
+        100.0, dtype=dtype)
 
     observed_time_series = missing_values_util.MaskedTimeSeries(
         time_series[..., tf.newaxis], is_missing)

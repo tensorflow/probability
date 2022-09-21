@@ -14,17 +14,33 @@
 # ============================================================================
 """Seasonal Model Tests."""
 
+import math
+
 # Dependency imports
 
+from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.bijectors import square
+from tensorflow_probability.python.distributions import categorical
+from tensorflow_probability.python.distributions import inverse_gamma
 from tensorflow_probability.python.distributions import linear_gaussian_ssm
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import mixture_same_family
 from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.sts.components.seasonal import ConstrainedSeasonalStateSpaceModel
+from tensorflow_probability.python.sts.components.seasonal import Seasonal
 from tensorflow_probability.python.sts.components.seasonal import SeasonalStateSpaceModel
 
+
+NUMPY_MODE = False
 
 tfl = tf.linalg
 
@@ -409,6 +425,274 @@ class ConstrainedSeasonalStateSpaceModelTestStaticShape64(
 # Don't run tests for the abstract base classes.
 del _SeasonalStateSpaceModelTest
 del _ConstrainedSeasonalStateSpaceModelTest
+
+
+class SeasonalComponentResampleDriftScaleInputs(test_util.TestCase):
+
+  def testDriftRequired(self):
+    seasonal_component = Seasonal(num_seasons=3, allow_drift=False)
+    with self.assertRaisesRegex(NotImplementedError,
+                                'implemented only .* with drift'):
+      seasonal_component.experimental_resample_drift_scale(
+          latents=tf.constant(
+              value=[], shape=[0, seasonal_component.num_seasons - 1]),
+          seed=test_util.test_seed(sampler_type='stateless'))
+
+  def testDriftScalePriorRequiresTransformedDistribution(self):
+    with self.assertRaisesRegex(
+        NotImplementedError,
+        'experimental_resample_drift_scale requires drift scale prior'):
+      seasonal_component = Seasonal(
+          num_seasons=3,
+          drift_scale_prior=inverse_gamma.InverseGamma(
+              tf.constant(16.), tf.constant(4.)))
+      seasonal_component.experimental_resample_drift_scale(
+          latents=tf.constant(
+              value=[], shape=[0, seasonal_component.num_seasons - 1]),
+          seed=test_util.test_seed(sampler_type='stateless'))
+
+  def testDriftScalePriorRequiresInvertedBijector(self):
+    with self.assertRaisesRegex(
+        NotImplementedError,
+        'experimental_resample_drift_scale requires drift scale prior'):
+      seasonal_component = Seasonal(
+          num_seasons=3,
+          drift_scale_prior=transformed_distribution.TransformedDistribution(
+              bijector=square.Square(),
+              distribution=inverse_gamma.InverseGamma(
+                  tf.constant(16.), tf.constant(4.))))
+      seasonal_component.experimental_resample_drift_scale(
+          latents=tf.constant(
+              value=[], shape=[0, seasonal_component.num_seasons - 1]),
+          seed=test_util.test_seed(sampler_type='stateless'))
+
+  def testDriftScalePriorRequiresInvertedSquaredBijector(self):
+    with self.assertRaisesRegex(
+        NotImplementedError,
+        'experimental_resample_drift_scale requires drift scale prior'):
+      seasonal_component = Seasonal(
+          num_seasons=3,
+          drift_scale_prior=transformed_distribution.TransformedDistribution(
+              bijector=invert.Invert(identity.Identity()),
+              distribution=inverse_gamma.InverseGamma(
+                  tf.constant(16.), tf.constant(4.))))
+      seasonal_component.experimental_resample_drift_scale(
+          latents=tf.constant(
+              value=[], shape=[0, seasonal_component.num_seasons - 1]),
+          seed=test_util.test_seed(sampler_type='stateless'))
+
+  def testDriftScalePriorRequiresTransformedInverseGamma(self):
+    with self.assertRaisesRegex(
+        NotImplementedError,
+        'experimental_resample_drift_scale requires drift scale prior'):
+      seasonal_component = Seasonal(
+          num_seasons=3,
+          drift_scale_prior=transformed_distribution.TransformedDistribution(
+              bijector=invert.Invert(square.Square()),
+              distribution=lognormal.LogNormal(loc=3., scale=4.)))
+      seasonal_component.experimental_resample_drift_scale(
+          latents=tf.constant(
+              value=[], shape=[0, seasonal_component.num_seasons - 1]),
+          seed=test_util.test_seed(sampler_type='stateless'))
+
+  def testProperInputsThrowsNoExceptionNonEmptyTimeseries(self):
+    seasonal_component = Seasonal(
+        num_seasons=3,
+        drift_scale_prior=transformed_distribution.TransformedDistribution(
+            bijector=invert.Invert(square.Square()),
+            distribution=inverse_gamma.InverseGamma(
+                tf.constant(16.), tf.constant(4.))))
+    seasonal_component.experimental_resample_drift_scale(
+        latents=tf.constant(
+            value=2., shape=[1, seasonal_component.num_seasons - 1]),
+        seed=test_util.test_seed(sampler_type='stateless'))
+
+  def testProperInputsThrowsNoExceptionEmptyTimeseries(self):
+    seasonal_component = Seasonal(
+        num_seasons=3,
+        drift_scale_prior=transformed_distribution.TransformedDistribution(
+            bijector=invert.Invert(square.Square()),
+            distribution=inverse_gamma.InverseGamma(
+                tf.constant(16.), tf.constant(4.))))
+    seasonal_component.experimental_resample_drift_scale(
+        latents=tf.zeros(shape=[
+            # Verify that a timeseries of size 0 still succeeds. Some
+            # implementations (e.g. using `tf.range`) could fail with 0.
+            0,
+            seasonal_component.num_seasons - 1
+        ]),
+        seed=test_util.test_seed(sampler_type='stateless'))
+
+
+@tf.function()
+def _compute_summary_for_normal_samples_with_inverse_gamma_scale_prior(
+    variance_inverse_gamma_prior, batch_shape, num_samples,
+    num_observations_per_sample, sampled_fixed_scale, seed):
+  """Computes the mean and standard deviation from num_samples.
+
+  Given an inverse gamma prior on the variance of Normal distributions scale,
+  this returns summary statistics of what is expected given `num_samples`
+  where each sample has `num_observations_per_sample` from
+  N(0, sampled_fixed_scale).
+
+  Args:
+    variance_inverse_gamma_prior: Prior on the variance.
+    batch_shape: Shape of batches.
+    num_samples: Number of samples.
+    num_observations_per_sample: How many observations is in each sample.
+    sampled_fixed_scale: The scale to draw observations with.
+    seed: The seed to use.
+
+  Returns:
+    Tuple of (mean, standard error) of the variance.
+  """
+  sample_square_sum = tf.math.reduce_sum(
+      tf.square(
+          normal.Normal(0., sampled_fixed_scale).sample(
+              ps.concat(
+                  [batch_shape, (num_samples, num_observations_per_sample)],
+                  axis=0),
+              seed=seed)),
+      axis=-1)
+
+  posterior_concentration = variance_inverse_gamma_prior.concentration + (
+      num_observations_per_sample / 2.)
+  posterior_scales = variance_inverse_gamma_prior.concentration + (
+      sample_square_sum / 2.)
+  d = inverse_gamma.InverseGamma(posterior_concentration, posterior_scales)
+
+  mix = mixture_same_family.MixtureSameFamily(
+      categorical.Categorical(logits=tf.zeros(d.batch_shape)), d)
+  return mix.mean(), tf.math.sqrt(mix.variance() /
+                                  tf.cast(num_samples, dtype=tf.float32))
+
+
+ENABLE_DRIFT_SCALE_TESTS = True
+# For reasons currently unclear, drift scale tests fail on external numpy.
+ENABLE_DRIFT_SCALE_TESTS = not NUMPY_MODE  # EnableOnExport
+
+
+@test_util.test_graph_and_eager_modes
+class SeasonalComponentResampleDriftScaleNumerical(test_util.TestCase):
+
+  @parameterized.named_parameters(
+      {
+          'testcase_name': 'Unconstrained',
+          'constrain_mean_effect_to_zero': False,
+      }, {
+          'testcase_name': 'Constrained',
+          'constrain_mean_effect_to_zero': True,
+      }, {
+          'testcase_name':
+              'UnconstrainedSmallNumberOfObservationsShouldRespectPrior',
+          'constrain_mean_effect_to_zero':
+              False,
+          'num_observations_of_transition_noise':
+              100
+      }, {
+          'testcase_name':
+              'ConstrainedSmallNumberOfObservationsShouldRespectPrior',
+          'constrain_mean_effect_to_zero':
+              True,
+          'num_observations_of_transition_noise':
+              100
+      }, {
+          'testcase_name': 'UnconstrainedWithStepsPerSeason',
+          'constrain_mean_effect_to_zero': False,
+          'num_steps_per_season': [2, 4, 3],
+      }, {
+          'testcase_name': 'ConstrainedWithStepsPerSeason',
+          'constrain_mean_effect_to_zero': True,
+          'num_steps_per_season': [2, 4, 3],
+      }, {
+          'testcase_name': 'UnconstrainedWithBatchShape',
+          'constrain_mean_effect_to_zero': False,
+          # TODO(kloveless): Add tests with different batch value, not just
+          # a batch shape.
+          'batch_shape': (3,),
+      }, {
+          'testcase_name': 'ConstrainedWithBatchShape',
+          'constrain_mean_effect_to_zero': True,
+          'batch_shape': (3,),
+      })
+  def testBasicSeasonality(self,
+                           constrain_mean_effect_to_zero,
+                           batch_shape=(),
+                           num_steps_per_season=None,
+                           num_observations_of_transition_noise=1000):
+    if not ENABLE_DRIFT_SCALE_TESTS:
+      print('Aborting drift scale test.')
+      return
+
+    # Use enough samples so we can get a reasonable estimate of the
+    # distribution.
+    num_samples = 1000
+    distribution_batch_shape = batch_shape + (num_samples,)
+
+    if num_steps_per_season is None:
+      num_steps_per_season = [1, 1, 1]
+    inverse_gamma_prior = inverse_gamma.InverseGamma(
+        tf.constant(16., shape=distribution_batch_shape),
+        tf.constant(4., shape=distribution_batch_shape))
+    seasonal_component = Seasonal(
+        num_seasons=3,
+        constrain_mean_effect_to_zero=constrain_mean_effect_to_zero,
+        num_steps_per_season=num_steps_per_season,
+        drift_scale_prior=transformed_distribution.TransformedDistribution(
+            bijector=invert.Invert(square.Square()),
+            distribution=inverse_gamma_prior))
+    # Scale the number of time steps to be a constant number of season
+    # transitions. This means all variations should converge similarly.
+    num_timesteps = num_observations_of_transition_noise * math.ceil(
+        sum(num_steps_per_season) / len(num_steps_per_season))
+    initial_state_size = (
+        seasonal_component.num_seasons -
+        1 if constrain_mean_effect_to_zero else seasonal_component.num_seasons)
+    drift_scale = 20.
+    ssm = seasonal_component.make_state_space_model(
+        num_timesteps=num_timesteps,
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(scale_diag=[1.] *
+                                                            initial_state_size),
+        param_vals={},
+        drift_scale=drift_scale,
+        # This needs to be non-zero for steps_per_season to be any value other
+        # than 1 (otherwise NaN is returned after cholesky decomposition
+        # failure). When there is not a season transition, LGSSM will encounter
+        # variances and covariances of 0 - and even though there are no
+        # differences to explain for our data (since it is generated from the
+        # same LGSSM), these 0's are not supported.
+        observation_noise_scale=1e-4,
+    )
+    seed = test_util.test_seed(sampler_type='stateless')
+
+    @tf.function
+    def sample_drift():
+      sample = ssm.sample(sample_shape=(num_samples,), seed=seed)
+      latents = ssm.posterior_sample(x=sample, seed=seed)
+      return seasonal_component.experimental_resample_drift_scale(
+          latents, seed=seed)
+
+    drift_scale_samples = sample_drift()
+    drift_variance_sample_mean = tf.math.reduce_mean(
+        tf.math.square(drift_scale_samples))
+
+    # Verify that the samples of the drift scale are close to the actual drift
+    # scale. This computes, given a certain number of samples, how close
+    # random samples would be (a very limited duplication of what is being
+    # tested).
+    expected_scale_variance_mean, expected_variance_standard_error = _compute_summary_for_normal_samples_with_inverse_gamma_scale_prior(
+        inverse_gamma_prior,
+        batch_shape=batch_shape,
+        num_samples=num_samples,
+        num_observations_per_sample=num_observations_of_transition_noise,
+        sampled_fixed_scale=drift_scale,
+        seed=seed,
+    )
+
+    z_scores = ((expected_scale_variance_mean - drift_variance_sample_mean) /
+                expected_variance_standard_error)
+    self.assertAllLess(z_scores, 4.2)
+
 
 if __name__ == '__main__':
   test_util.main()

@@ -63,6 +63,7 @@ multi_substrate_py_library(
     srcs = ["gibbs_sampler.py"],
     deps = [
         ":dynamic_spike_and_slab",
+        ":sample_parameters",
         ":spike_and_slab",
         # numpy dep,
         # tensorflow dep,
@@ -202,5 +203,34 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/distributions:normal_conjugate_posteriors",
         "//tensorflow_probability/python/internal:test_util",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+multi_substrate_py_library(
+    name = "sample_parameters",
+    srcs = ["sample_parameters.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:invert",
+        "//tensorflow_probability/python/bijectors:square",
+        "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/distributions:inverse_gamma",
+        "//tensorflow_probability/python/distributions:transformed_distribution",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "sample_parameters_test",
+    size = "medium",
+    srcs = ["sample_parameters_test.py"],
+    deps = [
+        ":sample_parameters",
+        # absl/testing:parameterized dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions:inverse_gamma",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

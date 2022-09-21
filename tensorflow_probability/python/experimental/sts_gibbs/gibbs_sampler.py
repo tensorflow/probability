@@ -76,6 +76,7 @@ from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import normal_conjugate_posteriors
 from tensorflow_probability.python.experimental.distributions import mvn_precision_factor_linop as mvnpflo
 from tensorflow_probability.python.experimental.sts_gibbs import dynamic_spike_and_slab
+from tensorflow_probability.python.experimental.sts_gibbs import sample_parameters
 from tensorflow_probability.python.experimental.sts_gibbs import spike_and_slab
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import dtype_util
@@ -777,27 +778,10 @@ def _resample_scale(prior, observed_residuals, is_missing=None, seed=None):
   Returns:
     sampled_scale: A `Tensor` sample from the posterior `p(scale | x)`.
   """
-  dtype = observed_residuals.dtype
-
-  if is_missing is not None:
-    num_missing = tf.reduce_sum(tf.cast(is_missing, dtype), axis=-1)
-  num_observations = prefer_static.shape(observed_residuals)[-1]
-  if is_missing is not None:
-    observed_residuals = tf.where(is_missing, tf.zeros_like(observed_residuals),
-                                  observed_residuals)
-    num_observations -= num_missing
-
-  variance_posterior = type(prior)(
-      concentration=prior.concentration + tf.cast(num_observations / 2., dtype),
-      scale=prior.scale +
-      tf.reduce_sum(tf.square(observed_residuals), axis=-1) / 2.)
-  new_scale = tf.sqrt(variance_posterior.sample(seed=seed))
-
-  # Support truncated priors.
-  if hasattr(prior, 'upper_bound') and prior.upper_bound is not None:
-    new_scale = tf.minimum(new_scale, prior.upper_bound)
-
-  return new_scale
+  posterior = sample_parameters.normal_scale_posterior_inverse_gamma_conjugate(
+      prior, observed_residuals, is_missing)
+  return sample_parameters.sample_with_optional_upper_bound(
+      posterior, seed=seed)
 
 
 def _build_sampler_loop_body(model,
