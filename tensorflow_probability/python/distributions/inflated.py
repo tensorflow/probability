@@ -28,6 +28,7 @@ from tensorflow_probability.python.distributions import negative_binomial
 from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
@@ -147,9 +148,7 @@ class _Inflated(mixture.Mixture):
               probs_or_logits,
               # pylint: disable=g-long-lambda
               lambda _: tf.broadcast_to(self._inflated_loc,
-                                        tf.shape(probs_or_logits))
-              # pylint: enable=g-long-lambda
-          ),
+                                        ps.shape(probs_or_logits))),
           atol=self._inflated_loc_atol,
           rtol=self._inflated_loc_rtol,
           validate_args=validate_args,
