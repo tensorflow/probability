@@ -356,10 +356,10 @@ class RunningVariance(RunningCovariance):
     Returns:
       var: An empty `RunningVariance`, ready for incoming samples.
     """
-    return super().from_shape(shape, dtype, event_ndims=0)
+    return super().from_shape(shape, dtype, event_ndims=event_ndims)
 
   @classmethod
-  def from_example(cls, example):
+  def from_example(cls, example, event_ndims=None):
     """Starts a `RunningVariance` from an example.
 
     Args:
@@ -371,7 +371,7 @@ class RunningVariance(RunningCovariance):
         that by convention, the supplied example is used only for
         initialization, but not counted as a sample.
     """
-    return super().from_example(example, event_ndims=0)
+    return super().from_example(example, event_ndims=event_ndims)
 
   def variance(self, ddof=0):
     """Returns the variance accumulated so far.
