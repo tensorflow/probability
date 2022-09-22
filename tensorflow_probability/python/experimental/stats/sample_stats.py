@@ -16,6 +16,7 @@
 
 import functools
 import math
+
 # Dependency imports
 
 import numpy as np
@@ -28,33 +29,35 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 
 
 __all__ = [
-    'RunningCentralMoments',
-    'RunningCovariance',
-    'RunningMean',
-    'RunningPotentialScaleReduction',
-    'RunningVariance',
+    "RunningCentralMoments",
+    "RunningCovariance",
+    "RunningMean",
+    "RunningPotentialScaleReduction",
+    "RunningVariance",
 ]
 
 JAX_MODE = False
 
 if JAX_MODE:
-  ac_decorator = lambda **kwargs: lambda cls: cls
-  ACClass = object
+    ac_decorator = lambda **kwargs: lambda cls: cls
+    ACClass = object
 else:
-  from tensorflow_probability.python.internal import auto_composite_tensor  # pylint: disable=g-import-not-at-top
+    from tensorflow_probability.python.internal import (
+        auto_composite_tensor,
+    )  # pylint: disable=g-import-not-at-top
 
-  def ac_decorator(**kwargs):
+    def ac_decorator(**kwargs):
+        def _decorator(cls):
+            return auto_composite_tensor.auto_composite_tensor(**kwargs)(cls)
 
-    def _decorator(cls):
-      return auto_composite_tensor.auto_composite_tensor(**kwargs)(cls)
+        return _decorator
 
-    return _decorator
-  ACClass = auto_composite_tensor.AutoCompositeTensor
+    ACClass = auto_composite_tensor.AutoCompositeTensor
 
 
-@ac_decorator(omit_kwargs='name')
+@ac_decorator(omit_kwargs="name")
 class RunningCovariance(ACClass):
-  """A running covariance computation.
+    """A running covariance computation.
 
   The running covariance computation supports batching. The `event_ndims`
   parameter indicates the number of trailing dimensions to treat as part of
@@ -78,32 +81,41 @@ class RunningCovariance(ACClass):
   `CovarianceReducer` in `tfp.experimental.mcmc`.
   """
 
-  def __init__(self, num_samples, mean, sum_squared_residuals, event_ndims,
-               name='RunningCovariance'):
-    with tf.name_scope(name) as name:
-      dtype = dtype_util.common_dtype(
-          [num_samples, mean, sum_squared_residuals], dtype_hint=tf.float32)
-      self.num_samples = tf.convert_to_tensor(num_samples, dtype=dtype)
-      self.mean = tf.convert_to_tensor(mean, dtype=dtype)
-      self.sum_squared_residuals = tf.convert_to_tensor(
-          sum_squared_residuals, dtype=dtype)
-      self.event_ndims = event_ndims
-      self.name = name
+    def __init__(
+        self,
+        num_samples,
+        mean,
+        sum_squared_residuals,
+        event_ndims,
+        name="RunningCovariance",
+    ):
+        with tf.name_scope(name) as name:
+            dtype = dtype_util.common_dtype(
+                [num_samples, mean, sum_squared_residuals], dtype_hint=tf.float32
+            )
+            self.num_samples = tf.convert_to_tensor(num_samples, dtype=dtype)
+            self.mean = tf.convert_to_tensor(mean, dtype=dtype)
+            self.sum_squared_residuals = tf.convert_to_tensor(
+                sum_squared_residuals, dtype=dtype
+            )
+            self.event_ndims = event_ndims
+            self.name = name
 
-  def tree_flatten(self):
-    return (self.num_samples, self.mean, self.sum_squared_residuals), (
-        self.event_ndims,
-        self.name,
-    )
+    def tree_flatten(self):
+        return (
+            (self.num_samples, self.mean, self.sum_squared_residuals),
+            (self.event_ndims, self.name,),
+        )
 
-  @classmethod
-  def tree_unflatten(cls, metadata, tensors):
-    return cls(*tensors, *metadata)
+    @classmethod
+    def tree_unflatten(cls, metadata, tensors):
+        return cls(*tensors, *metadata)
 
-  @classmethod
-  def from_shape(cls, shape=(), dtype=tf.float32, event_ndims=None,
-                 name='RunningCovariance'):
-    """Starts a `RunningCovariance` from shape and dtype metadata.
+    @classmethod
+    def from_shape(
+        cls, shape=(), dtype=tf.float32, event_ndims=None, name="RunningCovariance"
+    ):
+        """Starts a `RunningCovariance` from shape and dtype metadata.
 
     Args:
       shape: Python `Tuple` or `TensorShape` representing the shape of incoming
@@ -127,25 +139,28 @@ class RunningCovariance(ACClass):
       ValueError: if `event_ndims` is greater than the rank of the intended
         incoming samples (operation is extraneous).
     """
-    dtype = _float_dtype_like(dtype)
-    event_ndims = _default_covariance_event_ndims(event_ndims, shape)
-    if event_ndims == 0:
-      extra_ndims_shape = ()
-    else:
-      # event_ndims cannot be None by this point
-      extra_ndims_shape = shape[-event_ndims:]  # pylint: disable=invalid-unary-operand-type
-    return cls(
-        num_samples=tf.zeros((), dtype=dtype),
-        mean=tf.zeros(shape, dtype=dtype),
-        sum_squared_residuals=tf.zeros(
-            ps.concat([shape, extra_ndims_shape], axis=0), dtype=dtype),
-        event_ndims=event_ndims,
-        name=name,
-    )
+        dtype = _float_dtype_like(dtype)
+        event_ndims = _default_covariance_event_ndims(event_ndims, shape)
+        if event_ndims == 0:
+            extra_ndims_shape = ()
+        else:
+            # event_ndims cannot be None by this point
+            extra_ndims_shape = shape[
+                -event_ndims:
+            ]  # pylint: disable=invalid-unary-operand-type
+        return cls(
+            num_samples=tf.zeros((), dtype=dtype),
+            mean=tf.zeros(shape, dtype=dtype),
+            sum_squared_residuals=tf.zeros(
+                ps.concat([shape, extra_ndims_shape], axis=0), dtype=dtype
+            ),
+            event_ndims=event_ndims,
+            name=name,
+        )
 
-  @classmethod
-  def from_example(cls, example, event_ndims=None, name='RunningCovariance'):
-    """Starts a `RunningCovariance` from an example.
+    @classmethod
+    def from_example(cls, example, event_ndims=None, name="RunningCovariance"):
+        """Starts a `RunningCovariance` from an example.
 
     Args:
       example: A `Tensor`.  The `RunningCovariance` will accept samples
@@ -163,11 +178,12 @@ class RunningCovariance(ACClass):
     Raises:
       ValueError: if `event_ndims` is greater than the rank of the example.
     """
-    return cls.from_shape(
-        ps.shape(example), example.dtype, event_ndims=event_ndims, name=name)
+        return cls.from_shape(
+            ps.shape(example), example.dtype, event_ndims=event_ndims, name=name
+        )
 
-  def update(self, new_sample, axis=None):
-    """Update the `RunningCovariance` with a new sample.
+    def update(self, new_sample, axis=None):
+        """Update the `RunningCovariance` with a new sample.
 
     The update formula is from Philippe Pebay (2008) [1]. This implementation
     supports both batched and chunked covariance computation. A "batch" is the
@@ -206,38 +222,39 @@ class RunningCovariance(ACClass):
          SAND2008-6212_, 2008.
          https://prod-ng.sandia.gov/techlib-noauth/access-control.cgi/2008/086212.pdf
     """
-    with tf.name_scope((self.name or 'RunningCovariance') + '.update'):
-      dtype = self.mean.dtype
-      new_sample = tf.cast(new_sample, dtype=dtype)
-      if axis is not None:
-        chunk_n = tf.cast(ps.shape(new_sample)[axis], dtype=dtype)
-        chunk_mean = tf.math.reduce_mean(new_sample, axis=axis)
-        chunk_delta_mean = new_sample - tf.expand_dims(chunk_mean, axis=axis)
-        chunk_sum_squared_residuals = tf.reduce_sum(
-            _batch_outer_product(chunk_delta_mean, self.event_ndims),
-            axis=axis
-        )
-      else:
-        chunk_n = tf.ones((), dtype=dtype)
-        chunk_mean = new_sample
-        chunk_sum_squared_residuals = tf.zeros(
-            ps.shape(self.sum_squared_residuals),
-            dtype=dtype)
+        with tf.name_scope((self.name or "RunningCovariance") + ".update"):
+            dtype = self.mean.dtype
+            new_sample = tf.cast(new_sample, dtype=dtype)
+            if axis is not None:
+                chunk_n = tf.cast(ps.shape(new_sample)[axis], dtype=dtype)
+                chunk_mean = tf.math.reduce_mean(new_sample, axis=axis)
+                chunk_delta_mean = new_sample - tf.expand_dims(chunk_mean, axis=axis)
+                chunk_sum_squared_residuals = tf.reduce_sum(
+                    _batch_outer_product(chunk_delta_mean, self.event_ndims), axis=axis
+                )
+            else:
+                chunk_n = tf.ones((), dtype=dtype)
+                chunk_mean = new_sample
+                chunk_sum_squared_residuals = tf.zeros(
+                    ps.shape(self.sum_squared_residuals), dtype=dtype
+                )
 
-      new_n = self.num_samples + chunk_n
-      delta_mean = chunk_mean - self.mean
-      new_mean = self.mean + chunk_n * delta_mean / new_n
-      all_pairwise_deltas = _batch_outer_product(
-          delta_mean, self.event_ndims)
-      adj_factor = self.num_samples * chunk_n / (self.num_samples + chunk_n)
-      new_sum_squared_residuals = (self.sum_squared_residuals
-                                   + chunk_sum_squared_residuals
-                                   + adj_factor * all_pairwise_deltas)
-      return type(self)(
-          new_n, new_mean, new_sum_squared_residuals, self.event_ndims)
+            new_n = self.num_samples + chunk_n
+            delta_mean = chunk_mean - self.mean
+            new_mean = self.mean + chunk_n * delta_mean / new_n
+            all_pairwise_deltas = _batch_outer_product(delta_mean, self.event_ndims)
+            adj_factor = self.num_samples * chunk_n / (self.num_samples + chunk_n)
+            new_sum_squared_residuals = (
+                self.sum_squared_residuals
+                + chunk_sum_squared_residuals
+                + adj_factor * all_pairwise_deltas
+            )
+            return type(self)(
+                new_n, new_mean, new_sum_squared_residuals, self.event_ndims
+            )
 
-  def covariance(self, ddof=0):
-    """Returns the covariance accumulated so far.
+    def covariance(self, ddof=0):
+        """Returns the covariance accumulated so far.
 
     Args:
       ddof: Requested dynamic degrees of freedom for the covariance calculation.
@@ -247,41 +264,47 @@ class RunningCovariance(ACClass):
     Returns:
       covariance: An estimate of the covariance.
     """
-    with tf.name_scope((self.name or 'RunningCovariance') + '.covariance'):
-      ddof = tf.convert_to_tensor(ddof, dtype_hint=self.num_samples.dtype)
-      return self.sum_squared_residuals / (self.num_samples - ddof)
+        with tf.name_scope((self.name or "RunningCovariance") + ".covariance"):
+            ddof = tf.convert_to_tensor(ddof, dtype_hint=self.num_samples.dtype)
+            return self.sum_squared_residuals / (self.num_samples - ddof)
 
-  def __repr__(self):
-    return ('RunningCovariance(\n'
-            f'    num_samples={self.num_samples!r},\n'
-            f'    mean={self.mean!r},\n'
-            f'    sum_squared_residuals={self.sum_squared_residuals!r},\n'
-            f'    event_ndims={self.event_ndims!r})')
+    def __repr__(self):
+        return (
+            "RunningCovariance(\n"
+            f"    num_samples={self.num_samples!r},\n"
+            f"    mean={self.mean!r},\n"
+            f"    sum_squared_residuals={self.sum_squared_residuals!r},\n"
+            f"    event_ndims={self.event_ndims!r})"
+        )
 
 
 def _default_covariance_event_ndims(event_ndims, shape):
-  """Try to default `event_ndims` to 'full covariance' for the given `shape`."""
-  shape_rank = tf.get_static_value(ps.rank_from_shape(shape))
-  if event_ndims is None:
-    if shape_rank is None:
-      raise ValueError('Cannot default to computing all covariances for '
-                       'samples of statically unknown rank.')
-    else:
-      event_ndims = shape_rank
-  if shape_rank is not None and event_ndims > shape_rank:
-    raise ValueError('Cannot calculate cross-products in {} dimensions for '
-                     'samples of rank {}'.format(event_ndims, shape_rank))
-  if event_ndims > 13:
-    # This 13 is because we use an einsum to construct the needed outer product
-    # in `_batch_outer_product`.  Each event dimension requires two distinct
-    # characters to represent, and we don't want to rely on `tf.einsum`
-    # supporting a larger alphabet than lower-case English letters.
-    raise ValueError('`event_ndims` over 13 not supported')
-  return event_ndims
+    """Try to default `event_ndims` to 'full covariance' for the given `shape`."""
+    shape_rank = tf.get_static_value(ps.rank_from_shape(shape))
+    if event_ndims is None:
+        if shape_rank is None:
+            raise ValueError(
+                "Cannot default to computing all covariances for "
+                "samples of statically unknown rank."
+            )
+        else:
+            event_ndims = shape_rank
+    if shape_rank is not None and event_ndims > shape_rank:
+        raise ValueError(
+            "Cannot calculate cross-products in {} dimensions for "
+            "samples of rank {}".format(event_ndims, shape_rank)
+        )
+    if event_ndims > 13:
+        # This 13 is because we use an einsum to construct the needed outer product
+        # in `_batch_outer_product`.  Each event dimension requires two distinct
+        # characters to represent, and we don't want to rely on `tf.einsum`
+        # supporting a larger alphabet than lower-case English letters.
+        raise ValueError("`event_ndims` over 13 not supported")
+    return event_ndims
 
 
 def _batch_outer_product(target, event_ndims):
-  """Calculates the batch outer product along `target`'s event dimensions.
+    """Calculates the batch outer product along `target`'s event dimensions.
 
   More precisely, A `tf.einsum` operation is used to calculate desired
   pairwise products as follows:
@@ -304,26 +327,28 @@ def _batch_outer_product(target, event_ndims):
     outer_product: A `Tensor` with shape B + E + E for all pairwise
       products of `target` in the event dimensions.
   """
-  assign_indices = ''.join(list(
-      map(chr, range(ord('a'), ord('a') + event_ndims * 2))))
-  first_indices = assign_indices[:event_ndims]
-  second_indices = assign_indices[event_ndims:]
-  einsum_formula = '...{},...{}->...{}'.format(
-      first_indices, second_indices, assign_indices)
-  return tf.einsum(einsum_formula, target, target)
+    assign_indices = "".join(
+        list(map(chr, range(ord("a"), ord("a") + event_ndims * 2)))
+    )
+    first_indices = assign_indices[:event_ndims]
+    second_indices = assign_indices[event_ndims:]
+    einsum_formula = "...{},...{}->...{}".format(
+        first_indices, second_indices, assign_indices
+    )
+    return tf.einsum(einsum_formula, target, target)
 
 
 def _float_dtype_like(dtype):
-  if dtype_util.as_numpy_dtype(dtype) == np.int64:
-    return tf.float64
-  if dtype_util.is_integer(dtype):
-    return tf.float32
-  return dtype
+    if dtype_util.as_numpy_dtype(dtype) == np.int64:
+        return tf.float64
+    if dtype_util.is_integer(dtype):
+        return tf.float32
+    return dtype
 
 
-@ac_decorator(omit_kwargs='name')
+@ac_decorator(omit_kwargs="name")
 class RunningVariance(RunningCovariance):
-  """A running variance computation.
+    """A running variance computation.
 
   This is just an alias for `RunningCovariance`, with the `event_ndims` set to 0
   to compute variances.
@@ -333,10 +358,11 @@ class RunningVariance(RunningCovariance):
   `VarianceReducer` in `tfp.experimental.mcmc`.
   """
 
-  @classmethod
-  def from_shape(cls, shape=(), dtype=tf.float32, event_ndims=None,
-                 name="RunningVariance"):
-    """Starts a `RunningVariance` from shape and dtype metadata.
+    @classmethod
+    def from_shape(
+        cls, shape=(), dtype=tf.float32, event_ndims=None, name="RunningVariance"
+    ):
+        """Starts a `RunningVariance` from shape and dtype metadata.
 
     Args:
       shape: Python `Tuple` or `TensorShape` representing the shape of incoming
@@ -356,11 +382,11 @@ class RunningVariance(RunningCovariance):
     Returns:
       var: An empty `RunningVariance`, ready for incoming samples.
     """
-    return super().from_shape(shape, dtype, event_ndims=event_ndims)
+        return super().from_shape(shape, dtype, event_ndims=event_ndims)
 
-  @classmethod
-  def from_example(cls, example, event_ndims=None):
-    """Starts a `RunningVariance` from an example.
+    @classmethod
+    def from_example(cls, example, event_ndims=None):
+        """Starts a `RunningVariance` from an example.
 
     Args:
       example: A `Tensor`.  The `RunningVariance` will accept samples
@@ -371,10 +397,10 @@ class RunningVariance(RunningCovariance):
         that by convention, the supplied example is used only for
         initialization, but not counted as a sample.
     """
-    return super().from_example(example, event_ndims=event_ndims)
+        return super().from_example(example, event_ndims=event_ndims)
 
-  def variance(self, ddof=0):
-    """Returns the variance accumulated so far.
+    def variance(self, ddof=0):
+        """Returns the variance accumulated so far.
 
     Args:
       ddof: Requested dynamic degrees of freedom for the variance calculation.
@@ -384,11 +410,11 @@ class RunningVariance(RunningCovariance):
     Returns:
       variance: An estimate of the variance.
     """
-    return self.covariance(ddof)
+        return tf.linalg.diag_part(self.covariance(ddof))
 
-  @classmethod
-  def from_stats(cls, num_samples, mean, variance):
-    """Initialize a `RunningVariance` object with given stats.
+    @classmethod
+    def from_stats(cls, num_samples, mean, variance):
+        """Initialize a `RunningVariance` object with given stats.
 
     This allows the user to initialize knowing the mean, variance, and number
     of samples seen so far.
@@ -401,25 +427,29 @@ class RunningVariance(RunningCovariance):
     Returns:
       `RunningVariance` object, with given mean and variance estimate.
     """
-    # TODO(b/173736911): Add this to RunningCovariance
-    num_samples = tf.convert_to_tensor(num_samples, name='num_samples')
-    mean = tf.convert_to_tensor(mean, name='mean')
-    variance = tf.convert_to_tensor(variance, name='variance')
-    return cls(num_samples=num_samples,
-               mean=mean,
-               sum_squared_residuals=num_samples * variance,
-               event_ndims=0)
+        # TODO(b/173736911): Add this to RunningCovariance
+        num_samples = tf.convert_to_tensor(num_samples, name="num_samples")
+        mean = tf.convert_to_tensor(mean, name="mean")
+        variance = tf.convert_to_tensor(variance, name="variance")
+        return cls(
+            num_samples=num_samples,
+            mean=mean,
+            sum_squared_residuals=num_samples * variance,
+            event_ndims=0,
+        )
 
-  def __repr__(self):
-    return ('RunningVariance(\n'
-            f'    num_samples={self.num_samples!r},\n'
-            f'    mean={self.mean!r},\n'
-            f'    sum_squared_residuals={self.sum_squared_residuals!r})')
+    def __repr__(self):
+        return (
+            "RunningVariance(\n"
+            f"    num_samples={self.num_samples!r},\n"
+            f"    mean={self.mean!r},\n"
+            f"    sum_squared_residuals={self.sum_squared_residuals!r})"
+        )
 
 
-@ac_decorator(omit_kwargs='name')
+@ac_decorator(omit_kwargs="name")
 class RunningMean(ACClass):
-  """Computes a running mean.
+    """Computes a running mean.
 
   In computation, samples can be provided individually or in chunks. A
   "chunk" of size M implies incorporating M samples into a single expectation
@@ -430,8 +460,8 @@ class RunningMean(ACClass):
   `ExpectationsReducer` in `tfp.experimental.mcmc`.
   """
 
-  def __init__(self, num_samples, mean):
-    """Instantiates a `RunningMean`.
+    def __init__(self, num_samples, mean):
+        """Instantiates a `RunningMean`.
 
     Support batch accumulation of multiple independent running means.
 
@@ -441,19 +471,19 @@ class RunningMean(ACClass):
       mean: A `Tensor` broadcast-compatible with `num_samples` giving the
         current mean.
     """
-    self.num_samples = num_samples
-    self.mean = mean
+        self.num_samples = num_samples
+        self.mean = mean
 
-  def tree_flatten(self):
-    return (self.num_samples, self.mean), ()
+    def tree_flatten(self):
+        return (self.num_samples, self.mean), ()
 
-  @classmethod
-  def tree_unflatten(cls, _, tensors):
-    return cls(*tensors)
+    @classmethod
+    def tree_unflatten(cls, _, tensors):
+        return cls(*tensors)
 
-  @classmethod
-  def from_shape(cls, shape, dtype=tf.float32):
-    """Initialize an empty `RunningMean`.
+    @classmethod
+    def from_shape(cls, shape, dtype=tf.float32):
+        """Initialize an empty `RunningMean`.
 
     Args:
       shape: Python `Tuple` or `TensorShape` representing the shape of
@@ -467,14 +497,12 @@ class RunningMean(ACClass):
     Returns:
       state: `RunningMean` representing a stream of no inputs.
     """
-    dtype = _float_dtype_like(dtype)
-    return cls(
-        num_samples=tf.zeros((), dtype=dtype),
-        mean=tf.zeros(shape, dtype))
+        dtype = _float_dtype_like(dtype)
+        return cls(num_samples=tf.zeros((), dtype=dtype), mean=tf.zeros(shape, dtype))
 
-  @classmethod
-  def from_example(cls, example):
-    """Initialize an empty `RunningMean`.
+    @classmethod
+    def from_example(cls, example):
+        """Initialize an empty `RunningMean`.
 
     Args:
       example: A `Tensor`.  The `RunningMean` will accept samples
@@ -485,10 +513,10 @@ class RunningMean(ACClass):
         that by convention, the supplied example is used only for
         initialization, but not counted as a sample.
     """
-    return cls.from_shape(ps.shape(example), example.dtype)
+        return cls.from_shape(ps.shape(example), example.dtype)
 
-  def update(self, new_sample, axis=None):
-    """Update the `RunningMean` with a new sample.
+    def update(self, new_sample, axis=None):
+        """Update the `RunningMean` with a new sample.
 
     The update formula is from Philippe Pebay (2008) [1] and is identical to
     that used to calculate the intermediate mean in
@@ -511,30 +539,32 @@ class RunningMean(ACClass):
          SAND2008-6212_, 2008.
          https://prod-ng.sandia.gov/techlib-noauth/access-control.cgi/2008/086212.pdf
     """
-    dtype = self.mean.dtype
-    new_sample = tf.nest.map_structure(
-        lambda new_sample: tf.cast(new_sample, dtype=dtype),
-        new_sample)
-    if axis is None:
-      chunk_n = tf.constant(1, dtype=dtype)
-      chunk_mean = new_sample
-    else:
-      chunk_n = tf.cast(ps.shape(new_sample)[axis], dtype=dtype)
-      chunk_mean = tf.math.reduce_mean(new_sample, axis=axis)
-    new_n = self.num_samples + chunk_n
-    delta_mean = chunk_mean - self.mean
-    new_mean = self.mean + chunk_n * delta_mean / new_n
-    return RunningMean(new_n, new_mean)
+        dtype = self.mean.dtype
+        new_sample = tf.nest.map_structure(
+            lambda new_sample: tf.cast(new_sample, dtype=dtype), new_sample
+        )
+        if axis is None:
+            chunk_n = tf.constant(1, dtype=dtype)
+            chunk_mean = new_sample
+        else:
+            chunk_n = tf.cast(ps.shape(new_sample)[axis], dtype=dtype)
+            chunk_mean = tf.math.reduce_mean(new_sample, axis=axis)
+        new_n = self.num_samples + chunk_n
+        delta_mean = chunk_mean - self.mean
+        new_mean = self.mean + chunk_n * delta_mean / new_n
+        return RunningMean(new_n, new_mean)
 
-  def __repr__(self):
-    return ('RunningMean(\n'
-            f'    num_samples={self.num_samples!r},\n'
-            f'    mean={self.mean!r})')
+    def __repr__(self):
+        return (
+            "RunningMean(\n"
+            f"    num_samples={self.num_samples!r},\n"
+            f"    mean={self.mean!r})"
+        )
 
 
 @ac_decorator()
 class RunningCentralMoments(ACClass):
-  """Computes running central moments.
+    """Computes running central moments.
 
   `RunningCentralMoments` will compute arbitrary central moments in
   streaming fashion following the formula proposed by Philippe Pebay
@@ -554,8 +584,8 @@ class RunningCentralMoments(ACClass):
         https://prod-ng.sandia.gov/techlib-noauth/access-control.cgi/2008/086212.pdf
   """
 
-  def __init__(self, mean_state, exponentiated_residuals, desired_moments):
-    """Constructs a `RunningCentralMoments`.
+    def __init__(self, mean_state, exponentiated_residuals, desired_moments):
+        """Constructs a `RunningCentralMoments`.
 
     All moments up to the maximum of the desired moments will be computed.
 
@@ -569,21 +599,20 @@ class RunningCentralMoments(ACClass):
         The maximum element of this list gives the number of moments that
         will be computed.
     """
-    self.mean_state = mean_state
-    self.exponentiated_residuals = exponentiated_residuals
-    self.desired_moments = desired_moments
+        self.mean_state = mean_state
+        self.exponentiated_residuals = exponentiated_residuals
+        self.desired_moments = desired_moments
 
-  def tree_flatten(self):
-    return (self.mean_state,
-            self.exponentiated_residuals), (self.desired_moments,)
+    def tree_flatten(self):
+        return (self.mean_state, self.exponentiated_residuals), (self.desired_moments,)
 
-  @classmethod
-  def tree_unflatten(cls, metadata, tensors):
-    return cls(*tensors, *metadata)
+    @classmethod
+    def tree_unflatten(cls, metadata, tensors):
+        return cls(*tensors, *metadata)
 
-  @classmethod
-  def from_shape(cls, shape, moment, dtype=tf.float32):
-    """Returns an empty `RunningCentralMoments`.
+    @classmethod
+    def from_shape(cls, shape, moment, dtype=tf.float32):
+        """Returns an empty `RunningCentralMoments`.
 
     Args:
       shape: Python `Tuple` or `TensorShape` representing the shape of
@@ -600,24 +629,26 @@ class RunningCentralMoments(ACClass):
       state: `RunningCentralMoments` representing a stream of no
         inputs.
     """
-    if isinstance(moment, (tuple, list, np.ndarray)):
-      # we want to support numpy arrays too, but must convert to a list to not
-      # confuse `tf.nest.map_structure` in `finalize`
-      desired_moments = list(moment)
-      max_moment = max(desired_moments)
-    else:
-      desired_moments = [moment]
-      max_moment = moment
-    dtype = _float_dtype_like(dtype)
-    return cls(
-        mean_state=RunningMean.from_shape(shape, dtype),
-        exponentiated_residuals=tf.zeros(
-            ps.concat([(max_moment - 1,), shape], axis=0), dtype),
-        desired_moments=desired_moments)
+        if isinstance(moment, (tuple, list, np.ndarray)):
+            # we want to support numpy arrays too, but must convert to a list to not
+            # confuse `tf.nest.map_structure` in `finalize`
+            desired_moments = list(moment)
+            max_moment = max(desired_moments)
+        else:
+            desired_moments = [moment]
+            max_moment = moment
+        dtype = _float_dtype_like(dtype)
+        return cls(
+            mean_state=RunningMean.from_shape(shape, dtype),
+            exponentiated_residuals=tf.zeros(
+                ps.concat([(max_moment - 1,), shape], axis=0), dtype
+            ),
+            desired_moments=desired_moments,
+        )
 
-  @classmethod
-  def from_example(cls, example, moment):
-    """Initialize an empty `RunningCentralMoments`.
+    @classmethod
+    def from_example(cls, example, moment):
+        """Initialize an empty `RunningCentralMoments`.
 
     Args:
       example: A `Tensor`.  The `RunningCentralMoments` will accept
@@ -631,10 +662,10 @@ class RunningCentralMoments(ACClass):
         inputs.  Note that by convention, the supplied example is used
         only for initialization, but not counted as a sample.
     """
-    return cls.from_shape(ps.shape(example), moment, example.dtype)
+        return cls.from_shape(ps.shape(example), moment, example.dtype)
 
-  def update(self, new_sample):
-    """Update with a new sample.
+    def update(self, new_sample):
+        """Update with a new sample.
 
     Args:
       new_sample: Incoming `Tensor` sample with shape and dtype compatible with
@@ -643,83 +674,97 @@ class RunningCentralMoments(ACClass):
     Returns:
       state: `RunningCentralMoments` updated to include the new sample.
     """
-    shape = self.mean_state.mean.shape
-    dtype = self.mean_state.mean.dtype
-    n_2 = 1
-    n_1 = self.mean_state.num_samples
-    n = tf.cast(n_1 + n_2, dtype=dtype)
-    delta_mean = new_sample - self.mean_state.mean
-    new_mean_state = self.mean_state.update(new_sample)
-    # The sum of exponentiated residuals can be thought of as an estimation
-    # of the central moment before dividing through by the number of samples.
-    # Since the first central moment is always 0, it simplifies update
-    # logic to prepend an appropriate structure of zeros.
-    old_res = tf.concat([
-        tf.zeros(ps.concat([(1,), shape], axis=0), dtype),
-        self.exponentiated_residuals], axis=0)
-    # Not storing said zeros in the carried state, though
-    new_exponentiated_residuals = []
+        shape = self.mean_state.mean.shape
+        dtype = self.mean_state.mean.dtype
+        n_2 = 1
+        n_1 = self.mean_state.num_samples
+        n = tf.cast(n_1 + n_2, dtype=dtype)
+        delta_mean = new_sample - self.mean_state.mean
+        new_mean_state = self.mean_state.update(new_sample)
+        # The sum of exponentiated residuals can be thought of as an estimation
+        # of the central moment before dividing through by the number of samples.
+        # Since the first central moment is always 0, it simplifies update
+        # logic to prepend an appropriate structure of zeros.
+        old_res = tf.concat(
+            [
+                tf.zeros(ps.concat([(1,), shape], axis=0), dtype),
+                self.exponentiated_residuals,
+            ],
+            axis=0,
+        )
+        # Not storing said zeros in the carried state, though
+        new_exponentiated_residuals = []
 
-    # the following two nested for loops calculate equation 2.9 in Pebay's
-    # 2008 paper from smallest moment to highest.
-    max_moment = max(self.desired_moments)
-    for p in range(2, max_moment + 1):
-      summation = tf.zeros(shape, dtype)
-      for k in range(1, p - 1):
-        adjusted_old_res = ((-delta_mean / n) ** k) * old_res[p - k - 1]
-        summation += _n_choose_k(p, k) * adjusted_old_res
-      # the `adj_term` refers to the final term in equation 2.9 and is not
-      # transcribed exactly; rather, it's simplified to avoid having a
-      # `(n - 1)` denominator.
-      adj_term = (((delta_mean / n) ** p) * (n - 1) *
-                  ((n - 1) ** (p - 1) + (-1) ** p))
-      new_pth_residual = old_res[p - 1] + summation + adj_term
-      new_exponentiated_residuals.append(new_pth_residual)
+        # the following two nested for loops calculate equation 2.9 in Pebay's
+        # 2008 paper from smallest moment to highest.
+        max_moment = max(self.desired_moments)
+        for p in range(2, max_moment + 1):
+            summation = tf.zeros(shape, dtype)
+            for k in range(1, p - 1):
+                adjusted_old_res = ((-delta_mean / n) ** k) * old_res[p - k - 1]
+                summation += _n_choose_k(p, k) * adjusted_old_res
+            # the `adj_term` refers to the final term in equation 2.9 and is not
+            # transcribed exactly; rather, it's simplified to avoid having a
+            # `(n - 1)` denominator.
+            adj_term = (
+                ((delta_mean / n) ** p) * (n - 1) * ((n - 1) ** (p - 1) + (-1) ** p)
+            )
+            new_pth_residual = old_res[p - 1] + summation + adj_term
+            new_exponentiated_residuals.append(new_pth_residual)
 
-    return RunningCentralMoments(
-        new_mean_state,
-        # The cast is needed in case new_exponentiated_residuals is the empty
-        # list, which will happen if the user requested only the first moment.
-        exponentiated_residuals=tf.cast(
-            tf.stack(new_exponentiated_residuals, axis=0), dtype=dtype),
-        desired_moments=self.desired_moments)
+        return RunningCentralMoments(
+            new_mean_state,
+            # The cast is needed in case new_exponentiated_residuals is the empty
+            # list, which will happen if the user requested only the first moment.
+            exponentiated_residuals=tf.cast(
+                tf.stack(new_exponentiated_residuals, axis=0), dtype=dtype
+            ),
+            desired_moments=self.desired_moments,
+        )
 
-  def moments(self):
-    """Returns the central moments represented by this `RunningCentralMoments`.
+    def moments(self):
+        """Returns the central moments represented by this `RunningCentralMoments`.
 
     Returns:
       all_moments: A `Tensor` representing estimates of the requested central
         moments. Its leading dimension indexes the moment, in order of those
         requested (i.e. in order of `self.desired_moments`).
     """
-    # prepend a structure of zeros for the first moment
-    shape = self.mean_state.mean.shape
-    dtype = self.mean_state.mean.dtype
-    all_unfinalized_moments = tf.concat([
-        tf.zeros(ps.concat([(1,), shape], axis=0), dtype),
-        self.exponentiated_residuals], axis=0)
-    all_moments = all_unfinalized_moments / tf.cast(
-        self.mean_state.num_samples, dtype)
-    desired_moment_indices = tf.convert_to_tensor(
-        self.desired_moments, dtype=tf.int32) - 1
-    return tf.gather(all_moments, desired_moment_indices)
+        # prepend a structure of zeros for the first moment
+        shape = self.mean_state.mean.shape
+        dtype = self.mean_state.mean.dtype
+        all_unfinalized_moments = tf.concat(
+            [
+                tf.zeros(ps.concat([(1,), shape], axis=0), dtype),
+                self.exponentiated_residuals,
+            ],
+            axis=0,
+        )
+        all_moments = all_unfinalized_moments / tf.cast(
+            self.mean_state.num_samples, dtype
+        )
+        desired_moment_indices = (
+            tf.convert_to_tensor(self.desired_moments, dtype=tf.int32) - 1
+        )
+        return tf.gather(all_moments, desired_moment_indices)
 
-  def __repr__(self):
-    return (
-        'RunningCentralMoments('
-        f'    mean_state={self.mean_state!r},\n'
-        f'    exponentiated_residuals={self.exponentiated_residuals!r},\n'
-        f'    desired_moments={self.desired_moments!r})')
+    def __repr__(self):
+        return (
+            "RunningCentralMoments("
+            f"    mean_state={self.mean_state!r},\n"
+            f"    exponentiated_residuals={self.exponentiated_residuals!r},\n"
+            f"    desired_moments={self.desired_moments!r})"
+        )
 
 
 def _n_choose_k(n, k):
-  """Computes nCk."""
-  return math.factorial(n) // math.factorial(k) // math.factorial(n - k)
+    """Computes nCk."""
+    return math.factorial(n) // math.factorial(k) // math.factorial(n - k)
 
 
-@ac_decorator(omit_kwargs='name')
+@ac_decorator(omit_kwargs="name")
 class RunningPotentialScaleReduction(ACClass):
-  """A running R-hat diagnostic.
+    """A running R-hat diagnostic.
 
   `RunningPotentialScaleReduction` uses Gelman and Rubin (1992)'s potential
   scale reduction (also known as R-hat) for chain convergence [1].
@@ -747,8 +792,8 @@ class RunningPotentialScaleReduction(ACClass):
        Using Multiple Sequences. _Statistical Science_, 7(4):457-472, 1992.
   """
 
-  def __init__(self, chain_variances, independent_chain_ndims):
-    """Construct a `RunningPotentialScaleReduction`.
+    def __init__(self, chain_variances, independent_chain_ndims):
+        """Construct a `RunningPotentialScaleReduction`.
 
     Args:
       chain_variances: A `RunningVariance` or nested structure of
@@ -760,19 +805,19 @@ class RunningPotentialScaleReduction(ACClass):
         potential scale reduction factor should be computed.  Must be at least
         1.
     """
-    self.chain_variances = chain_variances
-    self.independent_chain_ndims = independent_chain_ndims
+        self.chain_variances = chain_variances
+        self.independent_chain_ndims = independent_chain_ndims
 
-  def tree_flatten(self):
-    return (self.chain_variances,), (self.independent_chain_ndims,)
+    def tree_flatten(self):
+        return (self.chain_variances,), (self.independent_chain_ndims,)
 
-  @classmethod
-  def tree_unflatten(cls, metadata, tensors):
-    return cls(*tensors, *metadata)
+    @classmethod
+    def tree_unflatten(cls, metadata, tensors):
+        return cls(*tensors, *metadata)
 
-  @classmethod
-  def from_shape(cls, shape=(), independent_chain_ndims=1, dtype=tf.float32):
-    """Starts an empty `RunningPotentialScaleReduction` from metadata.
+    @classmethod
+    def from_shape(cls, shape=(), independent_chain_ndims=1, dtype=tf.float32):
+        """Starts an empty `RunningPotentialScaleReduction` from metadata.
 
     Args:
       shape: Python `Tuple` or `TensorShape` representing the shape of incoming
@@ -794,20 +839,21 @@ class RunningPotentialScaleReduction(ACClass):
       state: `RunningPotentialScaleReduction` representing a stream
         of no inputs.
     """
-    dtype = tf.nest.map_structure(_float_dtype_like, dtype)
+        dtype = tf.nest.map_structure(_float_dtype_like, dtype)
 
-    dtype = nest_util.broadcast_structure(independent_chain_ndims, dtype)
-    chain_variances = nest.map_structure_up_to(
-        independent_chain_ndims,
-        RunningVariance.from_shape,
-        shape,
-        dtype,
-        check_types=False)
-    return cls(chain_variances, independent_chain_ndims)
+        dtype = nest_util.broadcast_structure(independent_chain_ndims, dtype)
+        chain_variances = nest.map_structure_up_to(
+            independent_chain_ndims,
+            RunningVariance.from_shape,
+            shape,
+            dtype,
+            check_types=False,
+        )
+        return cls(chain_variances, independent_chain_ndims)
 
-  @classmethod
-  def from_example(cls, example, independent_chain_ndims=1):
-    """Starts an empty `RunningPotentialScaleReduction` from metadata.
+    @classmethod
+    def from_example(cls, example, independent_chain_ndims=1):
+        """Starts an empty `RunningPotentialScaleReduction` from metadata.
 
     Args:
       example: A `Tensor`.  The `RunningPotentialScaleReduction` will
@@ -823,12 +869,14 @@ class RunningPotentialScaleReduction(ACClass):
         no inputs.  Note that by convention, the supplied example is
         used only for initialization, but not counted as a sample.
     """
-    return cls.from_shape(
-        shape=ps.shape(example), dtype=example.dtype,
-        independent_chain_ndims=independent_chain_ndims)
+        return cls.from_shape(
+            shape=ps.shape(example),
+            dtype=example.dtype,
+            independent_chain_ndims=independent_chain_ndims,
+        )
 
-  def update(self, new_sample):
-    """Update the `RunningPotentialScaleReduction` with a new sample.
+    def update(self, new_sample):
+        """Update the `RunningPotentialScaleReduction` with a new sample.
 
     Args:
       new_sample: Incoming `Tensor` sample or (possibly nested) collection of
@@ -838,68 +886,72 @@ class RunningPotentialScaleReduction(ACClass):
     Returns:
       state: `RunningPotentialScaleReduction` updated to include the new sample.
     """
-    def _update_for_one_state(chain_variances, new_sample):
-      """Updates the running variance for one group of Markov chains."""
-      # TODO(axch): chunking could be reasonably added here by accepting and
-      # including the chunked axis to the running variance object
-      return chain_variances.update(new_sample)
-    updated_chain_variancess = tf.nest.map_structure(
-        _update_for_one_state,
-        self.chain_variances,
-        new_sample,
-        check_types=False
-    )
-    return type(self)(updated_chain_variancess, self.independent_chain_ndims)
 
-  def potential_scale_reduction(self):
-    """Computes the potential scale reduction for samples accumulated so far.
+        def _update_for_one_state(chain_variances, new_sample):
+            """Updates the running variance for one group of Markov chains."""
+            # TODO(axch): chunking could be reasonably added here by accepting and
+            # including the chunked axis to the running variance object
+            return chain_variances.update(new_sample)
+
+        updated_chain_variancess = tf.nest.map_structure(
+            _update_for_one_state, self.chain_variances, new_sample, check_types=False
+        )
+        return type(self)(updated_chain_variancess, self.independent_chain_ndims)
+
+    def potential_scale_reduction(self):
+        """Computes the potential scale reduction for samples accumulated so far.
 
     Returns:
       rhat: An estimate of the R-hat.
     """
-    def _finalize_for_one_state(chain_ndims, chain_variances):
-      """Calculates R-hat for one group of Markov chains."""
-      # using notation from Brooks and Gelman (1998),
-      # n := num samples / chain; m := number of chains
-      n = chain_variances.num_samples
-      shape = chain_variances.mean.shape
-      m = tf.cast(
-          functools.reduce((lambda x, y: x * y), (shape[:chain_ndims])),
-          n.dtype)
 
-      # b/n is the between-chain variance (the variance of the chain means)
-      b_div_n = diagnostic._reduce_variance(  # pylint:disable=protected-access
-          tf.convert_to_tensor(chain_variances.mean),
-          axis=ps.range(chain_ndims),
-          biased=False)
+        def _finalize_for_one_state(chain_ndims, chain_variances):
+            """Calculates R-hat for one group of Markov chains."""
+            # using notation from Brooks and Gelman (1998),
+            # n := num samples / chain; m := number of chains
+            n = chain_variances.num_samples
+            shape = chain_variances.mean.shape
+            m = tf.cast(
+                functools.reduce((lambda x, y: x * y), (shape[:chain_ndims])), n.dtype
+            )
 
-      # W is the within sequence variance (the mean of the chain variances)
-      sum_of_chain_squared_residuals = tf.reduce_sum(
-          chain_variances.sum_squared_residuals, axis=ps.range(chain_ndims))
-      w = sum_of_chain_squared_residuals / (m * (n - 1))
+            # b/n is the between-chain variance (the variance of the chain means)
+            b_div_n = diagnostic._reduce_variance(  # pylint:disable=protected-access
+                tf.convert_to_tensor(chain_variances.mean),
+                axis=ps.range(chain_ndims),
+                biased=False,
+            )
 
-      # the `true_variance_estimate` is denoted as sigma^2_+ in the 1998 paper
-      true_variance_estimate = ((n - 1) / n) * w + b_div_n
-      return ((m + 1.) / m) * true_variance_estimate / w - (n - 1.) / (m * n)
+            # W is the within sequence variance (the mean of the chain variances)
+            sum_of_chain_squared_residuals = tf.reduce_sum(
+                chain_variances.sum_squared_residuals, axis=ps.range(chain_ndims)
+            )
+            w = sum_of_chain_squared_residuals / (m * (n - 1))
 
-    return tf.nest.map_structure(
-        _finalize_for_one_state,
-        self.independent_chain_ndims,
-        self.chain_variances,
-        check_types=False
-    )
+            # the `true_variance_estimate` is denoted as sigma^2_+ in the 1998 paper
+            true_variance_estimate = ((n - 1) / n) * w + b_div_n
+            return ((m + 1.0) / m) * true_variance_estimate / w - (n - 1.0) / (m * n)
 
-  def __repr__(self):
-    return (
-        'RunningPotentialScaleReduction(\n'
-        f'    chain_variances={self.chain_variances!r},\n'
-        f'    independent_chain_ndims={self.independent_chain_ndims!r})')
+        return tf.nest.map_structure(
+            _finalize_for_one_state,
+            self.independent_chain_ndims,
+            self.chain_variances,
+            check_types=False,
+        )
+
+    def __repr__(self):
+        return (
+            "RunningPotentialScaleReduction(\n"
+            f"    chain_variances={self.chain_variances!r},\n"
+            f"    independent_chain_ndims={self.independent_chain_ndims!r})"
+        )
 
 
 if JAX_MODE:
-  from jax import tree_util  # pylint: disable=g-import-not-at-top
-  tree_util.register_pytree_node_class(RunningCentralMoments)
-  tree_util.register_pytree_node_class(RunningCovariance)
-  tree_util.register_pytree_node_class(RunningVariance)
-  tree_util.register_pytree_node_class(RunningMean)
-  tree_util.register_pytree_node_class(RunningPotentialScaleReduction)
+    from jax import tree_util  # pylint: disable=g-import-not-at-top
+
+    tree_util.register_pytree_node_class(RunningCentralMoments)
+    tree_util.register_pytree_node_class(RunningCovariance)
+    tree_util.register_pytree_node_class(RunningVariance)
+    tree_util.register_pytree_node_class(RunningMean)
+    tree_util.register_pytree_node_class(RunningPotentialScaleReduction)
