@@ -17,7 +17,6 @@
 from absl.testing import parameterized
 
 import numpy as np
-
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import inverse_gamma
@@ -34,7 +33,7 @@ from tensorflow_probability.python.stats import sample_stats
 from tensorflow_probability.python.sts.components import local_level
 from tensorflow_probability.python.sts.components import local_linear_trend
 from tensorflow_probability.python.sts.components import regression
-from tensorflow_probability.python.sts.components import seasonal
+from tensorflow_probability.python.sts.components import semilocal_linear_trend
 from tensorflow_probability.python.sts.components import sum as sum_lib
 from tensorflow_probability.python.sts.forecast import forecast
 from tensorflow_probability.python.sts.internal import missing_values_util
@@ -189,11 +188,12 @@ class GibbsSamplerTests(test_util.TestCase):
     if not tf.nest.is_nested(num_chains):
       num_results = num_results // num_chains
 
+    batch_shape = [3]
     model, observed_time_series, is_missing = self._build_test_model(
         num_timesteps=num_observed_steps + num_forecast_steps,
         true_slope_scale=0.5 if use_slope else None,
-        batch_shape=[3],
-        time_series_shift=time_series_shift)
+        time_series_shift=time_series_shift,
+        batch_shape=batch_shape)
 
     @tf.function(autograph=False)
     def do_sampling():
@@ -226,9 +226,9 @@ class GibbsSamplerTests(test_util.TestCase):
     predictive_mean, predictive_stddev = self.evaluate((
         predictive_dist.mean(), predictive_dist.stddev()))
     self.assertAllEqual(predictive_mean.shape,
-                        [3, num_observed_steps + num_forecast_steps])
+                        batch_shape + [num_observed_steps + num_forecast_steps])
     self.assertAllEqual(predictive_stddev.shape,
-                        [3, num_observed_steps + num_forecast_steps])
+                        batch_shape + [num_observed_steps + num_forecast_steps])
 
     # big tolerance, but makes sure the predictive mean initializes near
     # the initial time series value
@@ -457,31 +457,23 @@ class GibbsSamplerTests(test_util.TestCase):
     ],
                             observed_time_series=observed_time_series)
 
-    with self.assertRaisesRegexp(ValueError, 'does not support Gibbs sampling'):
+    with self.assertRaisesRegex(ValueError, 'does not support Gibbs sampling'):
       gibbs_sampler.fit_with_gibbs_sampling(
           bad_model, observed_time_series, seed=test_util.test_seed())
 
     bad_model.supports_gibbs_sampling = True
-    with self.assertRaisesRegexp(
-        ValueError, 'Expected the first model component to be an instance of'):
-      gibbs_sampler.fit_with_gibbs_sampling(
-          bad_model, observed_time_series, seed=test_util.test_seed())
-
     bad_model_with_correct_params = sum_lib.Sum([
-        # A seasonal model with no drift has no parameters, so adding it
-        # won't break the check for correct params.
-        seasonal.Seasonal(
-            num_seasons=2,
-            allow_drift=False,
+        # An unsupported model component.
+        semilocal_linear_trend.SemiLocalLinearTrend(
             observed_time_series=observed_time_series),
         local_level.LocalLevel(observed_time_series=observed_time_series),
         regression.LinearRegression(design_matrix=tf.ones([5, 2]))
     ])
     bad_model_with_correct_params.supports_gibbs_sampling = True
 
-    with self.assertRaisesRegexp(ValueError,
-                                 'Expected the first model component to be an '
-                                 'instance of `tfp.sts.LocalLevel`'):
+    with self.assertRaisesRegex(
+        NotImplementedError,
+        'Found unsupported model component for Gibbs Sampling'):
       gibbs_sampler.fit_with_gibbs_sampling(bad_model_with_correct_params,
                                             observed_time_series,
                                             seed=test_util.test_seed())
@@ -673,13 +665,13 @@ class GibbsSamplerTests(test_util.TestCase):
   @parameterized.named_parameters(
       {
           'testcase_name': 'Rank1Updates',
-          'use_dyanamic_cholesky': False,
+          'use_dynamic_cholesky': False,
       }, {
           'testcase_name': 'DynamicCholesky',
-          'use_dyanamic_cholesky': True,
+          'use_dynamic_cholesky': True,
       })
-  def test_sparse_regression_recovers_plausible_weights(
-      self, use_dyanamic_cholesky):
+  def test_sparse_regression_recovers_plausible_weights(self,
+                                                        use_dynamic_cholesky):
     true_weights = tf.constant([0., 0., 2., 0., -2.])
     model, observed_time_series, _ = self._build_test_model(
         num_timesteps=20,
@@ -698,9 +690,9 @@ class GibbsSamplerTests(test_util.TestCase):
           num_results=100,
           num_warmup_steps=100,
           seed=test_util.test_seed(sampler_type='stateless'),
-          experimental_use_dynamic_cholesky=use_dyanamic_cholesky)
+          experimental_use_dynamic_cholesky=use_dynamic_cholesky)
 
-    if JAX_MODE and use_dyanamic_cholesky:
+    if JAX_MODE and use_dynamic_cholesky:
       with self.assertRaises(ValueError):
         self.evaluate(do_sampling())
       return

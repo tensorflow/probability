@@ -118,6 +118,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/sts/components:local_linear_trend",
         "//tensorflow_probability/python/sts/components:regression",
         "//tensorflow_probability/python/sts/components:seasonal",
+        "//tensorflow_probability/python/sts/components:semilocal_linear_trend",
         "//tensorflow_probability/python/sts/components:sum",
         "//tensorflow_probability/python/sts/internal:missing_values_util",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport

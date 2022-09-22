@@ -395,10 +395,6 @@ def fit_with_gibbs_sampling(model,
   Returns:
     model: A `GibbsSamplerState` structure of posterior samples.
   """
-  if not hasattr(model, 'supports_gibbs_sampling'):
-    raise ValueError('This STS model does not support Gibbs sampling. Models '
-                     'for Gibbs sampling must be created using the '
-                     'method `build_model_for_gibbs_fitting`.')
   if not tf.nest.is_nested(num_chains):
     num_chains = [num_chains]
 
@@ -420,7 +416,8 @@ def fit_with_gibbs_sampling(model,
   # the slope_scale is always zero.
   initial_slope_scale = 0.
   initial_slope = 0.
-  if isinstance(model.components[0], local_linear_trend.LocalLinearTrend):
+  (_, level_component), _ = (_get_components_from_model(model))
+  if isinstance(level_component, local_linear_trend.LocalLinearTrend):
     initial_slope_scale = 1. * tf.ones(batch_shape, dtype=dtype)
     initial_slope = tf.zeros(level_slope_shape, dtype=dtype)
 
@@ -476,17 +473,22 @@ def model_parameter_samples_from_gibbs_samples(model, gibbs_samples):
    A set of posterior samples, that can be used with `make_state_space_model`
    or `sts.forecast`.
   """
-  if not hasattr(model, 'supports_gibbs_sampling'):
-    raise ValueError('This STS model does not support Gibbs sampling. Models '
-                     'for Gibbs sampling must be created using the '
-                     'method `build_model_for_gibbs_fitting`.')
+  # Make use of the indices in the model to avoid requiring a specific
+  # order of components.
+  ((level_component_index, level_component),
+   (regression_component_index, _)) = (
+       _get_components_from_model(model))
+  model_parameter_samples = (gibbs_samples.observation_noise_scale,)
 
-  if isinstance(model.components[0], local_linear_trend.LocalLinearTrend):
-    return (gibbs_samples.observation_noise_scale, gibbs_samples.level_scale,
-            gibbs_samples.slope_scale, gibbs_samples.weights)
-  else:
-    return (gibbs_samples.observation_noise_scale, gibbs_samples.level_scale,
-            gibbs_samples.weights)
+  for index in range(len(model.components)):
+    if index == level_component_index:
+      model_parameter_samples += (gibbs_samples.level_scale,)
+      if isinstance(level_component, local_linear_trend.LocalLinearTrend):
+        model_parameter_samples += (gibbs_samples.slope_scale,)
+    elif index == regression_component_index:
+      model_parameter_samples += (gibbs_samples.weights,)
+
+  return model_parameter_samples
 
 
 def one_step_predictive(model,
@@ -582,7 +584,7 @@ def one_step_predictive(model,
         tf.range(1., num_forecast_steps + 1., dtype=forecast_level.dtype))
 
   level_pred = tf.concat(
-      ([thinned_samples.level] if use_zero_step_prediction else [
+      ([thinned_samples.level] if use_zero_step_prediction else [  # pylint:disable=g-long-ternary
           thinned_samples.level[..., :1],  # t == 0
           (thinned_samples.level[..., :-1] + thinned_samples.slope[..., :-1]
           )  # 1 <= t < T. Constructs the next level from previous level
@@ -784,6 +786,56 @@ def _resample_scale(prior, observed_residuals, is_missing=None, seed=None):
       posterior, seed=seed)
 
 
+def _get_components_from_model(model):
+  """Returns the split-apart components from an STS model.
+
+  Args:
+    model: A `tf.sts.StructuralTimeSeries` to split apart.
+
+  Returns:
+    A tuple of (index and level component, index and regression component) or
+    an exception. The regression component may be None (along with its index -
+    (None, None)).
+
+    Each 'index and component' is a tuple of (index, component), where index
+    is the position in the model.
+  """
+  if not hasattr(model, 'supports_gibbs_sampling'):
+    raise ValueError('This STS model does not support Gibbs sampling. Models '
+                     'for Gibbs sampling must be created using the '
+                     'method `build_model_for_gibbs_fitting`.')
+
+  level_components = []
+  regression_components = []
+
+  for index, component in enumerate(model.components):
+    if (isinstance(component, local_level.LocalLevel) or
+        isinstance(component, local_linear_trend.LocalLinearTrend)):
+      level_components.append((index, component))
+    elif (isinstance(component, regression.LinearRegression) or
+          isinstance(component, SpikeAndSlabSparseLinearRegression)):
+      regression_components.append((index, component))
+    else:
+      raise NotImplementedError(
+          'Found unsupported model component for Gibbs Sampling: {}'.format(
+              component))
+
+  if len(level_components) != 1:
+    raise ValueError(
+        'Expected exactly one level component, found {} components.'.format(
+            len(level_components)))
+  level_component = level_components[0]
+
+  regression_component = (None, None)
+  if len(regression_components) > 1:
+    raise ValueError(
+        'Expected at most one regression component, found {} components.'
+        .format(len(regression_components)))
+  elif len(regression_components) == 1:
+    regression_component = regression_components[0]
+  return level_component, regression_component
+
+
 def _build_sampler_loop_body(model,
                              observed_time_series,
                              is_missing=None,
@@ -819,29 +871,12 @@ def _build_sampler_loop_body(model,
   """
   if JAX_MODE and experimental_use_dynamic_cholesky:
     raise ValueError('Dynamic Cholesky decomposition not supported in JAX')
-  level_component = model.components[0]
-  if not (isinstance(level_component, local_level.LocalLevel) or
-          isinstance(level_component, local_linear_trend.LocalLinearTrend)):
-    raise ValueError(
-        'Expected the first model component to be an instance of '
-        '`tfp.sts.LocalLevel` or `tfp.local_linear_trend.LocalLinearTrend`; '
-        'instead saw {}'.format(level_component))
+  (_, level_component), (_, regression_component) = (
+      _get_components_from_model(model))
   model_has_slope = isinstance(level_component,
                                local_linear_trend.LocalLinearTrend)
 
-  # TODO(kloveless): When we add support for more flexible models, remove
-  # this assumption.
-  regression_component = (None if len(model.components) != 2 else
-                          model.components[1])
-  if regression_component:
-    if not (isinstance(regression_component, regression.LinearRegression) or
-            isinstance(regression_component,
-                       SpikeAndSlabSparseLinearRegression)):
-      raise ValueError(
-          'Expected the second model component to be an instance of '
-          '`tfp.sts.LinearRegression` or '
-          '`SpikeAndSlabSparseLinearRegression`; '
-          'instead saw {}'.format(regression_component))
+  if regression_component is not None:
     model_has_spike_slab_regression = isinstance(
         regression_component, SpikeAndSlabSparseLinearRegression)
 
