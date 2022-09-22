@@ -18,7 +18,6 @@ import inspect
 import six
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import distributions
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow.python.framework.composite_tensor import CompositeTensor  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.saved_model import nested_structure_coder  # pylint: disable=g-direct-tensorflow-import
@@ -160,6 +159,7 @@ def _find_clsid(clsid):
   pkg, cls = clsid
   if clsid not in _registry:
     if pkg.startswith('tensorflow_probability.') and '.distributions' in pkg:
+      from tensorflow_probability.python import distributions  # pylint: disable=g-import-not-at-top
       dist_cls = getattr(distributions, cls)
       if (inspect.isclass(dist_cls) and
           issubclass(dist_cls, distributions.Distribution)):
