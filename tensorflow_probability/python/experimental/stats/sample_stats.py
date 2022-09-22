@@ -334,7 +334,8 @@ class RunningVariance(RunningCovariance):
   """
 
   @classmethod
-  def from_shape(cls, shape=(), dtype=tf.float32):
+  def from_shape(cls, shape=(), dtype=tf.float32, event_ndims=None,
+                 name="RunningVariance"):
     """Starts a `RunningVariance` from shape and dtype metadata.
 
     Args:
@@ -347,9 +348,13 @@ class RunningVariance(RunningCovariance):
         cast to corresponding floats (i.e. `tf.int32` will be cast to
         `tf.float32`), as intermediate calculations should be performing
         floating-point division.
+      event_ndims:  Number of dimensions that specify the event shape, from
+        the inner-most dimensions.  Specifying `None` returns all cross
+        product terms (no batching) and is the default.
+      name: Python `str` name prefixed to Ops created by this class.
 
     Returns:
-      var: An empty `RunningCovariance`, ready for incoming samples.
+      var: An empty `RunningVariance`, ready for incoming samples.
     """
     return super().from_shape(shape, dtype, event_ndims=0)
 
