@@ -14,7 +14,7 @@
 # ============================================================================
 """Tests for dtype_util."""
 
-import collections
+import dataclasses
 
 # Dependency imports
 from absl.testing import parameterized
@@ -51,15 +51,49 @@ class DtypeUtilTest(test_util.TestCase):
         tf.float16, dtype_util.common_dtype(
             [x, None], dtype_hint=tf.float32))
 
-    fake_tensor = collections.namedtuple('fake_tensor', ['dtype'])
+    fake_tensor = dataclasses.make_dataclass('fake_tensor', ['dtype'])
     self.assertEqual(
         tf.float16, dtype_util.common_dtype(
             [fake_tensor(dtype=None), None, x], dtype_hint=tf.float32))
+    self.assertEqual(
+        tf.float32, dtype_util.common_dtype(
+            [fake_tensor(dtype=tf.float32), None]))
 
   def testCommonDtypeFromLinop(self):
     x = tf.linalg.LinearOperatorDiag(tf.ones(3, tf.float16))
     self.assertEqual(
         tf.float16, dtype_util.common_dtype([x], dtype_hint=tf.float32))
+
+  def testCommonStructuredDtype(self):
+    structured_dtype_obj = dataclasses.make_dataclass(
+        'structured_dtype_obj', ['dtype'])
+    x = structured_dtype_obj({'a': tf.float32, 'b': (None, None)})
+    y = structured_dtype_obj({'a': None, 'b': (None, tf.float64)})
+    z = structured_dtype_obj({'a': None, 'b': (None, None)})
+    w = structured_dtype_obj(None)
+
+    # Check that structured dtypes unify correctly.
+    self.assertAllEqualNested(
+        dtype_util.common_dtype([w, x, y, z]),
+        {'a': tf.float32, 'b': (None, tf.float64)})
+
+    # Check that dict `args` works and that `dtype_hint` works.
+    dtype_hint = {'a': tf.int32, 'b': (tf.int32, None)}
+    self.assertAllEqualNested(
+        dtype_util.common_dtype(
+            {'x': x, 'y': y, 'z': z}, dtype_hint=dtype_hint),
+        {'a': tf.float32, 'b': (tf.int32, tf.float64)})
+    self.assertAllEqualNested(
+        dtype_util.common_dtype([w], dtype_hint=dtype_hint),
+        dtype_hint)
+
+    # Check that non-nested dtype_hint broadcasts.
+    self.assertAllEqualNested(
+        dtype_util.common_dtype([y, z], dtype_hint=tf.int32),
+        {'a': tf.int32, 'b': (tf.int32, tf.float64)})
+
+    with self.assertRaisesRegex(TypeError, 'Found incompatible dtypes'):
+      dtype_util.common_dtype([x, structured_dtype_obj(dtype_hint)])
 
   @parameterized.named_parameters(
       dict(testcase_name='Float32', dtype=tf.float32,
