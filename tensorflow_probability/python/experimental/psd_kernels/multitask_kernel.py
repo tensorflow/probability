@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
@@ -140,8 +141,10 @@ class MultiTaskKernel(psd_kernel.AutoCompositeTensorPsdKernel):
     # ==> [6, 6]
     """
     with tf.name_scope(name):
-      x1 = tf.convert_to_tensor(x1, name='x1', dtype_hint=self.dtype)
-      x2 = tf.convert_to_tensor(x2, name='x2', dtype_hint=self.dtype)
+      x1 = nest_util.convert_to_nested_tensor(
+          x1, name='x1', dtype_hint=self.dtype, allow_packing=True)
+      x2 = nest_util.convert_to_nested_tensor(
+          x2, name='x2', dtype_hint=self.dtype, allow_packing=True)
       return self._matrix_over_all_tasks(x1, x2)
 
   def _matrix_over_all_tasks(self, x1, x2):
