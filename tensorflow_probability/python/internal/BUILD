@@ -420,6 +420,7 @@ multi_substrate_py_library(
     srcs = ["nest_util.py"],
     deps = [
         ":prefer_static",
+        ":tensor_util",
         # numpy dep,
         # tensorflow dep,
     ],

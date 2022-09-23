@@ -141,7 +141,9 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint
   """Emulates tf.convert_to_tensor."""
   dtype = utils.numpy_dtype(dtype)
   dtype_hint = utils.numpy_dtype(dtype_hint)
-  if is_tensor(value) and not isinstance(value, Variable):
+  if isinstance(value, Variable):
+    value = value.__wrapped__
+  if is_tensor(value):
     # In NumPy mode, we are lenient on the dtype compatibility check because
     # some codepaths rely on flexible conversion from int/float64 to 32.
     if dtype is not None and value.dtype != dtype:
@@ -619,12 +621,17 @@ class NumpyVariable(getattr(wrapt, 'ObjectProxy', object)):
       v = v.astype(utils.numpy_dtype(dtype))
     super(NumpyVariable, self).__init__(v)
     self._self_name = name
+    self._self_trainable = trainable
     self.initializer = None
   # pylint: enable=unused-argument
 
   @property
   def name(self):
     return self._self_name if self._self_name is not None else str(id(self))
+
+  @property
+  def trainable(self):
+    return self._self_trainable
 
   def __array__(self, dtype=None):
     if dtype is not None:
@@ -657,10 +664,6 @@ if JAX_MODE:
   jax.core.pytype_aval_mappings[NumpyVariable] = (
       jax.core.pytype_aval_mappings[onp.ndarray])
 
-
-def _convert_variable_to_tensor(value, dtype=None):
-  return convert_to_tensor(value.__wrapped__, dtype=dtype)
-register_tensor_conversion_function(NumpyVariable, _convert_variable_to_tensor)
 
 Variable = NumpyVariable
 
