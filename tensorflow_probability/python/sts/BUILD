@@ -218,6 +218,7 @@ multi_substrate_py_test(
         ":holiday_effects",
         # holidays dep,
         # numpy dep,
+        # pandas dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
     ],
