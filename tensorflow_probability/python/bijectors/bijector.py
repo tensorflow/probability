@@ -1090,7 +1090,7 @@ class Bijector(tf.Module, metaclass=abc.ABCMeta):
   def __getitem__(self, slices):
     try:
       return slicing.batch_slice(
-          self, slices, bijector_x_event_ndims=self.forward_min_event_ndims)
+          self, {}, slices, bijector_x_event_ndims=self.forward_min_event_ndims)
     except ValueError as e:
       if (tf.nest.is_nested(self.forward_min_event_ndims)
           and not self._parts_interact):
@@ -1099,6 +1099,9 @@ class Bijector(tf.Module, metaclass=abc.ABCMeta):
                          '({}) does not imply a consistent batch shape.'.format(
                              self.name, self.forward_min_event_ndims)) from e
       raise e
+
+  def __iter__(self):
+    raise TypeError('{!r} object is not iterable'.format(type(self).__name__))
 
   def _broadcast_parameters_with_batch_shape(self, batch_shape, x_event_ndims):
     """Broadcasts each parameter's batch shape with the given `batch_shape`.
@@ -1289,10 +1292,13 @@ class Bijector(tf.Module, metaclass=abc.ABCMeta):
     Returns:
       params_event_ndims: Per-event parameter ranks, a `str->int dict`.
     """
-    return {
+
+    from tensorflow_probability.python.internal import parameter_properties  # pylint:disable=g-import-not-at-top
+    return {  # pylint:disable=g-complex-comprehension
         param_name: param.event_ndims
         for param_name, param in cls.parameter_properties().items()
-        if param.event_ndims is not None
+        if (param.event_ndims is not parameter_properties.NO_EVENT_NDIMS and
+            param.event_ndims is not None)
     }
 
   def _forward(self, x):

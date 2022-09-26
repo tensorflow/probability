@@ -83,7 +83,7 @@ class NeutraKernelTest(tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(true_mean, sample_mean, rtol=0.1, atol=0.1)
     self.assertAllClose(true_cov, sample_cov, rtol=0.1, atol=0.1)
 
-  @parameterized.parameters([tfb.Identity(), tfb.Softplus()])
+  @parameterized.parameters((tfb.Identity(),), (tfb.Softplus(),))
   def testNested(self, bijector):
     if not tf.executing_eagerly():
       return

@@ -191,6 +191,10 @@ def trivially_instantiable_bijectors():
       result[bijector_name] = bijector_class
 
   result['Invert'] = tfb.Invert
+  # Add these bijectors since they subclass Invert but actually have no
+  # parameters.
+  result['Log'] = tfb.Log
+  result['Log1p'] = tfb.Log1p
 
   for bijector_name in sorted(result):
     logging.warning('Trivially supported bijectors: tfb.%s', bijector_name)

@@ -791,7 +791,11 @@ class BijectorBatchShapesTest(test_util.TestCase):
 
     def _maybe_broadcast_param_batch_shape(p, s):
       if isinstance(p, invert.Invert) and not p.bijector._params_event_ndims():
-        return s  # Can't broadcast a bijector that doesn't itself have params.
+        # Split has a shape parameter that has no batch shape.
+        if isinstance(p.bijector, split.Split):
+          return s
+        if not p.bijector._params_event_ndims():
+          return s  # Can't broadcast a bijector that doesn't have params.
       return ps.broadcast_shape(s, new_batch_shape)
     expected_broadcast_param_batch_shapes = tf.nest.map_structure(
         _maybe_broadcast_param_batch_shape,

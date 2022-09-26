@@ -812,9 +812,13 @@ class Distribution(_BaseDistribution):
           '{} does not support batch slicing; must implement '
           '_parameter_properties.'.format(type(self)))
     params_event_ndims = {}
+
+    from tensorflow_probability.python.internal import parameter_properties  # pylint: disable=g-import-not-at-top
     for (k, param) in properties.items():
       ndims = param.instance_event_ndims(self)
-      if param.is_tensor and ndims is not None:
+      if param.is_tensor and (
+          ndims is not parameter_properties.NO_EVENT_NDIMS and
+          ndims is not None):
         params_event_ndims[k] = ndims
     return params_event_ndims
 
