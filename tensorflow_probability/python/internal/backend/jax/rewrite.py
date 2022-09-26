@@ -45,6 +45,8 @@ def main(argv):
   if FLAGS.rewrite_numpy_import:
     contents = contents.replace('\nimport numpy as np',
                                 '\nimport numpy as onp; import jax.numpy as np')
+    contents = contents.replace('\nimport numpy as tnp',
+                                '\nimport jax.numpy as tnp')
   else:
     contents = contents.replace('\nimport numpy as np',
                                 '\nimport numpy as np; onp = np')

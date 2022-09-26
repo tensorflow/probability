@@ -788,17 +788,17 @@ class WindowedStatsTest(test_util.TestCase):
       check_fn((64, 4, 8), (2, 4), axis=2)
 
   def test_windowed_mean(self):
-    self.check_windowed(func=tfp.stats.windowed_mean, numpy_func=np.mean)
+    self.check_windowed(func=sample_stats.windowed_mean, numpy_func=np.mean)
 
   def test_windowed_mean_graph(self):
-    func = tf.function(tfp.stats.windowed_mean)
+    func = tf.function(sample_stats.windowed_mean)
     self.check_windowed(func=func, numpy_func=np.mean)
 
   def test_windowed_variance(self):
-    self.check_windowed(func=tfp.stats.windowed_variance, numpy_func=np.var)
+    self.check_windowed(func=sample_stats.windowed_variance, numpy_func=np.var)
 
   def test_windowed_variance_graph(self):
-    func = tf.function(tfp.stats.windowed_variance)
+    func = tf.function(sample_stats.windowed_variance)
     self.check_windowed(func=func, numpy_func=np.var)
 
 

@@ -20,13 +20,7 @@ NUMPY_MODE = False
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
-
-if NUMPY_MODE:
-  take_along_axis = np.take_along_axis
-elif JAX_MODE:
-  from jax.numpy import take_along_axis
-else:
-  from tensorflow.python.ops.numpy_ops import take_along_axis
+import tensorflow.experimental.numpy as tnp
 
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
@@ -802,10 +796,10 @@ def windowed_variance(
     def index_for_cumulative(indices):
       return tf.maximum(indices - 1, 0)
     cum_sums = tf.cumsum(x, axis=axis)
-    sums = take_along_axis(
+    sums = tnp.take_along_axis(
         cum_sums, index_for_cumulative(indices), axis=axis)
     cum_variances = cumulative_variance(x, sample_axis=axis)
-    variances = take_along_axis(
+    variances = tnp.take_along_axis(
         cum_variances, index_for_cumulative(indices), axis=axis)
 
     # This formula is the binary accurate variance merge from [1],
@@ -906,7 +900,7 @@ def windowed_mean(
     paddings = ps.reshape(ps.one_hot(2*axis, depth=2*rank, dtype=tf.int32),
                           (rank, 2))
     cum_sums = ps.pad(raw_cumsum, paddings)
-    sums = take_along_axis(cum_sums, indices, axis=axis)
+    sums = tnp.take_along_axis(cum_sums, indices, axis=axis)
     counts = ps.cast(indices[1] - indices[0], dtype=sums.dtype)
     return tf.math.divide_no_nan(sums[1] - sums[0], counts)
 
