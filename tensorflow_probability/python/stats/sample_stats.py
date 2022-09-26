@@ -735,11 +735,12 @@ def windowed_variance(
   Then each element of `low_indices` and `high_indices` must be
   between 0 and N+1, and the shape of the output will be `Bx + [M] + E`.
 
-  The shape `Bi + [1] + F` must be broadcastable with the shape of `x`.
+  The shape `Bi + [1] + F` must be implicitly broadcastable with the
+  shape of `x`, the following implicit broadcasting rules are applied:
 
   If `rank(Bi + [M] + F) < rank(x)`, then the indices are expanded
-  with extra inner dimensions to match the rank of `x`. In the special
-  case where the rank of indices is one, i.e when `rank(Bi) = rank(F) = 0`,
+  with extra inner dimensions to match the rank of `x`.
+  If rank of indices is one, i.e when `rank(Bi) = rank(F) = 0`,
   the indices are reshaped to `[1] * rank(Bx) + [M] + [1] * rank(E)`.
 
   The default windows are
@@ -855,11 +856,12 @@ def windowed_mean(
   Then each element of `low_indices` and `high_indices` must be
   between 0 and N+1, and the shape of the output will be `Bx + [M] + E`.
 
-  The shape `Bi + [1] + F` must be broadcastable with the shape of `x`.
+  The shape `Bi + [1] + F` must be implicitly broadcastable with the
+  shape of `x`, the following implicit broadcasting rules are applied:
 
   If `rank(Bi + [M] + F) < rank(x)`, then the indices are expanded
-  with extra inner dimensions to match the rank of `x`. In the special
-  case where the rank of indices is one, i.e when `rank(Bi) = rank(F) = 0`,
+  with extra inner dimensions to match the rank of `x`.
+  If rank of indices is one, i.e when `rank(Bi) = rank(F) = 0`,
   the indices are reshaped to `[1] * rank(Bx) + [M] + [1] * rank(E)`.
 
   The default windows are
