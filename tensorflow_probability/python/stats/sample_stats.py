@@ -718,9 +718,9 @@ def windowed_variance(
 
     result[i] = variance(x[low_indices[i]:high_indices[i]])
 
-  accurately and efficiently.  To wit, if K is the size of
-  `low_indices` and `high_indices`, and `N` is the size of `x` along
-  the given `axis`, the computation takes O(K + N) work, O(log(N))
+  accurately and efficiently.  To wit, if `m` is the size of
+  `low_indices` and `high_indices`, and `n` is the size of `x` along
+  the given `axis`, the computation takes O(n + m) work, O(log(n))
   depth (the length of the longest series of operations that are
   performed sequentially), and only uses O(1) TensorFlow kernel
   invocations.  The underlying algorithm is an adaptation of the
@@ -730,19 +730,19 @@ def windowed_variance(
   trailing-window estimators from some iterative process, such as the
   last half of an MCMC chain.
 
-  Suppose `x` has shape `Bx + [N] + E`, `low_indices` and `high_indices`
-  have shape `Bi + [M] + F`, such that `rank(Bx) = rank(Bi) = axis`.
+  Suppose `x` has shape `Bx + [n] + E`, `low_indices` and `high_indices`
+  have shape `Bi + [m] + F`, such that `rank(Bx) = rank(Bi) = axis`.
   Then each element of `low_indices` and `high_indices` must be
-  between 0 and N+1, and the shape of the output will be
-  `broadcast(Bx, Bi) + [M] + broadcast(E, F)`.
+  between 0 and `n+1`, and the shape of the output will be
+  `broadcast(Bx, Bi) + [m] + broadcast(E, F)`.
 
   The shape `Bi + [1] + F` must be implicitly broadcastable with the
   shape of `x`, the following implicit broadcasting rules are applied:
 
-  If `rank(Bi + [M] + F) < rank(x)`, then the indices are expanded
+  If `rank(Bi + [m] + F) < rank(x)`, then the indices are expanded
   with extra inner dimensions to match the rank of `x`.
   If rank of indices is one, i.e when `rank(Bi) = rank(F) = 0`,
-  the indices are reshaped to `[1] * rank(Bx) + [M] + [1] * rank(E)`.
+  the indices are reshaped to `[1] * rank(Bx) + [m] + [1] * rank(E)`.
 
   The default windows are
   `[0, 1), [1, 2), [1, 3), [2, 4), [2, 5), ...`
@@ -751,14 +751,14 @@ def windowed_variance(
   in the variance of the last half of the data at each point.
 
   Args:
-    x: A numeric `Tensor` holding `N` samples along the given `axis`,
+    x: A numeric `Tensor` holding `n` samples along the given `axis`,
       whose windowed variances are desired.
     low_indices: An integer `Tensor` defining the lower boundary
       (inclusive) of each window.  Default: elementwise half of
       `high_indices`.
     high_indices: An integer `Tensor` defining the upper boundary
       (exclusive) of each window.  Must be broadcast-compatible with
-      `low_indices`.  Default: `tf.range(1, N+1)`, i.e., N windows
+      `low_indices`.  Default: `tf.range(1, n+1)`, i.e., n windows
       that each end in the corresponding datum from `x` (inclusive)`.
     axis: Scalar `Tensor` designating the axis holding samples.  This
       is the axis of `x` along which we take windows, and therefore
@@ -842,9 +842,9 @@ def windowed_mean(
 
     result[i] = mean(x[low_indices[i]:high_indices[i]])
 
-  efficiently.  To wit, if K is the size of `low_indices` and
-  `high_indices`, and `N` is the size of `x` along the given `axis`,
-  the computation takes O(K + N) work, O(log(N)) depth (the length of
+  efficiently.  To wit, if `m` is the size of `low_indices` and
+  `high_indices`, and `n` is the size of `x` along the given `axis`,
+  the computation takes O(m + n) work, O(log(n)) depth (the length of
   the longest series of operations that are performed sequentially),
   and only uses O(1) TensorFlow kernel invocations.
 
@@ -852,19 +852,19 @@ def windowed_mean(
   trailing-window estimators from some iterative process, such as the
   last half of an MCMC chain.
 
-  Suppose `x` has shape `Bx + [N] + E`, `low_indices` and `high_indices`
-  have shape `Bi + [M] + F`, such that `rank(Bx) = rank(Bi) = axis`.
+  Suppose `x` has shape `Bx + [n] + E`, `low_indices` and `high_indices`
+  have shape `Bi + [m] + F`, such that `rank(Bx) = rank(Bi) = axis`.
   Then each element of `low_indices` and `high_indices` must be
-  between 0 and N+1, and the shape of the output will be
-  `broadcast(Bx, Bi) + [M] + broadcast(E, F)`.
+  between 0 and `n+1`, and the shape of the output will be
+  `broadcast(Bx, Bi) + [m] + broadcast(E, F)`.
 
   The shape `Bi + [1] + F` must be implicitly broadcastable with the
   shape of `x`, the following implicit broadcasting rules are applied:
 
-  If `rank(Bi + [M] + F) < rank(x)`, then the indices are expanded
+  If `rank(Bi + [m] + F) < rank(x)`, then the indices are expanded
   with extra inner dimensions to match the rank of `x`.
   If rank of indices is one, i.e when `rank(Bi) = rank(F) = 0`,
-  the indices are reshaped to `[1] * rank(Bx) + [M] + [1] * rank(E)`.
+  the indices are reshaped to `[1] * rank(Bx) + [m] + [1] * rank(E)`.
 
   The default windows are
   `[0, 1), [1, 2), [1, 3), [2, 4), [2, 5), ...`
@@ -873,14 +873,14 @@ def windowed_mean(
   in the variance of the last half of the data at each point.
 
   Args:
-    x: A numeric `Tensor` holding `N` samples along the given `axis`,
+    x: A numeric `Tensor` holding `n` samples along the given `axis`,
       whose windowed means are desired.
     low_indices: An integer `Tensor` defining the lower boundary
       (inclusive) of each window.  Default: elementwise half of
       `high_indices`.
     high_indices: An integer `Tensor` defining the upper boundary
       (exclusive) of each window.  Must be broadcast-compatible with
-      `low_indices`.  Default: `tf.range(1, N+1)`, i.e., N windows
+      `low_indices`.  Default: `tf.range(1, n+1)`, i.e., n windows
       that each end in the corresponding datum from `x` (inclusive).
     axis: Scalar `Tensor` designating the axis holding samples.  This
       is the axis of `x` along which we take windows, and therefore
