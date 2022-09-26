@@ -915,6 +915,12 @@ def _prepare_window_args(x, low_indices=None, high_indices=None, axis=0):
     low_indices = high_indices // 2
   else:
     low_indices = tf.convert_to_tensor(low_indices)
+
+  indices_rank = tf.get_static_value(ps.rank(low_indices))
+  x_rank = tf.get_static_value(ps.rank(x))
+  if indices_rank is None or x_rank is None:
+    raise ValueError("`indices` and `x` ranks must be statically known.")
+
   # Broadcast indices together.
   high_indices = high_indices + tf.zeros_like(low_indices)
   low_indices = low_indices + tf.zeros_like(high_indices)
