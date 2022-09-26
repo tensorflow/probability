@@ -1434,6 +1434,7 @@ multi_substrate_py_test(
     ],
     jax_tags = ["notap"],
     numpy_tags = ["notap"],
+    shard_count = 3,
     deps = [
         ":bijector_test_util",
         ":ffjord",
@@ -1655,6 +1656,7 @@ multi_substrate_py_test(
     size = "small",
     timeout = "moderate",
     srcs = ["masked_autoregressive_test.py"],
+    shard_count = 3,
     deps = [
         ":chain",
         ":inline",

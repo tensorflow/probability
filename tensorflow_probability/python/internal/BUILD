@@ -132,6 +132,7 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["distribute_lib_test.py"],
     disabled_substrates = ["numpy"],
+    shard_count = 3,
     deps = [
         ":distribute_lib",
         ":distribute_test_lib",

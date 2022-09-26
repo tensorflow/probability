@@ -408,10 +408,10 @@ class _MaskedAutoregressiveFlowTest(test_util.VectorDistributionTestHelpers,
     self.run_test_sample_consistent_log_prob(
         sess_run_fn=self.evaluate,
         dist=dist,
-        num_samples=int(1e6),
+        num_samples=int(1e5),
         radius=1.,
         center=0.,
-        rtol=0.025)
+        rtol=0.075)
 
   def testInvertMutuallyConsistent(self):
     maf = invert.Invert(

@@ -59,6 +59,7 @@ py_test(
     name = "conv_variational_test",
     size = "medium",
     srcs = ["conv_variational_test.py"],
+    shard_count = 2,
     deps = [
         # keras/testing_infra:test_utils dep,
         # numpy dep,

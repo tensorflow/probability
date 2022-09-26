@@ -445,7 +445,7 @@ class LKJTestGraphOnly(test_util.TestCase):
 class TrilSphericalUniformTest(test_util.TestCase):
 
   def verify_expectations(self, dimension, dtype):
-    num_samples = int(1e6)
+    num_samples = int(1e5)
     # pylint: disable=protected-access
     x = lkj._tril_spherical_uniform(
         dimension=dimension,
@@ -462,10 +462,10 @@ class TrilSphericalUniformTest(test_util.TestCase):
     samples, sample_mean, sample_var = self.evaluate(
         [x, sample_mean, sample_var])
     self.assertAllMeansClose(
-        samples, np.zeros_like(sample_mean), axis=0, atol=3e-3, rtol=1e-3)
+        samples, np.zeros_like(sample_mean), axis=0, atol=7e-3, rtol=2e-3)
     expected_var = np.tril(np.ones([dimension, dimension], dtype=dtype))
     expected_var = expected_var / np.arange(1, dimension + 1)[..., None]
-    self.assertAllClose(expected_var, sample_var, atol=2e-3, rtol=1e-2)
+    self.assertAllClose(expected_var, sample_var, atol=5e-3, rtol=2e-2)
 
   def test_expectations_1d(self, dtype):
     self.verify_expectations(1, dtype)

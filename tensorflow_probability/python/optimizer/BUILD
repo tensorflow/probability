@@ -184,6 +184,7 @@ multi_substrate_py_test(
     name = "nelder_mead_test",
     size = "medium",
     srcs = ["nelder_mead_test.py"],
+    shard_count = 3,
     deps = [
         ":nelder_mead",
         # numpy dep,

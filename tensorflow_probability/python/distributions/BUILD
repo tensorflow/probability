@@ -3633,6 +3633,7 @@ multi_substrate_py_test(
     name = "markov_chain_test",
     size = "medium",
     srcs = ["markov_chain_test.py"],
+    shard_count = 3,
     deps = [
         ":deterministic",
         ":dirichlet",
@@ -3664,6 +3665,7 @@ multi_substrate_py_test(
     name = "matrix_normal_linear_operator_test",
     size = "medium",
     srcs = ["matrix_normal_linear_operator_test.py"],
+    shard_count = 2,
     deps = [
         ":matrix_normal_linear_operator",
         # numpy dep,
@@ -3681,6 +3683,7 @@ multi_substrate_py_test(
     name = "matrix_t_linear_operator_test",
     size = "medium",
     srcs = ["matrix_t_linear_operator_test.py"],
+    shard_count = 2,
     deps = [
         ":matrix_t_linear_operator",
         # numpy dep,
