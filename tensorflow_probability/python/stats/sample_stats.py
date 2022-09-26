@@ -733,7 +733,8 @@ def windowed_variance(
   Suppose `x` has shape `Bx + [N] + E`, `low_indices` and `high_indices`
   have shape `Bi + [M] + F`, such that `rank(Bx) = rank(Bi) = axis`.
   Then each element of `low_indices` and `high_indices` must be
-  between 0 and N+1, and the shape of the output will be `Bx + [M] + E`.
+  between 0 and N+1, and the shape of the output will be
+  `broadcast(Bx, Bi) + [M] + broadcast(E, F)`.
 
   The shape `Bi + [1] + F` must be implicitly broadcastable with the
   shape of `x`, the following implicit broadcasting rules are applied:
@@ -854,7 +855,8 @@ def windowed_mean(
   Suppose `x` has shape `Bx + [N] + E`, `low_indices` and `high_indices`
   have shape `Bi + [M] + F`, such that `rank(Bx) = rank(Bi) = axis`.
   Then each element of `low_indices` and `high_indices` must be
-  between 0 and N+1, and the shape of the output will be `Bx + [M] + E`.
+  between 0 and N+1, and the shape of the output will be
+  `broadcast(Bx, Bi) + [M] + broadcast(E, F)`.
 
   The shape `Bi + [1] + F` must be implicitly broadcastable with the
   shape of `x`, the following implicit broadcasting rules are applied:
