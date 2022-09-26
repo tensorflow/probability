@@ -725,9 +725,8 @@ class WindowedStatsTest(test_util.TestCase):
     out = np.transpose(t_out, axes=dims)
     return out
 
-
   def check_gaussian_windowed_func(self, shape, indice_shape, axis,
-                              window_func, np_func):
+                                   window_func, np_func):
     stat_shape = np.array(shape).astype(np.int32)
     stat_shape[axis] = 1
     loc = np.arange(np.prod(stat_shape)).reshape(stat_shape)
@@ -759,9 +758,9 @@ class WindowedStatsTest(test_util.TestCase):
     return tf1.placeholder_with_default(x, shape=(None,)*len(x.shape))
 
   @parameterized.named_parameters(*[(
-    f"{np_func.__name__} shape={a} indices_shape={b} axis={axis}", a, b, axis,
-    tf_func, np_func) for a, (b, axis), (tf_func, np_func) in
-    itertools.product([(64, 4, 8), ],
+    f"{np_func.__name__} shape={s} indices_shape={i} axis={axis}", s, i, axis,
+    tf_func, np_func) for s, (i, axis), (tf_func, np_func) in
+    itertools.product([(64, 4, 8)],
                       [((128, 1, 1), 0),
                        ((32, 1, 1), 0),
                        ((32, 4, 1), 0),
@@ -786,22 +785,19 @@ class WindowedStatsTest(test_util.TestCase):
                        ((16,), 2),
                        ((1, 4), 2),
                        ((64, 4), 2)],
-                      [
-                        (sample_stats.windowed_mean, np.mean),
-                        (sample_stats.windowed_variance, np.var)
-                      ])])
+                      [(sample_stats.windowed_mean, np.mean),
+                       (sample_stats.windowed_variance, np.var)])])
   def test_windowed(self, shape, indice_shape, axis, window_func, np_func):
     self.check_gaussian_windowed_func(shape, indice_shape, axis, window_func,
                                       np_func)
 
-
   @parameterized.named_parameters(*[(
-    f"{np_func.__name__} shape={a} indices_shape={b} axis={axis}", a, b, axis,
-    tf_func, np_func) for a, (b, axis), (tf_func, np_func) in
-    itertools.product([(64, 4, 8), ],
-      [((4, 1, 4), 2), ((2, 4), 2)],
-      [(sample_stats.windowed_mean, np.mean),
-       (sample_stats.windowed_variance, np.var)])])
+    f"{np_func.__name__} shape={s} indices_shape={i} axis={axis}", s, i, axis,
+    tf_func, np_func) for s, (i, axis), (tf_func, np_func) in
+    itertools.product([(64, 4, 8)],
+                      [((4, 1, 4), 2), ((2, 4), 2)],
+                      [(sample_stats.windowed_mean, np.mean),
+                       (sample_stats.windowed_variance, np.var)])])
   def test_non_broadcastable_shapes(self, shape, indice_shape, axis,
                                     window_func, np_func):
     with self.assertRaisesRegexp((IndexError, ValueError, InvalidArgumentError),
