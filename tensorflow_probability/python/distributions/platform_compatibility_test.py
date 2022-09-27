@@ -111,6 +111,7 @@ SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
 LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
     'Bates',  # tf.repeat and tf.range do not vectorize. (b/157665707)
     'BetaQuotient',
+    'NoncentralChi2',  # Fails in TF1
     'NormalInverseGaussian',  # Fails in TF1.
     'Skellam',  # Fails in TF1.
     'TruncatedNormal',  # Numerical problem: b/150811273

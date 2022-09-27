@@ -99,6 +99,7 @@ from tensorflow_probability.python.distributions.mvn_full_covariance import Mult
 from tensorflow_probability.python.distributions.mvn_linear_operator import MultivariateNormalLinearOperator
 from tensorflow_probability.python.distributions.mvn_tril import MultivariateNormalTriL
 from tensorflow_probability.python.distributions.negative_binomial import NegativeBinomial
+from tensorflow_probability.python.distributions.noncentral_chi2 import NoncentralChi2
 from tensorflow_probability.python.distributions.normal import Normal
 from tensorflow_probability.python.distributions.normal_inverse_gaussian import NormalInverseGaussian
 from tensorflow_probability.python.distributions.onehot_categorical import OneHotCategorical
@@ -248,6 +249,7 @@ __all__ = [
     'MultivariateStudentTLinearOperator',
     'mvn_conjugate_linear_update',
     'NegativeBinomial',
+    'NoncentralChi2',
     'Normal',
     'normal_conjugates_known_scale_posterior',
     'normal_conjugates_known_scale_predictive',

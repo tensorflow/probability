@@ -119,6 +119,7 @@ multi_substrate_py_library(
         ":mvn_linear_operator",
         ":mvn_tril",
         ":negative_binomial",
+        ":noncentral_chi2",
         ":normal",
         ":normal_conjugate_posteriors",
         ":normal_inverse_gaussian",
@@ -1655,6 +1656,29 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/math:special",
         "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "noncentral_chi2",
+    srcs = ["noncentral_chi2.py"],
+    deps = [
+        ":chi2",
+        ":distribution",
+        ":gamma",
+        ":poisson",
+        # numpy dep,
+        # tensorflow:tensorflow_no_contrib dep,
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:special_math",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math:bessel",
+        "//tensorflow_probability/python/random",
     ],
 )
 
@@ -3955,6 +3979,21 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math:gradient",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "noncentral_chi2_test",
+    size = "medium",
+    srcs = ["noncentral_chi2_test.py"],
+    tags = ["tf1-broken"],  # log_bessel_ive gives an error
+    deps = [
+        ":noncentral_chi2",
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

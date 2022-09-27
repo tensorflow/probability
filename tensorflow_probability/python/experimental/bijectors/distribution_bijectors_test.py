@@ -55,6 +55,7 @@ PRECONDITIONING_FAILS_DISTS = (
     'LambertWNormal',  # CDF gradient incorrect at 0.
     'SigmoidBeta',  # inverse CDF numerical precision issues for large x
     'StudentT',  # CDF gradient incorrect at 0 (and unstable near zero).
+    'NoncentralChi2',  # JAX cannot backprop through CDF because of while loop
 )
 
 if JAX_MODE:
