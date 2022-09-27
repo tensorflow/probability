@@ -84,6 +84,9 @@ COMPOSITE_TENSOR_RTOL.update({
 })
 COMPOSITE_TENSOR_ATOL = collections.defaultdict(lambda: 1e-6)
 
+SLICING_RTOL = collections.defaultdict(lambda: 1e-5)
+SLICING_ATOL = collections.defaultdict(lambda: 1e-5)
+
 INSTANTIABLE_BUT_NOT_SLICEABLE = [
     # TODO(b/146897388): These are sliceable but have parameter dependent
     # support. Perhaps re-write the slicing test to enable these bijectors.
@@ -895,7 +898,11 @@ class BijectorSlicingTest(test_util.TestCase):
     # Check that slicing the bijector computation has the same shape as
     # using the sliced bijector and computing results.
     self.assertAllEqual(sliced_forward.shape, sliced_bijector_forward.shape)
-    self.assertAllClose(sliced_forward, sliced_bijector_forward)
+    self.assertAllClose(
+        sliced_forward,
+        sliced_bijector_forward,
+        atol=SLICING_ATOL[bijector_name],
+        rtol=SLICING_RTOL[bijector_name])
 
   @parameterized.named_parameters(
       {'testcase_name': bname, 'bijector_name': bname}
