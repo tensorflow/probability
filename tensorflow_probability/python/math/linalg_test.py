@@ -33,7 +33,6 @@ from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import gradient
 from tensorflow_probability.python.math import linalg
 from tensorflow_probability.python.math.psd_kernels import matern
-from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 JAX_MODE = False
 
@@ -307,8 +306,9 @@ class _PivotedCholesky(test_util.TestCase):
     self.assertAllGreater(tf.linalg.norm(dmatrix, ord='fro', axis=[-1, -2]), 0.)
 
   @test_util.tf_tape_safety_test
-  @tf_test_util.enable_control_flow_v2
   def testGradientTapeCFv2(self):
+    if not tf1.control_flow_v2_enabled():
+      self.skipTest('Requires v2 control flow')
     dim = 11
     matrix = self._random_batch_psd(dim)
     with tf.GradientTape() as tape:

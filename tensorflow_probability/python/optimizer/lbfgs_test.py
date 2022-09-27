@@ -506,14 +506,13 @@ class LBfgsTest(test_util.TestCase):
 
     # Test with a vector of unknown dimension, and a fully unknown shape.
     for shape in ([None], None):
-      start = tf1.placeholder(tf.float32, shape=shape)
+      start_value = np.arange(ndims, 0, -1, dtype='float64')
+      start = tf1.placeholder_with_default(start_value, shape=shape)
       lbfgs_op = lbfgs.minimize(
           quadratic, initial_position=start, tolerance=1e-8)
       self.assertFalse(lbfgs_op.position.shape.is_fully_defined())
 
-      start_value = np.arange(ndims, 0, -1, dtype='float64')
-      with self.cached_session() as session:
-        results = session.run(lbfgs_op, feed_dict={start: start_value})
+      results = self.evaluate(lbfgs_op)
       self.assertTrue(results.converged)
       self.assertLessEqual(_norm(results.objective_gradient), 1e-8)
       self.assertArrayNear(results.position, minimum, 1e-5)

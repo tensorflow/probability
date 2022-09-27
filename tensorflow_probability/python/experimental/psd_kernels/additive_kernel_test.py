@@ -175,4 +175,4 @@ class AdditiveKernelTest(test_util.TestCase):
     self.assertLen(grads, 2)
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

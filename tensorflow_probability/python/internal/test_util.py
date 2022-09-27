@@ -553,7 +553,7 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
       return _compute_error()
     else:
       # Make sure there's a global default session in graph mode.
-      with self.test_session():
+      with self.cached_session():
         return _compute_error()
 
   def skip_if_no_xla(self):

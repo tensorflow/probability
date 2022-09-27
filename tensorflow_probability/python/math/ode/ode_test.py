@@ -16,6 +16,7 @@
 
 from absl.testing import parameterized
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import test_util
@@ -23,7 +24,6 @@ from tensorflow_probability.python.math import gradient as tfp_gradient
 from tensorflow_probability.python.math.ode import base
 from tensorflow_probability.python.math.ode import bdf
 from tensorflow_probability.python.math.ode import dormand_prince
-from tensorflow.python import tf2  # pylint: disable=g-direct-tensorflow-import
 
 _RTOL = 1e-8
 _ATOL = 1e-12
@@ -488,7 +488,7 @@ class GradientTest(test_util.TestCase):
     self.assertLess(last_initial_step_size, first_step_size)
 
   def test_linear_ode(self, solver, solution_times_fn):
-    if not tf2.enabled():
+    if not tf1.control_flow_v2_enabled():
       self.skipTest('b/152464477')
     jacobian_diag_part = tf.constant([-0.5, -1.], dtype=tf.float64)
     ode_fn = lambda time, state, jacobian_diag_part: jacobian_diag_part * state
@@ -561,7 +561,7 @@ class GradientTestPforJacobian(test_util.TestCase):
     self.assertAllClose(grad, grad_exact)
 
   def test_tuple(self, solver):
-    if not tf2.enabled():
+    if not tf1.control_flow_v2_enabled():
       self.skipTest('b/152464477')
 
     alpha = np.float32(0.7)
