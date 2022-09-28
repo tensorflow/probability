@@ -86,6 +86,9 @@ COMPOSITE_TENSOR_ATOL = collections.defaultdict(lambda: 1e-6)
 
 SLICING_RTOL = collections.defaultdict(lambda: 1e-5)
 SLICING_ATOL = collections.defaultdict(lambda: 1e-5)
+SLICING_ATOL.update({
+    'Householder': 1e-4,
+})
 
 INSTANTIABLE_BUT_NOT_SLICEABLE = [
     # TODO(b/146897388): These are sliceable but have parameter dependent
