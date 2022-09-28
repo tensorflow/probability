@@ -673,8 +673,7 @@ class _TensorMeta(type(np.ndarray)):
   @classmethod
   def __instancecheck__(cls, instance):
     if JAX_MODE:
-      return isinstance(instance, (jax.xla.DeviceArray,
-                                   jax.core.Tracer))
+      return isinstance(instance, jax.Array)
     return isinstance(instance, np.ndarray)
 
 
