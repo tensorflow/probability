@@ -202,8 +202,8 @@ class GradientTest(test_util.TestCase):
             loc_q=1.,
             scale_r=1.))
     self.assertAllClose(0.5, y, atol=1e-6, rtol=1e-6)
-    self.assertAllClose({'loc_q': 1., 'scale_r': -1.}, dydx,
-                        atol=1e-6, rtol=1e-6)
+    self.assertAllCloseNested({'loc_q': 1., 'scale_r': -1.}, dydx,
+                              atol=1e-6, rtol=1e-6)
 
   @test_util.numpy_disable_gradient_test
   def test_output_gradients(self):

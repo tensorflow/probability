@@ -63,19 +63,23 @@ class DeferredTensorTest(test_util.TestCase):
     # For speed, we don't bother testing the optimization part of the example.
 
   def test_properties(self):
-    x = deferred_tensor.DeferredTensor(tf.Variable(0.), tf.math.exp, name='bar')
+    # Ensure that the function we pass in has a name in every backend.
+    def exp_fn(x):
+      return tf.math.exp(x)
+
+    x = deferred_tensor.DeferredTensor(tf.Variable(0.), exp_fn, name='bar')
     self.evaluate([v.initializer for v in x.trainable_variables])
     self.assertEqual((), x.shape)
     self.assertEqual(tf.float32, x.dtype)
     if tf.executing_eagerly():
       self.assertEqual(
           repr(x),
-          '<DeferredTensor: name=bar, dtype=float32, shape=[], fn=exp, '
+          '<DeferredTensor: name=bar, dtype=float32, shape=[], fn=exp_fn, '
           'numpy=1.0>')
     else:
       self.assertEqual(
           repr(x),
-          '<DeferredTensor: name=bar, dtype=float32, shape=[], fn=exp>')
+          '<DeferredTensor: name=bar, dtype=float32, shape=[], fn=exp_fn>')
 
   @test_util.jax_disable_variable_test
   @test_util.numpy_disable_variable_test

@@ -330,6 +330,12 @@ def multi_substrate_py_test(
     tags.append("multi_substrate")
 
     test_targets = []
+    remove_deps = [
+        "//third_party/py/tensorflow",
+        "//third_party/py/tensorflow:tensorflow",
+    ]
+
+    trimmed_deps = [dep for dep in deps if dep not in remove_deps]
 
     if "tf" not in disabled_substrates:
         native.py_test(
@@ -362,7 +368,7 @@ def multi_substrate_py_test(
             size = numpy_size or size,
             srcs = numpy_srcs,
             main = _substrate_src(main or "{}.py".format(name), "numpy"),
-            deps = _substrate_deps(deps, "numpy"),
+            deps = _substrate_deps(trimmed_deps, "numpy"),
             tags = tags + ["tfp_numpy"] + numpy_tags,
             srcs_version = srcs_version,
             python_version = "PY3",
@@ -382,7 +388,7 @@ def multi_substrate_py_test(
                 cmd = "$(location {}) $(SRCS) --numpy_to_jax > $@".format(REWRITER_TARGET),
                 exec_tools = [REWRITER_TARGET],
             )
-        jax_deps = _substrate_deps(deps, "jax") + jax_extra_deps
+        jax_deps = _substrate_deps(trimmed_deps, "jax") + jax_extra_deps
         # [internal] Add JAX build dep
         native.py_test(
             name = "{}.jax".format(name),

@@ -16,7 +16,9 @@
 
 import contextlib
 import functools
+import math
 import os
+import random
 import re
 import sys
 import unittest
@@ -26,6 +28,7 @@ from absl import logging
 from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
+
 import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
@@ -37,8 +40,6 @@ from tensorflow_probability.python.internal import test_combinations
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 from tensorflow_probability.python.util.deferred_tensor import TransformedVariable
 from tensorflow_probability.python.util.seed_stream import SeedStream
-from tensorflow.python.eager import context  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -66,6 +67,7 @@ __all__ = [
 
 JAX_MODE = False
 NUMPY_MODE = False
+TF_MODE = not (JAX_MODE or NUMPY_MODE)
 
 flags.DEFINE_string('test_regex', '',
                     ('If set, only run test cases for which this regex '
@@ -94,8 +96,28 @@ flags.DEFINE_enum('analyze_calibration', 'none',
 FLAGS = flags.FLAGS
 
 
-class TestCase(tf.test.TestCase, parameterized.TestCase):
+_TEST_BASE_CLASSES = (parameterized.TestCase,)
+if TF_MODE:
+  _TEST_BASE_CLASSES = _TEST_BASE_CLASSES + (tf.test.TestCase,)
+
+
+_DEFAULT_SEED = 87654321
+
+
+class TestCase(*_TEST_BASE_CLASSES):
   """Class to provide TensorFlow Probability specific test features."""
+
+  def setUp(self):
+    if TF_MODE:
+      super(TestCase, self).setUp()
+    else:
+      # Fix the numpy and math random seeds.
+      np.random.seed(_DEFAULT_SEED)
+      random.seed(_DEFAULT_SEED)
+
+  def tearDown(self):
+    if TF_MODE:
+      super(TestCase, self).tearDown()
 
   def maybe_static(self, x, is_static):
     """If `not is_static`, return placeholder_with_default with unknown shape.
@@ -113,6 +135,366 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
       return x
     else:
       return tf1.placeholder_with_default(x, shape=None)
+
+  @contextlib.contextmanager
+  def cached_session(self):
+    if TF_MODE:
+      with super(TestCase, self).cached_session() as sess:
+        yield sess
+    else:
+      with contextlib.nullcontext():
+        yield
+
+  @contextlib.contextmanager
+  def session(self):
+    if TF_MODE:
+      with super(TestCase, self).session() as sess:
+        yield sess
+    else:
+      with contextlib.nullcontext():
+        yield
+
+  def evaluate(self, x):
+    if TF_MODE:
+      return super(TestCase, self).evaluate(x)
+
+    def _evaluate(x):
+      if x is None:
+        return x
+      # TODO(b/223267515): Improve handling of JAX PRNGKeyArray objects.
+      if type(x).__name__ == 'PRNGKeyArray':
+        return x
+      return np.array(x)
+    return tf.nest.map_structure(_evaluate, x, expand_composites=True)
+
+  def _GetNdArray(self, a):
+    if TF_MODE:
+      return super(TestCase, self)._GetNdArray(a)
+    return np.array(a)
+
+  def _evaluateTensors(self, a, b):
+    if tf.is_tensor(a) and tf.is_tensor(b):
+      (a, b) = self.evaluate([a, b])
+    elif tf.is_tensor(a) and not tf.is_tensor(b):
+      a = self.evaluate(a)
+    elif not tf.is_tensor(a) and tf.is_tensor(b):
+      b = self.evaluate(b)
+    return a, b
+
+  def assertDTypeEqual(self, target, expected_dtype):
+    """Assert ndarray data type is equal to expected.
+
+    Args:
+      target: The numpy `ndarray`, or anything that can be converted into a
+        numpy `ndarray` (including Tensor).
+      expected_dtype: Expected data type.
+    """
+    target = self._GetNdArray(target)
+    if not isinstance(target, list):
+      arrays = [target]
+    for arr in arrays:
+      self.assertEqual(arr.dtype, expected_dtype)
+
+  # pylint: disable=g-doc-return-or-yield
+  @contextlib.contextmanager
+  def assertRaisesWithPredicateMatch(self, exception_type,
+                                     expected_err_re_or_predicate):
+    """Returns a context manager to enclose code expected to raise an exception.
+
+    If the exception is an OpError, the op stack is also included in the message
+    predicate search.
+
+    Args:
+      exception_type: The expected type of exception that should be raised.
+      expected_err_re_or_predicate: If this is callable, it should be a function
+        of one argument that inspects the passed-in exception and returns True
+        (success) or False (please fail the test). Otherwise, the error message
+        is expected to match this regular expression partially.
+
+    Returns:
+      A context manager to surround code that is expected to raise an
+      exception.
+    """
+    if callable(expected_err_re_or_predicate):
+      predicate = expected_err_re_or_predicate
+    else:
+
+      def predicate(e):
+        err_str = e.message if isinstance(e, tf.errors.OpError) else str(e)
+        op = e.op if isinstance(e, tf.errors.OpError) else None
+        while op is not None:
+          err_str += '\nCaused by: ' + op.name
+          op = op._original_op  # pylint: disable=protected-access
+        logging.info('Searching within error strings: "%s" within "%s"',
+                     expected_err_re_or_predicate, err_str)
+        return re.search(expected_err_re_or_predicate, err_str)
+
+    try:
+      yield
+      self.fail(exception_type.__name__ + ' not raised')
+    except Exception as e:  # pylint: disable=broad-except
+      if not isinstance(e, exception_type) or not predicate(e):
+        raise AssertionError('Exception of type %s: %s' %
+                             (str(type(e)), str(e))) from e
+
+  @contextlib.contextmanager
+  def assertRaisesOpError(self, msg):
+    if TF_MODE:
+      with super(TestCase, self).assertRaisesOpError(msg):
+        yield
+    else:
+      try:
+        yield
+        self.fail('No exception raised. Expected exception similar to '
+                  'tf.errors.OpError with message: %s' % msg)
+      except Exception as e:  # pylint: disable=broad-except
+        err_str = str(e)
+        if re.search(msg, err_str):
+          return
+        logging.error('Expected exception to match `%s`!', msg)
+        raise
+
+  def assertNear(self, f1, f2, err, msg=None):
+    """Asserts that two floats are near each other.
+
+    Checks that |f1 - f2| < err and asserts a test failure
+    if not.
+
+    Args:
+      f1: A float value.
+      f2: A float value.
+      err: A float value.
+      msg: An optional string message to append to the failure message.
+    """
+    # f1 == f2 is needed here as we might have: f1, f2 = inf, inf
+    self.assertTrue(
+        f1 == f2 or math.fabs(f1 - f2) <= err, '%f != %f +/- %f%s' %
+        (f1, f2, err, ' (%s)' % msg if msg is not None else ''))
+
+  def assertArrayNear(self, farray1, farray2, err, msg=None):
+    """Asserts that two float arrays are near each other.
+
+    Checks that for all elements of farray1 and farray2
+    |f1 - f2| < err.  Asserts a test failure if not.
+
+    Args:
+      farray1: a list of float values.
+      farray2: a list of float values.
+      err: a float value.
+      msg: Optional message to report on failure.
+    """
+    self.assertEqual(len(farray1), len(farray2), msg=msg)
+    for f1, f2 in zip(farray1, farray2):
+      self.assertNear(float(f1), float(f2), err, msg=msg)
+
+  def assertNotAllEqual(self, a, b, msg=None):
+    """Asserts that two numpy arrays or Tensors do not have the same values.
+
+    Args:
+      a: the expected numpy ndarray or anything can be converted to one.
+      b: the actual numpy ndarray or anything can be converted to one.
+      msg: Optional message to report on failure.
+    """
+    try:
+      self.assertAllEqual(a, b)
+    except AssertionError:
+      return
+    msg = msg or ''
+    raise AssertionError('The two values are equal at all elements. %s' % msg)
+
+  def assertNotAllClose(self, a, b, rtol=1e-6, atol=1e-6, msg=None):
+    """Assert that two numpy arrays, or Tensors, do not have near values.
+
+    Args:
+      a: The expected numpy `ndarray`, or anything that can be converted into a
+        numpy `ndarray` (including Tensor), or any arbitrarily nested of
+        structure of these.
+      b: The actual numpy `ndarray`, or anything that can be converted into a
+        numpy `ndarray` (including Tensor), or any arbitrarily nested of
+        structure of these.
+      rtol: relative tolerance.
+      atol: absolute tolerance.
+      msg: Optional message to report on failure.
+
+    Raises:
+      AssertionError: If `a` and `b` are unexpectedly close at all elements.
+    """
+    try:
+      self.assertAllClose(a, b, rtol=rtol, atol=atol, msg=msg)
+    except AssertionError:
+      return
+    msg = msg or ''
+    raise AssertionError('The two values are close at all elements. %s' % msg)
+
+  def assertEqual(self, first, second, msg=None):
+    if isinstance(first, list) and isinstance(second, tuple):
+      first = tuple(first)
+    if isinstance(first, tuple) and isinstance(second, list):
+      second = tuple(second)
+    return super(TestCase, self).assertEqual(first, second, msg)
+
+  def assertAllCloseAccordingToType(self,
+                                    a,
+                                    b,
+                                    rtol=1e-6,
+                                    atol=1e-6,
+                                    float_rtol=1e-6,
+                                    float_atol=1e-6,
+                                    half_rtol=1e-3,
+                                    half_atol=1e-3,
+                                    bfloat16_rtol=1e-2,
+                                    bfloat16_atol=1e-2,
+                                    msg=None):
+    """Like assertAllClose, but also suitable for comparing fp16 arrays.
+
+    In particular, the tolerance is reduced to 1e-3 if at least
+    one of the arguments is of type float16.
+
+    Args:
+      a: the expected numpy ndarray or anything can be converted to one.
+      b: the actual numpy ndarray or anything can be converted to one.
+      rtol: relative tolerance.
+      atol: absolute tolerance.
+      float_rtol: relative tolerance for float32.
+      float_atol: absolute tolerance for float32.
+      half_rtol: relative tolerance for float16.
+      half_atol: absolute tolerance for float16.
+      bfloat16_rtol: relative tolerance for bfloat16.
+      bfloat16_atol: absolute tolerance for bfloat16.
+      msg: Optional message to report on failure.
+    """
+    (a, b) = self._evaluateTensors(a, b)
+    a = self._GetNdArray(a)
+    b = self._GetNdArray(b)
+    # types with lower tol are put later to overwrite previous ones.
+    if (a.dtype == np.float32 or b.dtype == np.float32 or
+        a.dtype == np.complex64 or b.dtype == np.complex64):
+      rtol = max(rtol, float_rtol)
+      atol = max(atol, float_atol)
+    if a.dtype == np.float16 or b.dtype == np.float16:
+      rtol = max(rtol, half_rtol)
+      atol = max(atol, half_atol)
+    if not NUMPY_MODE:
+      if a.dtype == tf.bfloat16 or b.dtype == tf.bfloat16:
+        rtol = max(rtol, bfloat16_rtol)
+        atol = max(atol, bfloat16_atol)
+
+    self.assertAllClose(a, b, rtol=rtol, atol=atol, msg=msg)
+
+  def assertAllEqual(self, a, b, msg=None):
+    """Asserts that two numpy arrays or Tensors have the same values.
+
+    Args:
+      a: the expected numpy ndarray or anything can be converted to one.
+      b: the actual numpy ndarray or anything can be converted to one.
+      msg: Optional message to report on failure.
+    """
+    msg = msg if msg else ''
+    (a, b) = self._evaluateTensors(a, b)
+    a = self._GetNdArray(a)
+    b = self._GetNdArray(b)
+    # Arbitrary bounds so that we don't print giant tensors.
+    if (b.ndim <= 3 or b.size < 500):
+      self.assertEqual(
+          a.shape, b.shape, 'Shape mismatch: expected %s, got %s.'
+          ' Contents: %r. \n%s.' % (a.shape, b.shape, b, msg))
+    else:
+      self.assertEqual(
+          a.shape, b.shape, 'Shape mismatch: expected %s, got %s.'
+          ' %s' % (a.shape, b.shape, msg))
+
+    same = (a == b)
+
+    dtype_list = [np.float16, np.float32, np.float64]
+    if not NUMPY_MODE:
+      dtype_list += [tf.bfloat16]
+
+    if a.dtype in dtype_list:
+      same = np.logical_or(same, np.logical_and(np.isnan(a), np.isnan(b)))
+    msgs = [msg]
+    if not np.all(same):
+      # Adds more details to np.testing.assert_array_equal.
+      diff = np.logical_not(same)
+      if a.ndim:
+        x = a[np.where(diff)]
+        y = b[np.where(diff)]
+        msgs.append('not equal where = {}'.format(np.where(diff)))
+      else:
+        # np.where is broken for scalars
+        x, y = a, b
+      msgs.append('not equal lhs = %r' % x)
+      msgs.append('not equal rhs = %r' % y)
+
+      if (a.dtype.kind != b.dtype.kind and
+          {a.dtype.kind, b.dtype.kind}.issubset({'U', 'S', 'O'})):
+        a_list = []
+        b_list = []
+        # OK to flatten `a` and `b` because they are guaranteed to have the
+        # same shape.
+        for out_list, flat_arr in [(a_list, a.flat), (b_list, b.flat)]:
+          for item in flat_arr:
+            if isinstance(item, str):
+              out_list.append(item.encode('utf-8'))
+            else:
+              out_list.append(item)
+        a = np.array(a_list)
+        b = np.array(b_list)
+
+      np.testing.assert_array_equal(a, b, err_msg='\n'.join(msgs))
+
+  def assertAllGreater(self, a, comparison_target):
+    """Assert element values are all greater than a target value.
+
+    Args:
+      a: The numpy `ndarray`, or anything that can be converted into a numpy
+        `ndarray` (including Tensor).
+      comparison_target: The target value of comparison.
+    """
+    (a, comparison_target) = self._evaluateTensors(a, comparison_target)
+    a = self._GetNdArray(a)
+    self.assertGreater(np.min(a), comparison_target)
+
+  def assertAllLess(self, a, comparison_target):
+    """Assert element values are all less than a target value.
+
+    Args:
+      a: The numpy `ndarray`, or anything that can be converted into a numpy
+        `ndarray` (including Tensor).
+      comparison_target: The target value of comparison.
+    """
+    (a, comparison_target) = self._evaluateTensors(a, comparison_target)
+    a = self._GetNdArray(a)
+    self.assertLess(np.max(a), comparison_target)
+
+  def assertAllGreaterEqual(self, a, comparison_target):
+    """Assert element values are all greater than or equal to a target value.
+
+    Args:
+      a: The numpy `ndarray`, or anything that can be converted into a numpy
+        `ndarray` (including Tensor).
+      comparison_target: The target value of comparison.
+    """
+    (a, comparison_target) = self._evaluateTensors(a, comparison_target)
+    a = self._GetNdArray(a)
+    self.assertGreaterEqual(np.min(a), comparison_target)
+
+  def assertAllLessEqual(self, a, comparison_target):
+    """Assert element values are all less than or equal to a target value.
+
+    Args:
+      a: The numpy `ndarray`, or anything that can be converted into a numpy
+        `ndarray` (including Tensor).
+      comparison_target: The target value of comparison.
+    """
+    (a, comparison_target) = self._evaluateTensors(a, comparison_target)
+    a = self._GetNdArray(a)
+    self.assertLessEqual(np.max(a), comparison_target)
+
+  def assertShapeEqual(self, input_a, input_b, msg=None):
+    if TF_MODE:
+      super(TestCase, self).assertShapeEqual(input_a, input_b, msg=msg)
+    else:
+      self.assertTupleEqual(input_a.shape, input_b.shape, msg=msg)
 
   def assertAllAssertsNested(self, assert_fn, *structure, **kwargs):
     """Run `assert_fn` on `structure` and report which elements errored.
@@ -197,6 +579,64 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
                 tf.nest.flatten(y, expand_composites=True))),
         msg=msg)
 
+  def assertAllInRange(self,
+                       target,
+                       lower_bound,
+                       upper_bound,
+                       open_lower_bound=False,
+                       open_upper_bound=False):
+    """Assert that elements in a Tensor are all in a given range.
+
+    Args:
+      target: The numpy `ndarray`, or anything that can be converted into a
+        numpy `ndarray` (including Tensor).
+      lower_bound: lower bound of the range
+      upper_bound: upper bound of the range
+      open_lower_bound: (`bool`) whether the lower bound is open (i.e., > rather
+        than the default >=)
+      open_upper_bound: (`bool`) whether the upper bound is open (i.e., < rather
+        than the default <=)
+
+    Raises:
+      AssertionError:
+        if the value tensor does not have an ordered numeric type (float* or
+          int*), or
+        if there are nan values, or
+        if any of the elements do not fall in the specified range.
+    """
+    target = self._GetNdArray(target)
+    if not (np.issubdtype(target.dtype, np.floating) or
+            np.issubdtype(target.dtype, np.integer)):
+      raise AssertionError(
+          'The value of %s does not have an ordered numeric type, instead it '
+          'has type: %s' % (target, target.dtype))
+
+    nan_subscripts = np.where(np.isnan(target))
+    if np.size(nan_subscripts):
+      raise AssertionError(
+          '%d of the %d element(s) are NaN. '
+          'Subscripts(s) and value(s) of the NaN element(s):\n' %
+          (len(nan_subscripts[0]), np.size(target)) +
+          '\n'.join(self._format_subscripts(nan_subscripts, target)))
+
+    range_str = (('(' if open_lower_bound else '[') + str(lower_bound) + ', ' +
+                 str(upper_bound) + (')' if open_upper_bound else ']'))
+
+    violations = (
+        np.less_equal(target, lower_bound) if open_lower_bound else np.less(
+            target, lower_bound))
+    violations = np.logical_or(
+        violations,
+        np.greater_equal(target, upper_bound)
+        if open_upper_bound else np.greater(target, upper_bound))
+    violation_subscripts = np.where(violations)
+    if np.size(violation_subscripts):
+      raise AssertionError(
+          '%d of the %d element(s) are outside the range %s. ' %
+          (len(violation_subscripts[0]), np.size(target), range_str) +
+          'Subscript(s) and value(s) of the offending elements:\n' +
+          '\n'.join(self._format_subscripts(violation_subscripts, target)))
+
   def assertAllEqualNested(self, a, b, check_types=False, shallow=None):
     """Assert that analogous entries in two nested structures are equivalent.
 
@@ -218,6 +658,79 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
         check_types=check_types,
         msg='AllEqualNested failed',
         shallow=shallow)
+
+  def assertAllClose(self, a, b, rtol=1e-06, atol=1e-06, msg=None, path=None):
+    path = [] if path is None else path
+    path_str = ''
+    msg = msg if msg else ''
+    if isinstance(a, (list, tuple)):
+      # Try to directly compare a, b as ndarrays; if not work, then traverse
+      # through the sequence, which is more expensive.
+      try:
+        (a, b) = self._evaluateTensors(a, b)
+        a_as_ndarray = self._GetNdArray(a)
+        b_as_ndarray = self._GetNdArray(b)
+        self.assertAllClose(
+            a_as_ndarray,
+            b_as_ndarray,
+            rtol=rtol,
+            atol=atol,
+            msg='Mismatched value: a%s is different from b%s. %s' %
+            (path_str, path_str, msg))
+      except (ValueError, TypeError, NotImplementedError) as e:
+        if len(a) != len(b):
+          raise ValueError(
+              'Mismatched length: a%s has %d items, but b%s has %d items. %s' %
+              (path_str, len(a), path_str, len(b), msg)) from e
+        for idx, (a_ele, b_ele) in enumerate(zip(a, b)):
+          path.append(str(idx))
+          self.assertAllClose(
+              a_ele, b_ele, rtol=rtol, atol=atol, path=path, msg=msg)
+          del path[-1]
+    else:
+      (a, b) = self._evaluateTensors(a, b)
+      a = self._GetNdArray(a)
+      b = self._GetNdArray(b)
+      # When the array rank is small, print its contents. Numpy array printing
+      # is implemented using inefficient recursion so prints can cause tests to
+      # time out.
+      if a.shape != b.shape and (b.ndim <= 3 or b.size < 500):
+        shape_mismatch_msg = (
+            'Shape mismatch: expected %s, got %s with contents '
+            '%s.') % (a.shape, b.shape, b)
+      else:
+        shape_mismatch_msg = 'Shape mismatch: expected %s, got %s.' % (a.shape,
+                                                                       b.shape)
+      self.assertEqual(a.shape, b.shape, shape_mismatch_msg)
+
+      msgs = [msg]
+      a_dtype = a.dtype
+      if not np.allclose(a, b, rtol=rtol, atol=atol):
+        # Adds more details to np.testing.assert_allclose.
+        #
+        # NOTE: numpy.allclose (and numpy.testing.assert_allclose)
+        # checks whether two arrays are element-wise equal within a
+        # tolerance. The relative difference (rtol * abs(b)) and the
+        # absolute difference atol are added together to compare against
+        # the absolute difference between a and b.  Here, we want to
+        # tell user which elements violate such conditions.
+        cond = np.logical_or(
+            np.abs(a - b) > atol + rtol * np.abs(b),
+            np.isnan(a) != np.isnan(b))
+        if a.ndim:
+          x = a[np.where(cond)]
+          y = b[np.where(cond)]
+          msgs.append('not close where = {}'.format(np.where(cond)))
+        else:
+          # np.where is broken for scalars
+          x, y = a, b
+        msgs.append('not close lhs = {}'.format(x))
+        msgs.append('not close rhs = {}'.format(y))
+        msgs.append('not close dif = {}'.format(np.abs(x - y)))
+        msgs.append('not close tol = {}'.format(atol + rtol * np.abs(y)))
+        msgs.append('dtype = {}, shape = {}'.format(a_dtype, a.shape))
+        np.testing.assert_allclose(
+            a, b, rtol=rtol, atol=atol, err_msg='\n'.join(msgs), equal_nan=True)
 
   def assertAllCloseNested(
       self, a, b, rtol=1e-06, atol=1e-06, check_types=False):
@@ -547,6 +1060,7 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
     if JAX_MODE:
       return _compute_max_gradient_error_jax(f, args, delta)
     def _compute_error():
+      from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
       return gradient_checker_v2.max_error(
           *gradient_checker_v2.compute_gradient(f, x=args, delta=delta))
     if tf.executing_eagerly():
@@ -665,6 +1179,7 @@ class EagerGraphCombination(test_combinations.TestCombination):
 
   def context_managers(self, kwargs):
     # TODO(isaprykin): Switch the default to eager.
+    from tensorflow.python.eager import context  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
     mode = kwargs.pop('mode', 'graph')
     if mode == 'eager':
       return [context.eager_mode()]
@@ -788,7 +1303,7 @@ def test_graph_mode_only(test_class_or_method=None):
   Raises:
     SkipTest: Raised when not running in the TF backend.
   """
-  if JAX_MODE or NUMPY_MODE:
+  if not TF_MODE:
     raise unittest.SkipTest('Ignoring TF Graph Mode tests in non-TF backends.')
 
   decorator = test_combinations.generate(
@@ -911,7 +1426,7 @@ def tf_tape_safety_test(test_fn):
   """Only run a test of TF2 tape safety against the TF backend."""
 
   def new_test(self, *args, **kwargs):
-    if JAX_MODE or NUMPY_MODE:
+    if not TF_MODE:
       self.skipTest('Tape-safety tests are only run against TensorFlow.')
     return test_fn(self, *args, **kwargs)
 
@@ -1505,8 +2020,9 @@ def main(jax_mode=JAX_MODE):
     # (and it already supports regexes).
     tf.test.main()
   else:
-    from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
-    test_util.InstallStackTraceHandler()
+    if TF_MODE:
+      from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+      test_util.InstallStackTraceHandler()
     absltest.main(testLoader=_TestLoader())
 
 

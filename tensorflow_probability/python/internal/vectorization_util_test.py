@@ -99,7 +99,7 @@ class VectorizationTest(test_util.TestCase):
     vectorized_result = self.evaluate(vectorized_fn(x, y))
     result = tf.nest.map_structure(lambda a, b: a * np.ones(b.shape),
                                    fn(x, y), vectorized_result)
-    self.assertAllClose(result, vectorized_result)
+    self.assertAllCloseNested(result, vectorized_result)
 
   @parameterized.named_parameters(
       ('static_shapes', True),

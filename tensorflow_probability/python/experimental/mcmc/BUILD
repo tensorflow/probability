@@ -413,7 +413,7 @@ py_test(
     deps = [
         ":elliptical_slice_sampler",
         # numpy dep,
-        # tensorflow:tensorflow_no_contrib dep,
+        # tensorflow dep,
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/mcmc:sample",
@@ -425,7 +425,7 @@ py_library(
     srcs = ["nuts_autobatching.py"],
     deps = [
         # numpy dep,
-        # tensorflow:tensorflow_no_contrib dep,
+        # tensorflow dep,
         "//tensorflow_probability/python/experimental/auto_batching",
         "//tensorflow_probability/python/math:gradient",
         "//tensorflow_probability/python/mcmc:kernel",
@@ -1138,7 +1138,6 @@ multi_substrate_py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        # tensorflow:tensorflow_no_contrib dep,
         "//tensorflow_probability/python/bijectors:exp",
         "//tensorflow_probability/python/bijectors:identity",
         "//tensorflow_probability/python/distributions:beta",

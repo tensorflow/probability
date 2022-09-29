@@ -101,6 +101,7 @@ multi_substrate_py_test(
     srcs = ["batch_shape_lib_test.py"],
     deps = [
         ":test_util",
+        # mock dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:exp",

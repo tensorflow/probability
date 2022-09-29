@@ -56,6 +56,7 @@ multi_substrate_py_test(
     ],
     deps = [
         ":manual_special_functions",
+        # mock dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
