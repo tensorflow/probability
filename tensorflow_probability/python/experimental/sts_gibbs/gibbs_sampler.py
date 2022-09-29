@@ -385,6 +385,36 @@ def _get_design_matrix(model):
   return design_matrices[0]
 
 
+def get_seasonal_latents_shape(timeseries, model, num_chains=()):
+  """Computes the shape of seasonal latents.
+
+  Args:
+    timeseries: Timeseries that is being modeled. Used to extract the timeseries
+      length and batch shape.
+    model: The `sts.Sum` model that the seasonal components will be found in.
+      Must be a Gibbs-samplable model built with
+      `build_model_for_gibbs_fitting`.
+    num_chains: Optional int to indicate the number of parallel MCMC chains.
+      Default to an empty tuple to sample a single chain.
+
+  Returns:
+    A shape list.
+  """
+  _, _, seasonal_indices_and_components = _get_components_from_model(model)
+
+  seasonal_total_size = 0
+  for _, seasonal_component in seasonal_indices_and_components:
+    seasonal_total_size += seasonal_component.latent_size
+
+  batch_shape = prefer_static.concat(
+      [num_chains, prefer_static.shape(timeseries)[:-1]], axis=-1)
+  timeseries_shape = prefer_static.shape(timeseries)[-1:]
+  # Shape of all the seasonality component levels added together.
+  seasonal_levels_shape = [seasonal_total_size]
+  return prefer_static.concat(
+      [batch_shape, timeseries_shape, seasonal_levels_shape], axis=0)
+
+
 def fit_with_gibbs_sampling(model,
                             observed_time_series,
                             num_chains=(),
@@ -461,13 +491,6 @@ def fit_with_gibbs_sampling(model,
         prefer_static.concat([batch_shape, design_matrix.shape[-1:]],
                              axis=0),
         dtype=dtype)
-    seasonal_total_size = 0
-    for _, seasonal_component in seasonal_indices_and_components:
-      seasonal_total_size += seasonal_component.latent_size
-    # Shape of all the seasonal component levels added together.
-    seasonal_levels_shape = [seasonal_total_size]
-    seasonal_components_shape = [len(seasonal_indices_and_components)]
-    timeseries_shape = prefer_static.shape(observed_time_series)[-1:]
     initial_state = GibbsSamplerState(
         observation_noise_scale=tf.ones(batch_shape, dtype=dtype),
         level_scale=tf.ones(batch_shape, dtype=dtype),
@@ -475,17 +498,15 @@ def fit_with_gibbs_sampling(model,
         weights=weights,
         level=tf.zeros(level_slope_shape, dtype=dtype),
         slope=initial_slope,
-        # Drift scale per seasonal component.
+        seed=None,  # Set below.
         seasonal_drift_scales=tf.ones(
-            prefer_static.concat([batch_shape, seasonal_components_shape],
-                                 axis=0),
-            dtype=dtype),
-        # Seasonal level at each timestep for each latent level.
-        seasonal_levels=tf.zeros(
             prefer_static.concat(
-                [batch_shape, timeseries_shape, seasonal_levels_shape], axis=0),
+                [batch_shape, [len(seasonal_indices_and_components)]], axis=0),
             dtype=dtype),
-        seed=None)  # Set below.
+        seasonal_levels=tf.zeros(
+            get_seasonal_latents_shape(
+                observed_time_series, model, num_chains=num_chains),
+            dtype=dtype))
 
   if isinstance(seed, six.integer_types):
     tf.random.set_seed(seed)

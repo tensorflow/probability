@@ -1084,6 +1084,65 @@ class GibbsSamplerTests(test_util.TestCase):
           # before main runs.
           seasonal_components=[seasonal_component_factory()])
 
+  def test_get_seasonal_latents_shape_no_chains_constrained_and_unconstrained(
+      self):
+    model = sum_lib.Sum([
+        local_level.LocalLevel(),
+        seasonal.Seasonal(
+            name='s1', num_seasons=6, constrain_mean_effect_to_zero=True),
+        seasonal.Seasonal(
+            name='s2', num_seasons=10, constrain_mean_effect_to_zero=False)
+    ])
+    model.supports_gibbs_sampling = True  # Work-around to simplify testing.
+    self.assertAllEqual(
+        [
+            3,
+            4,
+            120,
+            # 5 from the constrained, 10 from the unconstrained.
+            15
+        ],
+        gibbs_sampler.get_seasonal_latents_shape(
+            timeseries=tf.ones(shape=[3, 4, 120]), model=model))
+
+  def test_get_seasonal_latents_shape_chains_constrained_and_unconstrained(
+      self):
+    model = sum_lib.Sum([
+        local_level.LocalLevel(),
+        seasonal.Seasonal(
+            name='s1', num_seasons=6, constrain_mean_effect_to_zero=True),
+        seasonal.Seasonal(
+            name='s2', num_seasons=10, constrain_mean_effect_to_zero=False)
+    ])
+    model.supports_gibbs_sampling = True  # Work-around to simplify testing.
+    self.assertAllEqual(
+        [
+            7,
+            3,
+            4,
+            120,
+            # 5 from the constrained, 10 from the unconstrained.
+            15
+        ],
+        gibbs_sampler.get_seasonal_latents_shape(
+            num_chains=[7], timeseries=tf.ones(shape=[3, 4, 120]), model=model))
+
+  def test_get_seasonal_latents_shape_no_seasonal_components(self):
+    model = sum_lib.Sum([
+        local_level.LocalLevel(),
+    ])
+    model.supports_gibbs_sampling = True  # Work-around to simplify testing.
+    self.assertAllEqual(
+        [
+            3,
+            4,
+            120,
+            # No components
+            0
+        ],
+        gibbs_sampler.get_seasonal_latents_shape(
+            timeseries=tf.ones(shape=[3, 4, 120]), model=model))
+
 
 if __name__ == '__main__':
   test_util.main()
