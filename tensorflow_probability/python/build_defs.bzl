@@ -17,6 +17,7 @@
 NO_REWRITE_NEEDED = [
     "internal:all_util",
     "internal:docstring_util",
+    "internal:lazy_loader",
     "internal:reparameterization",
     "python/layers",
     "platform_google",
