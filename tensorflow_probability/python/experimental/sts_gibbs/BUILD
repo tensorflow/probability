@@ -98,7 +98,7 @@ multi_substrate_py_test(
     size = "large",
     srcs = ["gibbs_sampler_test.py"],
     disabled_substrates = ["numpy"],
-    shard_count = 4,
+    shard_count = 8,
     deps = [
         ":gibbs_sampler",
         # absl/testing:parameterized dep,

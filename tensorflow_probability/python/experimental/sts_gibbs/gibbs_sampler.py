@@ -56,6 +56,7 @@ additional code):
 """
 
 import collections
+import itertools
 
 import numpy as np
 import six
@@ -74,6 +75,7 @@ from tensorflow_probability.python.distributions import mvn_diag
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import normal_conjugate_posteriors
+from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.experimental.distributions import mvn_precision_factor_linop as mvnpflo
 from tensorflow_probability.python.experimental.sts_gibbs import dynamic_spike_and_slab
 from tensorflow_probability.python.experimental.sts_gibbs import sample_parameters
@@ -86,6 +88,7 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.sts.components import local_level
 from tensorflow_probability.python.sts.components import local_linear_trend
 from tensorflow_probability.python.sts.components import regression
+from tensorflow_probability.python.sts.components import seasonal
 from tensorflow_probability.python.sts.components import sum as sum_lib
 from tensorflow_probability.python.sts.internal import util as sts_util
 
@@ -94,7 +97,8 @@ JAX_MODE = False
 # The sampler state stores current values for each model parameter,
 # and auxiliary quantities such as the latent level.
 GibbsSamplerState = collections.namedtuple(  # pylint: disable=unexpected-keyword-arg
-    'GibbsSamplerState', [
+    'GibbsSamplerState',
+    [
         'observation_noise_scale',
         'level_scale',
         'weights',
@@ -102,11 +106,20 @@ GibbsSamplerState = collections.namedtuple(  # pylint: disable=unexpected-keywor
         'seed',
         'slope_scale',
         'slope',
+        # [batch shape, num_seasonal_components]
+        'seasonal_drift_scales',
+        # [batch shape,
+        #  timeseries_length
+        #  num seasonal latents across all components]
+        'seasonal_levels',
     ])
-# Make the two slope-related quantities optional, for backwards compatibility.
+# Make the slope-and-season related quantities optional, for backwards
+# compatibility.
 GibbsSamplerState.__new__.__defaults__ = (
     0.,  # slope_scale
-    0.)  # slope
+    0.,  # slope
+    0.,  # seasonal_drift_scales
+    0.)  # seasonal_levels
 
 
 # TODO(b/151571025): revert to `tfd.InverseGamma` once its sampler is XLA-able.
@@ -192,7 +205,8 @@ def build_model_for_gibbs_fitting(observed_time_series,
                                   observation_noise_variance_prior,
                                   slope_variance_prior=None,
                                   initial_level_prior=None,
-                                  sparse_weights_nonzero_prob=None):
+                                  sparse_weights_nonzero_prob=None,
+                                  seasonal_components=None):
   """Builds a StructuralTimeSeries model instance that supports Gibbs sampling.
 
   To support Gibbs sampling, a model must have have conjugate priors on all
@@ -244,6 +258,9 @@ def build_model_for_gibbs_fitting(observed_time_series,
       `sparse_weights_nonzero_prob` is the prior probability of the 'slab'
       component.
       Default value: `None`.
+    seasonal_components: An (optional) list of Seasonal components to include
+      in the model. There are restrictions about what priors may be specified
+      (InverseGamma drift scale prior).
 
   Returns:
     model: A `tfp.sts.StructuralTimeSeries` model instance.
@@ -280,6 +297,22 @@ def build_model_for_gibbs_fitting(observed_time_series,
                     inverse_gamma.InverseGamma):
     raise ValueError('Observation noise variance prior must be an inverse '
                      'gamma distribution.')
+  if seasonal_components is None:
+    seasonal_components = []
+  for seasonal_component in seasonal_components:
+    if not seasonal_component.allow_drift:
+      raise NotImplementedError(
+          'Only seasonality with drift is supported by Gibbs sampling.')
+    prior = seasonal_component.get_parameter('drift_scale').prior
+    # TODO(kloveless): Create a helper function to help with this verification,
+    # to be shared with seasonal.py.
+    if not (isinstance(prior, transformed_distribution.TransformedDistribution)
+            and isinstance(prior.bijector, invert.Invert) and
+            isinstance(prior.bijector.bijector, square.Square) and
+            isinstance(prior.distribution, inverse_gamma.InverseGamma)):
+      raise NotImplementedError(
+          'Seasonal components drift scale must be the square root of an '
+          'inverse gamma distribution; got {}'.format(prior))
 
   sqrt = invert.Invert(
       square.Square())  # Converts variance priors to scale priors.
@@ -319,7 +352,7 @@ def build_model_for_gibbs_fitting(observed_time_series,
             weights_prior=weights_prior,
             name='regression'))
   model = sum_lib.Sum(
-      components,
+      components + seasonal_components,
       observed_time_series=observed_time_series,
       observation_noise_scale_prior=sqrt(observation_noise_variance_prior),
       # The Gibbs sampling steps in this file do not account for an
@@ -416,7 +449,8 @@ def fit_with_gibbs_sampling(model,
   # the slope_scale is always zero.
   initial_slope_scale = 0.
   initial_slope = 0.
-  (_, level_component), _ = (_get_components_from_model(model))
+  (_, level_component), _, seasonal_indices_and_components = (
+      _get_components_from_model(model))
   if isinstance(level_component, local_linear_trend.LocalLinearTrend):
     initial_slope_scale = 1. * tf.ones(batch_shape, dtype=dtype)
     initial_slope = tf.zeros(level_slope_shape, dtype=dtype)
@@ -427,6 +461,13 @@ def fit_with_gibbs_sampling(model,
         prefer_static.concat([batch_shape, design_matrix.shape[-1:]],
                              axis=0),
         dtype=dtype)
+    seasonal_total_size = 0
+    for _, seasonal_component in seasonal_indices_and_components:
+      seasonal_total_size += seasonal_component.latent_size
+    # Shape of all the seasonal component levels added together.
+    seasonal_levels_shape = [seasonal_total_size]
+    seasonal_components_shape = [len(seasonal_indices_and_components)]
+    timeseries_shape = prefer_static.shape(observed_time_series)[-1:]
     initial_state = GibbsSamplerState(
         observation_noise_scale=tf.ones(batch_shape, dtype=dtype),
         level_scale=tf.ones(batch_shape, dtype=dtype),
@@ -434,6 +475,16 @@ def fit_with_gibbs_sampling(model,
         weights=weights,
         level=tf.zeros(level_slope_shape, dtype=dtype),
         slope=initial_slope,
+        # Drift scale per seasonal component.
+        seasonal_drift_scales=tf.ones(
+            prefer_static.concat([batch_shape, seasonal_components_shape],
+                                 axis=0),
+            dtype=dtype),
+        # Seasonal level at each timestep for each latent level.
+        seasonal_levels=tf.zeros(
+            prefer_static.concat(
+                [batch_shape, timeseries_shape, seasonal_levels_shape], axis=0),
+            dtype=dtype),
         seed=None)  # Set below.
 
   if isinstance(seed, six.integer_types):
@@ -464,22 +515,29 @@ def model_parameter_samples_from_gibbs_samples(model, gibbs_samples):
   needed for `make_state_space_model`.
 
   Args:
-   model: A `tfd.sts.StructuralTimeSeries` model instance. This must be of the
-     form constructed by `build_model_for_gibbs_sampling`.
-   gibbs_samples: A `GibbsSamplerState` instance, presumably from
-     `fit_with_gibbs_sampling`.
+    model: A `tfd.sts.StructuralTimeSeries` model instance. This must be of the
+      form constructed by `build_model_for_gibbs_sampling`.
+    gibbs_samples: A `GibbsSamplerState` instance, presumably from
+      `fit_with_gibbs_sampling`.
 
   Returns:
-   A set of posterior samples, that can be used with `make_state_space_model`
-   or `sts.forecast`.
+    A set of posterior samples, that can be used with `make_state_space_model`
+    or `sts.forecast`.
   """
   # Make use of the indices in the model to avoid requiring a specific
   # order of components.
-  ((level_component_index, level_component),
-   (regression_component_index, _)) = (
+  ((level_component_index, level_component), (regression_component_index, _),
+   seasonal_indices_and_components) = (
        _get_components_from_model(model))
+  seasonal_index_set = set([x[0] for x in seasonal_indices_and_components])
   model_parameter_samples = (gibbs_samples.observation_noise_scale,)
 
+  # The last axis is the seasonal axis.
+  seasonal_parameter_samples = tf.unstack(
+      gibbs_samples.seasonal_drift_scales, axis=-1)
+  # Allow seasonal components to not be consecutive by tracking how many
+  # have been unpacked.
+  seasonal_component_index = 0
   for index in range(len(model.components)):
     if index == level_component_index:
       model_parameter_samples += (gibbs_samples.level_scale,)
@@ -487,6 +545,10 @@ def model_parameter_samples_from_gibbs_samples(model, gibbs_samples):
         model_parameter_samples += (gibbs_samples.slope_scale,)
     elif index == regression_component_index:
       model_parameter_samples += (gibbs_samples.weights,)
+    elif index in seasonal_index_set:
+      model_parameter_samples += (
+          seasonal_parameter_samples[seasonal_component_index],)
+      seasonal_component_index += 1
 
   return model_parameter_samples
 
@@ -592,6 +654,18 @@ def one_step_predictive(model,
       ]) + ([forecast_level] if num_forecast_steps > 0 else []),
       axis=-1)
 
+  # Calculate the seasonal effect at each time point.
+  _, _, seasonal_indices_and_components = _get_components_from_model(model)
+  if seasonal_indices_and_components and num_forecast_steps > 0:
+    raise NotImplementedError(
+        'Forecasting with one_step_predictive is not supported with '
+        'seasonality. Instead, use fit_with_gibbs_sampling with missing '
+        'values.')
+  seasonal_pred = _compute_seasonal_effect_from_levels(
+      thinned_samples.seasonal_levels,
+      [x[1] for x in seasonal_indices_and_components],
+      default_dtype=dtype)
+
   design_matrix = _get_design_matrix(model)
   if design_matrix is not None:
     design_matrix = design_matrix.to_dense()[:num_observed_steps +
@@ -600,8 +674,8 @@ def one_step_predictive(model,
   else:
     regression_effect = 0
 
-  y_mean = ((level_pred + regression_effect) * original_scale[..., tf.newaxis] +
-            original_mean[..., tf.newaxis])
+  y_mean = ((level_pred + seasonal_pred + regression_effect) *
+            original_scale[..., tf.newaxis] + original_mean[..., tf.newaxis])
 
   # To derive a forecast variance, including slope uncertainty, let
   #  `r[:k]` be iid Gaussian RVs with variance `level_scale**2` and `s[:k]` be
@@ -700,10 +774,12 @@ def _resample_latents(observed_residuals,
                       observation_noise_scale,
                       initial_state_prior,
                       slope_scale=None,
+                      seasonal_components=None,
+                      seasonal_drift_scales=None,
                       is_missing=None,
                       sample_shape=(),
                       seed=None):
-  """Uses Durbin-Koopman sampling to resample the latent level and slope.
+  """Uses Durbin-Koopman sampling to resample the model's latents.
 
   Durbin-Koopman sampling [1] is an efficient algorithm to sample from the
   posterior latents of a linear Gaussian state space model. This method
@@ -724,30 +800,62 @@ def _resample_latents(observed_residuals,
       specifying the standard deviation of slope random walk steps. If provided,
       a `LocalLinearTrend` model is used, otherwise, a `LocalLevel` model is
       used.
+    seasonal_components: An optional list of sts.Season components. This and
+      `seasonal_drift_scales` must have the same number of seasonal components.
+    seasonal_drift_scales: An optional float scalar `Tensor` (may contain batch
+      dimensions) of shape [num_seasonal_components].
     is_missing: Optional `bool` `Tensor` missingness mask.
     sample_shape: Optional `int` `Tensor` shape of samples to draw.
     seed: `int` `Tensor` of shape `[2]` controlling stateless sampling.
 
   Returns:
-    latents: Float `Tensor` resampled latent level, of shape
-      `[..., num_timesteps, latent_size]`, where `...` concatenates the
-      sample shape with any batch shape from `observed_time_series`.
+    latents: Float `Tensor` resampled latent level and (optional) seasonal,
+       of shape `[..., num_timesteps, latent_size]`, where `...` concatenates
+       the sample shape with any batch shape from `observed_time_series`.
+       The level latents are returned first, then each of the seasonal
+       components.
   """
+  if seasonal_components is None:
+    seasonal_components = []
 
   num_timesteps = prefer_static.shape(observed_residuals)[-1]
   if slope_scale is None:
-    ssm = local_level.LocalLevelStateSpaceModel(
+    local_ssm = local_level.LocalLevelStateSpaceModel(
         num_timesteps=num_timesteps,
         initial_state_prior=initial_state_prior,
         observation_noise_scale=observation_noise_scale,
         level_scale=level_scale)
   else:
-    ssm = local_linear_trend.LocalLinearTrendStateSpaceModel(
+    local_ssm = local_linear_trend.LocalLinearTrendStateSpaceModel(
         num_timesteps=num_timesteps,
         initial_state_prior=initial_state_prior,
         observation_noise_scale=observation_noise_scale,
         level_scale=level_scale,
         slope_scale=slope_scale)
+
+  if seasonal_components:
+    # It is assumed the the local ssm is added in first.
+    ssms = [local_ssm]
+    # Add an SSM for each season.
+    for season_index, seasonal_component in enumerate(seasonal_components):
+      seasonal_drift_scale = seasonal_drift_scales[..., season_index]
+      ssms.append(
+          seasonal_component.make_state_space_model(
+              num_timesteps=num_timesteps,
+              initial_state_prior=seasonal_component.initial_state_prior,
+              param_vals={},
+              drift_scale=seasonal_drift_scale,
+              # Set this to exactly 0, since we want the observation noise
+              # of the entire additive space to match observation_noise_scale,
+              # but that is already specified on the local ssm.
+              observation_noise_scale=0.,
+          ))
+    # No observation_noise_scale is needed here since it is taken from the local
+    # ssm (which is equivalent).
+    ssm = sum_lib.AdditiveStateSpaceModel(ssms)
+  else:
+    # Only the local value needs to be sampled, no addition needed.
+    ssm = local_ssm
 
   return ssm.posterior_sample(
       observed_residuals[..., tf.newaxis],
@@ -793,9 +901,9 @@ def _get_components_from_model(model):
     model: A `tf.sts.StructuralTimeSeries` to split apart.
 
   Returns:
-    A tuple of (index and level component, index and regression component) or
-    an exception. The regression component may be None (along with its index -
-    (None, None)).
+    A tuple of (index and level component, index and regression component,
+    indices and seasonal components) or an exception.
+    The regression component may be None (along with its index - (None, None)).
 
     Each 'index and component' is a tuple of (index, component), where index
     is the position in the model.
@@ -807,6 +915,7 @@ def _get_components_from_model(model):
 
   level_components = []
   regression_components = []
+  seasonal_components = []
 
   for index, component in enumerate(model.components):
     if (isinstance(component, local_level.LocalLevel) or
@@ -815,6 +924,8 @@ def _get_components_from_model(model):
     elif (isinstance(component, regression.LinearRegression) or
           isinstance(component, SpikeAndSlabSparseLinearRegression)):
       regression_components.append((index, component))
+    elif isinstance(component, seasonal.Seasonal):
+      seasonal_components.append((index, component))
     else:
       raise NotImplementedError(
           'Found unsupported model component for Gibbs Sampling: {}'.format(
@@ -833,7 +944,79 @@ def _get_components_from_model(model):
         .format(len(regression_components)))
   elif len(regression_components) == 1:
     regression_component = regression_components[0]
-  return level_component, regression_component
+  return level_component, regression_component, seasonal_components
+
+
+def _resample_seasonal_scales(
+    seasonal_components,
+    seasonal_latents,
+    seasonal_seed,
+):
+  """Samples the scales of the seasonal components given their latents.
+
+  Args:
+    seasonal_components: A non-empty list of seasonal components.
+    seasonal_latents: A tensor of shape [batch shape, timeseries length, latents
+      across all seasonal components].
+    seasonal_seed: The per-seasonal component list of seeds.
+
+  Returns:
+    A tensor of seasonal scale samples, of shape [batch shape,
+    number of seasonal components].
+  """
+  seasonal_seeds = samplers.split_seed(
+      seasonal_seed, n=len(seasonal_components), salt='sample_seasonal_scales')
+  seasonal_drift_scales_list = []
+  # Seasonal latents are in sequence, thus track the index.
+  next_latent_index = 0
+  for seasonal_component, seasonal_seed in itertools.zip_longest(
+      seasonal_components, seasonal_seeds):
+    # Select the latents for this seasonal component.
+    num_component_latents = seasonal_component.latent_size
+    seasonal_component_latents = seasonal_latents[
+        ..., next_latent_index:next_latent_index + num_component_latents]
+    next_latent_index += num_component_latents
+    seasonal_drift_scales_list.append(
+        seasonal_component.experimental_resample_drift_scale(
+            latents=seasonal_component_latents,
+            seed=seasonal_seed,
+        ))
+  number_of_latents = seasonal_latents.shape[-1]
+  if next_latent_index != number_of_latents:
+    raise TypeError(
+        f'Some seasonal latent values were not used. {next_latent_index} were '
+        'used, but there were {number_of_latents} latents. Are you using '
+        'unsupported structual components?')
+
+  return tf.stack(
+      seasonal_drift_scales_list,
+      # Seasonal component is the last dimension.
+      axis=-1)
+
+
+def _compute_seasonal_effect_from_levels(seasonal_levels, seasonal_components,
+                                         default_dtype):
+  """Given the seasonal levels, computes the effect on the timeseries."""
+  if not seasonal_components:
+    # Use a passed in dtype for the results for cases where the seasonal_levels
+    # are just empty, and their dtype may not match the computation dtype since
+    # they are default initialized.
+    return tf.zeros(shape=(1), dtype=default_dtype)
+  ret = tf.zeros(
+      dtype=seasonal_levels.dtype,
+      # Retain the batch shape.
+      shape=seasonal_levels.shape[:-1])
+  next_latent_index = 0
+  for seasonal_component in seasonal_components:
+    ret += seasonal_levels[
+        ...,
+        # The observation matrix is always just [1., 0., ..., 0.] for
+        # the seasonal state space models. Thus as an efficiency gain,
+        # just access it directly rather than constructing all the
+        # observation matrices at each timestep.
+        next_latent_index]
+    next_latent_index += seasonal_component.latent_size
+  return ret
 
 
 def _build_sampler_loop_body(model,
@@ -871,8 +1054,9 @@ def _build_sampler_loop_body(model,
   """
   if JAX_MODE and experimental_use_dynamic_cholesky:
     raise ValueError('Dynamic Cholesky decomposition not supported in JAX')
-  (_, level_component), (_, regression_component) = (
-      _get_components_from_model(model))
+  ((_, level_component), (_, regression_component),
+   seasonal_indices_and_components) = _get_components_from_model(model)
+  seasonal_components = [x[1] for x in seasonal_indices_and_components]
   model_has_slope = isinstance(level_component,
                                local_linear_trend.LocalLinearTrend)
 
@@ -960,15 +1144,20 @@ def _build_sampler_loop_body(model,
     resample_scale = tf.function(
         jit_compile=True, autograph=False)(
             _resample_scale)
+    resample_seasonal_scales = tf.function(
+        jit_compile=True, autograph=False)(
+            _resample_seasonal_scales)
   else:
     resample_latents = _resample_latents
     resample_scale = _resample_scale
+    resample_seasonal_scales = _resample_seasonal_scales
+
   def sampler_loop_body(previous_sample, _):
     """Runs one sampler iteration, resampling all model variables."""
 
-    (weights_seed, level_seed, observation_noise_scale_seed, level_scale_seed,
-     loop_seed) = samplers.split_seed(
-         previous_sample.seed, n=5, salt='sampler_loop_body')
+    (weights_seed, latent_seed, observation_noise_scale_seed, level_scale_seed,
+     loop_seed, seasonal_seed) = samplers.split_seed(
+         previous_sample.seed, n=6, salt='sampler_loop_body')
     # Preserve backward-compatible seed behavior by splitting slope separately.
     slope_scale_seed, = samplers.split_seed(
         previous_sample.seed, n=1, salt='sampler_loop_body_slope')
@@ -981,15 +1170,20 @@ def _build_sampler_loop_body(model,
       # through the regression weights, because the level can represent
       # arbitrary variation, while the weights are limited to representing
       # variation in the subspace given by the design matrix.
+      all_seasons_effect = _compute_seasonal_effect_from_levels(
+          previous_sample.seasonal_levels,
+          [x[1] for x in seasonal_indices_and_components],
+          default_dtype=previous_sample.level.dtype)
+      target_residuals = (
+          observed_time_series - previous_sample.level - all_seasons_effect)
       if model_has_spike_slab_regression:
         if experimental_use_weight_adjustment:
           previous_observation_noise_variance = tf.square(
               previous_sample.observation_noise_scale)
         else:
           previous_observation_noise_variance = 1.
-        targets = tf.where(is_missing,
-                           tf.zeros_like(observed_time_series),
-                           observed_time_series - previous_sample.level)
+        targets = tf.where(is_missing, tf.zeros_like(observed_time_series),
+                           target_residuals)
         (observation_noise_variance, weights
         ) = spike_and_slab_sampler.sample_noise_variance_and_weights(
             initial_nonzeros=tf.math.logical_or(
@@ -1002,7 +1196,7 @@ def _build_sampler_loop_body(model,
       else:
         weights = _resample_weights(
             design_matrix=design_matrix,
-            target_residuals=observed_time_series - previous_sample.level,
+            target_residuals=target_residuals,
             observation_noise_scale=previous_sample.observation_noise_scale,
             weights_prior_scale=weights_prior_scale,
             seed=weights_seed)
@@ -1025,13 +1219,42 @@ def _build_sampler_loop_body(model,
         observation_noise_scale=observation_noise_scale,
         initial_state_prior=level_component.initial_state_prior,
         is_missing=is_missing,
-        seed=level_seed)
+        seed=latent_seed,
+        seasonal_components=seasonal_components,
+        seasonal_drift_scales=previous_sample.seasonal_drift_scales)
     level = latents[..., 0]
     level_residuals = level[..., 1:] - level[..., :-1]
     if model_has_slope:
       slope = latents[..., 1]
       level_residuals -= slope[..., :-1]
       slope_residuals = slope[..., 1:] - slope[..., :-1]
+    next_latent_index = 2 if model_has_slope else 1
+    if seasonal_components:
+      num_seasonal_latents = sum(
+          [component.latent_size for component in seasonal_components])
+      # Seasonal levels are after the local latents.
+      seasonal_levels = latents[..., next_latent_index:next_latent_index +
+                                num_seasonal_latents]
+      next_latent_index += num_seasonal_latents
+      seasonal_drift_scales = resample_seasonal_scales(seasonal_components,
+                                                       seasonal_levels,
+                                                       seasonal_seed)
+    else:
+      # When there are no seasons, the lists will be empty and tf.stack
+      # will fail. Thus, just re-use whatever (unchanging) shape was
+      # initially set so it is unchanging on each iteration.
+      seasonal_drift_scales = previous_sample.seasonal_drift_scales
+      seasonal_levels = previous_sample.seasonal_levels
+    all_seasons_effect = _compute_seasonal_effect_from_levels(
+        seasonal_levels, [x[1] for x in seasonal_indices_and_components],
+        default_dtype=level.dtype)
+
+    number_of_latents = latents.shape[-1]
+    if next_latent_index != number_of_latents:
+      raise TypeError(
+          f'Some latent values were not used. {next_latent_index} were used, '
+          'but there were {number_of_latents} latents. Are you using '
+          'unsupported structual components?')
 
     # Estimate level scale from the empirical changes in level.
     level_scale = resample_scale(
@@ -1049,7 +1272,7 @@ def _build_sampler_loop_body(model,
       # Estimate noise scale from the residuals.
       observation_noise_scale = resample_scale(
           prior=observation_noise_variance_prior,
-          observed_residuals=regression_residuals - level,
+          observed_residuals=regression_residuals - level - all_seasons_effect,
           is_missing=is_missing,
           seed=observation_noise_scale_seed)
 
@@ -1061,6 +1284,8 @@ def _build_sampler_loop_body(model,
         weights=weights,
         level=level,
         slope=(slope if model_has_slope else previous_sample.slope),
+        seasonal_drift_scales=seasonal_drift_scales,
+        seasonal_levels=seasonal_levels,
         seed=loop_seed)
 
   return sampler_loop_body

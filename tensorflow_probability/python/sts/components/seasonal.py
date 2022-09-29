@@ -953,8 +953,7 @@ class Seasonal(StructuralTimeSeries):
     latents = tf.convert_to_tensor(latents, dtype_hint=self.dtype)
     batch_shape = ps.shape(latents)[:-2]
     num_observed_steps = tf.compat.dimension_value(latents.shape[-2])
-    drift_scale_shape = ps.concat(
-        [batch_shape, [tf.constant(1, dtype=tf.int32)]], axis=0)
+    drift_scale_shape = ps.concat([batch_shape, [1]], axis=0)
     sssm = self.make_state_space_model(
         num_timesteps=num_observed_steps,
         initial_state_prior=self.initial_state_prior,
