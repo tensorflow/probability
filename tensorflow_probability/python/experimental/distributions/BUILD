@@ -214,6 +214,7 @@ multi_substrate_py_library(
     name = "multitask_gaussian_process_regression_model",
     srcs = ["multitask_gaussian_process_regression_model.py"],
     deps = [
+        ":multitask_gaussian_process",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:cholesky_util",
@@ -230,13 +231,12 @@ multi_substrate_py_test(
     srcs = ["multitask_gaussian_process_regression_model_test.py"],
     shard_count = 2,
     deps = [
+        ":multitask_gaussian_process_regression_model",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:gaussian_process_regression_model",
         "//tensorflow_probability/python/distributions:uniform",
-        "//tensorflow_probability/python/experimental",
-        "//tensorflow_probability/python/experimental/distributions:multitask_gaussian_process_regression_model",
         "//tensorflow_probability/python/experimental/psd_kernels:multitask_kernel",
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",

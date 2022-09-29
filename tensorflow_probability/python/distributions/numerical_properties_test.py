@@ -32,7 +32,6 @@ from hypothesis import strategies as hps
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import experimental as tfe
 from tensorflow_probability.python.distributions import hypothesis_testlib as dhps
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import numerics_testing as nt
@@ -158,9 +157,10 @@ class LogProbConsistentPrecisionTest(test_util.TestCase):
     def log_prob_function(dist, x):
       return dist.log_prob(x)
 
+    self.assertIsInstance(dist, tf.__internal__.CompositeTensor)
     dist64 = tf.nest.map_structure(
         nt.floating_tensor_to_f64,
-        tfe.as_composite(dist),
+        dist,
         expand_composites=True)
     with tfp_hps.no_tf_rank_errors(), kernel_hps.no_pd_errors():
       result64 = log_prob_function(dist64, nt.floating_tensor_to_f64(samples))
@@ -245,7 +245,7 @@ class DistributionAccuracyTest(test_util.TestCase):
   @tfp_hps.tfp_hp_settings()
   def testLogProbAccuracy(self, dist_name, data):
     self.skip_if_tf1()
-    dist = tfe.as_composite(data.draw(dhps.distributions(
+    dist = data.draw(dhps.distributions(
         dist_name=dist_name,
         # Accuracy tools can't handle batches (yet?)
         batch_shape=(),
@@ -253,7 +253,7 @@ class DistributionAccuracyTest(test_util.TestCase):
         enable_vars=False,
         # Checking that samples pass validations (including in 64-bit
         # arithmetic) is left for another test
-        validate_args=False)))
+        validate_args=False))
     seed = test_util.test_seed(sampler_type='stateless')
     with tfp_hps.no_tf_rank_errors():
       sample = dist.sample(seed=seed)
@@ -261,6 +261,7 @@ class DistributionAccuracyTest(test_util.TestCase):
       hp.assume(self.evaluate(tf.reduce_all(~tf.math.is_nan(sample))))
     hp.note('Testing on sample {}'.format(sample))
 
+    self.assertIsInstance(dist, tf.__internal__.CompositeTensor)
     as_tensors = tf.nest.flatten(dist, expand_composites=True)
     def log_prob_function(tensors, x):
       dist_ = tf.nest.pack_sequence_as(dist, tensors, expand_composites=True)
