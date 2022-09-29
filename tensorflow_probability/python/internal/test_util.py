@@ -33,6 +33,7 @@ import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import empirical_statistical_testing
 from tensorflow_probability.python.internal import samplers
@@ -1037,15 +1038,7 @@ class TestCase(*_TEST_BASE_CLASSES):
     return dict(self.evaluate(tensor_values), **python_values)
 
   def compute_max_gradient_error(self, f, args, delta=1e-3):
-    """Wrapper around TF's gradient_checker_v2.
-
-    `gradient_checker_v2` depends on there being a default session, but our test
-    setup, using test_combinations, doesn't run the test function under a global
-    `self.test_session()` context. Thus, when running
-    `gradient_checker_v2.compute_gradient`, we need to ensure we're in a
-    `self.test_session()` context when not in eager mode. This function bundles
-    up the relevant logic, and ultimately returns the max error across autodiff
-    and finite difference gradient calculations.
+    """Computes difference between autodiff and numerical gradient.
 
     Args:
       f: callable function whose gradient to compute.
@@ -1057,18 +1050,7 @@ class TestCase(*_TEST_BASE_CLASSES):
       err: the maximum error between all components of the numeric and
       autodiff'ed gradients.
     """
-    if JAX_MODE:
-      return _compute_max_gradient_error_jax(f, args, delta)
-    def _compute_error():
-      from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
-      return gradient_checker_v2.max_error(
-          *gradient_checker_v2.compute_gradient(f, x=args, delta=delta))
-    if tf.executing_eagerly():
-      return _compute_error()
-    else:
-      # Make sure there's a global default session in graph mode.
-      with self.cached_session():
-        return _compute_error()
+    return _compute_max_gradient_error(f, args, delta, eval_fn=self.evaluate)
 
   def skip_if_no_xla(self):
     try:
@@ -1112,30 +1094,62 @@ class TestCase(*_TEST_BASE_CLASSES):
                       str(self.dtype))
     return output
 
-if JAX_MODE:
-  from jax import jacrev  # pylint: disable=g-import-not-at-top
-  from jax import vmap  # pylint: disable=g-import-not-at-top
 
-  def _compute_max_gradient_error_jax(f, xs, scale=1e-3):
-    f_jac = jacrev(f, argnums=range(len(xs)))
+def _compute_max_gradient_error(f, xs, scale=1e-3, eval_fn=None):
+  """Compute the max difference between autodiff and numerical jacobian."""
+  xs = tf.nest.map_structure(tf.convert_to_tensor, xs)
+  if JAX_MODE:
+    import jax  # pylint: disable=g-import-not-at-top
+    f_jac = jax.jacrev(f, argnums=range(len(xs)))
     theoretical_jacobian = f_jac(*xs)
-    numerical_jacobian = [_compute_numerical_jacobian_jax(f, xs, i, scale)
-                          for i in range(len(xs))]
-    return np.max(np.array(
-        [np.max(np.abs(a - b))
-         for (a, b) in zip(theoretical_jacobian, numerical_jacobian)]))
+  else:
+    def _theoretical_jacobian(xs):
+      # The reason we don't use tfp.math.value_and_jacobian is we don't know
+      # which dimensions are batch dimensions.
+      with tf.GradientTape() as tape:
+        tape.watch(xs)
+        ys = f(*xs)
+      theoretical_jacobian = tape.jacobian(ys, xs)
+      return theoretical_jacobian
+    theoretical_jacobian = _theoretical_jacobian(xs)
 
-  def _compute_numerical_jacobian_jax(f, xs, i, scale=1e-3):
-    dtype_i = xs[i].dtype
-    shape_i = xs[i].shape
-    size_i = np.product(shape_i, dtype=np.int32)
-    def grad_i(d):
-      return (f(*(xs[:i] + [xs[i] + d * scale] + xs[i+1:]))
-              - f(*(xs[:i] + [xs[i] - d * scale] + xs[i+1:]))) / (2. * scale)
-    ret = vmap(grad_i)(
+  numerical_jacobian = [_compute_numerical_jacobian(f, xs, i, scale)
+                        for i in range(len(xs))]
+  theoretical_jacobian, numerical_jacobian = eval_fn([
+      theoretical_jacobian, numerical_jacobian])
+  return np.max(np.array(
+      [np.max(np.abs(a - b))
+       for (a, b) in zip(theoretical_jacobian, numerical_jacobian)]))
+
+
+def _compute_numerical_jacobian(f, xs, i, scale=1e-3):
+  """Compute the numerical jacobian of `f`."""
+  dtype_i = xs[i].dtype
+  shape_i = xs[i].shape
+  size_i = np.product(shape_i, dtype=np.int32)
+  def grad_i(d):
+    return (f(*(xs[:i] + [xs[i] + d * scale] + xs[i+1:]))
+            - f(*(xs[:i] + [xs[i] - d * scale] + xs[i+1:]))) / (2. * scale)
+
+  if JAX_MODE:
+    import jax  # pylint: disable=g-import-not-at-top
+
+    ret = jax.vmap(grad_i)(
         np.eye(size_i, dtype=dtype_i).reshape((size_i,) + shape_i))
-    ret = np.moveaxis(ret, 0, -1)
-    return np.reshape(ret, ret.shape[:-1] + shape_i)
+  else:
+    @tf.function
+    def _numerical_jacobians():
+      """Computes numerical jacobian."""
+      # The reason we don't use `vectorized_map` is the underlying function
+      # might not be vmap-able.
+      return tf.map_fn(
+          grad_i,
+          tf.reshape(tf.eye(size_i, dtype=dtype_i), (size_i,) + shape_i),
+          parallel_iterations=3)
+    ret = _numerical_jacobians()
+
+  ret = distribution_util.rotate_transpose(ret, -1)
+  return tf.reshape(ret, ret.shape[:-1] + shape_i)
 
 
 @contextlib.contextmanager

@@ -4530,8 +4530,8 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "truncated_normal_test",
+    size = "medium",
     srcs = ["truncated_normal_test.py"],
-    jax_size = "medium",
     shard_count = 10,
     deps = [
         ":normal",
