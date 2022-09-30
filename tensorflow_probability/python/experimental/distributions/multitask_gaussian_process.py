@@ -26,6 +26,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.experimental.linalg import linear_operator_unitary
 from tensorflow_probability.python.experimental.psd_kernels import multitask_kernel
+from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
@@ -392,6 +393,22 @@ class MultiTaskGaussianProcess(distribution.AutoCompositeTensorDistribution):
         [ps.shape(index_points)[-(self.kernel.feature_ndims + 1)]],
         [self.kernel.num_tasks]], axis=0)
 
+  def _batch_shape(self, index_points=None):
+    # TODO(b/249858459): Update `batch_shape_lib` so it can take override
+    # parameters.
+    result = batch_shape_lib.inferred_batch_shape(self)
+    if index_points is not None:
+      return ps.broadcast_shape(
+          result,
+          index_points.shape[:-(self.kernel.feature_ndims + 1)])
+    return result
+
+  def _batch_shape_tensor(self, index_points=None):
+    kwargs = {}
+    if index_points is not None:
+      kwargs = {'index_points': index_points}
+    return batch_shape_lib.inferred_batch_shape_tensor(self, **kwargs)
+
   def _get_flattened_marginal_distribution(self, index_points=None):
     # This returns a MVN of event size [N * E], where N is the number of tasks
     # and E is the number of index points.
@@ -550,3 +567,14 @@ class MultiTaskGaussianProcess(distribution.AutoCompositeTensorDistribution):
     samples = self._get_flattened_marginal_distribution(
         index_points=index_points).sample(n, seed=seed)
     return _unvec(samples, [-1, self.kernel.num_tasks])
+
+  # Override to incorporate `index_points`
+  def _set_sample_static_shape(self, x, sample_shape, index_points=None):
+    """Helper to `sample`; sets static shape info."""
+    batch_shape = self._batch_shape(index_points=index_points)
+    event_shape = tf.TensorShape(self._event_shape(index_points=index_points))
+    return distribution._set_sample_static_shape_for_tensor(  # pylint:disable=protected-access
+        x,
+        sample_shape=sample_shape,
+        event_shape=event_shape,
+        batch_shape=batch_shape)

@@ -626,10 +626,14 @@ class GaussianProcess(
       return shape
 
   def _batch_shape(self, index_points=None):
-    kwargs = {}
+    # TODO(b/249858459): Update `batch_shape_lib` so it can take override
+    # parameters.
+    result = batch_shape_lib.inferred_batch_shape(self)
     if index_points is not None:
-      kwargs = {'index_points': index_points}
-    return batch_shape_lib.inferred_batch_shape(self, **kwargs)
+      return ps.broadcast_shape(
+          result,
+          index_points.shape[:-(self.kernel.feature_ndims + 1)])
+    return result
 
   def _batch_shape_tensor(self, index_points=None):
     kwargs = {}
@@ -639,6 +643,17 @@ class GaussianProcess(
 
   def _sample_n(self, n, seed=None, index_points=None):
     return self.get_marginal_distribution(index_points).sample(n, seed=seed)
+
+  # Override to incorporate `index_points`
+  def _set_sample_static_shape(self, x, sample_shape, index_points=None):
+    """Helper to `sample`; sets static shape info."""
+    batch_shape = self._batch_shape(index_points=index_points)
+    event_shape = tf.TensorShape(self._event_shape(index_points=index_points))
+    return distribution._set_sample_static_shape_for_tensor(  # pylint:disable=protected-access
+        x,
+        sample_shape=sample_shape,
+        event_shape=event_shape,
+        batch_shape=batch_shape)
 
   def _sample_and_log_prob(self,
                            sample_shape,

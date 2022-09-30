@@ -182,7 +182,7 @@ class _GaussianProcessTest(object):
     amp = np.float64(.5)
     len_scale = np.float64(.2)
     kernel = psd_kernels.ExponentiatedQuadratic(amp, len_scale)
-    mean_fn = lambda x: x[:, 0]**2
+    mean_fn = lambda x: x[..., 0]**2
     jitter = np.float64(1e-4)
     observation_noise_variance = np.float64(3e-3)
 
@@ -193,11 +193,19 @@ class _GaussianProcessTest(object):
         jitter=jitter,
         validate_args=True)
 
-    index_points = np.random.uniform(-1., 1., [10, 1])
+    index_points = np.random.uniform(-1., 1., [5, 10, 1])
+
+    # Check that the internal batch_shape and event_shape methods work.
+    self.assertAllEqual([5], gp._batch_shape(index_points=index_points))  # pylint: disable=protected-access
+    self.assertAllEqual([10], gp._event_shape(index_points=index_points))  # pylint: disable=protected-access
 
     expected_mean = mean_fn(index_points)
     self.assertAllClose(expected_mean,
                         self.evaluate(gp.mean(index_points=index_points)))
+
+    # Check that late-binding samples work.
+    self.evaluate(gp.sample(
+        seed=test_util.test_seed(), index_points=index_points))
 
     def _kernel_fn(x, y):
       return amp ** 2 * np.exp(-.5 * (np.squeeze((x - y)**2)) / (len_scale**2))
@@ -209,14 +217,19 @@ class _GaussianProcessTest(object):
 
     self.assertAllClose(expected_covariance,
                         self.evaluate(gp.covariance(index_points=index_points)))
-    self.assertAllClose(np.diag(expected_covariance),
+    self.assertAllClose(np.diagonal(expected_covariance, axis1=-2, axis2=-1),
                         self.evaluate(gp.variance(index_points=index_points)))
-    self.assertAllClose(np.sqrt(np.diag(expected_covariance)),
-                        self.evaluate(gp.stddev(index_points=index_points)))
+    self.assertAllClose(
+        np.sqrt(np.diagonal(expected_covariance, axis1=-2, axis2=-1)),
+        self.evaluate(gp.stddev(index_points=index_points)))
 
     # Calling mean with no index_points should raise an Error
     with self.assertRaises(ValueError):
       gp.mean()
+
+    # Calling sample with no index_points should raise an Error
+    with self.assertRaises(ValueError):
+      gp.sample(seed=test_util.test_seed())
 
     self.assertIn("event_shape=?", repr(gp))
     self.assertIn("event_shape=[10]", repr(gp.copy(index_points=index_points)))

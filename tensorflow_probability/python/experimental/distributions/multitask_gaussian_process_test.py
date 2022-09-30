@@ -152,8 +152,12 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
         observation_noise_variance=observation_noise_variance,
         validate_args=True)
 
-    index_points = np.random.uniform(-1., 1., [10, 4])
+    index_points = np.random.uniform(-1., 1., [5, 10, 4])
     observations = np.random.uniform(-1., 1., [10, num_tasks])
+
+    # Check that the internal batch_shape and event_shape methods work.
+    self.assertAllEqual([5], mtgp._batch_shape(index_points=index_points))  # pylint: disable=protected-access
+    self.assertAllEqual([10, 3], mtgp._event_shape(index_points=index_points))  # pylint: disable=protected-access
 
     multi_task_log_prob = mtgp.log_prob(
         observations, index_points=index_points)
@@ -176,6 +180,10 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
     for i in range(3):
       self.assertAllClose(
           single_task_var_, multi_task_var_[..., i], rtol=1e-3)
+
+    # Check that late-binding samples work.
+    self.evaluate(mtgp.sample(
+        seed=test_util.test_seed(), index_points=index_points))
 
   def testConstantMeanFunction(self):
     # 5x5 grid of index points in R^2 and flatten to 25x2

@@ -493,7 +493,7 @@ class _TransformedDistribution(distribution_lib.Distribution):
     y = self.bijector.forward(x, **bijector_kwargs)
 
     sample_shape = tf.convert_to_tensor([], dtype=tf.int32, name='sample_shape')
-    y = self._set_sample_static_shape(y, sample_shape)
+    y = self._set_sample_static_shape(y, sample_shape, **kwargs)
     return y
 
   def _stddev(self, **kwargs):
