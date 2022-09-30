@@ -14,6 +14,7 @@
 # ============================================================================
 """Adaptive MALT implementation."""
 
+import functools
 import os
 from typing import Any, Dict, Optional, Mapping, NamedTuple, Tuple, Union
 
@@ -23,6 +24,7 @@ import immutabledict
 import jax
 import jax.numpy as jnp
 import numpy as np
+from discussion.adaptive_malt import utils
 from fun_mc import using_jax as fun_mc
 from inference_gym import using_jax as gym
 import tensorflow_probability.substrates.jax as tfp
@@ -80,6 +82,7 @@ class TestGaussian(gym.targets.Model):
     return self._gaussian.sample(sample_shape, seed=seed, name=name)
 
 
+@functools.cache
 def get_target(name: str) -> gym.targets.Model:
   """Return the target name."""
   if name == 'german_credit_numeric_logistic_regression':
@@ -102,11 +105,13 @@ def get_target(name: str) -> gym.targets.Model:
         gym.targets.VectorizedStochasticVolatilitySP500())
   elif name == 'test_gaussian_1':
     return TestGaussian()
+  elif name == 'test_gaussian_2':
+    return TestGaussian(ndims=50)
   else:
     raise ValueError(f'Unknown target. {name}')
 
 
-def load_inits(name: str, directory: str) -> dict[str, np.ndarray]:
+def load_inits(name: str, directory: str) -> Dict[str, np.ndarray]:
   with epath.Path(os.path.join(directory, name + '.npz')).open('rb') as f:
     return dict(np.load(f))
 
@@ -223,6 +228,8 @@ class AdaptiveMCMCState(NamedTuple):
     proj_rautocov_state: Running lag-1 auto covariance of the projections.
     principal_rmean_state: Running mean of the unnormalized principal
       components.
+    precond_principal_rmean_state: Running mean of the preconditioned
+      unnormalized principal components.
     log_step_size_opt_state: Optimizer state for the log step size.
     log_trajectory_length_opt_state: Optimizer state for the log trajectory
       length.
@@ -235,6 +242,7 @@ class AdaptiveMCMCState(NamedTuple):
   rvar_state: fun_mc.RunningVarianceState
   proj_rautocov_state: fun_mc.RunningCovarianceState
   principal_rmean_state: fun_mc.RunningMeanState
+  precond_principal_rmean_state: fun_mc.RunningMeanState
   log_step_size_opt_state: fun_mc.AdamState
   log_trajectory_length_opt_state: fun_mc.AdamState
   step_size_rmean_state: fun_mc.RunningMeanState
@@ -317,6 +325,11 @@ def adaptive_mcmc_init(state: jnp.ndarray,
               mean=jax.random.normal(
                   jax.random.PRNGKey(0), state.shape[1:], state.dtype),
               num_points=rvar_smoothing),
+      precond_principal_rmean_state=fun_mc.running_mean_init(
+          state.shape[1:], state.dtype)._replace(
+              mean=jax.random.normal(
+                  jax.random.PRNGKey(0), state.shape[1:], state.dtype),
+              num_points=rvar_smoothing),
       rvar_state=fun_mc.running_variance_init(
           state.shape[1:], state.dtype)._replace(num_points=rvar_smoothing),
       proj_rautocov_state=fun_mc.running_covariance_init(
@@ -358,6 +371,8 @@ def adaptive_mcmc_step(
     step_size_adaptation_rate_decay: str = 'none',
     trajectory_length_adaptation_rate_decay: str = 'none',
     rvar_smoothing: int = 0,
+    jitter_style: str = 'halton',
+    use_precond_eigenvalue: bool = False,
     trajectory_opt_kwargs: Mapping[str, Any] = immutabledict.immutabledict({}),
     step_size_opt_kwargs: Mapping[str, Any] = immutabledict.immutabledict({}),
 ):
@@ -369,7 +384,7 @@ def adaptive_mcmc_step(
     num_mala_steps: Number of initial steps to be MALA.
     num_adaptation_steps: Number of steps to adapt hyperparameters.
     seed: Random seed.
-    method: MCMC method. Either 'hmc' or 'malt'.
+    method: MCMC method. Either 'hmc', 'malt'.
     damping: If not None, the fixed damping to use.
     scalar_step_size: If not None, the fixed scalar step size to use.
     vector_step_size: If not None, the fixed vector step size to use.
@@ -398,6 +413,9 @@ def adaptive_mcmc_step(
     trajectory_length_adaptation_rate_decay: How to decay the adaptation rate.
       One of 'none' or 'linear'.
     rvar_smoothing: Smoothing points.
+    jitter_style: HMC jitter style. One of 'halton' or 'exponential'.
+    use_precond_eigenvalue: Whether to use the preconditioned eigenvalue when
+      computing damping.
     trajectory_opt_kwargs: Extra arguments to the trajectory length optimizer.
     step_size_opt_kwargs: Extra arguments to the step size optimizer.
 
@@ -438,8 +456,16 @@ def adaptive_mcmc_step(
     max_eigenvalue = jnp.linalg.norm(principal)
     principal = principal / max_eigenvalue
 
+  if use_precond_eigenvalue:
+    max_eigenvalue = jnp.linalg.norm(
+        amcmc_state.precond_principal_rmean_state.mean)
+
   if method == 'hmc':
-    traj_factor = halton(amcmc_state.step.astype(jnp.float32)) * 2.
+    if jitter_style == 'halton':
+      traj_factor = halton(amcmc_state.step.astype(jnp.float32)) * 2.
+    elif jitter_style == 'exponential':
+      traj_factor = tfd.Exponential(1.).sample(
+          seed=jax.random.PRNGKey(amcmc_state.step))
   elif method == 'malt':
     traj_factor = 1.
 
@@ -477,7 +503,7 @@ def adaptive_mcmc_step(
             malt_lib._gaussian_momentum_refresh_fn(  # pylint: disable=protected-access
                 m,
                 damping=damping,
-                step_size=scalar_step_size,
+                step_size=scalar_step_size / 2.,
                 seed=seed,
             )),
         num_integrator_steps=num_integrator_steps,
@@ -611,6 +637,16 @@ def adaptive_mcmc_step(
   principal_rmean_state = fun_mc.choose(adapt, cand_principal_rmean_state,
                                         amcmc_state.principal_rmean_state)
 
+  cand_precond_principal_rmean_state, _ = fun_mc.running_mean_step(
+      amcmc_state.precond_principal_rmean_state,
+      ccipca((mcmc_state.state - mean) / vector_step_size,
+             amcmc_state.precond_principal_rmean_state.mean),
+      window_size=rvar_smoothing + amcmc_state.step // principal_factor,
+  )
+  precond_principal_rmean_state = fun_mc.choose(
+      adapt, cand_precond_principal_rmean_state,
+      amcmc_state.precond_principal_rmean_state)
+
   # Adjust auto-covariance of the squared projections.
   cand_proj_rautocov_state, _ = fun_mc.running_covariance_step(
       amcmc_state.proj_rautocov_state,
@@ -651,6 +687,7 @@ def adaptive_mcmc_step(
       rvar_state=rvar_state,
       proj_rautocov_state=proj_rautocov_state,
       principal_rmean_state=principal_rmean_state,
+      precond_principal_rmean_state=precond_principal_rmean_state,
       log_step_size_opt_state=log_step_size_opt_state,
       log_trajectory_length_opt_state=log_trajectory_length_opt_state,
       step_size_rmean_state=step_size_rmean_state,
@@ -788,7 +825,6 @@ def get_init_x(target: gym.targets.Model,
 def run_adaptive_mcmc_on_target(
     target: gym.targets.Model,
     method: str,
-    num_chains: int,
     init_step_size: jnp.ndarray,
     num_adaptation_steps: int,
     num_results: int,
@@ -799,6 +835,8 @@ def run_adaptive_mcmc_on_target(
         'beta_1': 0.,
         'beta_2': 0.95
     }),
+    num_chains: Optional[int] = None,
+    init_x: Optional[jnp.ndarray] = None,
     **amcmc_kwargs: Any,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
   """Does a run of adaptive MCMC.
@@ -806,7 +844,6 @@ def run_adaptive_mcmc_on_target(
   Args:
     target: Target model.
     method: MCMC method. Either 'hmc' or 'malt'.
-    num_chains: Number of chains.
     init_step_size: Initial scalar step size.
     num_adaptation_steps: Number of adaptation steps.
     num_results: Number of post-adaptation results.
@@ -814,13 +851,17 @@ def run_adaptive_mcmc_on_target(
     num_mala_steps: Number of initial steps to be MALA.
     rvar_smoothing: Smoothing points.
     trajectory_opt_kwargs: Kwargs sent to the trajectory length optimizer.
+    num_chains: Number of chains. Optional if `init_x` is specified.
+    init_x: Initial constrained chain position. Optional if `num_chains` is
+      specified.
     **amcmc_kwargs: Extra kwargs to pass to Adaptive MCMC.
 
   Returns:
      A tuple of final and traced results.
   """
-  init_z = target.default_event_space_bijector.inverse(
-      get_init_x(target, num_chains))
+  if init_x is None:
+    init_x = get_init_x(target, num_chains)
+  init_z = target.default_event_space_bijector.inverse(init_x)
 
   def target_log_prob_fn(x):
     return target.unnormalized_log_prob(x), ()
@@ -955,7 +996,7 @@ def run_fixed_mcmc_on_target(
               malt_lib._gaussian_momentum_refresh_fn(  # pylint: disable=protected-access
                   m,
                   damping=damping,
-                  step_size=scalar_step_size,
+                  step_size=scalar_step_size / 2.,
                   seed=seed,
               )),
           num_integrator_steps=cur_num_integrator_steps,
@@ -1001,3 +1042,83 @@ def run_fixed_mcmc_on_target(
           )
   }
   return trace, final
+
+
+@functools.partial(
+    jax.jit,
+    static_argnames=('target', 'method', 'num_adaptation_steps', 'num_results',
+                     'num_chains', 'jitter_style'))
+def _run_grid_element_impl(seed, inits, target, method, num_adaptation_steps,
+                           num_results, mean_trajectory_length, damping,
+                           num_chains, jitter_style, target_accept_prob):
+  """Implementation of run_grid_element."""
+  init_z = inits['init_z']
+  if num_chains is not None:
+    init_z = init_z[:num_chains]
+  init_x = target.default_event_space_bijector.forward(init_z)
+
+  trace, final = run_adaptive_mcmc_on_target(
+      target=target,
+      init_x=init_x,
+      method=method,
+      seed=seed,
+      num_adaptation_steps=num_adaptation_steps,
+      num_results=num_results,
+      step_size_adaptation_rate_decay='linear',
+      target_accept_prob=target_accept_prob,
+      init_step_size=inits['scalar_step_size'],
+      vector_step_size=inits['vector_step_size'],
+      mean_trajectory_length=mean_trajectory_length,
+      jitter_style=jitter_style,
+      damping=damping,
+  )
+
+  res = {
+      'stats': final['stats'],
+      'scalar_step_size': trace['scalar_step_size'][-1]
+  }
+  return res
+
+
+@gin.configurable
+def run_grid_element(mean_trajectory_length: jnp.ndarray,
+                     damping: jnp.ndarray,
+                     target_name: str,
+                     method: str,
+                     num_replicas: int,
+                     seed: int = 0,
+                     num_adaptation_steps: int = 1000,
+                     num_results: int = 1000,
+                     num_chains: Optional[int] = None,
+                     jitter_style: str = 'halton',
+                     target_accept_prob: float = 0.7,
+                     inits_dir: str = '') -> Dict[str, Any]:
+  """Runs a grid search element."""
+  target = get_target(target_name)
+  inits = load_inits(target_name, inits_dir)
+
+  seed = jax.random.PRNGKey(seed)
+  res = []
+  for i in range(num_replicas):
+    with utils.delete_device_buffers():
+      res.append(
+          jax.tree_map(
+              np.array,
+              _run_grid_element_impl(
+                  seed=jax.random.fold_in(seed, i),
+                  inits=inits,
+                  target=target,
+                  method=method,
+                  num_adaptation_steps=num_adaptation_steps,
+                  num_results=num_results,
+                  mean_trajectory_length=mean_trajectory_length,
+                  damping=damping,
+                  num_chains=num_chains,
+                  jitter_style=jitter_style,
+                  target_accept_prob=target_accept_prob,
+              )))
+  res = jax.tree_map(lambda *x: np.stack(x, 0), *res)
+  res['mean_trajectory_length'] = mean_trajectory_length
+  res['damping'] = damping
+
+  return res
