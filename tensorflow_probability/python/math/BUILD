@@ -55,7 +55,6 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:all_util",
         "//tensorflow_probability/python/math/ode",
         "//tensorflow_probability/python/math/psd_kernels",
-        "//tensorflow_probability/python/random",
     ],
 )
 

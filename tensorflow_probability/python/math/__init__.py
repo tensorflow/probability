@@ -84,15 +84,8 @@ from tensorflow_probability.python.math.special import logerfc
 from tensorflow_probability.python.math.special import logerfcx
 from tensorflow_probability.python.math.special import owens_t
 from tensorflow_probability.python.math.special import round_exponential_bump_function
-from tensorflow_probability.python.random import rademacher as random_rademacher
-from tensorflow_probability.python.random import rayleigh as random_rayleigh
 
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
-
-random_rademacher = deprecation.deprecated(
-    '2020-09-20', 'Use tfp.random.rademacher')(random_rademacher)
-random_rayleigh = deprecation.deprecated(
-    '2020-09-20', 'Use tfp.random.rayleigh')(random_rayleigh)
 
 _allowed_symbols = [
     'atan_difference',
@@ -148,8 +141,6 @@ _allowed_symbols = [
     'owens_t',
     'pivoted_cholesky',
     'psd_kernels',
-    'random_rademacher',
-    'random_rayleigh',
     'reduce_kahan_sum',
     'reduce_log_harmonic_mean_exp',
     'reduce_logmeanexp',
