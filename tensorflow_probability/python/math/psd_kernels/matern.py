@@ -52,7 +52,7 @@ class _AmplitudeLengthScaleMixin(object):
       raise ValueError('Must specify at most one of `length_scale` and '
                        '`inverse_length_scale`.')
     dtype = util.maybe_get_common_dtype(
-        [amplitude, length_scale])
+        [amplitude, length_scale, inverse_length_scale])
     self._amplitude = tensor_util.convert_nonref_to_tensor(
         amplitude, name='amplitude', dtype=dtype)
     self._length_scale = tensor_util.convert_nonref_to_tensor(
