@@ -61,11 +61,16 @@ py_test(
     srcs = ["conv_variational_test.py"],
     shard_count = 2,
     deps = [
+        ":conv_variational",
+        ":util",
         # keras/testing_infra:test_utils dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/random:random_ops",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -91,11 +96,15 @@ py_test(
     size = "medium",
     srcs = ["dense_variational_test.py"],
     deps = [
+        ":dense_variational",
+        ":util",
         # keras/testing_infra:test_utils dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -116,9 +125,14 @@ py_test(
     size = "small",
     srcs = ["dense_variational_v2_test.py"],
     deps = [
+        ":dense_variational_v2",
+        ":distribution_layer",
+        ":variable_input",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -154,11 +168,30 @@ py_test(
     srcs = ["distribution_layer_test.py"],
     shard_count = 5,
     deps = [
+        ":distribution_layer",
+        ":variable_input",
         # numpy dep,
         # six dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/bijectors:exp",
+        "//tensorflow_probability/python/bijectors:fill_scale_tril",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/distributions:bernoulli",
+        "//tensorflow_probability/python/distributions:categorical",
+        "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:kullback_leibler",
+        "//tensorflow_probability/python/distributions:logistic",
+        "//tensorflow_probability/python/distributions:mixture_same_family",
+        "//tensorflow_probability/python/distributions:mvn_diag",
+        "//tensorflow_probability/python/distributions:mvn_tril",
+        "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/distributions:poisson",
+        "//tensorflow_probability/python/distributions:uniform",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:generic",
+        "//tensorflow_probability/python/math/psd_kernels:exponentiated_quadratic",
+        "//tensorflow_probability/python/util:deferred_tensor",
     ],
 )
 
@@ -177,8 +210,8 @@ py_test(
     size = "small",
     srcs = ["initializers_test.py"],
     deps = [
+        ":initializers",
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -198,9 +231,12 @@ py_test(
     size = "small",
     srcs = ["masked_autoregressive_test.py"],
     deps = [
+        ":distribution_layer",
+        ":masked_autoregressive",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/bijectors:masked_autoregressive",
+        "//tensorflow_probability/python/distributions:mvn_diag",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -216,6 +252,7 @@ py_library(
         "//tensorflow_probability/python/distributions:deterministic",
         "//tensorflow_probability/python/distributions:independent",
         "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/util",
     ],
 )
 
@@ -234,8 +271,11 @@ py_test(
     size = "small",
     srcs = ["variable_input_test.py"],
     deps = [
+        ":distribution_layer",
+        ":variable_input",
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
