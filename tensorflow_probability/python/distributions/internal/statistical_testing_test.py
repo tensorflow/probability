@@ -19,7 +19,6 @@ import functools
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
@@ -147,18 +146,16 @@ class StatisticalTestingTest(test_util.TestCase):
                         [2, 4, 3]])
     samples = tf.convert_to_tensor(value=samples, dtype=dtype)
     def cdf(x):
-      ones = tf.ones_like(x)
-      answer = tf1.where(x < 3, 0.6 * ones, ones)
-      answer = tf1.where(x < 2, 0.3 * ones, answer)
-      answer = tf1.where(x < 1, 0.1 * ones, answer)
-      return tf1.where(x < 0, 0 * ones, answer)
+      answer = tf.where(x < 3., dtype(0.6), dtype(1.))
+      answer = tf.where(x < 2., dtype(0.3), answer)
+      answer = tf.where(x < 1., dtype(0.1), answer)
+      return tf.where(x < 0., dtype(0.), answer)
 
     def left_continuous_cdf(x):
-      ones = tf.ones_like(x)
-      answer = tf1.where(x <= 3, 0.6 * ones, ones)
-      answer = tf1.where(x <= 2, 0.3 * ones, answer)
-      answer = tf1.where(x <= 1, 0.1 * ones, answer)
-      return tf1.where(x <= 0, 0 * ones, answer)
+      answer = tf.where(x <= 3., dtype(0.6), dtype(1.))
+      answer = tf.where(x <= 2., dtype(0.3), answer)
+      answer = tf.where(x <= 1., dtype(0.1), answer)
+      return tf.where(x <= 0., dtype(0.), answer)
     obtained = self.evaluate(st.kolmogorov_smirnov_distance(
         samples, cdf, left_continuous_cdf=left_continuous_cdf))
     self.assertAllClose([0.4, 0.25, 0.35], obtained, atol=1e-7)
@@ -173,18 +170,16 @@ class StatisticalTestingTest(test_util.TestCase):
     probs = [0.1, 0.2, 0.3, 0.4]
     samples = rng.choice(4, size=shape, p=probs).astype(dtype=dtype)
     def cdf(x):
-      ones = tf.ones_like(x)
-      answer = tf1.where(x < 3, 0.6 * ones, ones)
-      answer = tf1.where(x < 2, 0.3 * ones, answer)
-      answer = tf1.where(x < 1, 0.1 * ones, answer)
-      return tf1.where(x < 0, 0 * ones, answer)
+      answer = tf.where(x < 3., dtype(0.6), dtype(1.))
+      answer = tf.where(x < 2., dtype(0.3), answer)
+      answer = tf.where(x < 1., dtype(0.1), answer)
+      return tf.where(x < 0., dtype(0.), answer)
 
     def left_continuous_cdf(x):
-      ones = tf.ones_like(x)
-      answer = tf1.where(x <= 3, 0.6 * ones, ones)
-      answer = tf1.where(x <= 2, 0.3 * ones, answer)
-      answer = tf1.where(x <= 1, 0.1 * ones, answer)
-      return tf1.where(x <= 0, 0 * ones, answer)
+      answer = tf.where(x <= 3., dtype(0.6), dtype(1.))
+      answer = tf.where(x <= 2., dtype(0.3), answer)
+      answer = tf.where(x <= 1., dtype(0.1), answer)
+      return tf.where(x <= 0., dtype(0.), answer)
 
     self.evaluate(st.assert_true_cdf_equal_by_dkwm(
         samples, cdf, left_continuous_cdf=left_continuous_cdf,

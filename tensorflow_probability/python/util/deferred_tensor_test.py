@@ -395,10 +395,7 @@ class TransformedVariableTest(test_util.TestCase):
   def test_vectorized_map(self):
     initial_value = tf.ones([5, 3])
     x = deferred_tensor.TransformedVariable(initial_value, sigmoid.Sigmoid())
-
-    # TODO(emilyaf): Remove `convert_to_tensor` after tf.Variables are
-    # CompositeTensor.
-    y = tf.vectorized_map(lambda v: v + 2., tf.convert_to_tensor(x))
+    y = tf.vectorized_map(lambda v: v + 2., x)
     self.evaluate([v.initializer for v in x.trainable_variables])
     self.assertAllClose(self.evaluate(y), initial_value + 2.)
 

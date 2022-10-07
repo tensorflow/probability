@@ -202,7 +202,8 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:categorical",
         "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 

@@ -1496,9 +1496,9 @@ multi_substrate_py_library(
     deps = [
         ":mvn_linear_operator",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
@@ -1587,7 +1587,6 @@ multi_substrate_py_library(
         ":mvn_linear_operator",
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:fill_scale_tril",
-        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:prefer_static",

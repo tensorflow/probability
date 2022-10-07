@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+
+import functools
+
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
@@ -719,13 +722,8 @@ class GammaSamplingTest(test_util.TestCase):
         tf.function(lambda: dist.sample(5, seed=test_util.test_seed()),
                     jit_compile=True)())
     # Also test the low-level sampler and verify the XLA-friendly variant.
-    # TODO(bjp): functools.partial, after eliminating PY2 which breaks
-    # tf_inspect in interesting ways:
-    # ValueError: Some arguments ['concentration', 'rate'] do not have default
-    # value, but they are positioned after those with default values. This can
-    # not be expressed with ArgSpec.
     scalar_gamma = tf.function(
-        lambda **kwds: gamma_lib.random_gamma_with_runtime(shape=[], **kwds),
+        functools.partial(gamma_lib.random_gamma_with_runtime, shape=[]),
         jit_compile=True)
     _, runtime = self.evaluate(
         scalar_gamma(

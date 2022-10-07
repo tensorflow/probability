@@ -1117,18 +1117,6 @@ def gen_new_seed(seed, salt):
   return int(hashlib.md5(string).hexdigest()[:8], 16) & 0x7FFFFFFF
 
 
-# TODO(b/35290280): Add unit-tests.
-def dimension_size(x, axis):
-  """Returns the size of a specific dimension."""
-  # Since tf.gather isn't 'constant-in, constant-out', we must first check the
-  # static shape or fallback to dynamic shape.
-  s = tf.compat.dimension_value(
-      tensorshape_util.with_rank_at_least(x.shape, np.abs(axis))[axis])
-  if s is not None:
-    return s
-  return tf.shape(x)[axis]
-
-
 def process_quadrature_grid_and_probs(quadrature_grid_and_probs,
                                       dtype,
                                       validate_args,
@@ -1185,8 +1173,8 @@ def process_quadrature_grid_and_probs(quadrature_grid_and_probs,
     elif validate_args:
       assertions = [
           assert_util.assert_equal(
-              dimension_size(probs, axis=-1),
-              dimension_size(grid, axis=-1),
+              ps.dimension_size(probs, axis=-1),
+              ps.dimension_size(grid, axis=-1),
               message=('`quadrature_grid_and_probs` must be a `tuple` of '
                        'same-length zero-th-dimension `Tensor`s')),
       ]

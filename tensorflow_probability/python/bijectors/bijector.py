@@ -35,7 +35,6 @@ from tensorflow_probability.python.math import generic as math_generic
 from tensorflow_probability.python.math import gradient
 
 # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.util import deprecation
 from tensorflow.python.util import nest
 # pylint: enable=g-direct-tensorflow-import
 
@@ -639,15 +638,6 @@ class Bijector(tf.Module, metaclass=abc.ABCMeta):
     Composites, may return structures of `None`.
     """
     return self._inverse_min_event_ndims
-
-  @property
-  @deprecation.deprecated(
-      '2021-08-01',
-      '`min_event_ndims` is now static for all bijectors; this property is '
-      'no longer needed.')
-  def has_static_min_event_ndims(self):
-    """Returns True if the bijector has statically-known `min_event_ndims`."""
-    return True
 
   @property
   def is_constant_jacobian(self):

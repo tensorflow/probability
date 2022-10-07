@@ -34,19 +34,10 @@ def make_backoff_cholesky(alternate_cholesky, name='BackoffCholesky'):
     run_backoff: An function that attempts a standard Cholesky, and then tries
       `alternate_cholesky` on failure.
   """
-  # TODO(leben) Remove this XLA bit once b/144845034 is resolved
-  def cholesky_ok(covariance):
-    try:
-      chol = tf.linalg.cholesky(covariance)
-      return chol, tf.reduce_all(tf.math.is_finite(chol))
-    except tf.errors.InvalidArgumentError:
-      return covariance, False
-
-  cholesky_ok = tf.function(cholesky_ok, autograph=False, jit_compile=True)
-
   def run_backoff(covariance):
     with tf.name_scope(name):
-      chol, ok = cholesky_ok(covariance)
+      chol = tf.linalg.cholesky(covariance)
+      ok = tf.reduce_all(tf.math.is_finite(chol))
       return tf.cond(
           ok,
           lambda: chol,

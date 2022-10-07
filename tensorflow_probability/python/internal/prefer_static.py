@@ -25,7 +25,6 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal.backend import numpy as nptf
 
-from tensorflow.python.client import pywrap_tf_session as c_api  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.framework import ops  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.framework import tensor_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import control_flow_ops  # pylint: disable=g-direct-tensorflow-import
@@ -111,13 +110,7 @@ def _get_static_value(pred):
     # Explicitly check for ops.Tensor, to avoid an AttributeError
     # when requesting `KerasTensor.graph`.
     if pred_value is None and isinstance(pred, ops.Tensor):
-      if hasattr(tensor_util, 'try_evaluate_constant'):
-        pred_value = tensor_util.try_evaluate_constant(pred)
-      else:
-        # TODO(feyu): remove this branch after try_evaluate_constant is in
-        # tf-nightly.
-        pred_value = c_api.TF_TryEvaluateConstant_wrapper(
-            pred.graph._c_graph, pred._as_tf_output())  # pylint: disable=protected-access
+      pred_value = tensor_util.try_evaluate_constant(pred)
     return pred_value
   return pred
 

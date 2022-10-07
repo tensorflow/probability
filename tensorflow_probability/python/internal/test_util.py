@@ -1896,7 +1896,7 @@ class VectorDistributionTestHelpers(object):
       x = dist.sample(num_samples, seed=test_seed_stream(hardcoded_seed=seed))
       x = tf.identity(x)  # Invalidate bijector cacheing.
       inverse_log_prob = tf.exp(-dist.log_prob(x))
-      importance_weights = tf1.where(
+      importance_weights = tf.where(
           tf.norm(tensor=x - center, axis=-1) <= radius, inverse_log_prob,
           tf.zeros_like(inverse_log_prob))
       return tf.reduce_mean(importance_weights, axis=0)
