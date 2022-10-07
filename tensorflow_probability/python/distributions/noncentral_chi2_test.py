@@ -14,6 +14,8 @@
 # ============================================================================
 """Tests for noncentral_chi2."""
 
+from absl.testing import parameterized
+
 import numpy as np
 from scipy import stats
 import tensorflow as tf
@@ -173,6 +175,43 @@ class NoncentralChi2Test(test_util.TestCase):
     self.assertLen(grad, 2)
     self.assertAllNotNone(grad)
     self.assertAllNotNan(grad)
+
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(('float32', np.float32, 5e-4),
+                                  ('float64', np.float64, 2e-4))
+  def test_cdf_gradient_with_respect_to_x(self, dtype, max_err):
+    df = tf.constant([np.e, 0.01, 0.1, 0.5, 1., 1.5, 3.1, 4., 10., 20., 100.3],
+                     dtype=dtype)[..., tf.newaxis]
+    nc = tf.constant([0., 0.01, 0.1, 0.5, 1., 1.5, 3.1, 4., 10., 20., 100.2],
+                     dtype=dtype)[..., tf.newaxis]
+
+    xs = tf.constant([0.1, 0.5, 0.9, 1., 2.9, 5., 7., 8.1, 21., 200.],
+                     dtype=dtype)
+
+    cdf_fn = tf.function(
+        noncentral_chi2.NoncentralChi2(df, nc).cdf, autograph=False)
+
+    err = self.compute_max_gradient_error(cdf_fn, [xs])
+    self.assertLess(err, max_err)
+
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(('float32', np.float32, 7e-3),
+                                  ('float64', np.float64, 2e-4))
+  def test_cdf_gradient_with_respect_to_noncentrality(self, dtype, max_err):
+    df = tf.constant([np.e, 0.01, 0.5, 1., 1.5, 3.1, 4., 10., 20., 100.3],
+                     dtype=dtype)[..., tf.newaxis]
+    nc = tf.constant([0.01, 0.1, 0.5, 1., 1.5, 3.1, 4., 10., 20., 100.2],
+                     dtype=dtype)[..., tf.newaxis]
+
+    xs = tf.constant([0., 0.1, 0.5, 0.9, 1., 2.9, 5., 4., 7., 8.1, 21., 200.],
+                     dtype=dtype)
+
+    cdf_fn = tf.function(
+        lambda nc: noncentral_chi2.NoncentralChi2(df, nc).cdf(xs),
+        autograph=False)
+
+    err = self.compute_max_gradient_error(cdf_fn, [nc])
+    self.assertLess(err, max_err)
 
   def test_asserts_positive_df(self):
     df = tf.Variable([1., 2., -3.])

@@ -1671,6 +1671,7 @@ multi_substrate_py_library(
         # tensorflow:tensorflow_no_contrib dep,
         "//tensorflow_probability/python/bijectors:softplus",
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:custom_gradient",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
@@ -1678,6 +1679,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:special_math",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/math:bessel",
+        "//tensorflow_probability/python/math:generic",
         "//tensorflow_probability/python/random",
     ],
 )
@@ -3987,6 +3989,7 @@ multi_substrate_py_test(
     name = "noncentral_chi2_test",
     size = "medium",
     srcs = ["noncentral_chi2_test.py"],
+    shard_count = 3,
     tags = ["tf1-broken"],  # log_bessel_ive gives an error
     deps = [
         ":noncentral_chi2",

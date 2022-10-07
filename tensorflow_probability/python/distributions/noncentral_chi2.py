@@ -23,6 +23,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.distributions import poisson as poisson_lib
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
@@ -32,10 +33,296 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math import bessel
+from tensorflow_probability.python.math import generic
 import tensorflow_probability.python.random as tfp_random
 
 
 __all__ = ['NoncentralChi2']
+
+
+def _nc2_log_prob(x, df, noncentrality):
+  """Computes the log probability of a noncentral Chi2 random variable.
+
+  Note: the (pseudo) log probability can be evaluate for nonpositive degrees of
+  freedom as well, but the results might be wrong as `log_bessel_ive` does not
+  return the sign of its result.
+
+  Args:
+    x: `tf.Tensor` of locations at which to compute the log probability.
+    df: `tf.Tensor` of the degrees of freedom of the NC2 variate.
+    noncentrality: `tf.Tensor` of the noncentrality of the NC2 variate.
+
+  Returns:
+    `tf.Tensor` of log probabilities.
+  """
+  numpy_dtype = dtype_util.as_numpy_dtype(df.dtype)
+  log2 = numpy_dtype(np.log(2.))
+
+  safe_noncentrality_mask = noncentrality > 0.
+  safe_noncentrality = tf.where(safe_noncentrality_mask, noncentrality, 1.)
+
+  sqrt_x = tf.math.sqrt(x)
+  sqrt_nc = tf.math.sqrt(safe_noncentrality)
+
+  df_factor = 0.25 * df - 0.5
+
+  log_prob = -log2 - 0.5 * tf.math.square(sqrt_x - sqrt_nc)
+  log_prob = log_prob + tf.math.xlogy(df_factor, x)
+  log_prob = log_prob - tf.math.xlogy(df_factor, safe_noncentrality)
+  log_prob = log_prob + bessel.log_bessel_ive(2. * df_factor, sqrt_nc * sqrt_x)
+
+  log_prob = tf.where(safe_noncentrality_mask, log_prob,
+                      chi2_lib.Chi2(df).log_prob(x))
+
+  return log_prob
+
+
+def _nc2_cdf_abramowitz_and_stegun(x, df, noncentrality):
+  """Computes the CDF of a noncentral chi2 random variable.
+
+  Computation is performed according to Eq (26.4.25) in
+  Abramowitz, M., Stegun, I. A., & Romer, R. H. (1988).
+  Handbook of mathematical functions with formulas, graphs,
+  and mathematical tables.
+
+  Args:
+    x: point at which CDF is to be evaluated.
+    df: `tf.Tensor` of the degrees of freedom of the distribution.
+    noncentrality: `tf.Tensor` of the noncentrality parameter of the
+      distribution.
+
+  Returns:
+    `tf.Tensor` of the CDF evaluated at x.
+  """
+
+  dtype = df.dtype
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  log_eps_abs = tf.math.log(numpy_dtype(np.finfo(numpy_dtype).eps))
+
+  # This can be set to something a bit larger (e.g. twice the type's machine
+  # epsilon) if we want to speed up the calculation in the tails,
+  # at the cost of potentially quite wrong answers in the far tails.
+  log_eps_s = -80.
+
+  below_precision_mask = log_eps_abs > _log_cdf_chernoff_bound(
+      x, df, noncentrality)
+
+  # At the end, we will just set the dimensions with very low
+  # noncentrality using the CDF of the standard chi2
+  small_noncentrality_mask = noncentrality < 1e-10
+
+  nc_over_2 = noncentrality / 2.
+  x_over_2 = x / 2.
+
+  # Index of the term with the highest weight in the sum from Eq (26.4.25)
+  central_index = tf.math.floor(nc_over_2)
+
+  # Bump 0 indices to 1
+  central_index = central_index + tf.where(
+      tf.math.equal(central_index, 0.), numpy_dtype(1.), numpy_dtype(0.))
+
+  # Calculate the "central" term in the series
+  log_central_weight = tf.math.xlogy(central_index, nc_over_2)
+  log_central_weight = log_central_weight - nc_over_2
+  log_central_weight = log_central_weight - tf.math.lgamma(central_index + 1.)
+
+  central_weight = tf.math.exp(log_central_weight)
+
+  central_df_over_2 = 0.5 * df + central_index
+
+  central_index = central_index * tf.ones_like(x)
+  central_weight = central_weight * tf.ones_like(x)
+
+  # Wilson-Hilferty transform
+  # For large values of `df`, the Chi2 CDF of x is very well approximated
+  # by the CDF of a Gaussian with mean 1 - 2 / (9 df) and variance 2 / (9 df)
+  # evaluated at(x / df)^{1/3}.
+  #
+  # The rationale of using it here is that for `df`s larger than 1e3 it is
+  # more numerically stable and accurate to use the Gaussian WH transform than
+  # to evaluate the Chi2 CDF directly
+  central_df_var_term = 1. / central_df_over_2 / 9.
+
+  wilson_hilferty_x = (x_over_2 / central_df_over_2)**(1. / 3.)
+  wilson_hilferty_x = wilson_hilferty_x - (1. - central_df_var_term)
+  wilson_hilferty_x = wilson_hilferty_x / tf.math.sqrt(central_df_var_term)
+
+  # Compute the central chi2 probability
+  central_chi2_prob = tf.where(central_df_over_2 < 1e3,
+                               tf.math.igamma(central_df_over_2, x_over_2),
+                               special_math.ndtr(wilson_hilferty_x))
+
+  # Prob will contain the return value of the function
+  prob = central_weight * central_chi2_prob
+
+  # Calculate adjustment terms to the chi2 probability above.
+  # This means that `tf.math.igamma` only needs to be called once, the rest
+  # of the CDFs can be calculated using the adjustment.
+  log_adjustment_term = tf.math.xlogy(central_df_over_2, x_over_2)
+  log_adjustment_term = log_adjustment_term - x_over_2 - tf.math.lgamma(
+      central_df_over_2 + 1.)
+  central_adjustment_term = tf.math.exp(log_adjustment_term)
+
+  # Now, sum the series "backwards" from the central term
+  def backwards_summation_loop_body(index, weight, adj_term, total_adj, prob):
+
+    update_mask = ~below_precision_mask & (index > 0.) & (
+        tf.math.log(weight) + tf.math.log(adj_term) > log_eps_s)
+
+    df_over_2 = 0.5 * df + index
+
+    adj_term = adj_term * tf.where(update_mask, df_over_2 / x_over_2, 1.)
+    total_adj = total_adj + tf.where(update_mask, adj_term, 0.)
+
+    adjusted_prob = central_chi2_prob + total_adj
+    weight = weight * tf.where(update_mask, index / nc_over_2, 1.)
+
+    prob_term = weight * adjusted_prob
+    prob = prob + tf.where(update_mask, prob_term, 0.)
+
+    index = index - tf.cast(tf.where(update_mask, 1., 0.), dtype)
+
+    return index, weight, adj_term, total_adj, prob
+
+  def backwards_summation_loop_cond(index, weight, adj_term, total_adj, prob):
+    return tf.reduce_any(~below_precision_mask & (index > 0.) & (
+        tf.math.log(weight) + tf.math.log(adj_term) > log_eps_s))
+
+  _, _, _, _, prob = tf.while_loop(
+      cond=backwards_summation_loop_cond,
+      body=backwards_summation_loop_body,
+      loop_vars=(central_index, central_weight, central_adjustment_term,
+                 tf.zeros_like(central_adjustment_term), prob))
+
+  # Now, sum the series "forwards" from the central term
+  def forwards_summation_loop_body(index, weight, adj_term, total_adj, prob):
+
+    update_mask = ~below_precision_mask & (
+        tf.math.log(weight) + tf.math.log(adj_term) > log_eps_s)
+
+    weight = weight * tf.where(update_mask, nc_over_2 / (index + 1.), 1.)
+    adjusted_prob = central_chi2_prob - total_adj
+
+    prob_term = weight * adjusted_prob
+    prob = prob + tf.where(update_mask, prob_term, 0.)
+
+    index = tf.where(update_mask, index + 1., index)
+    df_over_2 = 0.5 * df + index
+    adj_term = adj_term * tf.where(update_mask, x_over_2 / df_over_2, 1.)
+    total_adj = total_adj + tf.where(update_mask, adj_term, 0.)
+
+    return index, weight, adj_term, total_adj, prob
+
+  def forwards_summation_loop_cond(index, weight, adj_term, total_adj, prob):
+    return tf.reduce_any(~below_precision_mask & (
+        tf.math.log(weight) + tf.math.log(adj_term) > log_eps_s))
+
+  _, _, _, _, prob = tf.while_loop(
+      cond=forwards_summation_loop_cond,
+      body=forwards_summation_loop_body,
+      loop_vars=(central_index, central_weight, central_adjustment_term,
+                 central_adjustment_term, prob))
+
+  prob = tf.where(small_noncentrality_mask, tf.math.igamma(0.5 * df, 0.5 * x),
+                  prob)
+
+  x_above_mean_mask = x > (df + noncentrality)
+
+  prob = tf.where(below_precision_mask & x_above_mean_mask, tf.ones_like(x),
+                  prob)
+
+  prob = tf.where(below_precision_mask & ~x_above_mean_mask, tf.zeros_like(x),
+                  prob)
+
+  return prob
+
+
+def _log_cdf_chernoff_bound(x, df, noncentrality):
+  """Implements a Chernoff bound on in the log domain on the CDF of a noncentral Chi2 random variable.
+
+  Implements Eqs (22) and (23) in Shnidman, D. A. The Calculation of the
+  Probability of Detection and the Generalized Marcum Q-Function (1989)
+  The substitutions used are self.df = 2N, self.nc = 2NX and x = 2Y
+
+  Args:
+    x: `tf.Tensor` of points at which to evaluate the Chernoff bound.
+    df: `tf.Tensor` of the degrees of freedom of the NC2 variate.
+    noncentrality: `tf.Tensor` of the noncentrality of the NC2 variate.
+
+  Returns:
+    `tf.Tensor` of Chernoff bounds on the log CDF.
+  """
+
+  df_over_2x = tf.math.xdivy(df, 2. * x)
+
+  # Quantity in Eq (22)
+  chernoff_coef = 1. - df_over_2x - tf.math.sqrt(
+      tf.math.square(df_over_2x) + tf.math.xdivy(noncentrality, x))
+
+  # Exponent in Eq (23)
+  bound = -chernoff_coef * x + noncentrality * chernoff_coef / (
+      1. - chernoff_coef) - tf.math.xlog1py(df, -chernoff_coef)
+  bound = 0.5 * bound
+
+  return bound
+
+
+def _nc2_cdf_fwd(x, df, noncentrality):
+  output = _nc2_cdf_abramowitz_and_stegun(x, df, noncentrality)
+  return output, (output, x, df, noncentrality)
+
+
+def _nc2_cdf_bwd(aux, g):
+  """Reverse mode implementation for `_nc2_cdf_abramowitz_and_stegun`."""
+  # The gradients for the `noncentrality` parameter can be derived by
+  # considering the infinite scale mixture of central Chi2s representation of
+  # the noncentral Chi2 and noticing that after differentiating wrt the
+  # noncentrality the result simplifies to a difference of two NC2 CDFs.
+  nc2_cdf_1, x, df, noncentrality = aux
+
+  # Compute gradient for `x`
+  grad_x = tf.math.exp(_nc2_log_prob(x, df, noncentrality)) * g
+
+  # Compute gradient for `noncentrality`
+  nc2_cdf_2 = _nc2_cdf_naive(x, df + 2., noncentrality)
+
+  grad_nc = 0.5 * (nc2_cdf_2 - nc2_cdf_1) * g
+
+  grad_x, grad_nc = generic.fix_gradient_for_broadcasting([x, noncentrality],
+                                                          [grad_x, grad_nc])
+
+  return grad_x, None, grad_nc
+
+
+def _nc2_cdf_jvp(primals, tangents):
+  """Computes the JVP for `_nc2_cdf_abramowitz_and_stegun` (supports JAX custom derivative)."""
+  x, df, noncentrality = primals
+  d_x, _, d_noncentrality = tangents
+
+  output = _nc2_cdf_naive(x, df, noncentrality)
+
+  shape = ps.broadcast_shape(ps.shape(d_x), ps.shape(d_noncentrality))
+  d_x = tf.broadcast_to(d_x, shape)
+  d_noncentrality = tf.broadcast_to(d_noncentrality, shape)
+
+  # Compute tangets for `x`
+  d_x = tf.math.exp(_nc2_log_prob(x, df, noncentrality)) * d_x
+
+  # Compute tangents for `noncentrality`
+  nc2_cdf_1 = output
+  nc2_cdf_2 = _nc2_cdf_naive(x, df + 2., noncentrality)
+
+  d_noncentrality = 0.5 * (nc2_cdf_2 - nc2_cdf_1) * d_noncentrality
+
+  tangents = d_x + d_noncentrality
+
+  return output, tangents
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_nc2_cdf_fwd, vjp_bwd=_nc2_cdf_bwd, jvp_fn=_nc2_cdf_jvp)
+def _nc2_cdf_naive(x, df, noncentrality):
+  return _nc2_cdf_abramowitz_and_stegun(x, df, noncentrality)
 
 
 class NoncentralChi2(distribution.AutoCompositeTensorDistribution):
@@ -189,45 +476,12 @@ class NoncentralChi2(distribution.AutoCompositeTensorDistribution):
     return tf.where(high_df_mask, nc_chi2_samps_high_df, nc_chi2_samps_low_df)
 
   def _log_prob(self, x):
-    numpy_dtype = dtype_util.as_numpy_dtype(self.dtype)
-    log2 = numpy_dtype(np.log(2.))
-
     df = tf.convert_to_tensor(self.df, dtype=self.dtype)
     noncentrality = tf.convert_to_tensor(self.noncentrality, dtype=self.dtype)
-    safe_noncentrality_mask = noncentrality > 0.
-    safe_noncentrality = tf.where(safe_noncentrality_mask, noncentrality, 1.)
 
-    sqrt_x = tf.math.sqrt(x)
-    sqrt_nc = tf.math.sqrt(safe_noncentrality)
-
-    df_factor = 0.25 * df - 0.5
-
-    log_prob = -log2 - 0.5 * tf.math.square(sqrt_x - sqrt_nc)
-    log_prob = log_prob + tf.math.xlogy(df_factor, x)
-    log_prob = log_prob - tf.math.xlogy(df_factor, safe_noncentrality)
-    log_prob = log_prob + bessel.log_bessel_ive(2. * df_factor,
-                                                sqrt_nc * sqrt_x)
-
-    return tf.where(safe_noncentrality_mask, log_prob,
-                    chi2_lib.Chi2(df).log_prob(x))
+    return _nc2_log_prob(x, df, noncentrality)
 
   def _cdf(self, x):
-    return self._nc2_cdf_abramowitz_and_stegun(x)
-
-  def _nc2_cdf_abramowitz_and_stegun(self, x):
-    """Computes the CDF of a noncentral chi2 random variable.
-
-    Computation is performed according to Eq (26.4.25) in
-    Abramowitz, M., Stegun, I. A., & Romer, R. H. (1988).
-    Handbook of mathematical functions with formulas, graphs,
-    and mathematical tables.
-
-    Args:
-      x: point at which CDF is to be evaluated.
-
-    Returns:
-      `tf.Tensor` of the CDF evaluated at x.
-    """
     df = tf.convert_to_tensor(self.df, dtype=self.dtype)
     noncentrality = tf.convert_to_tensor(self.noncentrality, dtype=self.dtype)
 
@@ -235,164 +489,7 @@ class NoncentralChi2(distribution.AutoCompositeTensorDistribution):
     df = tf.broadcast_to(df, param_shape)
     noncentrality = tf.broadcast_to(noncentrality, param_shape)
 
-    numpy_dtype = dtype_util.as_numpy_dtype(self.dtype)
-    log_eps_abs = tf.math.log(numpy_dtype(np.finfo(numpy_dtype).eps))
-
-    log_eps_p = numpy_dtype(-15. * np.log(10.))
-    log_eps_s = log_eps_p - 10.
-
-    below_precision_mask = log_eps_abs > self._log_cdf_chernoff_bound(
-        x, df, noncentrality)
-
-    # At the end, we will just set the dimensions with very low
-    # noncentrality using the CDF of the standard chi2
-    small_noncentrality_mask = noncentrality < 1e-10
-
-    nc_over_2 = noncentrality / 2.
-    x_over_2 = x / 2.
-
-    # Index of the term with the highest weight in the sum from Eq (26.4.25)
-    central_index = tf.math.floor(nc_over_2)
-
-    # Bump 0 indices to 1
-    central_index = central_index + tf.where(
-        tf.math.equal(central_index, 0.), numpy_dtype(1.), numpy_dtype(0.))
-
-    # Calculate the "central" term in the series
-    log_central_weight = tf.math.xlogy(central_index, nc_over_2)
-    log_central_weight = log_central_weight - nc_over_2
-    log_central_weight = log_central_weight - tf.math.lgamma(central_index + 1.)
-
-    central_weight = tf.math.exp(log_central_weight)
-
-    central_df_over_2 = 0.5 * df + central_index
-
-    central_index = central_index * tf.ones_like(x)
-    central_weight = central_weight * tf.ones_like(x)
-
-    # Wilson-Hilferty transform
-    # For large values of `df`, the Chi2 CDF of x is very well approximated
-    # by the CDF of a Gaussian with mean 1 - 2 / (9 df) and variance 2 / (9 df)
-    # evaluated at(x / df)^{1/3}.
-    #
-    # The rationale of using it here is that for `df`s larger than 1e3 it is
-    # more numerically stable and accurate to use the Gaussian WH transform than
-    # to evaluate the Chi2 CDF directly
-    central_df_var_term = 1. / central_df_over_2 / 9.
-
-    wilson_hilferty_x = (x_over_2 / central_df_over_2)**(1. / 3.)
-    wilson_hilferty_x = wilson_hilferty_x - (1. - central_df_var_term)
-    wilson_hilferty_x = wilson_hilferty_x / tf.math.sqrt(central_df_var_term)
-
-    # Compute the central chi2 probability
-    central_chi2_prob = tf.where(central_df_over_2 < 1e3,
-                                 tf.math.igamma(central_df_over_2, x_over_2),
-                                 special_math.ndtr(wilson_hilferty_x))
-
-    # Prob will contain the return value of the function
-    prob = central_weight * central_chi2_prob
-
-    # Calculate adjustment terms to the chi2 probability above.
-    # This means that `tf.math.igamma` only needs to be called once, the rest
-    # of the CDFs can be calculated using the adjustment.
-    log_adjustment_term = tf.math.xlogy(central_df_over_2, x_over_2)
-    log_adjustment_term = log_adjustment_term - x_over_2 - tf.math.lgamma(
-        central_df_over_2 + 1.)
-    central_adjustment_term = tf.math.exp(log_adjustment_term)
-
-    # Now, sum the series "backwards" from the central term
-    def backwards_summation_loop_body(index, weight, adj_term, total_adj, prob):
-
-      update_mask = ~below_precision_mask & (index > 0.) & (
-          tf.math.log(weight) + tf.math.log(adj_term) > log_eps_s)
-
-      df_over_2 = 0.5 * df + index
-
-      adj_term = adj_term * tf.where(update_mask, df_over_2 / x_over_2, 1.)
-      total_adj = total_adj + tf.where(update_mask, adj_term, 0.)
-
-      adjusted_prob = central_chi2_prob + total_adj
-      weight = weight * tf.where(update_mask, index / nc_over_2, 1.)
-
-      prob_term = weight * adjusted_prob
-      prob = prob + tf.where(update_mask, prob_term, 0.)
-
-      index = index - tf.cast(tf.where(update_mask, 1., 0.), self.dtype)
-
-      return index, weight, adj_term, total_adj, prob
-
-    def backwards_summation_loop_cond(index, weight, adj_term, total_adj, prob):
-      return tf.reduce_any(
-          ~below_precision_mask &
-          (index > 0.) &
-          (tf.math.log(weight) + tf.math.log(adj_term) > log_eps_s))
-
-    _, _, _, _, prob = tf.while_loop(
-        cond=backwards_summation_loop_cond,
-        body=backwards_summation_loop_body,
-        loop_vars=(central_index, central_weight, central_adjustment_term,
-                   tf.zeros_like(central_adjustment_term), prob))
-
-    # Now, sum the series "forwards" from the central term
-    def forwards_summation_loop_body(index, weight, adj_term, total_adj, prob):
-
-      update_mask = ~below_precision_mask & (
-          tf.math.log(weight) + tf.math.log(adj_term) > log_eps_s)
-
-      weight = weight * tf.where(update_mask, nc_over_2 / (index + 1.), 1.)
-      adjusted_prob = central_chi2_prob - total_adj
-
-      prob_term = weight * adjusted_prob
-      prob = prob + tf.where(update_mask, prob_term, 0.)
-
-      index = tf.where(update_mask, index + 1., index)
-      df_over_2 = 0.5 * df + index
-      adj_term = adj_term * tf.where(update_mask, x_over_2 / df_over_2, 1.)
-      total_adj = total_adj + tf.where(update_mask, adj_term, 0.)
-
-      return index, weight, adj_term, total_adj, prob
-
-    def forwards_summation_loop_cond(index, weight, adj_term, total_adj, prob):
-      return tf.reduce_any(
-          ~below_precision_mask &
-          (tf.math.log(weight) + tf.math.log(adj_term) > log_eps_s))
-
-    _, _, _, _, prob = tf.while_loop(
-        cond=forwards_summation_loop_cond,
-        body=forwards_summation_loop_body,
-        loop_vars=(central_index, central_weight, central_adjustment_term,
-                   central_adjustment_term, prob))
-
-    prob = tf.where(small_noncentrality_mask,
-                    tf.math.igamma(0.5 * df, 0.5 * x), prob)
-
-    x_above_mean_mask = x > self.mean()
-
-    prob = tf.where(below_precision_mask & x_above_mean_mask, tf.ones_like(x),
-                    prob)
-
-    prob = tf.where(below_precision_mask & ~x_above_mean_mask, tf.zeros_like(x),
-                    prob)
-
-    return prob
-
-  def _log_cdf_chernoff_bound(self, x, df, noncentrality):
-    # Implements Eqs (22) and (23) in Shnidman, D. A. The Calculation of the
-    # Probability of Detection and the Generalized Marcum Q-Function (1989)
-    # The substitutions used are self.df = 2N, self.nc = 2NX and x = 2Y
-
-    df_over_2x = tf.math.xdivy(df, 2. * x)
-
-    # Quantity in Eq (22)
-    chernoff_coef = 1. - df_over_2x - tf.math.sqrt(
-        tf.math.square(df_over_2x) + tf.math.xdivy(noncentrality, x))
-
-    # Exponent in Eq (23)
-    bound = -chernoff_coef * x + noncentrality * chernoff_coef / (
-        1. - chernoff_coef) - tf.math.xlog1py(df, -chernoff_coef)
-    bound = 0.5 * bound
-
-    return bound
+    return _nc2_cdf_naive(x, df, noncentrality)
 
   def _mean(self):
     return self.df + self.noncentrality
