@@ -55,7 +55,7 @@ from tensorflow_probability.python.vi import optimization
 JAX_MODE = False
 
 
-@test_util.test_all_tf_execution_regimes
+@test_util.test_graph_and_eager_modes
 class _TrainableASVISurrogate(object):
 
   @test_util.jax_disable_variable_test
@@ -104,8 +104,13 @@ class _TrainableASVISurrogate(object):
     # Test that gradients are available wrt the variational parameters.
     posterior_sample = surrogate_posterior.sample(
         seed=test_util.test_seed(sampler_type='stateless'))
+
+    @tf.function
+    def log_prob():
+      return surrogate_posterior.log_prob(posterior_sample)
+
     with tf.GradientTape() as tape:
-      posterior_logprob = surrogate_posterior.log_prob(posterior_sample)
+      posterior_logprob = log_prob()
     grad = tape.gradient(posterior_logprob,
                          surrogate_posterior.trainable_variables)
     self.assertTrue(all(g is not None for g in grad))
@@ -137,9 +142,12 @@ class _TrainableASVISurrogate(object):
     # Test that gradients are available wrt the variational parameters.
     posterior_sample = surrogate_posterior.sample(
         seed=test_util.test_seed(sampler_type='stateless'))
-    _, grad = gradient.value_and_gradient(
-        lambda params: surrogate_apply_fn(params).log_prob(posterior_sample),
-        [raw_params])
+
+    @tf.function
+    def log_prob(params):
+      return surrogate_apply_fn(params).log_prob(posterior_sample)
+
+    _, grad = gradient.value_and_gradient(log_prob, [raw_params])
     self.assertTrue(
         all(custom_gradient.is_valid_gradient(g)
             for g in tf.nest.flatten(grad)))
@@ -220,14 +228,14 @@ class ASVISurrogatePosteriorTestBrownianMotion(test_util.TestCase,
     losses = optimization.fit_surrogate_posterior(
         target_log_prob,
         surrogate_posterior,
-        num_steps=5,  # Don't optimize to completion.
+        num_steps=3,  # Don't optimize to completion.
         optimizer=tf.optimizers.Adam(0.1),
-        sample_size=10)
+        sample_size=5)
 
     # Compute posterior statistics.
     with tf.control_dependencies([losses]):
       posterior_samples = surrogate_posterior.sample(
-          100, seed=test_util.test_seed(sampler_type='stateless'))
+          20, seed=test_util.test_seed(sampler_type='stateless'))
       posterior_mean = tf.nest.map_structure(tf.reduce_mean, posterior_samples)
       posterior_stddev = tf.nest.map_structure(tf.math.reduce_std,
                                                posterior_samples)
@@ -259,12 +267,12 @@ class ASVISurrogatePosteriorTestBrownianMotion(test_util.TestCase,
     optimized_params, _ = minimize_stateless(
         loss_fn,
         init=init_fn(seed=test_util.test_seed()),
-        num_steps=5,  # Don't optimize to completion.
+        num_steps=3,  # Don't optimize to completion.
         optimizer=optax.adam(0.1),
         seed=test_util.test_seed(sampler_type='stateless'))
     surrogate_posterior = build_surrogate_posterior_fn(optimized_params)
     surrogate_posterior.sample(
-        100, seed=test_util.test_seed(sampler_type='stateless'))
+        20, seed=test_util.test_seed(sampler_type='stateless'))
 
 
 @test_util.test_all_tf_execution_regimes
