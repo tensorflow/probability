@@ -135,7 +135,7 @@ class Transpose(bijector.AutoCompositeTensorBijector):
       if rightmost_transposed_ndims is not None:
         rightmost_transposed_ndims = tensor_util.convert_nonref_to_tensor(
             rightmost_transposed_ndims,
-            dtype_hint=np.int32)
+            dtype_hint=np.int32, as_shape_tensor=True)
         if not dtype_util.is_integer(rightmost_transposed_ndims.dtype):
           raise TypeError('`rightmost_transposed_ndims` must be integer type.')
         rightmost_transposed_ndims_ = tf.get_static_value(
@@ -151,7 +151,7 @@ class Transpose(bijector.AutoCompositeTensorBijector):
       else:  # perm is not None:
         perm = tensor_util.convert_nonref_to_tensor(
             perm, dtype_hint=np.int32, name='perm')
-        rightmost_transposed_ndims_ = tf.get_static_value(tf.size(perm))
+        rightmost_transposed_ndims_ = tf.get_static_value(ps.size(perm))
 
       # TODO(b/110828604): If bijector base class ever supports dynamic
       # `min_event_ndims`, then this class already works dynamically and the
