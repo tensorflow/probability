@@ -14,9 +14,6 @@
 # ============================================================================
 """Functions for computing statistics of samples."""
 
-JAX_MODE = False
-NUMPY_MODE = False
-
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
