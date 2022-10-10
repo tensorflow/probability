@@ -106,6 +106,7 @@ multi_substrate_py_library(
         ":tanh",
         ":transform_diagonal",
         ":transpose",
+        ":unit_vector",
         ":weibull_cdf",
     ],
 )
@@ -1005,6 +1006,20 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "unit_vector",
+    srcs = ["unit_vector.py"],
+    deps = [
+        ":bijector",
+        ":pad",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
@@ -2129,6 +2144,20 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/distributions:independent",
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/distributions:transformed_distribution",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "unit_vector_test",
+    size = "small",
+    srcs = ["unit_vector_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":unit_vector",
+        # numpy dep,
+        # tensorflow dep,
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
