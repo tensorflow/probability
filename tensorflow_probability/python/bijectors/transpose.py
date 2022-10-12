@@ -150,7 +150,7 @@ class Transpose(bijector.AutoCompositeTensorBijector):
 
       else:  # perm is not None:
         perm = tensor_util.convert_nonref_to_tensor(
-            perm, dtype_hint=np.int32, name='perm')
+            perm, dtype_hint=np.int32, name='perm', as_shape_tensor=True)
         rightmost_transposed_ndims_ = tf.get_static_value(ps.size(perm))
 
       # TODO(b/110828604): If bijector base class ever supports dynamic
@@ -204,7 +204,7 @@ class Transpose(bijector.AutoCompositeTensorBijector):
       perm_start = (
           distribution_util.prefer_static_value(
               self.rightmost_transposed_ndims) - 1)
-      return tf.range(start=perm_start, limit=-1, delta=-1, name='perm')
+      return ps.range(start=perm_start, limit=-1, delta=-1, name='perm')
     return self.perm
 
   def _get_rightmost_transposed_ndims(self):
@@ -245,11 +245,11 @@ class Transpose(bijector.AutoCompositeTensorBijector):
     return self._event_shape(input_shape, static_perm_to_shape)
 
   def _forward_event_shape_tensor(self, input_shape):
-    perm = self._make_perm(tf.size(input_shape), self._get_perm())
-    return tf.gather(input_shape, perm)
+    perm = self._make_perm(ps.size(input_shape), self._get_perm())
+    return ps.gather(input_shape, perm)
 
   def _inverse(self, y):
-    return self._transpose(y, tf.argsort(self._get_perm()))
+    return self._transpose(y, ps.argsort(self._get_perm()))
 
   def _inverse_event_shape(self, output_shape):
     def static_perm_to_shape(subshp, perm):
@@ -276,9 +276,9 @@ class Transpose(bijector.AutoCompositeTensorBijector):
         distribution_util.prefer_static_value(
             self._get_rightmost_transposed_ndims()))
     dtype = perm.dtype
-    perm = tf.concat([
-        tf.range(tf.cast(sample_batch_ndims, dtype)),
-        tf.cast(
+    perm = ps.concat([
+        ps.range(ps.cast(sample_batch_ndims, dtype)),
+        ps.cast(
             sample_batch_ndims + distribution_util.prefer_static_value(perm),
             dtype),
     ],
@@ -286,7 +286,7 @@ class Transpose(bijector.AutoCompositeTensorBijector):
     return perm
 
   def _transpose(self, x, perm):
-    perm = self._make_perm(tf.rank(x), perm)
+    perm = self._make_perm(ps.rank(x), perm)
     return tf.transpose(a=x, perm=perm)
 
   def _parameter_control_dependencies(self, is_init):
@@ -378,7 +378,7 @@ def _maybe_validate_perm(
     elif validate_args:
       assertions += [
           assert_util.assert_equal(
-              tf.sort(perm), tf.range(tf.size(perm, out_type=perm.dtype)),
+              ps.sort(perm), ps.range(ps.size(perm, out_type=perm.dtype)),
               message=msg)
       ]
 
