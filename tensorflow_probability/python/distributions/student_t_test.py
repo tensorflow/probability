@@ -161,7 +161,7 @@ class StudentTTest(test_util.TestCase):
     self.assertAllClose(sample_values.mean(), mu_v, rtol=0.1, atol=0)
     self.assertAllClose(
         sample_values.var(), sigma_v**2 * df_v / (df_v - 2), rtol=0.1, atol=0)
-    self._checkKLApprox(df_v, mu_v, sigma_v, sample_values)
+    self._check_kl_approx(df_v, mu_v, sigma_v, sample_values)
 
   # Test that sampling with the same seed twice gives the same results.
   def testStudentSampleMultipleTimes(self):
@@ -215,7 +215,7 @@ class StudentTTest(test_util.TestCase):
         sigma_v[0]**2 * df_v[0] / (df_v[0] - 2),
         rtol=0.2,
         atol=0)
-    self._checkKLApprox(df_v[0], mu_v[0], sigma_v[0], sample_values[:, 0, 0])
+    self._check_kl_approx(df_v[0], mu_v[0], sigma_v[0], sample_values[:, 0, 0])
     self.assertAllClose(
         sample_values[:, 0, 1].mean(), mu_v[1], rtol=0.1, atol=0)
     self.assertAllClose(
@@ -223,9 +223,9 @@ class StudentTTest(test_util.TestCase):
         sigma_v[1]**2 * df_v[1] / (df_v[1] - 2),
         rtol=0.2,
         atol=0)
-    self._checkKLApprox(df_v[1], mu_v[1], sigma_v[1], sample_values[:, 0, 1])
+    self._check_kl_approx(df_v[1], mu_v[1], sigma_v[1], sample_values[:, 0, 1])
 
-  def _checkKLApprox(self, df, mu, sigma, samples):
+  def _check_kl_approx(self, df, mu, sigma, samples):
     n = samples.size
     np.random.seed(137)
     sample_scipy = sp_stats.t.rvs(df, loc=mu, scale=sigma, size=n)
@@ -488,13 +488,14 @@ class StudentTTest(test_util.TestCase):
     df = tf.constant(2.0)
     mu = tf.constant(1.0)
     sigma = tf.constant(3.0)
-    _, [grad_df, grad_mu, grad_sigma] = gradient.value_and_gradient(
+    grads = gradient.value_and_gradient(
         lambda d, m, s: student_t.StudentT(  # pylint: disable=g-long-lambda
             df=d,
             loc=m,
             scale=s,
             validate_args=True).sample(100, seed=test_util.test_seed()),
-        [df, mu, sigma])
+        [df, mu, sigma])[1]
+    grad_df, grad_mu, grad_sigma = grads
     self.assertIsNotNone(grad_df)
     self.assertIsNotNone(grad_mu)
     self.assertIsNotNone(grad_sigma)

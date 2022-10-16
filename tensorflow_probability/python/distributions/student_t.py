@@ -362,19 +362,19 @@ class StudentT(distribution.AutoCompositeTensorDistribution):
         dtype=self.dtype,
         seed=seed)
 
-  def _log_prob(self, x):
+  def _log_prob(self, value):
     df = tf.convert_to_tensor(self.df)
     loc = tf.convert_to_tensor(self.loc)
     scale = tf.convert_to_tensor(self.scale)
-    return log_prob(x, df, loc, scale)
+    return log_prob(value, df, loc, scale)
 
-  def _cdf(self, x):
+  def _cdf(self, value):
     df = tf.convert_to_tensor(self.df)
-    return cdf(x, df, self.loc, self.scale)
+    return cdf(value, df, self.loc, self.scale)
 
-  def _quantile(self, x):
+  def _quantile(self, value):
     df = tf.convert_to_tensor(self.df)
-    return quantile(x, df, self.loc, self.scale)
+    return quantile(value, df, self.loc, self.scale)
 
   def _entropy(self):
     df = tf.convert_to_tensor(self.df)
