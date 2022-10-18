@@ -14,15 +14,19 @@
 # ============================================================================
 """Tests for Student t distribution."""
 
+import itertools
 import math
 
 # Dependency imports
 import numpy as np
+from absl.testing import parameterized
 from scipy import stats as sp_stats
+from scipy import special as sp_special
 
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import student_t
+from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import gradient
 
@@ -100,12 +104,10 @@ class StudentTTest(test_util.TestCase):
 
     expected_log_cdf = sp_stats.t.logcdf(t, df_v, loc=mu_v, scale=sigma_v)
     expected_cdf = sp_stats.t.cdf(t, df_v, loc=mu_v, scale=sigma_v)
-    self.assertAllClose(expected_log_cdf, log_cdf_values, atol=0., rtol=1e-5)
-    self.assertAllClose(
-        np.log(expected_cdf), log_cdf_values, atol=0., rtol=1e-5)
-    self.assertAllClose(expected_cdf, cdf_values, atol=0., rtol=1e-5)
-    self.assertAllClose(
-        np.exp(expected_log_cdf), cdf_values, atol=0., rtol=1e-5)
+    self.assertAllClose(expected_log_cdf, log_cdf_values, atol=0.)
+    self.assertAllClose(np.log(expected_cdf), log_cdf_values, atol=0.)
+    self.assertAllClose(expected_cdf, cdf_values, atol=0.)
+    self.assertAllClose(np.exp(expected_log_cdf), cdf_values, atol=0.)
 
   def testStudentQuantile(self):
     batch_shape = (40, 1)
@@ -488,14 +490,13 @@ class StudentTTest(test_util.TestCase):
     df = tf.constant(2.0)
     mu = tf.constant(1.0)
     sigma = tf.constant(3.0)
-    grads = gradient.value_and_gradient(
+    grad_df, grad_mu, grad_sigma = gradient.value_and_gradient(
         lambda d, m, s: student_t.StudentT(  # pylint: disable=g-long-lambda
             df=d,
             loc=m,
             scale=s,
             validate_args=True).sample(100, seed=test_util.test_seed()),
         [df, mu, sigma])[1]
-    grad_df, grad_mu, grad_sigma = grads
     self.assertIsNotNone(grad_df)
     self.assertIsNotNone(grad_mu)
     self.assertIsNotNone(grad_sigma)
@@ -562,6 +563,182 @@ class StudentTTest(test_util.TestCase):
     scale = tf.Variable(1, dtype=tf.int32)
     with self.assertRaisesRegexp(ValueError, 'Expected floating point'):
       student_t.StudentT(df=df, loc=loc, scale=scale, validate_args=True)
+
+
+@test_util.test_graph_and_eager_modes
+class StdtrTest(test_util.TestCase):
+
+  def testStdtrBroadcast(self):
+    df = np.ones([3, 2], dtype=np.float32)
+    t = np.ones([4, 1, 1], dtype=np.float32)
+    self.assertAllEqual([4, 3, 2], student_t.stdtr(df, t).shape)
+
+  def _test_stdtr_value(self, df_low, df_high, use_log10_scale, dtype, rtol):
+    tiny = np.finfo(dtype).tiny
+    n = [int(1e3)]
+    strm = test_util.test_seed_stream()
+
+    df = uniform.Uniform(low=df_low, high=dtype(df_high)).sample(n, strm())
+    df = tf.math.pow(dtype(10.), df) if use_log10_scale else df
+    p = uniform.Uniform(low=tiny, high=dtype(1.)).sample(n, strm())
+    numpy_df, numpy_p = self.evaluate([df, p])
+    numpy_t = sp_special.stdtrit(numpy_df, numpy_p)
+
+    # Wrap in tf.function for faster computations.
+    stdtr = tf.function(student_t.stdtr, autograph=False)
+
+    result = self.evaluate(stdtr(numpy_df, numpy_t))
+
+    self.assertEqual(dtype, result.dtype)
+    self.assertAllClose(
+        sp_special.stdtr(numpy_df, numpy_t), result, atol=0., rtol=rtol)
+
+  @parameterized.named_parameters(
+      {"testcase_name": "float32",
+       "dtype": np.float32,
+       "rtol": 5e-5},
+      {"testcase_name": "float64",
+       "dtype": np.float64,
+       "rtol": 5e-13})
+  def testStdtrSmall(self, dtype, rtol):
+    self._test_stdtr_value(
+        df_low=0.5, df_high=10., use_log10_scale=False, dtype=dtype, rtol=rtol)
+
+  @parameterized.named_parameters(
+      {"testcase_name": "float32",
+       "dtype": np.float32,
+       "rtol": 1e-5},
+      {"testcase_name": "float64",
+       "dtype": np.float64,
+       "rtol": 1e-12})
+  def testStdtrMedium(self, dtype, rtol):
+    self._test_stdtr_value(
+        df_low=10., df_high=1e2, use_log10_scale=False, dtype=dtype, rtol=rtol)
+
+  @parameterized.named_parameters(
+      {"testcase_name": "float32",
+       "dtype": np.float32,
+       "rtol": 1e-5},
+      {"testcase_name": "float64",
+       "dtype": np.float64,
+       "rtol": 1e-12})
+  def testStdtrLarge(self, dtype, rtol):
+    self._test_stdtr_value(
+        df_low=1e2, df_high=1e4, use_log10_scale=False, dtype=dtype, rtol=rtol)
+
+  @parameterized.named_parameters(
+      {"testcase_name": "float64",
+       "dtype": np.float64,
+       "rtol": 5e-14})
+  def testStdtrVeryLarge(self, dtype, rtol):
+    self._test_stdtr_value(
+        df_low=4., df_high=8., use_log10_scale=True, dtype=dtype, rtol=rtol)
+
+  @parameterized.parameters(np.float32, np.float64)
+  def testStdtrBounds(self, dtype):
+    # Test out-of-range values (should return NaN output).
+    df = np.array([-1., 0.], dtype=dtype)
+    t = np.array([0.5, 0.5], dtype=dtype)
+
+    result = self.evaluate(student_t.stdtr(df, t))
+    self.assertEqual(dtype, result.dtype)
+    self.assertAllNan(result)
+
+  @test_util.numpy_disable_gradient_test
+  def testStdtrGradient(self):
+    space_df = np.logspace(np.log10(0.5), 8., num=15).tolist()
+    space_p = np.linspace(0.01, 0.99, num=15).tolist()
+    df, p = zip(*list(itertools.product(space_df, space_p)))
+    t = sp_special.stdtrit(df, p)
+    df, t = [tf.constant(z, dtype="float64") for z in (df, t)]
+
+    # Wrap in tf.function for faster computations.
+    stdtr = tf.function(student_t.stdtr, autograph=False)
+
+    err = self.compute_max_gradient_error(
+        lambda z: stdtr(z, t), [df], delta=1e-5)
+    self.assertLess(err, 2e-10)
+
+    err = self.compute_max_gradient_error(
+        lambda z: stdtr(df, z), [t], delta=1e-5)
+    self.assertLess(err, 7e-11)
+
+  @parameterized.parameters(np.float32, np.float64)
+  @test_util.numpy_disable_gradient_test
+  def testStdtrGradientFinite(self, dtype):
+    eps = np.finfo(dtype).eps
+    log_df_max = 4. if dtype == np.float32 else 8.
+
+    space_df = np.logspace(np.log10(0.5), log_df_max, num=20).tolist()
+    space_p = np.linspace(eps, 1. - eps, num=20).tolist()
+    space_p += [0.5 - eps, 0.5, 0.5 + eps]
+    df, p = zip(*list(itertools.product(space_df, space_p)))
+    t = sp_special.stdtrit(df, p)
+    df, t = [tf.constant(z, dtype=dtype) for z in (df, t)]
+
+    # Wrap in tf.function for faster computations.
+    @tf.function(autograph=False)
+    def stdtr_partials(df, t):
+      return gradient.value_and_gradient(student_t.stdtr, [df, t])[1]
+
+    partial_df, partial_t = self.evaluate(stdtr_partials(df, t))
+
+    self.assertEqual(dtype, partial_df.dtype)
+    self.assertEqual(dtype, partial_t.dtype)
+    self.assertAllFinite([partial_df, partial_t])
+
+  @parameterized.parameters(np.float32, np.float64)
+  @test_util.numpy_disable_gradient_test
+  def testStdtrGradientBounds(self, dtype):
+    # Test out-of-range values (should return NaN output).
+    df = tf.constant([-1., 0.], dtype=dtype)
+    t = tf.constant([0.5, 0.5], dtype=dtype)
+
+    partial_df, partial_t = self.evaluate(
+        gradient.value_and_gradient(student_t.stdtr, [df, t])[1])
+
+    self.assertEqual(dtype, partial_df.dtype)
+    self.assertEqual(dtype, partial_t.dtype)
+    self.assertAllNan([partial_df, partial_t])
+
+  @test_util.numpy_disable_gradient_test
+  def testStdtrGradientBroadcast(self):
+    df = np.ones([3, 2], dtype=np.float32)
+    t = np.zeros([4, 1, 1], dtype=np.float32)
+
+    def simple_binary_operator(df, t):
+      return df + t
+
+    simple_partials = gradient.value_and_gradient(
+        simple_binary_operator, [df, t])[1]
+    stdtr_partials = gradient.value_and_gradient(
+        student_t.stdtr, [df, t])[1]
+    df_partials, t_partials = zip([*simple_partials], [*stdtr_partials])
+    self.assertAllEqual(df_partials[0].shape, df_partials[1].shape)
+    self.assertAllEqual(t_partials[0].shape, t_partials[1].shape)
+
+  @parameterized.parameters(np.float32, np.float64)
+  @test_util.numpy_disable_gradient_test
+  def testStdtrSecondDerivativeFinite(self, dtype):
+    eps = np.finfo(dtype).eps
+
+    space_df = np.logspace(np.log10(0.5), 4., num=7).tolist()
+    space_p = np.linspace(eps, 1. - eps, num=7).tolist()
+    space_p += [0.5 - eps, 0.5 + eps]
+    df, p = zip(*list(itertools.product(space_df, space_p)))
+    t = sp_special.stdtrit(df, p)
+    df, t = [tf.constant(z, dtype=dtype) for z in (df, t)]
+
+    def stdtr_partials(df, t):
+      return gradient.value_and_gradient(student_t.stdtr, [df, t])[1]
+
+    # Wrap in tf.function for faster computations.
+    @tf.function(autograph=False)
+    def stdtr_partials_of_partials(df, t):
+      return gradient.value_and_gradient(stdtr_partials, [df, t])[1]
+
+    partials_of_partials = stdtr_partials_of_partials(df, t)
+    self.assertAllFinite(self.evaluate(partials_of_partials))
 
 
 if __name__ == '__main__':

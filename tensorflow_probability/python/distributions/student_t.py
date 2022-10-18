@@ -14,6 +14,8 @@
 # ============================================================================
 """Student's t distribution class."""
 
+import functools
+
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
@@ -23,13 +25,17 @@ from tensorflow_probability.python.bijectors import softplus as softplus_bijecto
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import generic
+from tensorflow_probability.python.math import gradient
 from tensorflow_probability.python.math import special
 from tensorflow_probability.python.math.numeric import log1psquare
 
@@ -90,13 +96,366 @@ def log_prob(x, df, loc, scale):
   Returns:
     A `Tensor` with shape broadcast according to the arguments.
   """
+  dtype = dtype_util.common_dtype([x, df, loc, scale], tf.float32)
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  half = numpy_dtype(0.5)
+  one = numpy_dtype(1.)
+
+  x, df, loc, scale = [
+      tf.convert_to_tensor(param, dtype=dtype)
+      for param in (x, df, loc, scale)]
+
   # Writing `y` this way reduces XLA mem copies.
   y = (x - loc) * (tf.math.rsqrt(df) / scale)
-  log_unnormalized_prob = -0.5 * (df + 1.) * log1psquare(y)
+  log_unnormalized_prob = -half * (df + one) * log1psquare(y)
   log_normalization = (
-      tf.math.log(tf.abs(scale)) + 0.5 * tf.math.log(df) +
-      0.5 * np.log(np.pi) + special.log_gamma_difference(0.5, 0.5 * df))
+      tf.math.log(tf.abs(scale)) + half * tf.math.log(df) +
+      special.lbeta(half, half * df))
   return log_unnormalized_prob - log_normalization
+
+
+def entropy(df, scale, batch_shape, dtype):
+  """Compute entropy of the StudentT distribution.
+
+  Args:
+    df: Floating-point `Tensor`. The degrees of freedom of the
+      distribution(s). `df` must contain only positive values.
+    scale: Floating-point `Tensor`; the scale(s) of the distribution(s). Must
+      contain only positive values.
+    batch_shape: Floating-point `Tensor` of the batch shape
+    dtype: Return dtype.
+
+  Returns:
+    A `Tensor` of the entropy for a Student's T with these parameters.
+  """
+  v = tf.ones(batch_shape, dtype=dtype)
+  u = v * df
+  return (tf.math.log(tf.abs(scale)) + 0.5 * tf.math.log(df) +
+          special.lbeta(u / 2., v / 2.) + 0.5 * (df + 1.) *
+          (tf.math.digamma(0.5 * (df + 1.)) - tf.math.digamma(0.5 * df)))
+
+
+# The implementations of the Student's t-distribution cumulative distribution
+# function and its inverse, respectively stdtr(df, t) and stdtrit(df, p), are
+# based on ideas and equations available in the following references:
+# [1] Geoffrey W. Hill
+#     Algorithm 395: Student's t-distribution
+#     Communications of the ACM, v. 13, n. 10, p. 617-619, 1970
+#     https://doi.org/10.1145/355598.362775
+# [2] Geoffrey W. Hill
+#     Remark on "Algorithm 395: Student's t-Distribution [S14]"
+#     ACM Transactions on Mathematical Software, v. 7, n. 2, p. 247-249, 1981
+#     https://doi.org/10.1145/355945.355955
+# [3] William Press, Saul Teukolsky, William Vetterling and Brian Flannery
+#     Numerical Recipes: The Art of Scientific Computing
+#     Cambridge University Press, 2007 (Third Edition)
+#     http://numerical.recipes/book/book.html
+# [4] Geoffrey W. Hill
+#     Algorithm 396: Student's t-quantiles
+#     Communications of the ACM, v. 13, n. 10, p. 619-620, 1970
+#     https://doi.org/10.1145/355598.355600
+# [5] Geoffrey W. Hill
+#     Remark on "Algorithm 396: Student's t-Quantiles [S14]"
+#     ACM Transactions on Mathematical Software, v. 7, n. 2, p. 250-251, 1981
+#     https://doi.org/10.1145/355945.355956
+# [6] R Core Team, R Foundation and Ross Ihaka
+#     Mathlib: A C Library of Special Functions
+#     https://svn.r-project.org/R/tags/R-4-2-1/src/nmath/qt.c
+
+
+def _stdtr_asymptotic_expansion(df, t, numpy_dtype):
+  """Computes `stdtr(df, t)` using asymptotic expansion."""
+  # This function provides a fast approximation of stdtr(df, t) for large value
+  # of df. It is based on an asymptotic normalizing expansion of Cornish-Fisher
+  # type [1, 2].
+  one = numpy_dtype(1.)
+  two = numpy_dtype(2.)
+
+  coeffs1 = [
+      1.00000000000000000000E+0, 3.00000000000000000000E+0]
+
+  coeffs2 = [
+      4.00000000000000022204E-1, 3.29999999999999982236E+0,
+      2.40000000000000000000E+1, 8.55000000000000000000E+1]
+
+  coeffs3 = [
+      3.04761904761904789396E-1, 3.75238095238095237249E+0,
+      4.66714285714285708195E+1, 4.27500000000000000000E+2,
+      2.58750000000000000000E+3, 8.51850000000000000000E+3]
+
+  coeffs4 = [
+      2.74285714285714299354E-1, 4.49904761904761940627E+0,
+      7.84514285714285648510E+1, 1.11871071428571417528E+3,
+      1.23876000000000003638E+4, 1.01024550000000002910E+5,
+      5.59494000000000000000E+5, 1.76495962500000000000E+6]
+
+  coeffs5 = [
+      2.65974025974025973795E-1, 5.44969696969696926203E+0,
+      1.22202943722943729199E+2, 2.35472987012987005073E+3,
+      3.76250090259740245529E+4, 4.86996139285714307334E+5,
+      4.96087065000000037253E+6, 3.79785955499999970198E+7,
+      2.01505390875000000000E+8, 6.22437908625000000000E+8]
+
+  terms_coeffs = [
+      [numpy_dtype(c) for c in coeffs]
+      for coeffs in (coeffs1, coeffs2, coeffs3, coeffs4, coeffs5)]
+
+  # Mask out negative and too small df so the gradient correctly propagates.
+  safe_df = tf.where(df < one, one, df)
+  df_minus_half = safe_df - numpy_dtype(0.5)
+  squared_z = df_minus_half * log1psquare(t * tf.math.rsqrt(safe_df))
+  z = tf.math.sqrt(squared_z)
+  # To avoid overflow when df is huge, we manipulate b and the denominator of
+  # each term of the expansion in the log domain.
+  log_b = tf.math.log(numpy_dtype(48.)) + tf.math.xlogy(two, df_minus_half)
+
+  term_sign = one
+  log_term_denominator = numpy_dtype(0.)
+  # We initialize the series with its first term.
+  series_sum = z
+  last_index = len(terms_coeffs) - 1
+
+  # We evaluate the next five terms using a procedure based on Horner's method.
+  for index, coeffs in enumerate(terms_coeffs):
+    if index < last_index:
+      log_term_denominator = log_term_denominator + log_b
+    else:
+      log_term_denominator = log_term_denominator + tf.math.log(
+          (numpy_dtype(0.43595) * squared_z + two) * squared_z +
+          tf.math.exp(log_b) + numpy_dtype(537.))
+
+    term_numerator = coeffs[0]
+    for c in coeffs[1:]:
+      term_numerator = c + term_numerator * squared_z
+
+    term_numerator = term_numerator * z
+    series_sum = series_sum + term_sign * tf.math.exp(
+      tf.math.log(term_numerator) - log_term_denominator)
+    term_sign = -one * term_sign
+
+  return special_math.ndtr(tf.math.sign(t) * series_sum)
+
+
+def _stdtr_computation(df, t):
+  """Computes Student's t-distribution cumulative distribution function."""
+  dtype = dtype_util.common_dtype([df, t], tf.float32)
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  half = numpy_dtype(0.5)
+  one = numpy_dtype(1.)
+
+  df, t = [tf.convert_to_tensor(param, dtype=dtype) for param in (df, t)]
+  broadcast_shape = functools.reduce(
+      ps.broadcast_shape, [ps.shape(df), ps.shape(t)])
+  df, t = [tf.broadcast_to(param, broadcast_shape) for param in (df, t)]
+
+  # For moderate df and relatively small t**2, or in case of large df, we use
+  # asymptotic expansion [1, 2] to compute stdtr(df, t). The condition to use
+  # it was specified by experimentation for np.float32 and was taken from [2,
+  # page 249] for np.float64.
+
+  if numpy_dtype == np.float32:
+    use_asymptotic_expansion = (
+        (df >= 10.) & (tf.math.square(t) < (16. * df - 5.))) | (df > 30.)
+  else:
+    use_asymptotic_expansion = (
+        (df >= 100.) & (tf.math.square(t) < (0.1 * df - 5.))) | (df > 1000.)
+
+  result = _stdtr_asymptotic_expansion(df, t, numpy_dtype)
+
+  # Otherwise, we evaluate stdtr(df, t) using the regularized incomplete beta
+  # function [3, page 323, equation 6.14.10]:
+  #   stdtr(df, t) =
+  #       0.5 * betainc(0.5 * df, 0.5, df / (df + t**2)), when t < 0
+  #       1. - 0.5 * betainc(0.5 * df, 0.5, df / (df + t**2)), when t >= 0
+  # To avoid rounding error when t**2 is small compared to df, we compute the
+  # ratio df / (df + t**2) in the logarithmic space. If ratio > 0.99, we then
+  # use the following symmetry relation:
+  #   betainc(a, b, x) = 1 - betainc(b, a, 1 - x) .
+
+  raw_ratio = t * tf.math.rsqrt(df)
+  ratio = tf.math.exp(-log1psquare(raw_ratio))
+  one_minus_ratio = tf.math.exp(-log1psquare(tf.math.reciprocal(raw_ratio)))
+
+  # The maximum value for the ratio was set by experimentation.
+  use_symmetry_relation = (ratio > 0.99)
+  half_df = half * df
+  a = tf.where(use_symmetry_relation, half, half_df)
+  b = tf.where(use_symmetry_relation, half_df, half)
+  x = tf.where(use_symmetry_relation, one_minus_ratio, ratio)
+
+  y = special.betainc(a, b, x)
+  neg_cdf = half * tf.where(use_symmetry_relation, one - y, y)
+  result_betainc = tf.where(t < 0., neg_cdf, one - neg_cdf)
+
+  result = tf.where(use_asymptotic_expansion, result, result_betainc)
+
+  # Determine if df is out of range (should return NaN output).
+  result_is_nan = (df <= 0.)
+  result = tf.where(result_is_nan, numpy_dtype(np.nan), result)
+
+  return result
+
+
+def _stdtr_partials(df, t):
+  """Returns the partial derivatives of `stdtr(df, t)`."""
+  dtype = dtype_util.common_dtype([df, t], tf.float32)
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  eps = np.finfo(numpy_dtype).eps
+  half = numpy_dtype(0.5)
+  one = numpy_dtype(1.)
+
+  df, t = [tf.convert_to_tensor(param, dtype=dtype) for param in (df, t)]
+  broadcast_shape = functools.reduce(
+      ps.broadcast_shape, [ps.shape(df), ps.shape(t)])
+  df, t = [tf.broadcast_to(param, broadcast_shape) for param in (df, t)]
+
+  # The gradient with respect to t can be computed more accurately and stably
+  # using Student's t-distribution probability density function.
+
+  stdtr_grad_t = tf.math.exp(log_prob(t, df, numpy_dtype(0.), one))
+
+  # For moderate df and relatively small t**2, or in case of large df, we use
+  # automatic differentiation of the procedure _stdtr_asymptotic_expansion to
+  # compute the gradient with respect to df.
+
+  if numpy_dtype == np.float32:
+    use_asymptotic_expansion = (
+        (df >= 10.) & (tf.math.square(t) < (16. * df - 5.))) | (df > 30.)
+  else:
+    use_asymptotic_expansion = (
+        (df >= 100.) & (tf.math.square(t) < (0.1 * df - 5.))) | (df > 1000.)
+
+  stdtr_grad_df = gradient.value_and_gradient(
+      lambda _df: _stdtr_asymptotic_expansion(_df, t, numpy_dtype), df)[1]
+
+  # Otherwise, the gradient with respect to df is evaluated using the partial
+  # derivatives of betainc(a, b, x). For t < 0, we have:
+  #   stdtr_grad_df = 0.5 * (betainc_grad_a * a_grad_df +
+  #                          betainc_grad_x * x_grad_df)
+  #                 = 0.5 * (betainc_grad_a * a_grad_df +
+  #                          2. * stdtr_grad_t / x_grad_t * x_grad_df)
+  #                 = 0.5 * (betainc_grad_a * a_grad_df -
+  #                          stdtr_grad_t * t / df) ,
+  # where a = 0.5 * df and x = df / (df + t**2). In above equation, the second
+  # equality follows from the fact that:
+  #   stdtr_grad_t = 0.5 * betainc_grad_x * x_grad_t , for t < 0.
+  # To avoid rounding error when t**2 is small compared to df, we compute the
+  # ratio df / (df + t**2) in the logarithmic space. If ratio > 0.99, we then
+  # use the following symmetry relation:
+  #   betainc(a, b, x) = 1 - betainc(b, a, 1 - x) .
+
+  abs_t = tf.math.abs(t)
+  # If abs_t < min_abs_t, then ratio == 1 and one_minus_ratio < eps.
+  min_abs_t = tf.math.sqrt(df * eps * tf.math.reciprocal(one - eps))
+  # Mask out too small t**2 so the gradient correctly propagates.
+  safe_abs_t = tf.where(abs_t < min_abs_t, min_abs_t, abs_t)
+
+  raw_ratio = safe_abs_t * tf.math.rsqrt(df)
+  ratio = tf.math.exp(-log1psquare(raw_ratio))
+  one_minus_ratio = tf.math.exp(-log1psquare(tf.math.reciprocal(raw_ratio)))
+
+  # The maximum value for the ratio was set by experimentation.
+  use_symmetry_relation = (ratio > 0.99)
+  half_df = half * df
+  a = tf.where(use_symmetry_relation, half, half_df)
+  b = tf.where(use_symmetry_relation, half_df, half)
+  x = tf.where(use_symmetry_relation, one_minus_ratio, ratio)
+
+  # Prepare betainc inputs to make the evaluation of its gradients easier.
+  use_betainc = ~use_asymptotic_expansion
+  a = tf.where(use_betainc, a, half)
+  b = tf.where(use_betainc, b, half)
+  x = tf.where(use_betainc, x, half)
+
+  # To protect the code from future changes in the implementation of partial
+  # derivatives of betainc, we prefer not to call special._betainc_partials
+  # directly.
+  betainc_grad_a, betainc_grad_b = gradient.value_and_gradient(
+      lambda _a, _b: special.betainc(_a, _b, x), [a, b])[1]
+  betainc_grad_a = tf.where(
+      use_symmetry_relation, -betainc_grad_b, betainc_grad_a)
+
+  stdtr_grad_df_betainc = half * (
+      betainc_grad_a * half + stdtr_grad_t * abs_t / df)
+  # Handle the case (t >= 0).
+  stdtr_grad_df_betainc = tf.where(
+      t >= 0., -stdtr_grad_df_betainc, stdtr_grad_df_betainc)
+  # Handle the case (abs_t < min_abs_t): we use a rough linear approximation.
+  stdtr_grad_df_betainc = tf.where(
+      abs_t < min_abs_t, stdtr_grad_df_betainc * abs_t, stdtr_grad_df_betainc)
+
+  stdtr_grad_df = tf.where(
+      use_asymptotic_expansion, stdtr_grad_df, stdtr_grad_df_betainc)
+
+  # Determine if df is out of range (should return NaN output).
+  result_is_nan = (df <= 0.)
+  stdtr_grad_df, stdtr_grad_t = [
+      tf.where(result_is_nan, numpy_dtype(np.nan), grad)
+      for grad in [stdtr_grad_df, stdtr_grad_t]]
+
+  return stdtr_grad_df, stdtr_grad_t
+
+
+def _stdtr_fwd(df, t):
+  """Computes output, aux (collaborates with _stdtr_bwd)."""
+  output = _stdtr_computation(df, t)
+  return output, (df, t)
+
+
+def _stdtr_bwd(aux, g):
+  """Reverse mode impl for stdtr."""
+  df, t = aux
+  partial_df, partial_t = _stdtr_partials(df, t)
+  return generic.fix_gradient_for_broadcasting(
+      [df, t], [partial_df * g, partial_t * g])
+
+
+def _stdtr_jvp(primals, tangents):
+  """Computes JVP for stdtr (supports JAX custom derivative)."""
+  df, t = primals
+  ddf, dt = tangents
+
+  p = _stdtr_custom_gradient(df, t)
+  partial_df, partial_t = _stdtr_partials(df, t)
+  return (p, partial_df * ddf + partial_t * dt)
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_stdtr_fwd,
+    vjp_bwd=_stdtr_bwd,
+    jvp_fn=_stdtr_jvp)
+def _stdtr_custom_gradient(df, t):
+  """Computes `stdtr(df, t)` with correct custom gradient."""
+  return _stdtr_computation(df, t)
+
+
+def stdtr(df, t, name=None):
+  """Computes the cumulative distribution function of Student's t-distribution.
+
+  Returns the area under the probability density function of this distribution
+  with `df > 0` degrees of freedom, integrated from minus infinity to `t`.
+
+  Args:
+    df: A `Tensor`. Must be one of the following types: `float32`, `float64`.
+    t: A `Tensor`. Must have the same type as `df`.
+    name: A name for the operation (optional).
+
+  Returns:
+    A `Tensor` with shape broadcast according to the arguments.
+
+  Raises:
+    TypeError: if `df` is not one of the following types: `float32`, `float64`.
+  """
+  with tf.name_scope(name or 'stdtr'):
+    dtype = dtype_util.common_dtype([df, t], tf.float32)
+    df = tf.convert_to_tensor(df, dtype=dtype)
+    t = tf.convert_to_tensor(t, dtype=dtype)
+
+    if dtype_util.as_numpy_dtype(dtype) not in [np.float32, np.float64]:
+      raise TypeError(f'df.dtype={dtype} is not handled. '
+                      'See docstring for supported types.')
+
+    return _stdtr_custom_gradient(df, t)
 
 
 def cdf(x, df, loc, scale):
@@ -114,10 +473,14 @@ def cdf(x, df, loc, scale):
   Returns:
     A `Tensor` with shape broadcast according to the arguments.
   """
-  y = (x - loc) / tf.abs(scale)
-  x_t = df / (y**2. + df)
-  neg_cdf = 0.5 * special.betainc(0.5 * df, 0.5, x_t)
-  return tf.where(y < 0., neg_cdf, 1. - neg_cdf)
+  dtype = dtype_util.common_dtype([x, df, loc, scale], tf.float32)
+
+  x, df, loc, scale = [
+      tf.convert_to_tensor(param, dtype=dtype)
+      for param in (x, df, loc, scale)]
+
+  t = (x - loc) / tf.math.abs(scale)
+  return stdtr(df, t)
 
 
 def quantile(p, df, loc, scale):
@@ -140,27 +503,6 @@ def quantile(p, df, loc, scale):
   y = special.betaincinv(0.5 * df, 0.5, 2 * p_adjusted)
   return loc + tf.math.abs(
       scale) * tf.math.sign(p - 0.5) * tf.math.sqrt(df * (1 - y) / y)
-
-
-def entropy(df, scale, batch_shape, dtype):
-  """Compute entropy of the StudentT distribution.
-
-  Args:
-    df: Floating-point `Tensor`. The degrees of freedom of the
-      distribution(s). `df` must contain only positive values.
-    scale: Floating-point `Tensor`; the scale(s) of the distribution(s). Must
-      contain only positive values.
-    batch_shape: Floating-point `Tensor` of the batch shape
-    dtype: Return dtype.
-
-  Returns:
-    A `Tensor` of the entropy for a Student's T with these parameters.
-  """
-  v = tf.ones(batch_shape, dtype=dtype)
-  u = v * df
-  return (tf.math.log(tf.abs(scale)) + 0.5 * tf.math.log(df) +
-          special.lbeta(u / 2., v / 2.) + 0.5 * (df + 1.) *
-          (tf.math.digamma(0.5 * (df + 1.)) - tf.math.digamma(0.5 * df)))
 
 
 class StudentT(distribution.AutoCompositeTensorDistribution):
