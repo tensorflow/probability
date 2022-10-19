@@ -771,6 +771,8 @@ class GaussianProcess(
         'cholesky_fn': self.cholesky_fn,
         'mean_fn': self.mean_fn,
         'jitter': self.jitter,
+        'always_yield_multivariate_normal':
+            self._always_yield_multivariate_normal,
         'validate_args': self.validate_args,
         'allow_nan_stats': self.allow_nan_stats
     }

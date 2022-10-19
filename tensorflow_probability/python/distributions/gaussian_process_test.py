@@ -426,6 +426,10 @@ class _GaussianProcessTest(object):
     )
     self.assertAllEqual([5], self.evaluate(gp.batch_shape_tensor()))
     self.assertAllEqual([], self.evaluate(gp.event_shape_tensor()))
+    gp_pp = gp.posterior_predictive(tf.ones([5, 1]),
+                                    predictive_index_points=tf.ones([5, 1, 2]))
+    self.assertAllEqual([5], self.evaluate(gp_pp.batch_shape_tensor()))
+    self.assertAllEqual([], self.evaluate(gp_pp.event_shape_tensor()))
 
     gp = gaussian_process.GaussianProcess(
         kernel=psd_kernels.ExponentiatedQuadratic(),
@@ -434,6 +438,10 @@ class _GaussianProcessTest(object):
     )
     self.assertAllEqual([5], self.evaluate(gp.batch_shape_tensor()))
     self.assertAllEqual([1], self.evaluate(gp.event_shape_tensor()))
+    gp_pp = gp.posterior_predictive(tf.ones([5, 1]),
+                                    predictive_index_points=tf.ones([5, 1, 2]))
+    self.assertAllEqual([5], self.evaluate(gp_pp.batch_shape_tensor()))
+    self.assertAllEqual([1], self.evaluate(gp_pp.event_shape_tensor()))
 
   @test_util.disable_test_for_backend(
       disable_numpy=True,
