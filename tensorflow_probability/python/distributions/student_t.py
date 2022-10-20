@@ -99,7 +99,6 @@ def log_prob(x, df, loc, scale):
   dtype = dtype_util.common_dtype([x, df, loc, scale], tf.float32)
   numpy_dtype = dtype_util.as_numpy_dtype(dtype)
   half = numpy_dtype(0.5)
-  one = numpy_dtype(1.)
 
   x, df, loc, scale = [
       tf.convert_to_tensor(param, dtype=dtype)
@@ -107,7 +106,7 @@ def log_prob(x, df, loc, scale):
 
   # Writing `y` this way reduces XLA mem copies.
   y = (x - loc) * (tf.math.rsqrt(df) / scale)
-  log_unnormalized_prob = -half * (df + one) * log1psquare(y)
+  log_unnormalized_prob = -half * (df + numpy_dtype(1.)) * log1psquare(y)
   log_normalization = (
       tf.math.log(tf.abs(scale)) + half * tf.math.log(df) +
       special.lbeta(half, half * df))
@@ -200,13 +199,11 @@ def _stdtr_asymptotic_expansion(df, t, numpy_dtype):
       [numpy_dtype(c) for c in coeffs]
       for coeffs in (coeffs1, coeffs2, coeffs3, coeffs4, coeffs5)]
 
-  # Mask out negative and too small df so the gradient correctly propagates.
-  safe_df = tf.where(df < one, one, df)
-  df_minus_half = safe_df - numpy_dtype(0.5)
-  squared_z = df_minus_half * log1psquare(t * tf.math.rsqrt(safe_df))
+  df_minus_half = df - numpy_dtype(0.5)
+  squared_z = df_minus_half * log1psquare(t * tf.math.rsqrt(df))
   z = tf.math.sqrt(squared_z)
   # To avoid overflow when df is huge, we manipulate b and the denominator of
-  # each term of the expansion in the log domain.
+  # each term of the expansion in the logarithmic space.
   log_b = tf.math.log(numpy_dtype(48.)) + tf.math.xlogy(two, df_minus_half)
 
   term_sign = one
@@ -300,6 +297,7 @@ def _stdtr_partials(df, t):
   """Returns the partial derivatives of `stdtr(df, t)`."""
   dtype = dtype_util.common_dtype([df, t], tf.float32)
   numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  tiny = np.finfo(numpy_dtype).tiny
   eps = np.finfo(numpy_dtype).eps
   half = numpy_dtype(0.5)
   one = numpy_dtype(1.)
@@ -325,8 +323,23 @@ def _stdtr_partials(df, t):
     use_asymptotic_expansion = (
         (df >= 100.) & (tf.math.square(t) < (0.1 * df - 5.))) | (df > 1000.)
 
+  abs_t = tf.math.abs(t)
+  min_abs_t = half * df * tf.math.pow(tiny, numpy_dtype(0.25))
+  t_is_tiny = (abs_t < min_abs_t)
+  df_asymptotic_expansion = tf.where(use_asymptotic_expansion, df, one)
+  t_asymptotic_expansion = tf.where(
+      use_asymptotic_expansion,
+      # Mask out tiny t so the gradient correctly propagates. When t is tiny,
+      # second derivative of log1psquare(t * tf.math.rsqrt(df)) can be NaN.
+      tf.where(t_is_tiny, tf.where(t < 0., -min_abs_t, min_abs_t), t),
+      one)
+
   stdtr_grad_df = gradient.value_and_gradient(
-      lambda _df: _stdtr_asymptotic_expansion(_df, t, numpy_dtype), df)[1]
+      lambda z: _stdtr_asymptotic_expansion(
+          z, t_asymptotic_expansion, numpy_dtype),
+      df_asymptotic_expansion)[1]
+  # Handle the case (abs_t < min_abs_t): we use a rough linear approximation.
+  stdtr_grad_df = tf.where(t_is_tiny, stdtr_grad_df * abs_t, stdtr_grad_df)
 
   # Otherwise, the gradient with respect to df is evaluated using the partial
   # derivatives of betainc(a, b, x). For t < 0, we have:
@@ -344,13 +357,13 @@ def _stdtr_partials(df, t):
   # use the following symmetry relation:
   #   betainc(a, b, x) = 1 - betainc(b, a, 1 - x) .
 
-  abs_t = tf.math.abs(t)
-  # If abs_t < min_abs_t, then ratio == 1 and one_minus_ratio < eps.
-  min_abs_t = tf.math.sqrt(df * eps * tf.math.reciprocal(one - eps))
-  # Mask out too small t**2 so the gradient correctly propagates.
-  safe_abs_t = tf.where(abs_t < min_abs_t, min_abs_t, abs_t)
+  min_abs_t_betainc = tf.math.sqrt(df * eps * tf.math.reciprocal(one - eps))
+  abs_t_is_too_small = (abs_t < min_abs_t_betainc)
+  # Mask out too small abs(t) so the gradient correctly propagates. When abs(t)
+  # is too small, ratio == 1 and one_minus_ratio < eps.
+  abs_t_betainc = tf.where(abs_t_is_too_small, min_abs_t_betainc, abs_t)
 
-  raw_ratio = safe_abs_t * tf.math.rsqrt(df)
+  raw_ratio = abs_t_betainc * tf.math.rsqrt(df)
   ratio = tf.math.exp(-log1psquare(raw_ratio))
   one_minus_ratio = tf.math.exp(-log1psquare(tf.math.reciprocal(raw_ratio)))
 
@@ -367,11 +380,8 @@ def _stdtr_partials(df, t):
   b = tf.where(use_betainc, b, half)
   x = tf.where(use_betainc, x, half)
 
-  # To protect the code from future changes in the implementation of partial
-  # derivatives of betainc, we prefer not to call special._betainc_partials
-  # directly.
   betainc_grad_a, betainc_grad_b = gradient.value_and_gradient(
-      lambda _a, _b: special.betainc(_a, _b, x), [a, b])[1]
+      lambda y, z: special.betainc(y, z, x), [a, b])[1]
   betainc_grad_a = tf.where(
       use_symmetry_relation, -betainc_grad_b, betainc_grad_a)
 
@@ -380,9 +390,10 @@ def _stdtr_partials(df, t):
   # Handle the case (t >= 0).
   stdtr_grad_df_betainc = tf.where(
       t >= 0., -stdtr_grad_df_betainc, stdtr_grad_df_betainc)
-  # Handle the case (abs_t < min_abs_t): we use a rough linear approximation.
+  # Handle the case (abs_t < min_abs_t_betainc): we use again a rough linear
+  # approximation.
   stdtr_grad_df_betainc = tf.where(
-      abs_t < min_abs_t, stdtr_grad_df_betainc * abs_t, stdtr_grad_df_betainc)
+      abs_t_is_too_small, stdtr_grad_df_betainc * abs_t, stdtr_grad_df_betainc)
 
   stdtr_grad_df = tf.where(
       use_asymptotic_expansion, stdtr_grad_df, stdtr_grad_df_betainc)
@@ -483,6 +494,260 @@ def cdf(x, df, loc, scale):
   return stdtr(df, t)
 
 
+def _stdtrit_betaincinv(df, p, numpy_dtype, use_betaincinv):
+  """Computes `stdtrit(df, p)` using special.betaincinv."""
+  # This function inverts the procedure that computes stdtr(df, t) using the
+  # regularized incomplete beta function. For details on this procedure, see
+  # the function _stdtr_computation.
+  # We assume here that condition (p <= 0.5) is always true.
+  half = numpy_dtype(0.5)
+  one = numpy_dtype(1.)
+
+  half_df = half * df
+  two_p = numpy_dtype(2.) * p
+
+  use_symmetry_relation = (
+      p > (half * special.betainc(half_df, half, numpy_dtype(0.99))))
+  a = tf.where(use_symmetry_relation, half, half_df)
+  b = tf.where(use_symmetry_relation, half_df, half)
+  y = tf.where(use_symmetry_relation, one - two_p, two_p)
+
+  # Prepare betaincinv inputs to make its evaluation easier.
+  a = tf.where(use_betaincinv, a, half)
+  b = tf.where(use_betaincinv, b, half)
+  y = tf.where(use_betaincinv, y, numpy_dtype(0.))
+
+  x = special.betaincinv(a, b, y)
+
+  log_abs_t = half * (
+      tf.math.log(df) + tf.where(use_symmetry_relation, one, -one) * (
+          tf.math.log(x) - tf.math.log1p(-x)))
+
+  return -tf.math.exp(log_abs_t)
+
+
+def _stdtrit_series_expansion(df, p, numpy_dtype):
+  """Computes `stdtrit(df, p)` using series expansion."""
+  # This function provides a fast approximation of stdtrit(df, p) for df >= 1.
+  # It is based on an asymptotic inverse expansion of Cornish-Fisher type about
+  # normal deviates. But for small p, where t**2 / df is large, a second series
+  # expansion is used to achieve sufficient accuracy. Both approximations were
+  # proposed in [4].
+  # We assume here that condition (p <= 0.5) is always true.
+  half, one, two, three, four, five, six, seven = [
+      numpy_dtype(n) for n in (0.5,) + tuple(range(1, 8))]
+
+  a = tf.math.reciprocal(df - half)
+  b = numpy_dtype(48.) / tf.math.square(a)
+  c = numpy_dtype(96.36) + a * (
+      (numpy_dtype(20700.) * a / b - numpy_dtype(98.)) * a - numpy_dtype(16.))
+  d = df * tf.math.sqrt(a * half * numpy_dtype(np.pi)) * (
+      (numpy_dtype(94.5) / (b + c) - three) / b + one)
+
+  # First series expansion: asymptotic inverse expansion about normal deviates.
+  z = tf.math.ndtri(p)
+  squared_z = tf.math.square(z)
+  c = b + c + z * (
+      ((numpy_dtype(0.05) * d * z - five) * z - seven) * z - two)
+  c_correction = numpy_dtype(0.3) * (
+      df - numpy_dtype(4.5)) * (z + numpy_dtype(0.6))
+  c = tf.where(df >= 5., c, c + c_correction)
+
+  squared_t_over_df = numpy_dtype(0.4) * squared_z + numpy_dtype(6.3)
+  squared_t_over_df = squared_t_over_df * squared_z + numpy_dtype(36.)
+  squared_t_over_df = squared_t_over_df * squared_z + numpy_dtype(94.5)
+  squared_t_over_df = z * (
+      (squared_t_over_df / c - squared_z - three) / b + one)
+  squared_t_over_df = tf.math.expm1(a * tf.math.square(squared_t_over_df))
+
+  # Second series expansion.
+  y = tf.math.exp(two / df * (
+      tf.math.log(d) + tf.math.log(two) + tf.math.log(p)))
+
+  df_plus_2 = df + two
+  large_squared_t_over_df = (df + six) / (df * y) - numpy_dtype(0.089) * d
+  large_squared_t_over_df = df_plus_2 * three * (
+      large_squared_t_over_df - numpy_dtype(0.822))
+  large_squared_t_over_df = large_squared_t_over_df + half / (df + four)
+  large_squared_t_over_df = y / large_squared_t_over_df - one
+  large_squared_t_over_df = tf.math.reciprocal(y) + large_squared_t_over_df * (
+      (df + one) / df_plus_2)
+
+  p_is_not_small = (y >= (numpy_dtype(0.05) + a))
+  # The condition to use the first series expansion was improved in [6].
+  use_first_series_expansion = p_is_not_small | ((df < 2.1) & (p > 0.25))
+  squared_t_over_df = tf.where(
+      use_first_series_expansion, squared_t_over_df, large_squared_t_over_df)
+
+  return -tf.math.sqrt(df * squared_t_over_df)
+
+
+def _stdtrit_computation(df, p):
+  """Returns the inverse of `stdtr(df, t)` with respect to `t`."""
+  # This function increases the accuracy of an initial estimate for t by using
+  # Taylor series expansion iterations as proposed in [5].
+  dtype = dtype_util.common_dtype([df, p], tf.float32)
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  zero = numpy_dtype(0.)
+  eps = np.finfo(numpy_dtype).eps
+  half = numpy_dtype(0.5)
+  one = numpy_dtype(1.)
+
+  df, p = [tf.convert_to_tensor(param, dtype=dtype) for param in (df, p)]
+  broadcast_shape = functools.reduce(
+      ps.broadcast_shape, [ps.shape(df), ps.shape(p)])
+  df, p = [tf.broadcast_to(param, broadcast_shape) for param in (df, p)]
+
+  # max_iterations, use_betaincinv, and tolerance were set by experimentation.
+  max_iterations = 3
+  if numpy_dtype == np.float32:
+    use_betaincinv = (df < 2.)
+    tolerance = numpy_dtype(8.) * eps
+  else:
+    use_betaincinv = (df < 1.)
+    tolerance = numpy_dtype(4096.) * eps
+
+  adjusted_p = tf.where(p < 0.5, p, one - p)
+  initial_candidate = tf.where(
+      use_betaincinv,
+      # Since _stdtrit_betaincinv is expensive, we pass use_betaincinv to it
+      # to save computation.
+      _stdtrit_betaincinv(df, adjusted_p, numpy_dtype, use_betaincinv),
+      _stdtrit_series_expansion(df, adjusted_p, numpy_dtype))
+
+  def taylor_expansion_improvement(should_stop, candidate):
+    stdtr_grad_t = tf.math.exp(log_prob(candidate, df, zero, one))
+    should_stop = should_stop | tf.math.equal(stdtr_grad_t, zero)
+
+    first_order_correction = (adjusted_p - stdtr(df, candidate)) / stdtr_grad_t
+
+    candidate_is_zero = tf.math.equal(candidate, zero)
+    safe_inv_candidate = tf.where(
+        candidate_is_zero, one, tf.math.reciprocal(candidate))
+    second_order_correction = half * (df + one) * tf.math.square(
+        first_order_correction) * safe_inv_candidate * tf.math.reciprocal(
+            one + (df * safe_inv_candidate) * safe_inv_candidate)
+    second_order_correction = tf.where(
+        candidate_is_zero, zero, second_order_correction)
+
+    correction = first_order_correction + second_order_correction
+    new_candidate = tf.where(should_stop, candidate, candidate + correction)
+
+    adjusted_tolerance = tf.math.abs(tolerance * new_candidate)
+    should_stop = should_stop | (tf.math.abs(correction) <= adjusted_tolerance)
+
+    return should_stop, new_candidate
+
+  (_, result) = tf.while_loop(
+      cond=lambda stop, _: tf.reduce_any(~stop),
+      body=taylor_expansion_improvement,
+      loop_vars=(
+          ~tf.math.is_finite(initial_candidate),
+          initial_candidate),
+      maximum_iterations=max_iterations)
+
+  # Handle the case (p >= 0.5).
+  result = tf.math.sign(half - p) * result
+
+  # Determine if the inputs are out of range (should return NaN output).
+  result_is_nan = (p <= zero) | (p >= one) | (df <= zero)
+  result = tf.where(result_is_nan, numpy_dtype(np.nan), result)
+
+  return result
+
+
+def _stdtrit_partials(df, p, return_value=False):
+  """Returns the partial derivatives of `stdtrit(df, p)`."""
+  dtype = dtype_util.common_dtype([df, p], tf.float32)
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+
+  df, p = [tf.convert_to_tensor(param, dtype=dtype) for param in (df, p)]
+  broadcast_shape = functools.reduce(
+      ps.broadcast_shape, [ps.shape(df), ps.shape(p)])
+  df, p = [tf.broadcast_to(param, broadcast_shape) for param in (df, p)]
+
+  # We use the fact that stdtr and stdtrit are inverses of each other to
+  # compute the gradients.
+  t = _stdtrit_custom_gradient(df, p)
+  stdtr_partial_df, stdtr_partial_t = _stdtr_partials(df, t)
+
+  partial_df = -stdtr_partial_df / stdtr_partial_t
+  partial_p = tf.math.reciprocal(stdtr_partial_t)
+
+  if return_value:
+    results = [partial_df, partial_p, t]
+  else:
+    results = [partial_df, partial_p]
+
+  # Determine if the inputs are out of range (should return NaN output).
+  result_is_nan = (p <= 0.) | (p >= 1.) | (df <= 0.)
+  results = [
+      tf.where(result_is_nan, numpy_dtype(np.nan), result)
+      for result in results]
+
+  return results
+
+
+def _stdtrit_fwd(df, p):
+  """Computes output, aux (collaborates with _stdtrit_bwd)."""
+  output = _stdtrit_computation(df, p)
+  return output, (df, p)
+
+
+def _stdtrit_bwd(aux, g):
+  """Reverse mode impl for stdtrit."""
+  df, p = aux
+  partial_df, partial_p = _stdtrit_partials(df, p)
+  return generic.fix_gradient_for_broadcasting(
+      [df, p], [partial_df * g, partial_p * g])
+
+
+def _stdtrit_jvp(primals, tangents):
+  """Computes JVP for stdtrit (supports JAX custom derivative)."""
+  df, p = primals
+  ddf, dp = tangents
+
+  partial_df, partial_p, t = _stdtrit_partials(df, p, return_value=True)
+  return (t, partial_df * ddf + partial_p * dp)
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_stdtrit_fwd,
+    vjp_bwd=_stdtrit_bwd,
+    jvp_fn=_stdtrit_jvp)
+def _stdtrit_custom_gradient(df, p):
+  """Computes `stdtrit(df, p)` with correct custom gradient."""
+  return _stdtrit_computation(df, p)
+
+
+def stdtrit(df, p, name=None):
+  """Computes the inverse of `stdtr` with respect to `t`.
+
+  This function returns a value `t` such that `p = stdtr(df, t)`.
+
+  Args:
+    df: A `Tensor`. Must be one of the following types: `float32`, `float64`.
+    p: A `Tensor`. Must have the same type as `df`.
+    name: A name for the operation (optional).
+
+  Returns:
+    A `Tensor` with shape broadcast according to the arguments.
+
+  Raises:
+    TypeError: if `df` is not one of the following types: `float32`, `float64`.
+  """
+  with tf.name_scope(name or 'stdtrit'):
+    dtype = dtype_util.common_dtype([df, p], tf.float32)
+    df = tf.convert_to_tensor(df, dtype=dtype)
+    p = tf.convert_to_tensor(p, dtype=dtype)
+
+    if dtype_util.as_numpy_dtype(dtype) not in [np.float32, np.float64]:
+      raise TypeError(f'df.dtype={dtype} is not handled. '
+                      'See docstring for supported types.')
+
+    return _stdtrit_custom_gradient(df, p)
+
+
 def quantile(p, df, loc, scale):
   """Compute quantile function of Student T distribution.
 
@@ -498,11 +763,13 @@ def quantile(p, df, loc, scale):
   Returns:
     A `Tensor` with shape broadcast according to the arguments.
   """
-  df = tf.convert_to_tensor(df)
-  p_adjusted = tf.where(p < 0.5, p, 1. - p)
-  y = special.betaincinv(0.5 * df, 0.5, 2 * p_adjusted)
-  return loc + tf.math.abs(
-      scale) * tf.math.sign(p - 0.5) * tf.math.sqrt(df * (1 - y) / y)
+  dtype = dtype_util.common_dtype([p, df, loc, scale], tf.float32)
+
+  p, df, loc, scale = [
+      tf.convert_to_tensor(param, dtype=dtype)
+      for param in (p, df, loc, scale)]
+
+  return loc + tf.math.abs(scale) * stdtrit(df, p)
 
 
 class StudentT(distribution.AutoCompositeTensorDistribution):

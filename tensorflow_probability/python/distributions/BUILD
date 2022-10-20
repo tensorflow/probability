@@ -4419,6 +4419,7 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["student_t_test.py"],
     jax_size = "medium",
+    shard_count = 3,
     deps = [
         ":student_t",
         ":uniform",
