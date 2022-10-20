@@ -163,7 +163,7 @@ def entropy(df, scale, batch_shape, dtype):
 
 
 def _stdtr_asymptotic_expansion(df, t, numpy_dtype):
-  """Computes `stdtr(df, t)` using asymptotic expansion."""
+  """Compute `stdtr(df, t)` using asymptotic expansion."""
   # This function provides a fast approximation of stdtr(df, t) for large value
   # of df. It is based on an asymptotic normalizing expansion of Cornish-Fisher
   # type [1, 2].
@@ -227,14 +227,14 @@ def _stdtr_asymptotic_expansion(df, t, numpy_dtype):
 
     term_numerator = term_numerator * z
     series_sum = series_sum + term_sign * tf.math.exp(
-      tf.math.log(term_numerator) - log_term_denominator)
+        tf.math.log(term_numerator) - log_term_denominator)
     term_sign = -one * term_sign
 
   return special_math.ndtr(tf.math.sign(t) * series_sum)
 
 
 def _stdtr_computation(df, t):
-  """Computes Student's t-distribution cumulative distribution function."""
+  """Compute cumulative distribution function of Student T distribution."""
   dtype = dtype_util.common_dtype([df, t], tf.float32)
   numpy_dtype = dtype_util.as_numpy_dtype(dtype)
   half = numpy_dtype(0.5)
@@ -281,8 +281,9 @@ def _stdtr_computation(df, t):
   x = tf.where(use_symmetry_relation, one_minus_ratio, ratio)
 
   y = special.betainc(a, b, x)
-  neg_cdf = half * tf.where(use_symmetry_relation, one - y, y)
-  result_betainc = tf.where(t < 0., neg_cdf, one - neg_cdf)
+  result_betainc = half * tf.where(use_symmetry_relation, one - y, y)
+  # Handle the case (t >= 0).
+  result_betainc = tf.where(t >= 0., one - result_betainc, result_betainc)
 
   result = tf.where(use_asymptotic_expansion, result, result_betainc)
 
@@ -294,7 +295,7 @@ def _stdtr_computation(df, t):
 
 
 def _stdtr_partials(df, t):
-  """Returns the partial derivatives of `stdtr(df, t)`."""
+  """Return the partial derivatives of `stdtr(df, t)`."""
   dtype = dtype_util.common_dtype([df, t], tf.float32)
   numpy_dtype = dtype_util.as_numpy_dtype(dtype)
   tiny = np.finfo(numpy_dtype).tiny
@@ -358,10 +359,10 @@ def _stdtr_partials(df, t):
   #   betainc(a, b, x) = 1 - betainc(b, a, 1 - x) .
 
   min_abs_t_betainc = tf.math.sqrt(df * eps * tf.math.reciprocal(one - eps))
-  abs_t_is_too_small = (abs_t < min_abs_t_betainc)
-  # Mask out too small abs(t) so the gradient correctly propagates. When abs(t)
-  # is too small, ratio == 1 and one_minus_ratio < eps.
-  abs_t_betainc = tf.where(abs_t_is_too_small, min_abs_t_betainc, abs_t)
+  t_is_small = (abs_t < min_abs_t_betainc)
+  # Mask out small t so the gradient correctly propagates. When t is small,
+  # ratio == 1 and one_minus_ratio < eps.
+  abs_t_betainc = tf.where(t_is_small, min_abs_t_betainc, abs_t)
 
   raw_ratio = abs_t_betainc * tf.math.rsqrt(df)
   ratio = tf.math.exp(-log1psquare(raw_ratio))
@@ -393,7 +394,7 @@ def _stdtr_partials(df, t):
   # Handle the case (abs_t < min_abs_t_betainc): we use again a rough linear
   # approximation.
   stdtr_grad_df_betainc = tf.where(
-      abs_t_is_too_small, stdtr_grad_df_betainc * abs_t, stdtr_grad_df_betainc)
+      t_is_small, stdtr_grad_df_betainc * abs_t, stdtr_grad_df_betainc)
 
   stdtr_grad_df = tf.where(
       use_asymptotic_expansion, stdtr_grad_df, stdtr_grad_df_betainc)
@@ -408,13 +409,13 @@ def _stdtr_partials(df, t):
 
 
 def _stdtr_fwd(df, t):
-  """Computes output, aux (collaborates with _stdtr_bwd)."""
+  """Compute output, aux (it collaborates with _stdtr_bwd)."""
   output = _stdtr_computation(df, t)
   return output, (df, t)
 
 
 def _stdtr_bwd(aux, g):
-  """Reverse mode impl for stdtr."""
+  """Reverse mode implementation for stdtr."""
   df, t = aux
   partial_df, partial_t = _stdtr_partials(df, t)
   return generic.fix_gradient_for_broadcasting(
@@ -422,7 +423,7 @@ def _stdtr_bwd(aux, g):
 
 
 def _stdtr_jvp(primals, tangents):
-  """Computes JVP for stdtr (supports JAX custom derivative)."""
+  """Compute JVP for stdtr (it supports JAX custom derivative)."""
   df, t = primals
   ddf, dt = tangents
 
@@ -436,19 +437,21 @@ def _stdtr_jvp(primals, tangents):
     vjp_bwd=_stdtr_bwd,
     jvp_fn=_stdtr_jvp)
 def _stdtr_custom_gradient(df, t):
-  """Computes `stdtr(df, t)` with correct custom gradient."""
+  """Compute `stdtr(df, t)` with correct custom gradient."""
   return _stdtr_computation(df, t)
 
 
 def stdtr(df, t, name=None):
-  """Computes the cumulative distribution function of Student's t-distribution.
+  """Compute cumulative distribution function of Student T distribution.
 
-  Returns the area under the probability density function of this distribution
-  with `df > 0` degrees of freedom, integrated from minus infinity to `t`.
+  This function returns the integral from minus infinity to `t` of Student T
+  distribution with `df > 0` degrees of freedom.
 
   Args:
-    df: A `Tensor`. Must be one of the following types: `float32`, `float64`.
-    t: A `Tensor`. Must have the same type as `df`.
+    df: Floating-point `Tensor`. The degrees of freedom of the
+      distribution(s). `df` must contain only positive values.
+    t: Floating-point `Tensor`. Where to compute the cumulative
+      distribution function.
     name: A name for the operation (optional).
 
   Returns:
@@ -475,7 +478,8 @@ def cdf(x, df, loc, scale):
   Note that scale can be negative.
 
   Args:
-    x: Floating-point `Tensor`. Where to compute the log probabilities.
+    x: Floating-point `Tensor`. Where to compute the cumulative
+      distribution function.
     df: Floating-point `Tensor`. The degrees of freedom of the
       distribution(s). `df` must contain only positive values.
     loc: Floating-point `Tensor`; the location(s) of the distribution(s).
@@ -495,7 +499,7 @@ def cdf(x, df, loc, scale):
 
 
 def _stdtrit_betaincinv(df, p, numpy_dtype, use_betaincinv):
-  """Computes `stdtrit(df, p)` using special.betaincinv."""
+  """Compute `stdtrit(df, p)` using special.betaincinv."""
   # This function inverts the procedure that computes stdtr(df, t) using the
   # regularized incomplete beta function. For details on this procedure, see
   # the function _stdtr_computation.
@@ -527,7 +531,7 @@ def _stdtrit_betaincinv(df, p, numpy_dtype, use_betaincinv):
 
 
 def _stdtrit_series_expansion(df, p, numpy_dtype):
-  """Computes `stdtrit(df, p)` using series expansion."""
+  """Compute `stdtrit(df, p)` using series expansion."""
   # This function provides a fast approximation of stdtrit(df, p) for df >= 1.
   # It is based on an asymptotic inverse expansion of Cornish-Fisher type about
   # normal deviates. But for small p, where t**2 / df is large, a second series
@@ -583,7 +587,7 @@ def _stdtrit_series_expansion(df, p, numpy_dtype):
 
 
 def _stdtrit_computation(df, p):
-  """Returns the inverse of `stdtr(df, t)` with respect to `t`."""
+  """Return the inverse of `stdtr(df, t)` with respect to `t`."""
   # This function increases the accuracy of an initial estimate for t by using
   # Taylor series expansion iterations as proposed in [5].
   dtype = dtype_util.common_dtype([df, p], tf.float32)
@@ -657,7 +661,7 @@ def _stdtrit_computation(df, p):
 
 
 def _stdtrit_partials(df, p, return_value=False):
-  """Returns the partial derivatives of `stdtrit(df, p)`."""
+  """Return the partial derivatives of `stdtrit(df, p)`."""
   dtype = dtype_util.common_dtype([df, p], tf.float32)
   numpy_dtype = dtype_util.as_numpy_dtype(dtype)
 
@@ -689,13 +693,13 @@ def _stdtrit_partials(df, p, return_value=False):
 
 
 def _stdtrit_fwd(df, p):
-  """Computes output, aux (collaborates with _stdtrit_bwd)."""
+  """Compute output, aux (it collaborates with _stdtrit_bwd)."""
   output = _stdtrit_computation(df, p)
   return output, (df, p)
 
 
 def _stdtrit_bwd(aux, g):
-  """Reverse mode impl for stdtrit."""
+  """Reverse mode implementation for stdtrit."""
   df, p = aux
   partial_df, partial_p = _stdtrit_partials(df, p)
   return generic.fix_gradient_for_broadcasting(
@@ -703,7 +707,7 @@ def _stdtrit_bwd(aux, g):
 
 
 def _stdtrit_jvp(primals, tangents):
-  """Computes JVP for stdtrit (supports JAX custom derivative)."""
+  """Compute JVP for stdtrit (it supports JAX custom derivative)."""
   df, p = primals
   ddf, dp = tangents
 
@@ -716,18 +720,19 @@ def _stdtrit_jvp(primals, tangents):
     vjp_bwd=_stdtrit_bwd,
     jvp_fn=_stdtrit_jvp)
 def _stdtrit_custom_gradient(df, p):
-  """Computes `stdtrit(df, p)` with correct custom gradient."""
+  """Compute `stdtrit(df, p)` with correct custom gradient."""
   return _stdtrit_computation(df, p)
 
 
 def stdtrit(df, p, name=None):
-  """Computes the inverse of `stdtr` with respect to `t`.
+  """Compute the inverse of `stdtr` with respect to `t`.
 
   This function returns a value `t` such that `p = stdtr(df, t)`.
 
   Args:
-    df: A `Tensor`. Must be one of the following types: `float32`, `float64`.
-    p: A `Tensor`. Must have the same type as `df`.
+    df: Floating-point `Tensor`. The degrees of freedom of the
+      distribution(s). `df` must contain only positive values.
+    p: Floating-point `Tensor`. Probabilities from 0 to 1.
     name: A name for the operation (optional).
 
   Returns:
