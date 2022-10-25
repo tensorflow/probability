@@ -86,10 +86,31 @@ py_binary(
 )
 
 # pytype_strict
+py_binary(
+    name = "trial_runner",
+    srcs = ["trial_runner.py"],
+    deps = [
+        ":adaptive_malt",
+        ":utils",
+        # JAX gpu dep,
+        # absl:app dep,
+        # absl/flags dep,
+        # etils/epath dep,
+        # gin dep,
+    ],
+)
+
+# pytype_strict
 py_library(
     name = "grid_search_runner_experiments",
     srcs = ["grid_search_runner_experiments.py"],
     deps = [
         # numpy dep,
     ],
+)
+
+# pytype_strict
+py_library(
+    name = "trial_runner_experiments",
+    srcs = ["trial_runner_experiments.py"],
 )

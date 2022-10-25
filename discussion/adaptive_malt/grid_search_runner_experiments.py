@@ -31,6 +31,102 @@ def get_experiment(
   if False:  # pylint: disable=using-constant-test
     # Just to make the syntax more uniform below...
     pass
+  elif name == 'grid_search.1.8_meads_rescaled_damping':
+    # MEADS.
+
+    def args_to_hparams(target, damping_vals,
+                        grid_index):
+      return {
+          'experiment.output_dir': os.path.join(output_dir, target),
+          'experiment.grid_index': grid_index,
+          'experiment.damping_vals': damping_vals,
+          'run_grid_element.mean_trajectory_length': 1.,
+          'run_grid_element.target_name': target,
+          'run_grid_element.num_replicas': 10,
+          'run_grid_element.method': 'meads',
+          'run_grid_element.inits_dir': inits_dir,
+          'run_grid_element.num_chains': 128,
+      }
+
+    for target, damping_vals in [
+        (
+            'test_gaussian_2',
+            np.linspace(0., 0.16, 25),
+        ),
+        (
+            'test_gaussian_1',
+            np.linspace(0., 0.06, 25),
+        ),
+        (
+            'radon_indiana',
+            np.linspace(0., 0.032, 25),
+        ),
+        (
+            'german_credit_numeric_sparse_logistic_regression',
+            np.linspace(0., 0.06, 25),
+        ),
+        (
+            'item_response_theory',
+            np.linspace(0., 0.04, 25),
+        ),
+        (
+            'german_credit_numeric_logistic_regression',
+            np.linspace(0., 0.32, 25),
+        ),
+    ]:
+      all_job_args.append({
+          'target': target,
+          'grid_index': 0,
+          'damping_vals': list(damping_vals),
+      })
+  elif name == 'grid_search.1.7_meads':
+    # MEADS.
+
+    def args_to_hparams(target, damping_vals,
+                        grid_index):
+      return {
+          'experiment.output_dir': os.path.join(output_dir, target),
+          'experiment.grid_index': grid_index,
+          'experiment.damping_vals': damping_vals,
+          'run_grid_element.mean_trajectory_length': 1.,
+          'run_grid_element.target_name': target,
+          'run_grid_element.num_replicas': 10,
+          'run_grid_element.method': 'meads',
+          'run_grid_element.inits_dir': inits_dir,
+          'run_grid_element.num_chains': 128,
+      }
+
+    for target, damping_vals in [
+        (
+            'test_gaussian_2',
+            np.linspace(0., 1., 25),
+        ),
+        (
+            'test_gaussian_1',
+            np.linspace(0., 1., 25),
+        ),
+        (
+            'radon_indiana',
+            np.linspace(0., 1., 25),
+        ),
+        (
+            'german_credit_numeric_sparse_logistic_regression',
+            np.linspace(0., 1., 25),
+        ),
+        (
+            'item_response_theory',
+            np.linspace(0., 1., 25),
+        ),
+        (
+            'german_credit_numeric_logistic_regression',
+            np.linspace(0., 1., 25),
+        ),
+    ]:
+      all_job_args.append({
+          'target': target,
+          'grid_index': 0,
+          'damping_vals': list(damping_vals),
+      })
   elif name == 'grid_search.1.6.malt.lower_accept':
     # Like 1.5, but even lower target accept for MALT.
 

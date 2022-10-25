@@ -29,7 +29,7 @@ import yaml
 
 
 def save_h5py(path: str, value: Any):
-  """Saves a nested value to h5py using a lossy encoding."""
+  """Saves a nested value to h5 using a lossy encoding."""
   # Need to go via a buffer for some filesystems...
   buf = io.BytesIO()
   h5 = h5py.File(buf, 'w')
@@ -40,6 +40,33 @@ def save_h5py(path: str, value: Any):
 
   with epath.Path(path).open('wb') as f:
     f.write(buf.getvalue())
+
+
+def load_h5py(path: str):
+  """Loads an h5."""
+  return h5py.File(epath.Path(path).open('rb'))
+
+
+def h5_to_dict(h5: h5py.Group) -> Dict[str, Any]:
+  """Converts an h5 group to a nested dict."""
+  out_dict = {}
+
+  def visitor(path, obj):
+    if not isinstance(obj, h5py.Dataset):
+      return
+    elems = path.split('/')
+    cur_dict = out_dict
+    for e in elems[:-1]:
+      new_dict = cur_dict.get(e)
+      if new_dict is None:
+        new_dict = {}
+        cur_dict[e] = new_dict
+      cur_dict = new_dict
+
+    cur_dict[elems[-1]] = np.array(obj)
+  h5.visititems(visitor)
+
+  return out_dict
 
 
 class YAMLDictParser(flags.ArgumentParser):
