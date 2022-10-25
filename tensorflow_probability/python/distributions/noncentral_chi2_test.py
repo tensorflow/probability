@@ -24,6 +24,8 @@ from tensorflow_probability.python.distributions import noncentral_chi2
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import test_util
 
+JAX_MODE = False
+
 
 @test_util.test_all_tf_execution_regimes
 class NoncentralChi2Test(test_util.TestCase):
@@ -233,6 +235,43 @@ class NoncentralChi2Test(test_util.TestCase):
           df=df, noncentrality=noncentrality, validate_args=True)
       self.evaluate([v.initializer for v in d.variables])
       self.evaluate(d.sample(seed=test_util.test_seed()))
+
+  def test_approx_quantile(self):
+    batch_size = 6
+    df = np.linspace(1., 20., batch_size).astype(np.float64)[..., np.newaxis]
+    nc = np.linspace(0., 20., batch_size).astype(np.float64)[..., np.newaxis]
+    x = np.linspace(0., 1., 13).astype(np.float64)
+    dist = noncentral_chi2.NoncentralChi2(
+        df=df, noncentrality=nc, validate_args=True)
+
+    expected_quantile = stats.ncx2.ppf(x, df, nc)
+
+    quantile = dist.quantile_approx(x)
+    self.assertEqual(quantile.shape, (batch_size, 13))
+    self.assertAllClose(self.evaluate(quantile), expected_quantile)
+
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(
+      # Gradients are on the order of 1e2 to 1e3, so this corresponds to less
+      # than 1% relative error.
+      ('float32', np.float32, 5e-1),
+      ('float64', np.float64, 2e-2))
+  def test_approx_quantile_gradient(self, dtype, max_err):
+    if tf.executing_eagerly() and not JAX_MODE:
+      self.skipTest('Eager test is too slow.')
+
+    df = tf.constant([2., np.e, 0.01, 0.5, 1., 1.5, 3.1, 4., 10., 20., 100.3],
+                     dtype=dtype)[..., tf.newaxis]
+    nc = tf.constant([0., 0.01, 0.1, 0.5, 1., 1.5, 3.1, 4., 10., 20., 100.2],
+                     dtype=dtype)[..., tf.newaxis]
+
+    ps = tf.constant([0.1, 0.3, 0.5, 0.7, 0.9], dtype=dtype)
+
+    quantile_fn = tf.function(
+        noncentral_chi2.NoncentralChi2(df, nc).quantile_approx, autograph=False)
+
+    err = self.compute_max_gradient_error(quantile_fn, [ps])
+    self.assertLess(err, max_err)
 
 
 @test_util.test_graph_and_eager_modes

@@ -1680,6 +1680,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/math:bessel",
         "//tensorflow_probability/python/math:generic",
+        "//tensorflow_probability/python/math:root_search",
         "//tensorflow_probability/python/random",
     ],
 )

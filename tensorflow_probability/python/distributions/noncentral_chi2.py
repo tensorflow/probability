@@ -34,6 +34,7 @@ from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math import bessel
 from tensorflow_probability.python.math import generic
+from tensorflow_probability.python.math import root_search
 import tensorflow_probability.python.random as tfp_random
 
 
@@ -102,6 +103,7 @@ def _nc2_cdf_abramowitz_and_stegun(x, df, noncentrality):
   # This can be set to something a bit larger (e.g. twice the type's machine
   # epsilon) if we want to speed up the calculation in the tails,
   # at the cost of potentially quite wrong answers in the far tails.
+  # SciPy uses log(1e-300) = -690 on 64 bit precision.
   log_eps_s = -80.
 
   below_precision_mask = log_eps_abs > _log_cdf_chernoff_bound(
@@ -325,6 +327,90 @@ def _nc2_cdf_naive(x, df, noncentrality):
   return _nc2_cdf_abramowitz_and_stegun(x, df, noncentrality)
 
 
+def _nc2_quantile_numeric(p, df, noncentrality, tol):
+  """Numerically inverts the CDF of the NC2 distribution.
+
+  Uses the noncentral Wilson-Hilferty approximation from [1] (in the paper
+  referred to as 'first approx') to guess the initial location for the
+  root search.
+
+  References
+  [1] Abdel-Aty, S. H. (1954). Approximate formulae for the percentage points
+      and the probability integral of the non-central χ2 distribution.
+      Biometrika, 41(3/4), 538-540.
+
+  Args:
+    p: `tf.Tensor` of locations at which to invert the CDF.
+    df: `tf.Tensor` of the degrees of freedom of the NC2 variate.
+    noncentrality: `tf.Tensor` of the noncentrality of the NC2 variate.
+    tol: `float` tolerance for the root search algorithm
+
+  Returns:
+  `tf.Tensor` of quantiles corresponding to the CDF locations.
+  """
+  # Ensure that pathological values don't affect the numerical root search
+  p_zero_mask = tf.math.equal(p, 0.)
+  p_one_mask = tf.math.equal(p, 1.)
+
+  safe_p = tf.where(p_zero_mask | p_one_mask, 0.5 * tf.ones_like(p), p)
+
+  df_plus_nc = df + noncentrality
+  wilson_hilferty_coef = 2. / 9. * (df_plus_nc + noncentrality)
+  wilson_hilferty_coef = wilson_hilferty_coef / tf.math.square(df_plus_nc)
+
+  quant_approx = tf.math.ndtri(safe_p) * tf.math.sqrt(wilson_hilferty_coef)
+  quant_approx = quant_approx + (1. - wilson_hilferty_coef)
+  quant_approx = df_plus_nc * quant_approx**3.
+  quant_approx = tf.nn.relu(quant_approx)  # Ensure the approx is nonnegative
+
+  numeric_root_search_results = root_search.find_root_secant(
+      objective_fn=lambda x: _nc2_cdf_naive(x, df, noncentrality) - safe_p,
+      initial_position=quant_approx,
+      position_tolerance=tol,
+      value_tolerance=tol)
+
+  numeric_root = numeric_root_search_results.estimated_root
+  numeric_root = tf.where(p_zero_mask, tf.zeros_like(numeric_root),
+                          numeric_root)
+  numeric_root = tf.where(p_one_mask, np.inf * tf.ones_like(numeric_root),
+                          numeric_root)
+
+  return numeric_root
+
+
+def _nc2_quantile_fwd(p, df, noncentrality, tol):
+  output = _nc2_quantile_numeric(p, df, noncentrality, tol)
+  return output, (output, p, df, noncentrality)
+
+
+def _nc2_quantile_bwd(aux, g):
+  output, p, df, noncentrality = aux
+
+  # Compute the gradient for `p`
+  grad_p = tf.math.exp(-_nc2_log_prob(output, df, noncentrality)) * g
+  grad_p = generic.fix_gradient_for_broadcasting([p], [grad_p])
+
+  return grad_p, None, None, None
+
+
+def _nc2_quantile_jvp(primals, tangents):
+  p, df, noncentrality, tol = primals
+  d_p, _, _, _ = tangents
+
+  output = _nc2_quantile_naive(p, df, noncentrality, tol)
+  d_p = tf.math.exp(-_nc2_log_prob(output, df, noncentrality)) * d_p
+
+  return output, d_p
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_nc2_quantile_fwd,
+    vjp_bwd=_nc2_quantile_bwd,
+    jvp_fn=_nc2_quantile_jvp)
+def _nc2_quantile_naive(p, df, noncentrality, tol):
+  return _nc2_quantile_numeric(p, df, noncentrality, tol)
+
+
 class NoncentralChi2(distribution.AutoCompositeTensorDistribution):
   """Noncentral Chi2 distribution.
 
@@ -499,6 +585,40 @@ class NoncentralChi2(distribution.AutoCompositeTensorDistribution):
 
   def _default_event_space_bijector(self):
     return softplus_bijector.Softplus(validate_args=self.validate_args)
+
+  def quantile_approx(self, value, tol=None):
+    """Approximates the quantile function of a noncentral X2 random variable by numerically inverting its CDF.
+
+    Args:
+      value: `tf.Tensor` of locations at which to invert the CDF.
+      tol: Optional `tf.Tensor` that specifies the error tolerance of the root
+      finding algorithm. Note, that the shape of `tol` must broadcast with
+      `value`. If `None` is given, then the tolerance is set to the machine
+      epsilon of the distribution's dtype. Defaults to `None`.
+
+    Returns:
+      `tf.Tensor` of approximate quantile values.
+    """
+    df = tf.convert_to_tensor(self.df, dtype=self.dtype)
+    noncentrality = tf.convert_to_tensor(self.noncentrality, dtype=self.dtype)
+
+    shape = ps.broadcast_shape(
+        ps.shape(value),
+        ps.broadcast_shape(ps.shape(df), ps.shape(noncentrality)))
+
+    value = tf.broadcast_to(value, shape)
+    df = tf.broadcast_to(df, shape)
+    noncentrality = tf.broadcast_to(noncentrality, shape)
+
+    numpy_dtype = dtype_util.as_numpy_dtype(self.dtype)
+
+    if tol is None:
+      tol = numpy_dtype(np.finfo(numpy_dtype).eps)
+    else:
+      tol = numpy_dtype(tol)
+      tol = tf.broadcast_to(tol, shape)
+
+    return _nc2_quantile_naive(value, df, noncentrality, tol)
 
   def _sample_control_dependencies(self, x):
     assertions = []
