@@ -247,6 +247,7 @@ py_library(
         "util.py",
     ],
     deps = [
+        # keras dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:deterministic",
