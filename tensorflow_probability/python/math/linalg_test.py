@@ -14,6 +14,8 @@
 # ============================================================================
 """Tests for linear algebra."""
 
+import functools
+
 # Dependency imports
 from absl.testing import parameterized
 import hypothesis as hp
@@ -35,6 +37,8 @@ from tensorflow_probability.python.math import linalg
 from tensorflow_probability.python.math.psd_kernels import matern
 
 JAX_MODE = False
+NUMPY_MODE = False
+TF_MODE = not (JAX_MODE or NUMPY_MODE)
 
 
 class _CholeskyExtend(test_util.TestCase):
@@ -296,6 +300,7 @@ class _PivotedCholesky(test_util.TestCase):
                               np.finfo(self.dtype).resolution)
       diag_diff_prev, diff_norm_prev = diag_diff, diff_norm
 
+  @test_util.numpy_disable_gradient_test
   def testGradient(self):
     dim = 11
     matrix = self._random_batch_psd(dim)
@@ -370,6 +375,9 @@ class _PivotedCholesky(test_util.TestCase):
           linalg.pivoted_cholesky(mat, max_rank=rank, diag_rtol=-1),
           atol=1e-4)
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True,
+      reason='LinearOperatorPSDKernel not available in numpy backend.')
   def testLinopKernel(self):
     x = tf.random.uniform([10, 2], dtype=self.dtype, seed=test_util.test_seed())
     masked_shape = x.shape if self.use_static_shape else [None] * len(x.shape)
@@ -665,7 +673,7 @@ class _SparseOrDenseMatmul(test_util.TestCase):
 
     self.verify_sparse_dense_matvecmul(x_, y_)
 
-if not JAX_MODE:
+if TF_MODE:
   # TODO(b/147683793): Enable tests when JAX backend supports SparseTensor.
 
   @test_util.test_all_tf_execution_regimes
@@ -741,54 +749,66 @@ class FillTriangularTest(test_util.TestCase):
     self.assertAllClose(expected, actual_, rtol=1e-8, atol=1e-9)
     self.assertAllClose(x_, grad_actual_, rtol=1e-8, atol=1e-9)
 
+  @test_util.numpy_disable_gradient_test
   def testCorrectlyMakes1x1TriLower(self):
     rng = test_util.test_np_rng()
     self._run_test(rng.randn(3, int(1*2/2)))
 
+  @test_util.numpy_disable_gradient_test
   def testCorrectlyMakesNoBatchTriLower(self):
     rng = test_util.test_np_rng()
     self._run_test(rng.randn(int(4*5/2)))
 
+  @test_util.numpy_disable_gradient_test
   def testCorrectlyMakesBatchTriLower(self):
     rng = test_util.test_np_rng()
     self._run_test(rng.randn(2, 3, int(3*4/2)))
 
+  @test_util.numpy_disable_gradient_test
   def testCorrectlyMakesBatchTriLowerUnknownShape(self):
     rng = test_util.test_np_rng()
     self._run_test(rng.randn(2, 3, int(3*4/2)), use_deferred_shape=True)
 
+  @test_util.numpy_disable_gradient_test
   def testCorrectlyMakesBatch7x7TriLowerUnknownShape(self):
     rng = test_util.test_np_rng()
     self._run_test(rng.randn(2, 3, int(7*8/2)), use_deferred_shape=True)
 
+  @test_util.numpy_disable_gradient_test
   def testCorrectlyMakesBatch7x7TriLower(self):
     rng = test_util.test_np_rng()
     self._run_test(rng.randn(2, 3, int(7*8/2)))
 
+  @test_util.numpy_disable_gradient_test
   def testCorrectlyMakes1x1TriUpper(self):
     rng = test_util.test_np_rng()
     self._run_test(rng.randn(3, int(1*2/2)), upper=True)
 
+  @test_util.numpy_disable_gradient_test
   def testCorrectlyMakesNoBatchTriUpper(self):
     rng = test_util.test_np_rng()
     self._run_test(rng.randn(int(4*5/2)), upper=True)
 
+  @test_util.numpy_disable_gradient_test
   def testCorrectlyMakesBatchTriUpper(self):
     rng = test_util.test_np_rng()
     self._run_test(rng.randn(2, 2, int(3*4/2)), upper=True)
 
+  @test_util.numpy_disable_gradient_test
   def testCorrectlyMakesBatchTriUpperUnknownShape(self):
     rng = test_util.test_np_rng()
     self._run_test(rng.randn(2, 2, int(3*4/2)),
                    use_deferred_shape=True,
                    upper=True)
 
+  @test_util.numpy_disable_gradient_test
   def testCorrectlyMakesBatch7x7TriUpperUnknownShape(self):
     rng = test_util.test_np_rng()
     self._run_test(rng.randn(2, 3, int(7*8/2)),
                    use_deferred_shape=True,
                    upper=True)
 
+  @test_util.numpy_disable_gradient_test
   def testCorrectlyMakesBatch7x7TriUpper(self):
     rng = test_util.test_np_rng()
     self._run_test(rng.randn(2, 3, int(7*8/2)), upper=True)
@@ -826,6 +846,197 @@ class FillTriangularInverseTest(FillTriangularTest):
     else:
       self.assertAllEqual(x_.shape, inverse_actual.shape)
     self.assertAllEqual(x_, inverse_actual_)
+
+
+class _HPSDLogDetTest(test_util.TestCase):
+
+  def testEqualsHPSDLogDet(self):
+    rng = test_util.test_np_rng()
+    xs = rng.random_sample(7).astype(self.dtype)[:, tf.newaxis]
+    k = matern.MaternOneHalf()
+    mat = k.matrix(xs, xs)
+    self.assertAllClose(
+        self.evaluate(linalg.hpsd_logdet(mat)),
+        self.evaluate(tf.linalg.logdet(mat)),
+        rtol=3e-6)
+
+  def testUsesOverridenCholeskyFactor(self):
+    rng = test_util.test_np_rng()
+    xs = rng.random_sample(7).astype(self.dtype)[:, tf.newaxis]
+    k = matern.MaternOneHalf()
+    mat = k.matrix(xs, xs)
+    my_cholesky = tf.linalg.eye(num_rows=7, dtype=mat.dtype)
+    # Log Det should be zero.
+    logdet_ = self.evaluate(
+        linalg.hpsd_logdet(mat, cholesky_matrix=my_cholesky))
+    self.assertAllClose(logdet_, np.zeros_like(logdet_))
+
+  @test_util.numpy_disable_gradient_test
+  def testHPSDLogDetGradient(self):
+    rng = test_util.test_np_rng()
+    # Test that this respects batch shapes.
+    xs = rng.random_sample((6, 10)).astype(self.dtype)[..., tf.newaxis]
+    k = matern.MaternThreeHalves()
+    mat = k.matrix(xs, xs)
+    # Ensure that the matrix is more well conditioned.
+    mat = tf.linalg.set_diag(mat, tf.linalg.diag_part(mat) + 1e-1)
+
+    # Use the square of logdet to test that the upstream gradients are properly
+    # incorporated.
+    _, naive_gradient = gradient.value_and_gradient(
+        lambda x: tf.linalg.logdet(x)**2, mat)
+    _, custom_gradient = gradient.value_and_gradient(
+        lambda x: linalg.hpsd_logdet(x)**2, mat)
+    naive_gradient, custom_gradient = self.evaluate(
+        [naive_gradient, custom_gradient])
+    if self.dtype == np.float32:
+      rtol = 9e-3
+    else:
+      rtol = 5e-5
+    self.assertAllClose(naive_gradient, custom_gradient, rtol=rtol)
+
+  @test_util.numpy_disable_gradient_test
+  def testHPSDLogDetGradientWithCholesky(self):
+    rng = test_util.test_np_rng()
+    # Test that this respects batch shapes.
+    xs = rng.random_sample((6, 10)).astype(self.dtype)[..., tf.newaxis]
+    k = matern.MaternThreeHalves()
+    mat = k.matrix(xs, xs)
+
+    # Check that `logdet` gradient uses the cholesky factor.
+    identity = self.evaluate(
+        tf.eye(num_rows=10, batch_shape=[6], dtype=self.dtype))
+    cholesky_factor = 3. * identity
+
+    _, cholesky_gradient = gradient.value_and_gradient(
+        lambda x: linalg.hpsd_logdet(x, cholesky_matrix=cholesky_factor)**2,
+        mat)
+    cholesky_gradient = self.evaluate(cholesky_gradient)
+    # Since the cholesky factors are rescaled identity matrices c * I,
+    # using the chain rule we have
+    # grad logdet(A)**2 -> 2 * logdet(A) * grad logdet(A), so
+    # this should be 4 * n * log(c) * (1 / c**2) I
+    # where `n` is dimension of I.
+    self.assertAllClose(
+        cholesky_gradient, 4. * 10 * np.log(3.) / 9. * identity)
+
+
+@test_util.test_all_tf_execution_regimes
+class HPSDLogDet32Test(_HPSDLogDetTest):
+  dtype = np.float32
+
+
+@test_util.test_all_tf_execution_regimes
+class HPSDLogDet64Test(_HPSDLogDetTest):
+  dtype = np.float64
+
+
+del _HPSDLogDetTest
+
+
+class _QuadraticFormSolveTest(test_util.TestCase):
+
+  def testEqualsQuadraticFormSolve(self):
+    rng = test_util.test_np_rng()
+    xs = rng.random_sample(7).astype(self.dtype)[:, tf.newaxis]
+    k = matern.MaternOneHalf()
+    mat = k.matrix(xs, xs)
+    y = rng.random_sample(7).astype(self.dtype)
+    self.assertAllClose(
+        self.evaluate(linalg.hpsd_quadratic_form_solvevec(mat, y)),
+        tf.reduce_sum(y.T  * tf.squeeze(
+            tf.linalg.solve(mat, y[..., tf.newaxis]), axis=-1), axis=-1),
+        rtol=5e-5)
+
+  def testUsesOverridenCholeskyFactor(self):
+    rng = test_util.test_np_rng()
+    xs = rng.random_sample(7).astype(self.dtype)[:, tf.newaxis]
+    k = matern.MaternOneHalf()
+    mat = k.matrix(xs, xs)
+    y = rng.random_sample(7).astype(self.dtype)
+    my_cholesky = tf.linalg.eye(num_rows=7, dtype=mat.dtype)
+    # Symmetric Solve should be just the norm squared.
+    symsolve_ = self.evaluate(
+        linalg.hpsd_quadratic_form_solvevec(
+            mat, y, cholesky_matrix=my_cholesky))
+    self.assertAllClose(symsolve_, np.linalg.norm(y)**2)
+
+  @test_util.numpy_disable_gradient_test
+  def testQuadraticFormSolveGradient(self):
+    rng = test_util.test_np_rng()
+    # Test that this respects batch shapes.
+    xs = rng.random_sample((6, 10)).astype(self.dtype)[..., tf.newaxis]
+    k = matern.MaternThreeHalves()
+    mat = k.matrix(xs, xs)
+    # Ensure that the matrix is more well conditioned.
+    mat = tf.linalg.set_diag(mat, tf.linalg.diag_part(mat) + 1e-1)
+    rhs = tf.convert_to_tensor(rng.random_sample((3, 1, 10)).astype(self.dtype))
+
+    def naive_hpsd_quadratic_form_solvevec(matrix, rhs):
+      cholesky_matrix = tf.linalg.cholesky(matrix)
+      chol_linop = tf.linalg.LinearOperatorLowerTriangular(cholesky_matrix)
+      return tf.reduce_sum(
+          tf.math.square(chol_linop.solvevec(rhs)), axis=-1)
+
+    # Use the square of hpsd_quadratic_form_solvevec to test that the upstream
+    # gradients are properly incorporated.
+    _, naive_gradient = gradient.value_and_gradient(
+        lambda x: naive_hpsd_quadratic_form_solvevec(x, rhs)**2, mat)
+    _, custom_gradient = gradient.value_and_gradient(
+        lambda x: linalg.hpsd_quadratic_form_solvevec(x, rhs)**2, mat)
+    naive_gradient, custom_gradient = self.evaluate(
+        [naive_gradient, custom_gradient])
+    self.assertAllClose(naive_gradient, custom_gradient, rtol=2e-4)
+
+    _, naive_gradient = gradient.value_and_gradient(
+        lambda x: naive_hpsd_quadratic_form_solvevec(mat, x)**2, rhs)
+    _, custom_gradient = gradient.value_and_gradient(
+        lambda x: linalg.hpsd_quadratic_form_solvevec(mat, x)**2, rhs)
+    naive_gradient, custom_gradient = self.evaluate(
+        [naive_gradient, custom_gradient])
+    self.assertAllClose(naive_gradient, custom_gradient, rtol=3e-6)
+
+  @test_util.numpy_disable_gradient_test
+  def testQuadraticFormSolveGradientWithCholesky(self):
+    rng = test_util.test_np_rng()
+    # Test that this respects batch shapes.
+    xs = rng.random_sample((6, 10)).astype(self.dtype)[..., tf.newaxis]
+    k = matern.MaternThreeHalves()
+    mat = k.matrix(xs, xs)
+    rhs = tf.convert_to_tensor(rng.random_sample((3, 1, 10)).astype(self.dtype))
+
+    identity = self.evaluate(
+        tf.eye(num_rows=10, batch_shape=[6], dtype=self.dtype))
+    cholesky_factor = (3. * identity).astype(self.dtype)
+    mat_for_factor = tf.convert_to_tensor((9. * identity).astype(self.dtype))
+
+    hpsd_quadratic_form_solvevec = functools.partial(
+        linalg.hpsd_quadratic_form_solvevec, cholesky_matrix=cholesky_factor)
+
+    _, [actual_mat_gradient, actual_rhs_gradient] = self.evaluate((
+        gradient.value_and_gradient(
+            lambda x, y: hpsd_quadratic_form_solvevec(x, y)**2, mat, rhs)))
+
+    _, [expected_mat_gradient, expected_rhs_gradient] = self.evaluate((
+        gradient.value_and_gradient(
+            lambda x, y: linalg.hpsd_quadratic_form_solvevec(x, y)**2,
+            mat_for_factor, rhs)))
+
+    self.assertAllClose(actual_mat_gradient, expected_mat_gradient)
+    self.assertAllClose(actual_rhs_gradient, expected_rhs_gradient)
+
+
+@test_util.test_all_tf_execution_regimes
+class QuadraticFormSolve32Test(_QuadraticFormSolveTest):
+  dtype = np.float32
+
+
+@test_util.test_all_tf_execution_regimes
+class QuadraticFormSolve64Test(_QuadraticFormSolveTest):
+  dtype = np.float64
+
+
+del _QuadraticFormSolveTest
 
 
 if __name__ == '__main__':

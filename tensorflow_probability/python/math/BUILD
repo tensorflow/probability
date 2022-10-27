@@ -286,6 +286,7 @@ multi_substrate_py_library(
         "linalg.py",
     ],
     deps = [
+        ":generic",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
