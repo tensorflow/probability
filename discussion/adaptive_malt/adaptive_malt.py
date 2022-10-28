@@ -82,7 +82,7 @@ class TestGaussian(gym.targets.Model):
     return self._gaussian.sample(sample_shape, seed=seed, name=name)
 
 
-@functools.cache
+@functools.lru_cache(maxsize=None)
 def get_target(name: str) -> gym.targets.Model:
   """Return the target name."""
   if name == 'german_credit_numeric_logistic_regression':
