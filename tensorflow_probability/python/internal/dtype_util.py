@@ -19,6 +19,8 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
+
 
 __all__ = [
     'as_numpy_dtype',
@@ -86,12 +88,14 @@ _NOT_YET_SEEN = _NotYetSeen()
 def common_dtype(args, dtype_hint=None):
   """Returns (nested) explict dtype from `args` if there is one.
 
-  Dtypes of all args, and `dtype_hint`, must have the same nested structure if
-  they are not `None`. `args` itself may be any nested structure; its
-  structure is flattened and ignored.
-
   Args:
-    args: A nested structure of objects that may have `dtype`.
+    args: A nested structure of objects that may have `dtype`. If `dtype_hint`
+      is not nested, then the structure of `args` is flattened and ignored. If
+      `dtype_hint` is nested, then `args` is interpreted as a depth-1
+      iterable or mapping, each element of which is an object with dtype of
+      this structure (or dtype `None`), a nested structure with this shallow
+      structure, or `None`. This enables unification of dtypes between
+      objects of nested dtype and nested structures of arrays.
     dtype_hint: Optional (nested) dtype containing defaults to use in place of
       `None`. If `dtype_hint` is not nested and the common dtype of `args` is
       nested, `dtype_hint` serves as the default for each element of the common
@@ -138,27 +142,65 @@ def common_dtype(args, dtype_hint=None):
   args0 = [x, y]
   common_dtype(args0)  # ==> {'a': tf.float64, 'b': [tf.float32, tf.int32]}
 
-  # The nested structure of the argument to `common_dtype` is flattened and
-  # ignored; only the nested structures of the dtypes are relevant.
+  # If `dtype_hint` is not structured, the nested structure of the argument
+  # to `common_dtype` is flattened and ignored, and only the nested structures
+  # of the dtypes are relevant.
   args1 = {'x': x, 'yz': {'y': y, 'z': None}}
   common_dtype(args1)  # ==> {'a': tf.float64, 'b': [tf.float32, tf.int32]}
+
+  # Use structured `dtype_hint` to indicate the structure of the expected dtype.
+  # In this example, `x` is an object with structured dtype, and `t` is a
+  # a structure of objects whose dtypes are compatible with the corresponding
+  # components of `x.dtype`. Without structured `dtype_hint`, this example
+  # would fail, since the args `[x, t]` would be flattened entirely, and the
+  # structured `x.dtype` is incompatible with the non-structured `float32`
+  # contained in `t`.
+  t = {'a': [1., 2., 3.], 'b': [np.float32(1.), [[4, 5]]]}
+  common_dtype([x, t], dtype_hint={'a': None, 'b': [None, None]})
+  #   ==> {'a': tf.float64, 'b': [tf.float32, tf.int32]}
   ```
   """
 
   def _unify_dtype(current, new):
     if current is not None and new is not None and current != new:
       if SKIP_DTYPE_CHECKS:
-        return (np.ones([2], dtype) + np.ones([2], dt)).dtype
+        return (np.ones([2], current) + np.ones([2], new)).dtype
       raise TypeError
     return new if current is None else current
 
   dtype = None
-  flattened_args = tf.nest.flatten(args)
+  shallow_structure = args
+  if tf.nest.is_nested(dtype_hint):
+    # Flatten only the top layer of the `args` structure.
+    shallow_structure = nest.get_traverse_shallow_structure(
+        lambda x: x is args, args)
+  flattened_args = nest.flatten_up_to(shallow_structure, args)
+
   seen = [_NOT_YET_SEEN] * len(flattened_args)
   for i, a in enumerate(flattened_args):
     if hasattr(a, 'dtype') and a.dtype:
       dt = tf.nest.map_structure(
           lambda d: d if d is None else as_numpy_dtype(d), a.dtype)
+      seen[i] = dt
+    elif nest.is_nested(a):
+      # `a` should have a shallow structure that matches `dtype_hint`, and each
+      # element of `a`'s shallow structure should have a single dtype (or None),
+      # which we obtain with a recursive call to `common_dtype`. We omit
+      # `dtype_hint` in this call because `dtype_hint` is applied to the entire
+      # nested dtype in the last line of the function.
+      try:
+        nest.assert_shallow_structure(dtype_hint, a)
+      except ValueError:
+        raise ValueError(
+            'The arg {} must have a shallow structure that matches '
+            '`dtype_hint={}`'.format(a, dtype_hint)) from None
+      try:
+        dt = nest.map_structure_up_to(dtype_hint, common_dtype, a)
+      except TypeError as e:
+        raise TypeError(
+            'The shallow structure of the arg {} that matches `dtype_hint={}` '
+            'contains elements with incompatible dtypes: {}'.format(
+                a, dtype_hint, e)) from None
       seen[i] = dt
     else:
       seen[i] = None
@@ -170,7 +212,8 @@ def common_dtype(args, dtype_hint=None):
     except TypeError:
       raise TypeError(
           'Found incompatible dtypes, {} and {}. Seen so far: {}'.format(
-              dtype, dt, tf.nest.pack_sequence_as(args, seen))) from None
+              dtype, dt, tf.nest.pack_sequence_as(shallow_structure, seen))
+          ) from None
   if dtype_hint is None:
     return tf.nest.map_structure(base_dtype, dtype)
   if dtype is None:

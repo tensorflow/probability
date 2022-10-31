@@ -92,8 +92,49 @@ class DtypeUtilTest(test_util.TestCase):
         dtype_util.common_dtype([y, z], dtype_hint=tf.int32),
         {'a': tf.int32, 'b': (tf.int32, tf.float64)})
 
-    with self.assertRaisesRegex(TypeError, 'Found incompatible dtypes'):
-      dtype_util.common_dtype([x, structured_dtype_obj(dtype_hint)])
+    # Check that structured `dtype_hint` behaves as expected.
+    s = {'a': [tf.ones([3], tf.float32), 4.],
+         'b': (np.float64(2.), None)}
+    self.assertAllEqualNested(
+        dtype_util.common_dtype([x, s], dtype_hint=z.dtype),
+        {'a': tf.float32, 'b': (tf.float64, None)})
+    self.assertAllEqualNested(
+        dtype_util.common_dtype([y, s], dtype_hint=z.dtype),
+        {'a': tf.float32, 'b': (tf.float64, tf.float64)})
+
+    t = {'a': [[1., 2., 3.]], 'b': {'c': np.float64(1.), 'd': np.float64(2.)}}
+    self.assertAllEqualNested(
+        dtype_util.common_dtype(
+            [w, t],
+            dtype_hint={'a': tf.float32, 'b': tf.float32}),
+        {'a': tf.float32, 'b': tf.float64})
+
+    with self.assertRaisesRegex(ValueError, 'the same nested structure'):
+      dtype_util.common_dtype([x, s])
+
+    with self.assertRaisesRegex(ValueError, 'the same nested structure'):
+      dtype_util.common_dtype([x, t], dtype_hint={'a': None, 'b': None})
+
+    with self.assertRaisesRegex(
+        ValueError, 'must have a shallow structure that matches'):
+      dtype_util.common_dtype([{'a': np.float64(3.), 'b': [3, 2], 'c': 3.}],
+                              dtype_hint=dtype_hint)
+
+    if not dtype_util.SKIP_DTYPE_CHECKS:
+      with self.assertRaisesRegex(
+          TypeError, 'contains elements with incompatible dtypes'):
+        dtype_util.common_dtype(
+            [{'a': np.float64(3.),
+              'b': (tf.ones([3], dtype=tf.float32),
+                    tf.ones([2], dtype=tf.float16))}],
+            dtype_hint={'a': None, 'b': None})
+
+      with self.assertRaisesRegex(TypeError, 'Found incompatible dtypes'):
+        dtype_util.common_dtype([x, {'a': np.float64(3.), 'b': (3, 2)}],
+                                dtype_hint=dtype_hint)
+
+      with self.assertRaisesRegex(TypeError, 'Found incompatible dtypes'):
+        dtype_util.common_dtype([x, structured_dtype_obj(dtype_hint)])
 
   @parameterized.named_parameters(
       dict(testcase_name='Float32', dtype=tf.float32,
