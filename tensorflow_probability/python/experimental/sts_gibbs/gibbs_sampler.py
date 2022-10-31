@@ -579,7 +579,7 @@ def one_step_predictive(model,
                         num_forecast_steps=0,
                         original_mean=0.,
                         original_scale=1.,
-                        thin_every=10,
+                        thin_every=1,
                         use_zero_step_prediction=False):
   """Constructs a one-step-ahead predictive distribution at every timestep.
 
@@ -614,7 +614,7 @@ def one_step_predictive(model,
     thin_every: Optional Python `int` factor by which to thin the posterior
       samples, to reduce complexity of the predictive distribution. For example,
       if `thin_every=10`, every `10`th sample will be used.
-      Default value: `10`.
+      Default value: `1`.
     use_zero_step_prediction: If true, instead of using the local level
       and trend from the timestep before, just use the local level from the
       same timestep.
