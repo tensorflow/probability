@@ -352,7 +352,7 @@ class GaussianProcess(
       if index_points is not None:
         index_points = nest_util.convert_to_nested_tensor(
             index_points, dtype=input_dtype, name='index_points',
-            convert_ref=False)
+            convert_ref=False, allow_packing=True)
       jitter = tensor_util.convert_nonref_to_tensor(
           jitter, dtype=dtype, name='jitter')
       observation_noise_variance = tensor_util.convert_nonref_to_tensor(
@@ -589,7 +589,7 @@ class GaussianProcess(
           'computed.')
     return nest_util.convert_to_nested_tensor(
         index_points if index_points is not None else self._index_points,
-        dtype_hint=self.kernel.dtype)
+        dtype_hint=self.kernel.dtype, allow_packing=True)
 
   @distribution_util.AppendDocstring(kwargs_dict={
       'index_points':

@@ -266,7 +266,8 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
       self._diag_shift = tensor_util.convert_nonref_to_tensor(
           diag_shift, dtype=float_dtype, name='diag_shift')
       self._fixed_inputs = nest_util.convert_to_nested_tensor(
-          fixed_inputs, dtype=dtype, name='fixed_inputs', convert_ref=False)
+          fixed_inputs, dtype=dtype, name='fixed_inputs', convert_ref=False,
+          allow_packing=True)
       if ((fixed_inputs_mask is not None) and
           (fixed_inputs_is_missing is not None)):
         raise ValueError('Expected at most one of `fixed_inputs_mask` or '
@@ -378,7 +379,8 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
            fixed_inputs,
            diag_shift], tf.float32)
       float_dtype = dtype
-    fixed_inputs = nest_util.convert_to_nested_tensor(fixed_inputs, dtype)
+    fixed_inputs = nest_util.convert_to_nested_tensor(
+        fixed_inputs, dtype=dtype, allow_packing=True)
     if ((fixed_inputs_mask is not None) and
         (fixed_inputs_is_missing is not None)):
       raise ValueError('Expected at most one of `fixed_inputs_mask` or '
@@ -452,7 +454,7 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
       return k12
 
     fixed_inputs = nest_util.convert_to_nested_tensor(
-        self._fixed_inputs, dtype_hint=self.dtype)
+        self._fixed_inputs, dtype_hint=self.dtype, allow_packing=True)
     fixed_inputs_is_missing = self._get_fixed_inputs_is_missing()
     if fixed_inputs_is_missing is not None:
       fixed_inputs_is_missing = util.pad_shape_with_ones(
@@ -503,7 +505,7 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
       return k12
 
     fixed_inputs = nest_util.convert_to_nested_tensor(
-        self._fixed_inputs, dtype_hint=self.dtype)
+        self._fixed_inputs, dtype_hint=self.dtype, allow_packing=True)
     fixed_inputs_is_missing = self._get_fixed_inputs_is_missing()
     if fixed_inputs_is_missing is not None:
       fixed_inputs_is_missing = fixed_inputs_is_missing[..., tf.newaxis, :]
@@ -574,7 +576,7 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
   def _divisor_matrix(self, fixed_inputs=None, fixed_inputs_is_missing=None):
     fixed_inputs = nest_util.convert_to_nested_tensor(
         self._fixed_inputs if fixed_inputs is None else fixed_inputs,
-        dtype_hint=self.dtype)
+        dtype_hint=self.dtype, allow_packing=True)
     if fixed_inputs_is_missing is None:
       fixed_inputs_is_missing = self._get_fixed_inputs_is_missing()
     # NOTE: Replacing masked-out rows/columns of the divisor matrix with

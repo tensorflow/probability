@@ -512,11 +512,11 @@ class GaussianProcessRegressionModel(
       if index_points is not None:
         index_points = nest_util.convert_to_nested_tensor(
             index_points, dtype=input_dtype, convert_ref=False,
-            name='index_points')
+            name='index_points', allow_packing=True)
       if observation_index_points is not None:
         observation_index_points = nest_util.convert_to_nested_tensor(
             observation_index_points, dtype=input_dtype, convert_ref=False,
-            name='observation_index_points')
+            name='observation_index_points', allow_packing=True)
       observations = tensor_util.convert_nonref_to_tensor(
           observations, dtype=dtype,
           name='observations')
@@ -583,7 +583,8 @@ class GaussianProcessRegressionModel(
               """Conditional mean."""
               observations = tf.convert_to_tensor(self._observations)
               observation_index_points = nest_util.convert_to_nested_tensor(
-                  self._observation_index_points, dtype_hint=self.kernel.dtype)
+                  self._observation_index_points, dtype_hint=self.kernel.dtype,
+                  allow_packing=True)
               k_x_obs_linop = tf.linalg.LinearOperatorFullMatrix(
                   kernel.matrix(x, observation_index_points))
               chol_linop = tf.linalg.LinearOperatorLowerTriangular(
@@ -774,7 +775,7 @@ class GaussianProcessRegressionModel(
       jitter = tf.convert_to_tensor(jitter, dtype=dtype)
 
       observation_index_points = nest_util.convert_to_nested_tensor(
-          observation_index_points, dtype=input_dtype)
+          observation_index_points, dtype=input_dtype, allow_packing=True)
       observation_noise_variance = tf.convert_to_tensor(
           observation_noise_variance, dtype=dtype)
       observations = tf.convert_to_tensor(observations, dtype=dtype)
