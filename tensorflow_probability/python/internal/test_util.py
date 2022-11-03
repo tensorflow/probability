@@ -36,8 +36,11 @@ from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import empirical_statistical_testing
+from tensorflow_probability.python.internal import parameter_properties
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_combinations
+from tensorflow_probability.python.math import psd_kernels
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 from tensorflow_probability.python.util.deferred_tensor import TransformedVariable
 from tensorflow_probability.python.util.seed_stream import SeedStream
@@ -2080,3 +2083,44 @@ class NonCompositeTensorExp(bijector.Bijector):
   @classmethod
   def _parameter_properties(cls, dtype):
     return dict()
+
+
+class MultipartKernel(psd_kernels.AutoCompositeTensorPsdKernel):
+  """A kernel that takes nested structures as inputs.
+
+  The inputs are flattened and concatenated, and then passed to the base kernel.
+  """
+
+  def __init__(self, kernel, feature_ndims=None):
+    parameters = dict(locals())
+    self._kernel = kernel
+    if feature_ndims is None:
+      feature_ndims = {'foo': kernel.feature_ndims, 'bar': kernel.feature_ndims}
+    super(MultipartKernel, self).__init__(
+        feature_ndims=feature_ndims,
+        dtype={'foo': tf.float32, 'bar': tf.float32},
+        parameters=parameters,
+        validate_args=kernel.validate_args)
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict(kernel=parameter_properties.BatchedComponentProperties())
+
+  @property
+  def kernel(self):
+    return self._kernel
+
+  def _apply(self, x1, x2, example_ndims=0):
+    def _flatten_and_concat(x):
+      flat = tf.nest.flatten(
+          tf.nest.map_structure(
+              lambda t, nd: tf.reshape(  # pylint: disable=g-long-lambda
+                  t, ps.concat([ps.shape(t)[:-nd], [-1]], axis=0)),
+              x, self.feature_ndims))
+      # Broadcast shapes of flattened components together.
+      broadcasted_flat = [flat[0] + tf.zeros_like(flat[1][..., :1]),
+                          flat[1] + tf.zeros_like(flat[0][..., :1])]
+      return tf.concat(broadcasted_flat, axis=-1)
+    x1 = _flatten_and_concat(x1)
+    x2 = _flatten_and_concat(x2)
+    return self.kernel._apply(x1, x2, example_ndims=example_ndims)  # pylint: disable=protected-access

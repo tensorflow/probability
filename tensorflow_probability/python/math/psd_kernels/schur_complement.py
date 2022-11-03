@@ -17,6 +17,7 @@
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
@@ -197,22 +198,23 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
       base_kernel: A `PositiveSemidefiniteKernel` instance, the kernel used to
         build the block matrices of which this kernel computes the Schur
         complement.
-      fixed_inputs: A Tensor, representing a collection of inputs. The Schur
-        complement that this kernel computes comes from a block matrix, whose
-        bottom-right corner is derived from `base_kernel.matrix(fixed_inputs,
-        fixed_inputs)`, and whose top-right and bottom-left pieces are
-        constructed by computing the base_kernel at pairs of input locations
-        together with these `fixed_inputs`. `fixed_inputs` is allowed to be an
-        empty collection (either `None` or having a zero shape entry), in which
-        case the kernel falls back to the trivial application of `base_kernel`
-        to inputs. See class-level docstring for more details on the exact
-        computation this does; `fixed_inputs` correspond to the `Z` structure
-        discussed there. `fixed_inputs` is assumed to have shape `[b1, ..., bB,
-        N, f1, ..., fF]` where the `b`'s are batch shape entries, the `f`'s are
-        feature_shape entries, and `N` is the number of fixed inputs. Use of
-        this kernel entails a 1-time O(N^3) cost of computing the Cholesky
-        decomposition of the k(Z, Z) matrix. The batch shape elements of
-        `fixed_inputs` must be broadcast compatible with
+      fixed_inputs: A (nested) Tensor, representing a collection of inputs. The
+        Schur complement that this kernel computes comes from a block matrix,
+        whose bottom-right corner is derived from
+        `base_kernel.matrix(fixed_inputs, fixed_inputs)`, and whose top-right
+        and bottom-left pieces are constructed by computing the base_kernel
+        at pairs of input locations together with these `fixed_inputs`.
+        `fixed_inputs` is allowed to be an empty collection (either `None` or
+        having a zero shape entry), in which case the kernel falls back to
+        the trivial application of `base_kernel` to inputs. See class-level
+        docstring for more details on the exact computation this does;
+        `fixed_inputs` correspond to the `Z` structure discussed there.
+        `fixed_inputs` (or each of its nested components) is assumed to have
+        shape `[b1, ..., bB, N, f1, ..., fF]` where the `b`'s are batch shape
+        entries, the `f`'s are feature_shape entries, and `N` is the number
+        of fixed inputs. Use of this kernel entails a 1-time O(N^3) cost of
+        computing the Cholesky decomposition of the k(Z, Z) matrix. The batch
+        shape elements of `fixed_inputs` must be broadcast compatible with
         `base_kernel.batch_shape`.
       fixed_inputs_mask: Deprecated. A boolean Tensor of shape `[..., N]`. When
         `mask` is not None and an element of `mask` is `False`, this kernel
@@ -244,16 +246,27 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
     from tensorflow_probability.python.bijectors import invert
     # pylint: enable=g-import-not-at-top
     with tf.name_scope(name) as name:
-      dtype = dtype_util.common_dtype(
-          [base_kernel,
-           fixed_inputs,
-           diag_shift,
-           _precomputed_divisor_matrix_cholesky], tf.float32)
+      if tf.nest.is_nested(base_kernel.feature_ndims):
+        dtype = dtype_util.common_dtype(
+            [base_kernel, fixed_inputs],
+            dtype_hint=nest_util.broadcast_structure(
+                base_kernel.feature_ndims, tf.float32))
+        float_dtype = dtype_util.common_dtype(
+            [diag_shift, _precomputed_divisor_matrix_cholesky], tf.float32)
+      else:
+        # If the fixed inputs are not nested, we assume they are of the same
+        # float dtype as the remaining parameters.
+        dtype = dtype_util.common_dtype(
+            [base_kernel,
+             fixed_inputs,
+             diag_shift,
+             _precomputed_divisor_matrix_cholesky], tf.float32)
+        float_dtype = dtype
       self._base_kernel = base_kernel
       self._diag_shift = tensor_util.convert_nonref_to_tensor(
-          diag_shift, dtype=dtype, name='diag_shift')
-      self._fixed_inputs = tensor_util.convert_nonref_to_tensor(
-          fixed_inputs, dtype=dtype, name='fixed_inputs')
+          diag_shift, dtype=float_dtype, name='diag_shift')
+      self._fixed_inputs = nest_util.convert_to_nested_tensor(
+          fixed_inputs, dtype=dtype, name='fixed_inputs', convert_ref=False)
       if ((fixed_inputs_mask is not None) and
           (fixed_inputs_is_missing is not None)):
         raise ValueError('Expected at most one of `fixed_inputs_mask` or '
@@ -268,7 +281,7 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
       self._precomputed_divisor_matrix_cholesky = _precomputed_divisor_matrix_cholesky
       if self._precomputed_divisor_matrix_cholesky is not None:
         self._precomputed_divisor_matrix_cholesky = tf.convert_to_tensor(
-            self._precomputed_divisor_matrix_cholesky, dtype)
+            self._precomputed_divisor_matrix_cholesky, float_dtype)
       if cholesky_fn is None:
         from tensorflow_probability.python.distributions import cholesky_util  # pylint:disable=g-import-not-at-top
         cholesky_fn = cholesky_util.make_cholesky_with_jitter_fn()
@@ -313,22 +326,23 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
       base_kernel: A `PositiveSemidefiniteKernel` instance, the kernel used to
         build the block matrices of which this kernel computes the Schur
         complement.
-      fixed_inputs: A Tensor, representing a collection of inputs. The Schur
-        complement that this kernel computes comes from a block matrix, whose
-        bottom-right corner is derived from `base_kernel.matrix(fixed_inputs,
-        fixed_inputs)`, and whose top-right and bottom-left pieces are
-        constructed by computing the base_kernel at pairs of input locations
-        together with these `fixed_inputs`. `fixed_inputs` is allowed to be an
-        empty collection (either `None` or having a zero shape entry), in which
-        case the kernel falls back to the trivial application of `base_kernel`
-        to inputs. See class-level docstring for more details on the exact
-        computation this does; `fixed_inputs` correspond to the `Z` structure
-        discussed there. `fixed_inputs` is assumed to have shape `[b1, ..., bB,
-        N, f1, ..., fF]` where the `b`'s are batch shape entries, the `f`'s are
-        feature_shape entries, and `N` is the number of fixed inputs. Use of
-        this kernel entails a 1-time O(N^3) cost of computing the Cholesky
-        decomposition of the k(Z, Z) matrix. The batch shape elements of
-        `fixed_inputs` must be broadcast compatible with
+      fixed_inputs: A (nested) Tensor, representing a collection of inputs. The
+        Schur complement that this kernel computes comes from a block matrix,
+        whose bottom-right corner is derived from
+        `base_kernel.matrix(fixed_inputs, fixed_inputs)`, and whose top-right
+        and bottom-left pieces are constructed by computing the base_kernel
+        at pairs of input locations together with these `fixed_inputs`.
+        `fixed_inputs` is allowed to be an empty collection (either `None` or
+        having a zero shape entry), in which case the kernel falls back to
+        the trivial application of `base_kernel` to inputs. See class-level
+        docstring for more details on the exact computation this does;
+        `fixed_inputs` correspond to the `Z` structure discussed there.
+        `fixed_inputs` (or each of its nested components) is assumed to have
+        shape `[b1, ..., bB, N, f1, ..., fF]` where the `b`'s are batch shape
+        entries, the `f`'s are feature_shape entries, and `N` is the number
+        of fixed inputs. Use of this kernel entails a 1-time O(N^3) cost of
+        computing the Cholesky decomposition of the k(Z, Z) matrix. The batch
+        shape elements of `fixed_inputs` must be broadcast compatible with
         `base_kernel.batch_shape`.
       fixed_inputs_mask: Deprecated. A boolean Tensor of shape `[..., N]`. When
         `mask` is not None and an element of `mask` is `False`, the returned
@@ -350,9 +364,21 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
       name: Python `str` name prefixed to Ops created by this class.
         Default value: `"PrecomputedSchurComplement"`
     """
-    dtype = dtype_util.common_dtype(
-        [base_kernel, fixed_inputs, diag_shift], tf.float32)
-    fixed_inputs = tf.convert_to_tensor(fixed_inputs, dtype)
+    if tf.nest.is_nested(base_kernel.feature_ndims):
+      dtype = dtype_util.common_dtype(
+          [base_kernel, fixed_inputs],
+          dtype_hint=nest_util.broadcast_structure(
+              base_kernel.feature_ndims, tf.float32))
+      float_dtype = dtype_util.common_dtype([diag_shift], tf.float32)
+    else:
+      # If the fixed inputs are not nested, we assume they are of the same
+      # float dtype as the remaining parameters.
+      dtype = dtype_util.common_dtype(
+          [base_kernel,
+           fixed_inputs,
+           diag_shift], tf.float32)
+      float_dtype = dtype
+    fixed_inputs = nest_util.convert_to_nested_tensor(fixed_inputs, dtype)
     if ((fixed_inputs_mask is not None) and
         (fixed_inputs_is_missing is not None)):
       raise ValueError('Expected at most one of `fixed_inputs_mask` or '
@@ -364,7 +390,7 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
       fixed_inputs_is_missing = tf.convert_to_tensor(
           fixed_inputs_is_missing, tf.bool)
     if diag_shift is not None:
-      diag_shift = tf.convert_to_tensor(diag_shift, dtype)
+      diag_shift = tf.convert_to_tensor(diag_shift, float_dtype)
 
     if cholesky_fn is None:
       from tensorflow_probability.python.distributions import cholesky_util  # pylint:disable=g-import-not-at-top
@@ -395,9 +421,10 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
     # back to (cheaper) trivial behavior.
     if self._fixed_inputs is None:
       return True
-    num_fixed_inputs = tf.compat.dimension_value(
-        self._fixed_inputs.shape[-(self._base_kernel.feature_ndims + 1)])
-    if num_fixed_inputs is not None and num_fixed_inputs == 0:
+    num_fixed_inputs = tf.nest.map_structure(
+        lambda t, nd: tf.compat.dimension_value(t.shape[-(nd + 1)]),
+        self._fixed_inputs, self._base_kernel.feature_ndims)
+    if all(n is not None and n == 0 for n in tf.nest.flatten(num_fixed_inputs)):
       return True
     return False
 
@@ -424,7 +451,8 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
     if self._is_fixed_inputs_empty():
       return k12
 
-    fixed_inputs = tf.convert_to_tensor(self._fixed_inputs)
+    fixed_inputs = nest_util.convert_to_nested_tensor(
+        self._fixed_inputs, dtype_hint=self.dtype)
     fixed_inputs_is_missing = self._get_fixed_inputs_is_missing()
     if fixed_inputs_is_missing is not None:
       fixed_inputs_is_missing = util.pad_shape_with_ones(
@@ -474,7 +502,8 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
     if self._is_fixed_inputs_empty():
       return k12
 
-    fixed_inputs = tf.convert_to_tensor(self._fixed_inputs)
+    fixed_inputs = nest_util.convert_to_nested_tensor(
+        self._fixed_inputs, dtype_hint=self.dtype)
     fixed_inputs_is_missing = self._get_fixed_inputs_is_missing()
     if fixed_inputs_is_missing is not None:
       fixed_inputs_is_missing = fixed_inputs_is_missing[..., tf.newaxis, :]
@@ -530,7 +559,8 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
     return dict(
         base_kernel=parameter_properties.BatchedComponentProperties(),
         fixed_inputs=parameter_properties.ParameterProperties(
-            event_ndims=lambda self: self.base_kernel.feature_ndims + 1),
+            event_ndims=lambda self: tf.nest.map_structure(  # pylint: disable=g-long-lambda
+                lambda nd: nd + 1, self.base_kernel.feature_ndims)),
         fixed_inputs_mask=parameter_properties.ParameterProperties(
             event_ndims=1),
         fixed_inputs_is_missing=parameter_properties.ParameterProperties(
@@ -542,8 +572,9 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
             parameter_properties.ParameterProperties(event_ndims=2)))
 
   def _divisor_matrix(self, fixed_inputs=None, fixed_inputs_is_missing=None):
-    fixed_inputs = tf.convert_to_tensor(
-        self._fixed_inputs if fixed_inputs is None else fixed_inputs)
+    fixed_inputs = nest_util.convert_to_nested_tensor(
+        self._fixed_inputs if fixed_inputs is None else fixed_inputs,
+        dtype_hint=self.dtype)
     if fixed_inputs_is_missing is None:
       fixed_inputs_is_missing = self._get_fixed_inputs_is_missing()
     # NOTE: Replacing masked-out rows/columns of the divisor matrix with

@@ -363,5 +363,48 @@ class SchurComplementTest(test_util.TestCase):
     y = np.ones([3, 2], np.float32)
     self.assertAllClose(schur_with_divisor.matrix(x, y), schur.matrix(x, y))
 
+  def testStructuredBaseKernel(self):
+    base_kernel = exponentiated_quadratic.ExponentiatedQuadratic()
+    structured_kernel = test_util.MultipartKernel(base_kernel)
+    fixed_inputs = np.random.uniform(-1, 1, (10, 7)).astype(np.float32)
+    structured_fixed_inputs = dict(
+        zip(('foo', 'bar'), tf.split(fixed_inputs, [4, 3], axis=-1)))
+
+    schur = schur_complement.SchurComplement(base_kernel, fixed_inputs)
+    structured_schur = schur_complement.SchurComplement(
+        structured_kernel, structured_fixed_inputs)
+    structured_precomputed_schur = (
+        schur_complement.SchurComplement.with_precomputed_divisor(
+            structured_kernel, structured_fixed_inputs))
+
+    x = np.random.uniform(-1, 1, (4, 7)).astype(np.float32)
+    y = np.random.uniform(-1, 1, (4, 7)).astype(np.float32)
+    struct_x = dict(zip(('foo', 'bar'), tf.split(x, [4, 3], axis=-1)))
+    struct_y = dict(zip(('foo', 'bar'), tf.split(y, [4, 3], axis=-1)))
+    expected_apply_result = schur.apply(x, y)
+    expected_matrix_result = schur.matrix(x, y)
+
+    self.assertAllEqual(schur.batch_shape, structured_schur.batch_shape)
+    self.assertAllEqual(schur.batch_shape,
+                        structured_precomputed_schur.batch_shape)
+    self.assertAllClose(expected_apply_result,
+                        structured_schur.apply(struct_x, struct_y))
+    self.assertAllClose(expected_apply_result,
+                        structured_precomputed_schur.apply(struct_x, struct_y))
+    self.assertAllClose(expected_matrix_result,
+                        structured_schur.matrix(struct_x, struct_y))
+    self.assertAllClose(expected_matrix_result,
+                        structured_precomputed_schur.matrix(struct_x, struct_y))
+
+    # Test input masking.
+    mask = np.random.randint(2, size=(10,), dtype=bool)
+    masked_schur = schur_complement.SchurComplement(
+        base_kernel, fixed_inputs, fixed_inputs_mask=mask)
+    masked_structured_schur = schur_complement.SchurComplement(
+        structured_kernel, structured_fixed_inputs, fixed_inputs_mask=mask)
+    self.assertAllClose(masked_schur.apply(x, y),
+                        masked_structured_schur.apply(struct_x, struct_y))
+
+
 if __name__ == '__main__':
   test_util.main()

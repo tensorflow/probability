@@ -24,7 +24,6 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import parameter_properties
-from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.math.psd_kernels.internal import util as kernels_util
@@ -90,46 +89,6 @@ class TestKernel(psd_kernel.PositiveSemidefiniteKernel):
 class CompositeTensorTestKernel(
     TestKernel, psd_kernel.AutoCompositeTensorPsdKernel):
   pass
-
-
-class MultipartKernel(psd_kernel.AutoCompositeTensorPsdKernel):
-  """A kernel that takes nested structures as inputs.
-
-  The inputs are flattened and concatenated, and then passed to the base kernel.
-  """
-
-  def __init__(self, kernel, feature_ndims=None):
-    parameters = dict(locals())
-    self._kernel = kernel
-    if feature_ndims is None:
-      feature_ndims = {'foo': kernel.feature_ndims, 'bar': kernel.feature_ndims}
-    super(MultipartKernel, self).__init__(
-        feature_ndims=feature_ndims,
-        dtype={'foo': tf.float32, 'bar': tf.float32},
-        parameters=parameters,
-        validate_args=kernel.validate_args)
-
-  @classmethod
-  def _parameter_properties(cls, dtype):
-    return dict(kernel=parameter_properties.BatchedComponentProperties())
-
-  @property
-  def kernel(self):
-    return self._kernel
-
-  def _apply(self, x1, x2, example_ndims=0):
-    def _flatten_and_concat(x):
-      flat = tf.nest.map_structure(
-          lambda t, nd: tf.reshape(  # pylint: disable=g-long-lambda
-              t, ps.concat([ps.shape(t)[:-nd], [-1]], axis=0)),
-          x, self.feature_ndims)
-      # Broadcast shapes of flattened components together.
-      broadcasted_flat = [flat['foo'] + tf.zeros_like(flat['bar'][..., :1]),
-                          flat['bar'] + tf.zeros_like(flat['foo'][..., :1])]
-      return tf.concat(broadcasted_flat, axis=-1)
-    x1 = _flatten_and_concat(x1)
-    x2 = _flatten_and_concat(x2)
-    return self.kernel._apply(x1, x2, example_ndims=example_ndims)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -530,9 +489,9 @@ class PositiveSemidefiniteKernelTest(test_util.TestCase):
       {'foo': 3, 'bar': 2})
   def testMultipartKernelFeatureNdims(self, **feature_ndims):
     k0 = TestKernel(multiplier=3.)
-    mk0 = MultipartKernel(k0, feature_ndims=feature_ndims)
+    mk0 = test_util.MultipartKernel(k0, feature_ndims=feature_ndims)
     k1 = TestKernel(multiplier=2.)
-    mk1 = MultipartKernel(k1, feature_ndims=feature_ndims)
+    mk1 = test_util.MultipartKernel(k1, feature_ndims=feature_ndims)
 
     # Define inputs to the multipart kernel. `x` has batch shape, `y` does not.
     x = {'foo': np.random.normal(
@@ -559,7 +518,7 @@ class PositiveSemidefiniteKernelTest(test_util.TestCase):
 
   def testMultipartKernelBatchExampleShapesBroadcast(self):
     k = TestKernel(multiplier=3.)
-    mk = MultipartKernel(k, feature_ndims={'foo': 2, 'bar': 1})
+    mk = test_util.MultipartKernel(k, feature_ndims={'foo': 2, 'bar': 1})
 
     # x has broadcasted batch and example dims [2, 3, 4].
     x = {'foo': tf.ones([3, 4, 2, 2]), 'bar': tf.ones([2, 3, 1, 5])}

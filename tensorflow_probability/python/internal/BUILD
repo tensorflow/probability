@@ -750,6 +750,8 @@ multi_substrate_py_library(
     srcs = ["test_util.py"],
     deps = [
         ":dtype_util",
+        ":parameter_properties",
+        ":prefer_static",
         ":samplers",
         ":test_combinations",
         # absl/flags dep,
@@ -760,6 +762,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/bijectors:bijector",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:empirical_statistical_testing",
+        "//tensorflow_probability/python/math/psd_kernels",
         "//tensorflow_probability/python/util:deferred_tensor",
         "//tensorflow_probability/python/util:seed_stream",
     ],

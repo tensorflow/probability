@@ -13,6 +13,7 @@
 # limitations under the License.
 # ============================================================================
 # Dependency imports
+from absl.testing import parameterized
 import numpy as np
 
 import tensorflow.compat.v1 as tf1
@@ -29,7 +30,7 @@ from tensorflow_probability.python.math import gradient
 from tensorflow_probability.python.math import psd_kernels
 
 
-class _GaussianProcessTest(object):
+class _GaussianProcessTest(test_util.TestCase):
 
   def testShapes(self):
     # 5x5 grid of index points in R^2 and flatten to 25x2
@@ -467,9 +468,81 @@ class _GaussianProcessTest(object):
     self.assertAllClose(actual, call_log_prob(gp))
     self.assertAllClose(actual, call_log_prob(unflat))
 
+  @parameterized.parameters(
+      {"foo_feature_shape": [5], "bar_feature_shape": [3]},
+      {"foo_feature_shape": [3, 2], "bar_feature_shape": [5]},
+      {"foo_feature_shape": [3, 2], "bar_feature_shape": [4, 3]},
+  )
+  def testStructuredIndexPoints(self, foo_feature_shape, bar_feature_shape):
+    base_kernel = psd_kernels.ExponentiatedQuadratic()
+    structured_kernel = test_util.MultipartKernel(
+        base_kernel,
+        feature_ndims={"foo": len(foo_feature_shape),
+                       "bar": len(bar_feature_shape)})
+
+    foo_num_features = np.prod(foo_feature_shape)
+    bar_num_features = np.prod(bar_feature_shape)
+    batch_and_example_shape = [3, 2, 10]
+    index_points = np.random.uniform(
+        -1, 1, batch_and_example_shape + [foo_num_features + bar_num_features]
+        ).astype(np.float32)
+    split_index_points = tf.split(
+        index_points, [foo_num_features, bar_num_features], axis=-1)
+    structured_index_points = {
+        "foo": tf.reshape(split_index_points[0],
+                          batch_and_example_shape + foo_feature_shape),
+        "bar": tf.reshape(split_index_points[1],
+                          batch_and_example_shape + bar_feature_shape)}
+    base_gp = gaussian_process.GaussianProcess(
+        base_kernel, index_points=index_points)
+    structured_gp = gaussian_process.GaussianProcess(
+        structured_kernel, index_points=structured_index_points)
+
+    self.assertAllEqual(base_gp.event_shape, structured_gp.event_shape)
+    self.assertAllEqual(base_gp.event_shape_tensor(),
+                        structured_gp.event_shape_tensor())
+    self.assertAllEqual(base_gp.batch_shape, structured_gp.batch_shape)
+    self.assertAllEqual(base_gp.batch_shape_tensor(),
+                        structured_gp.batch_shape_tensor())
+
+    s = structured_gp.sample(3, seed=test_util.test_seed())
+    self.assertAllClose(base_gp.log_prob(s), structured_gp.log_prob(s))
+    self.assertAllClose(base_gp.mean(), structured_gp.mean())
+    self.assertAllClose(base_gp.variance(), structured_gp.variance())
+
+    # Check that batch shapes and number of index points broadcast across
+    # different parts of index_points.
+    bcast_structured_index_points = {
+        "foo": np.random.uniform(
+            -1, 1, [2, 1] + foo_feature_shape).astype(np.float32),
+        "bar": np.random.uniform(
+            -1, 1, [3, 1, 10] + bar_feature_shape).astype(np.float32),
+    }
+    bcast_structured_gp = gaussian_process.GaussianProcess(
+        structured_kernel, index_points=bcast_structured_index_points)
+    self.assertAllEqual(base_gp.event_shape, bcast_structured_gp.event_shape)
+    self.assertAllEqual(base_gp.event_shape_tensor(),
+                        bcast_structured_gp.event_shape_tensor())
+    self.assertAllEqual(base_gp.batch_shape, bcast_structured_gp.batch_shape)
+    self.assertAllEqual(base_gp.batch_shape_tensor(),
+                        bcast_structured_gp.batch_shape_tensor())
+
+    index_points_bad_num_examples = {
+        "foo": np.random.uniform(
+            -1, 1, [5] + foo_feature_shape).astype(np.float32),
+        "bar": np.random.uniform(
+            -1, 1, [2] + bar_feature_shape).astype(np.float32),
+    }
+
+    # Non-broadcasting numbers of index points should raise.
+    structured_gp_bad_num_examples = gaussian_process.GaussianProcess(
+        structured_kernel, index_points=index_points_bad_num_examples)
+    with self.assertRaisesRegex(ValueError, "the same or broadcastable"):
+      _ = structured_gp_bad_num_examples.event_shape
+
 
 @test_util.test_all_tf_execution_regimes
-class GaussianProcessStaticTest(_GaussianProcessTest, test_util.TestCase):
+class GaussianProcessStaticTest(_GaussianProcessTest):
   is_static = True
 
   @test_util.numpy_disable_gradient_test
@@ -499,8 +572,11 @@ class GaussianProcessStaticTest(_GaussianProcessTest, test_util.TestCase):
 
 
 @test_util.test_all_tf_execution_regimes
-class GaussianProcessDynamicTest(_GaussianProcessTest, test_util.TestCase):
+class GaussianProcessDynamicTest(_GaussianProcessTest):
   is_static = False
+
+
+del _GaussianProcessTest
 
 
 if __name__ == "__main__":

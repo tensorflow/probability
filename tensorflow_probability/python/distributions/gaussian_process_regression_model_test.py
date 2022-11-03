@@ -618,6 +618,41 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         # issue is being cleaned up in cl/256413439.
         implied_pnv_param)
 
+  def testStructuredIndexPoints(self):
+    base_kernel = exponentiated_quadratic.ExponentiatedQuadratic()
+    observation_index_points = np.random.uniform(
+        -1, 1, (12, 8)).astype(np.float32)
+    observations = np.sum(observation_index_points, axis=-1)
+    index_points = np.random.uniform(-1, 1, (6, 8)).astype(np.float32)
+    base_gprm = gprm.GaussianProcessRegressionModel(
+        base_kernel,
+        index_points=index_points,
+        observation_index_points=observation_index_points,
+        observations=observations)
+
+    structured_kernel = test_util.MultipartKernel(base_kernel)
+    structured_obs_index_points = dict(
+        zip(('foo', 'bar'),
+            tf.split(observation_index_points, [5, 3], axis=-1)))
+    structured_index_points = dict(
+        zip(('foo', 'bar'), tf.split(index_points, [5, 3], axis=-1)))
+    structured_gprm = gprm.GaussianProcessRegressionModel(
+        structured_kernel,
+        index_points=structured_index_points,
+        observation_index_points=structured_obs_index_points,
+        observations=observations)
+
+    s = structured_gprm.sample(3, seed=test_util.test_seed())
+    self.assertAllClose(base_gprm.log_prob(s), structured_gprm.log_prob(s))
+    self.assertAllClose(base_gprm.mean(), structured_gprm.mean())
+    self.assertAllClose(base_gprm.variance(), structured_gprm.variance())
+    self.assertAllEqual(base_gprm.event_shape, structured_gprm.event_shape)
+    self.assertAllEqual(base_gprm.event_shape_tensor(),
+                        structured_gprm.event_shape_tensor())
+    self.assertAllEqual(base_gprm.batch_shape, structured_gprm.batch_shape)
+    self.assertAllEqual(base_gprm.batch_shape_tensor(),
+                        structured_gprm.batch_shape_tensor())
+
 
 class GaussianProcessRegressionModelStaticTest(
     _GaussianProcessRegressionModelTest):
