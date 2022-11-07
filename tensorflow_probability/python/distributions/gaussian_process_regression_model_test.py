@@ -653,6 +653,22 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
     self.assertAllEqual(base_gprm.batch_shape_tensor(),
                         structured_gprm.batch_shape_tensor())
 
+    # Iterable index points should be interpreted as single Tensors if the
+    # kernel is not structured.
+    index_points_list = tf.unstack(index_points)
+    obs_index_points_nested_list = tf.nest.map_structure(
+        tf.unstack, tf.unstack(observation_index_points))
+    gprm_with_lists = gprm.GaussianProcessRegressionModel(
+        base_kernel,
+        index_points=index_points_list,
+        observation_index_points=obs_index_points_nested_list,
+        observations=observations)
+    self.assertAllEqual(base_gprm.event_shape_tensor(),
+                        gprm_with_lists.event_shape_tensor())
+    self.assertAllEqual(base_gprm.batch_shape_tensor(),
+                        gprm_with_lists.batch_shape_tensor())
+    self.assertAllClose(base_gprm.log_prob(s), gprm_with_lists.log_prob(s))
+
 
 class GaussianProcessRegressionModelStaticTest(
     _GaussianProcessRegressionModelTest):

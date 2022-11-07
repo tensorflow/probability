@@ -540,6 +540,17 @@ class _GaussianProcessTest(test_util.TestCase):
     with self.assertRaisesRegex(ValueError, "the same or broadcastable"):
       _ = structured_gp_bad_num_examples.event_shape
 
+    # Iterable index points should be interpreted as single Tensors if the
+    # kernel is not structured.
+    index_points_list = tf.unstack(index_points)
+    gp_with_list = gaussian_process.GaussianProcess(
+        base_kernel, index_points=index_points_list)
+    self.assertAllEqual(base_gp.event_shape_tensor(),
+                        gp_with_list.event_shape_tensor())
+    self.assertAllEqual(base_gp.batch_shape_tensor(),
+                        gp_with_list.batch_shape_tensor())
+    self.assertAllClose(base_gp.log_prob(s), gp_with_list.log_prob(s))
+
 
 @test_util.test_all_tf_execution_regimes
 class GaussianProcessStaticTest(_GaussianProcessTest):
