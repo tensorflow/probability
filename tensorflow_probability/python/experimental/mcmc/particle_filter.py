@@ -201,6 +201,7 @@ def infer_trajectories(observations,
   # Generate simulated observations.
   observed_positions = tfd.Normal(loc=tf.linspace(0.4, 0.8, 0.01),
                                   scale=0.1).sample()
+
   # Run particle filtering to sample plausible trajectories.
   (trajectories,  # {'position': [40, 1000], 'velocity': [40, 1000]}
    lps) = tfp.experimental.mcmc.infer_trajectories(
@@ -397,6 +398,7 @@ def particle_filter(observations,
                     seed=None,
                     name=None):  # pylint: disable=g-doc-args
   """Samples a series of particles representing filtered latent states.
+
   The particle filter samples from the sequence of "filtering" distributions
   `p(state[t] | observations[:t])` over latent
   states: at each point in time, this is the distribution conditioned on all
@@ -404,6 +406,7 @@ def particle_filter(observations,
   at time `t` may be different from the particle with the same index at time
   `t + 1`. To reconstruct trajectories by tracing back through the resampling
   process, see `tfp.mcmc.experimental.reconstruct_trajectories`.
+
   ${particle_filter_arg_str}
     trace_fn: Python `callable` defining the values to be traced at each step,
       with signature `traced_values = trace_fn(weighted_particles, results)`
@@ -435,7 +438,9 @@ def particle_filter(observations,
       `trace_criterion_fn==None`, this is computed from the final step;
       otherwise, each Tensor will have initial dimension `num_steps_traced`
       and stacks the traced results across all steps.
+
   #### References
+
   [1] Adam Scibior, Vaden Masrani, and Frank Wood. Differentiable Particle
       Filtering without Modifying the Forward Pass. _arXiv preprint
       arXiv:2106.10314_, 2021. https://arxiv.org/abs/2106.10314
