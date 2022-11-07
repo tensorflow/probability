@@ -122,7 +122,7 @@ class InferenceGymTestCaseTest(test_util.InferenceGymTestCase):
     expected_type = {
         'backend_tensorflow': otf.Tensor,
         'backend_numpy': np.ndarray,
-        'backend_jax': jax.xla.DeviceArray,
+        'backend_jax': jax.Array,
     }[BACKEND]
     self.assertIsInstance(a, expected_type)
 

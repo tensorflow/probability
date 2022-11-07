@@ -271,10 +271,9 @@ class DeferredTensor(six.with_metaclass(
 
     # Secret handshake with tf.is_tensor to return True for DT.
     #
-    # Works around an exception in LinearOperator (which in 2.0.0 checks only
-    # `tf.is_tensor`, not also `linear_operator_util.is_ref`:
-    # ValueError: Graph parent item 0 is not a Tensor;
-    #   <DeferredTensor: dtype=float32, shape=[2], fn=exp>.
+    # Works around `tf.get_static_value` not returning `None`.
+    # With this, `tf.get_static_value` returns `None`, and without
+    # this returns the `DeferredTensor` object.
     # TODO(b/140157055): Remove this shim after LinOp is patched in 2.0.
     self.is_tensor_like = True
 
@@ -298,11 +297,6 @@ class DeferredTensor(six.with_metaclass(
   @property
   def shape(self):
     """Represents the shape of a `Tensor`."""
-    return self._shape
-
-  # TODO(b/140157055): Remove this shim.
-  def get_shape(self):
-    """Legacy means of getting Tensor shape, for compat with 2.0.0 LinOp."""
     return self._shape
 
   @property

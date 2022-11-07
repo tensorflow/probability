@@ -110,6 +110,47 @@ class MultiTaskGaussianProcessRegressionModelTest(
     self.assertAllEqual(
         self.evaluate(tf.shape(gp.mean())), batch_shape + event_shape)
 
+  def testValidateArgs(self):
+    index_points = np.linspace(-4., 4., 10, dtype=np.float32)
+    index_points = np.reshape(index_points, [5, 2])
+    index_points = np.linspace(-4., 4., 16, dtype=np.float32)
+    observation_index_points = np.reshape(index_points, [8, 2])
+
+    observation_noise_variance = 1e-4
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic()
+    multi_task_kernel = multitask_kernel.Independent(
+        num_tasks=3, base_kernel=kernel)
+    with self.assertRaisesRegexp(ValueError, 'match the number of tasks'):
+      observations = np.linspace(-1., 1., 24).astype(np.float32)
+      mtgprm_lib.MultiTaskGaussianProcessRegressionModel(
+          multi_task_kernel,
+          observation_index_points=observation_index_points,
+          observations=observations,
+          index_points=index_points,
+          observation_noise_variance=observation_noise_variance,
+          validate_args=True)
+
+    with self.assertRaisesRegexp(ValueError, 'match the number of tasks'):
+      observations = np.linspace(-1., 1., 32).reshape(8, 4).astype(np.float32)
+      mtgprm_lib.MultiTaskGaussianProcessRegressionModel(
+          multi_task_kernel,
+          observation_index_points=observation_index_points,
+          observations=observations,
+          index_points=index_points,
+          observation_noise_variance=observation_noise_variance,
+          validate_args=True)
+
+    with self.assertRaisesRegexp(
+        ValueError, 'match the second to last dimension'):
+      observations = np.linspace(-1., 1., 18).reshape(6, 3).astype(np.float32)
+      mtgprm_lib.MultiTaskGaussianProcessRegressionModel(
+          multi_task_kernel,
+          observation_index_points=observation_index_points,
+          observations=observations,
+          index_points=index_points,
+          observation_noise_variance=observation_noise_variance,
+          validate_args=True)
+
   @parameterized.parameters(1, 3, 5)
   def testBindingIndexPoints(self, num_tasks):
     amplitude = np.float64(0.5)

@@ -124,6 +124,7 @@ multi_substrate_py_test(
     size = "large",
     srcs = ["joint_distribution_test.py"],
     disabled_substrates = ["numpy"],
+    shard_count = 3,
     deps = [
         ":joint_distribution",
         ":sharded",

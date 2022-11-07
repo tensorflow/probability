@@ -18,6 +18,7 @@ Note: Many of these functions will eventually be migrated to core TensorFlow.
 """
 
 import collections
+import functools
 
 import numpy as np
 import tensorflow.compat.v2 as tf
@@ -26,6 +27,7 @@ from tensorflow_probability.python.internal import custom_gradient as tfp_custom
 from tensorflow_probability.python.internal import distribute_lib
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import variadic_reduce
 from tensorflow_probability.python.math.scan_associative import scan_associative
 
@@ -835,3 +837,26 @@ def soft_sorting_matrix(x, temperature, name=None):
             pairwise_distances, axis=-1)[..., tf.newaxis])
     y = tf.nn.softmax(p_logits / temperature, axis=-1)
     return y
+
+
+def fix_gradient_for_broadcasting(primals, grads):
+  """Ensure `grads` have same shape as `primals`."""
+  if len(primals) != len(grads):
+    raise ValueError('Expected same number of `x` and `grads`')
+  if (all(tensorshape_util.is_fully_defined(x.shape) for x in primals) and
+      all(x.shape == primals[0].shape for x in primals)):
+    return grads
+  # Compute the leave one out broadcast shapes, and use that to compute
+  # the axes.
+  new_grads = []
+  primal_shapes = [tf.shape(x) for x in primals]
+  for i in range(len(primals)):
+    loo_primal_shapes = primal_shapes[:i] + primal_shapes[i+1:]
+    x_shape = tf.shape(primals[i])
+    loo_broadcast_shape = functools.reduce(
+        tf.broadcast_dynamic_shape, loo_primal_shapes)
+    rx, _ = tf.raw_ops.BroadcastGradientArgs(
+        s0=x_shape, s1=loo_broadcast_shape)
+    new_grads.append(
+        tf.reshape(tf.reduce_sum(grads[i], axis=rx), shape=x_shape))
+  return new_grads

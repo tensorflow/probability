@@ -244,5 +244,11 @@ class SigmoidBeta(distribution.AutoCompositeTensorDistribution):
     sig_x = tf.math.sigmoid(x)
     return special.betainc(concentration1, concentration0, sig_x)
 
+  def _quantile(self, p):
+    concentration1 = tf.convert_to_tensor(self.concentration1)
+    concentration0 = tf.convert_to_tensor(self.concentration0)
+    y = special.betaincinv(concentration1, concentration0, p)
+    return tf.math.log(y) - tf.math.log1p(-y)
+
   def _mode(self):
     return tf.math.log(self.concentration1 / self.concentration0)

@@ -33,6 +33,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import generic
 from tensorflow_probability.python.math import special
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
@@ -631,17 +632,24 @@ def _random_gamma_bwd(shape, log_space, aux, g):
       concentration.shape == rate_tensorshape):
     return grad_concentration, grad_rate, grad_log_rate, None  # seed=None
 
-  ax_conc, ax_rate = tf.raw_ops.BroadcastGradientArgs(
-      s0=tf.shape(concentration), s1=rate_shape)
-  grad_concentration = tf.reshape(
-      tf.math.reduce_sum(grad_concentration, axis=ax_conc),
-      tf.shape(concentration))
+  # Dummy parameter used for fix_gradient_for_broadcasting.
+  rate_param = tf.ones_like(concentration)
+  grad_rate_param = rate_param
+  if rate is not None:
+    rate_param = rate
+    grad_rate_param = grad_rate
+  if log_rate is not None:
+    rate_param = log_rate
+    grad_rate_param = grad_log_rate
+
+  grad_concentration, grad_rate_param = generic.fix_gradient_for_broadcasting(
+      [concentration, rate_param],
+      [grad_concentration, grad_rate_param])
+
   if grad_rate is not None:
-    grad_rate = tf.reshape(
-        tf.math.reduce_sum(grad_rate, axis=ax_rate), rate_shape)
+    grad_rate = grad_rate_param
   if grad_log_rate is not None:
-    grad_log_rate = tf.reshape(
-        tf.math.reduce_sum(grad_log_rate, axis=ax_rate), rate_shape)
+    grad_log_rate = grad_rate_param
 
   return grad_concentration, grad_rate, grad_log_rate, None  # seed=None
 

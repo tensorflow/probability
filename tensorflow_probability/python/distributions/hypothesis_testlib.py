@@ -90,7 +90,9 @@ SPECIAL_DISTS = (
     'TransformedDistribution',  # (has strategy)
     'QuantizedDistribution',  # (has strategy)
     'VariationalGaussianProcess',  # PSDKernel strategy not implemented.
-    'WishartLinearOperator')
+    'WishartLinearOperator',
+    'ZeroInflatedNegativeBinomial',  # b/244737961
+)
 
 
 # MUTEX_PARAMS are mutually exclusive parameters that cannot be drawn together
@@ -374,6 +376,8 @@ CONSTRAINTS = {
         tfp_hps.softplus_plus_eps(),
     'TwoPieceNormal.skewness':
         tfp_hps.softplus_plus_eps(),
+    'NoncentralChi2.noncentrality':
+        tfp_hps.softplus_plus_eps()
 }
 
 

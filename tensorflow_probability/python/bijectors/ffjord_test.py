@@ -18,21 +18,19 @@
 
 from absl.testing import parameterized
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import ffjord
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import gradient as tfp_gradient
 
-from tensorflow.python import tf2  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
-
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_graph_and_eager_modes
 @parameterized.named_parameters([
     ('float32', np.float32),
     ('float64', np.float64),
 ])
-class FFJORDBijectorTest(tfp_test_util.TestCase):
+class FFJORDBijectorTest(test_util.TestCase):
   """Tests correctness of the Y = g(X) = FFJORD(X) transformation."""
 
   def testBijector(self, dtype):
@@ -60,7 +58,7 @@ class FFJORDBijectorTest(tfp_test_util.TestCase):
     )
 
   def testBijectorConditionKwargs(self, dtype):
-    if not tf2.enabled():
+    if not tf1.control_flow_v2_enabled():
       self.skipTest('b/152464477')
 
     tf_dtype = tf.as_dtype(dtype)
@@ -202,4 +200,4 @@ class FFJORDBijectorTest(tfp_test_util.TestCase):
 
 
 if __name__ == '__main__':
-  tfp_test_util.main()
+  test_util.main()

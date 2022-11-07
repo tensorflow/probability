@@ -219,6 +219,7 @@ py_library(
     srcs = ["nest.py"],
     deps = [
         # tree dep,
+        # wrapt dep,
     ],
 )
 
@@ -313,8 +314,7 @@ py_test(
     tags = ["tfp_numpy"],
     deps = [
         ":tensor_array_ops",
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:test_util.numpy",
     ],
 )
 
@@ -385,12 +385,7 @@ py_library(
 py_library(
     name = "test_lib",
     srcs = ["test_lib.py"],
-    deps = [
-        ":nest",
-        # absl/logging dep,
-        # absl/testing:absltest dep,
-        # numpy dep,
-    ],
+    deps = [],
 )
 
 py_library(
@@ -441,9 +436,10 @@ py_test(
     size = "small",
     srcs = ["numpy_test.py"],
     shard_count = 15,
-    tags = ["tfp_numpy"],
+    tags = ["tf1-broken"],
     deps = [
         ":numpy_testlib",
+        # tensorflow dep,
     ],
 )
 

@@ -45,12 +45,12 @@ implemented in this module.
 
 import collections
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.util import seed_stream
 
 
 _DifferentialEvolutionOptimizerResults = collections.namedtuple(
@@ -176,8 +176,8 @@ def one_step(
     if population_values is None:
       population_values = objective_function(*population)
     population_size = tf.shape(population[0])[0]
-    seed_stream = tfp_util.SeedStream(seed, salt='one_step')
-    mixing_indices = _get_mixing_indices(population_size, seed=seed_stream())
+    stream = seed_stream.SeedStream(seed, salt='one_step')
+    mixing_indices = _get_mixing_indices(population_size, seed=stream())
     # Construct the mutated solution vectors. There is one for each member of
     # the population.
     mutants = _get_mutants(population,
@@ -189,7 +189,7 @@ def one_step(
                                    population_size,
                                    mutants,
                                    crossover_prob,
-                                   seed=seed_stream())
+                                   seed=stream())
     candidate_values = objective_function(*candidates)
     if population_values is None:
       population_values = objective_function(*population)
@@ -200,10 +200,16 @@ def one_step(
         population_values)
 
     to_replace = candidate_values < population_values
-    next_population = [
-        tf1.where(to_replace, candidates_part, population_part)
-        for candidates_part, population_part in zip(candidates, population)
-    ]
+
+    def _replace(c_part, p_part):
+      to_replace_reshaped = tf.reshape(
+          to_replace, shape=ps.concat([
+              [population_size],
+              ps.ones([ps.size(ps.shape(c_part)[:-1])], dtype=np.int32)
+          ], axis=0))
+      return tf.where(to_replace_reshaped, c_part, p_part)
+
+    next_population = tf.nest.map_structure(_replace, candidates, population)
     next_values = tf.where(to_replace, candidate_values, population_values)
 
   return next_population, next_values
@@ -572,7 +578,7 @@ def _get_starting_population(initial_population,
   if initial_population is not None:
     return [tf.convert_to_tensor(part) for part in initial_population]
   # Constructs the population by adding normal noise to the initial position.
-  seed_stream = tfp_util.SeedStream(seed, salt='get_starting_population')
+  stream = seed_stream.SeedStream(seed, salt='get_starting_population')
   population = []
   for part in initial_position:
     part = tf.convert_to_tensor(part)
@@ -585,7 +591,7 @@ def _get_starting_population(initial_population,
     population_part = tf.random.normal(population_part_shape,
                                        stddev=population_stddev,
                                        dtype=part.dtype.base_dtype,
-                                       seed=seed_stream())
+                                       seed=stream())
     population_part += part
     population_part = tf.concat([[part], population_part], axis=0)
     population.append(population_part)
@@ -627,9 +633,9 @@ def _binary_crossover(population,
     The recombined population.
   """
   sizes = [tf.cast(tf.size(x), dtype=tf.float64) for x in population]
-  seed_stream = tfp_util.SeedStream(seed, salt='binary_crossover')
+  stream = seed_stream.SeedStream(seed, salt='binary_crossover')
   force_crossover_group = categorical.Categorical(sizes).sample(
-      [population_size, 1], seed=seed_stream())
+      [population_size, 1], seed=stream())
   recombinants = []
   for i, population_part in enumerate(population):
     pop_part_flat = tf.reshape(population_part, [population_size, -1])
@@ -640,7 +646,7 @@ def _binary_crossover(population,
                           minval=0,
                           maxval=part_size,
                           dtype=tf.int32,
-                          seed=seed_stream()),
+                          seed=stream()),
         part_size,
         on_value=True,
         off_value=False,
@@ -650,9 +656,9 @@ def _binary_crossover(population,
     do_binary_crossover = tf.random.uniform(
         [population_size, part_size],
         dtype=crossover_prob.dtype.base_dtype,
-        seed=seed_stream()) < crossover_prob
+        seed=stream()) < crossover_prob
     do_binary_crossover |= force_crossovers
-    recombinant_flat = tf1.where(
+    recombinant_flat = tf.where(
         do_binary_crossover, mutant_part_flat, pop_part_flat)
     recombinant = tf.reshape(recombinant_flat, tf.shape(population_part))
     recombinants.append(recombinant)
@@ -725,19 +731,19 @@ def _get_mixing_indices(size, seed=None, name=None):
   with tf.name_scope(name or 'get_mixing_indices'):
     size = tf.convert_to_tensor(size)
     dtype = size.dtype
-    seed_stream = tfp_util.SeedStream(seed, salt='get_mixing_indices')
+    stream = seed_stream.SeedStream(seed, salt='get_mixing_indices')
     first = tf.random.uniform([size],
                               maxval=size-1,
                               dtype=dtype,
-                              seed=seed_stream())
+                              seed=stream())
     second = tf.random.uniform([size],
                                maxval=size-2,
                                dtype=dtype,
-                               seed=seed_stream())
+                               seed=stream())
     third = tf.random.uniform([size],
                               maxval=size-3,
                               dtype=dtype,
-                              seed=seed_stream())
+                              seed=stream())
 
     # Shift second if it is on top of or to the right of first
     second = tf.where(first < second, second, second + 1)

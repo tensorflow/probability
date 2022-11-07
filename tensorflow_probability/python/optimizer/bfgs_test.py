@@ -528,12 +528,11 @@ class BfgsTest(test_util.TestCase):
 
     # Test with a vector of unknown dimension, and a fully unknown shape.
     for shape in ([None], None):
-      start = tf1.placeholder(tf.float32, shape=shape)
+      start = tf1.placeholder_with_default([0.6, 0.8], shape=shape)
       bfgs_op = bfgs.minimize(quadratic, initial_position=start, tolerance=1e-8)
       self.assertFalse(bfgs_op.position.shape.is_fully_defined())
 
-      with self.cached_session() as session:
-        results = session.run(bfgs_op, feed_dict={start: [0.6, 0.8]})
+      results = self.evaluate(bfgs_op)
       self.assertTrue(results.converged)
       self.assertLessEqual(_norm(results.objective_gradient), 1e-8)
       self.assertArrayNear(results.position, minimum, 1e-5)

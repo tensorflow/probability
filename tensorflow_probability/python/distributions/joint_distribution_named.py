@@ -464,14 +464,15 @@ class JointDistributionNamed(_JointDistributionNamed,
 
   def __new__(cls, *args, **kwargs):
     """Returns a `_JointDistributionNamed` if `model` contains non-CT dists."""
-    if args:
-      model = args[0]
-    else:
-      model = kwargs.get('model')
+    if cls is JointDistributionNamed:
+      if args:
+        model = args[0]
+      else:
+        model = kwargs.get('model')
 
-    if not all(isinstance(d, tf.__internal__.CompositeTensor) or callable(d)
-               for d in tf.nest.flatten(model)):
-      return _JointDistributionNamed(*args, **kwargs)
+      if not all(isinstance(d, tf.__internal__.CompositeTensor) or callable(d)
+                 for d in tf.nest.flatten(model)):
+        return _JointDistributionNamed(*args, **kwargs)
     return super(JointDistributionNamed, cls).__new__(cls)
 
   @property

@@ -23,10 +23,12 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import generic
 
 
 __all__ = [
@@ -34,6 +36,7 @@ __all__ = [
     'cholesky_update',
     'fill_triangular',
     'fill_triangular_inverse',
+    'hpsd_logdet',
     'lu_matrix_inverse',
     'lu_reconstruct',
     'lu_reconstruct_assertions',  # Internally visible for MatvecLU.
@@ -41,6 +44,7 @@ __all__ = [
     'pivoted_cholesky',
     'sparse_or_dense_matmul',
     'sparse_or_dense_matvecmul',
+    'hpsd_quadratic_form_solvevec',
 ]
 
 
@@ -377,7 +381,7 @@ def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
           [[tf.cast(m, tf.int32), 0]]], axis=0)
       diag_update = tf.pad(row**2, paddings=paddings)[..., 0, :]
       reverse_perm = _invert_permutation(perm)
-      matrix_diag -= batch_gather(diag_update, reverse_perm)
+      matrix_diag = matrix_diag - batch_gather(diag_update, reverse_perm)
       # Step 9.
       row = tf.pad(row, paddings=paddings)
       # TODO(bjp): Defer the reverse permutation all-at-once at the end?
@@ -1084,3 +1088,143 @@ def _maybe_validate_matrix(a, validate_args):
     assertions.append(assert_util.assert_rank_at_least(
         a, rank=2, message='Input `a` must have at least 2 dimensions.'))
   return assertions
+
+
+def _hpsd_logdet_fwd(matrix, cholesky_matrix):
+  if cholesky_matrix is None:
+    cholesky_matrix = tf.linalg.cholesky(matrix)
+  output = 2. * tf.reduce_sum(
+      tf.math.log(tf.linalg.diag_part(cholesky_matrix)), axis=-1)
+  return output, (cholesky_matrix,)
+
+
+def _hpsd_logdet_bwd(cholesky_matrix, aux, g):
+  """Reverse mode impl for hpsd_logdet."""
+  del cholesky_matrix
+  cholesky_matrix, = aux
+  dmatrix = g
+  chol_linop = tf.linalg.LinearOperatorLowerTriangular(cholesky_matrix)
+  chol_inverse = chol_linop.solve(tf.linalg.eye(
+      num_rows=chol_linop.domain_dimension_tensor(),
+      dtype=chol_linop.dtype))
+  inverse_matrix = tf.linalg.matmul(
+      chol_inverse, chol_inverse, transpose_a=True)
+
+  return (dmatrix[..., tf.newaxis, tf.newaxis] * inverse_matrix,)
+
+
+def _hpsd_logdet_jvp(cholesky_matrix, primals, tangents):
+  matrix, = primals
+  gmatrix, = tangents
+  output, (cholesky_matrix,) = _hpsd_logdet_fwd(matrix, cholesky_matrix)
+  chol_linop = tf.linalg.LinearOperatorLowerTriangular(cholesky_matrix)
+  matrix_jvp = chol_linop.solve(chol_linop.solve(gmatrix), adjoint=True)
+  return output, tf.linalg.trace(matrix_jvp)
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_hpsd_logdet_fwd,
+    vjp_bwd=_hpsd_logdet_bwd,
+    jvp_fn=_hpsd_logdet_jvp,
+    nondiff_argnums=(1,))
+def _hpsd_logdet_custom_gradient(matrix, cholesky_matrix):
+  return _hpsd_logdet_fwd(matrix, cholesky_matrix)[0]
+
+
+def hpsd_logdet(matrix, cholesky_matrix=None):
+  """Computes the `log|det(matrix)|`, where `matrix` is a HPSD matrix.
+
+  Given `matrix` computes `log|det(matrix)|`, where `matrix` is Hermitian
+  Positive Semi-definite matrix.
+
+  Args:
+    matrix: A Floating-point `Tensor` of shape `[..., N, N]`. Represents
+      a hermitian positive semi-definite matrix.
+    cholesky_matrix: (Optional) Floating-point `Tensor` of shape `[..., N, N]`
+      that represents a cholesky factor of `matrix`.
+  Returns:
+    hpsd_logdet: Scalar `Tensor`, retaining the batch shape of `matrix`.
+  """
+  with tf.name_scope('hpsd_logdet'):
+    dtype = dtype_util.common_dtype([matrix, cholesky_matrix], tf.float32)
+    matrix = tf.convert_to_tensor(matrix, dtype=dtype)
+    if cholesky_matrix is not None:
+      cholesky_matrix = tf.convert_to_tensor(cholesky_matrix, dtype=dtype)
+    return _hpsd_logdet_custom_gradient(matrix, cholesky_matrix)
+
+
+def _hpsd_quadratic_form_solvevec_fwd(matrix, rhs, cholesky_matrix):
+  if cholesky_matrix is None:
+    cholesky_matrix = tf.linalg.cholesky(matrix)
+  chol_linop = tf.linalg.LinearOperatorLowerTriangular(cholesky_matrix)
+  solve_rhs = chol_linop.solvevec(rhs)
+  output = tf.math.reduce_sum(tf.math.square(solve_rhs), axis=-1)
+  return output, (cholesky_matrix, rhs, solve_rhs)
+
+
+def _hpsd_quadratic_form_solvevec_bwd(cholesky_matrix, aux, g):
+  """Reverse mode impl for hpsd_quadratic_form_solvevec."""
+  del cholesky_matrix
+
+  # y^T A^-1 y
+  cholesky_matrix, rhs, solve_rhs = aux
+  chol_linop = tf.linalg.LinearOperatorLowerTriangular(cholesky_matrix)
+  full_solve = chol_linop.solvevec(solve_rhs, adjoint=True)
+  matrix_grad = -full_solve[..., tf.newaxis, :] * full_solve[..., tf.newaxis]
+  rhs_grad = 2. * full_solve
+
+  matrix_grad, rhs_grad = generic.fix_gradient_for_broadcasting(
+      [cholesky_matrix, rhs[..., tf.newaxis]],
+      [matrix_grad * g[..., tf.newaxis, tf.newaxis],
+       (rhs_grad * g[..., tf.newaxis])[..., tf.newaxis]])
+  return matrix_grad, tf.squeeze(rhs_grad, axis=-1)
+
+
+def _hpsd_quadratic_form_solvevec_jvp(cholesky_matrix, primals, tangents):
+  """JVP for hpsd_quadratic_form_solvevec."""
+  matrix, rhs = primals
+  gmatrix, grhs = tangents
+  output, (cholesky_matrix, _, solve_rhs) = _hpsd_quadratic_form_solvevec_fwd(
+      matrix, rhs, cholesky_matrix)
+  chol_linop = tf.linalg.LinearOperatorLowerTriangular(cholesky_matrix)
+  full_solve = chol_linop.solvevec(solve_rhs, adjoint=True)
+  rhs_grad = 2 * tf.math.reduce_sum(grhs * full_solve, axis=-1)
+  gmatrix_linop = tf.linalg.LinearOperatorFullMatrix(gmatrix)
+  matrix_grad = -tf.math.reduce_sum(
+      full_solve * gmatrix_linop.matvec(full_solve), axis=-1)
+  return output, matrix_grad + rhs_grad
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_hpsd_quadratic_form_solvevec_fwd,
+    vjp_bwd=_hpsd_quadratic_form_solvevec_bwd,
+    jvp_fn=_hpsd_quadratic_form_solvevec_jvp,
+    nondiff_argnums=(2,))
+def _hpsd_quadratic_form_solvevec_custom_gradient(
+    matrix, rhs, cholesky_matrix):
+  return _hpsd_quadratic_form_solvevec_fwd(matrix, rhs, cholesky_matrix)[0]
+
+
+def hpsd_quadratic_form_solvevec(matrix, rhs, cholesky_matrix=None):
+  """Computes the `rhs^T matrix^-1 rhs`, where `matrix` is HPSD.
+
+  Given `matrix` and `rhs` computes `rhs^T @ matrix^-1 rhs`, where
+  `matrix` is a Hermitian Positive semi-definite matrix.
+
+  Args:
+    matrix: A Floating-point `Tensor` of shape `[..., N, N]`. Represents
+      a hermitian positive semi-definite matrix.
+    rhs: A Floating-point `Tensor` of shape `[..., N]`.
+    cholesky_matrix: (Optional) Floating-point `Tensor` of shape `[..., N, N]`
+      that represents a cholesky factor of `matrix`.
+  Returns:
+    hpsd_quadratic_form_solvevec: `Tensor` of shape `[..., N]`.
+  """
+  with tf.name_scope('hpsd_quadratic_form_solvevec'):
+    dtype = dtype_util.common_dtype([matrix, rhs, cholesky_matrix], tf.float32)
+    matrix = tf.convert_to_tensor(matrix, dtype=dtype)
+    rhs = tf.convert_to_tensor(rhs, dtype=dtype)
+    if cholesky_matrix is not None:
+      cholesky_matrix = tf.convert_to_tensor(cholesky_matrix, dtype=dtype)
+    return _hpsd_quadratic_form_solvevec_custom_gradient(
+        matrix, rhs, cholesky_matrix)

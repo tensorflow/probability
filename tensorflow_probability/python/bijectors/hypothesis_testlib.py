@@ -191,6 +191,10 @@ def trivially_instantiable_bijectors():
       result[bijector_name] = bijector_class
 
   result['Invert'] = tfb.Invert
+  # Add these bijectors since they subclass Invert but actually have no
+  # parameters.
+  result['Log'] = tfb.Log
+  result['Log1p'] = tfb.Log1p
 
   for bijector_name in sorted(result):
     logging.warning('Trivially supported bijectors: tfb.%s', bijector_name)
@@ -380,6 +384,9 @@ def bijector_supports():
       'Transpose':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_UNCONSTRAINED),
+      'UnitVector':
+          BijectorSupport(Support.VECTOR_UNCONSTRAINED,
+                          Support.VECTOR_WITH_L2_NORM_1_SIZE_GT1),
       'WeibullCDF':
           BijectorSupport(Support.SCALAR_NON_NEGATIVE, Support.SCALAR_IN_0_1),
   }

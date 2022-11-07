@@ -231,7 +231,7 @@ class BetaincTest(test_util.TestCase):
   @parameterized.parameters(np.float32, np.float64)
   @test_util.numpy_disable_gradient_test
   def testBetaincGradient(self, dtype):
-    space = np.logspace(-2., 2., 10).tolist()
+    space = np.logspace(-2., 2., 5).tolist()
     space_x = np.linspace(0.01, 0.99, 10).tolist()
     a, b, x = zip(*list(itertools.product(space, space, space_x)))
 
@@ -239,19 +239,15 @@ class BetaincTest(test_util.TestCase):
     b = np.array(b, dtype=dtype)
     x = np.array(x, dtype=dtype)
 
-    # Wrap in tf.function and compile for faster computations.
-    betainc = tf.function(special.betainc, autograph=False, jit_compile=True)
+    # Wrap in tf.function for faster computations.
+    betainc = tf.function(special.betainc, autograph=False)
 
     delta = 1e-4 if dtype == np.float64 else 1e-3
     tolerance = 7e-3 if dtype == np.float64 else 7e-2
     tolerance_x = 1e-3 if dtype == np.float64 else 1e-1
 
     err = self.compute_max_gradient_error(
-        lambda z: betainc(z, b, x), [a], delta=delta)
-    self.assertLess(err, tolerance)
-
-    err = self.compute_max_gradient_error(
-        lambda z: betainc(a, z, x), [b], delta=delta)
+        lambda r, s: betainc(r, s, x), [a, b], delta=delta)
     self.assertLess(err, tolerance)
 
     err = self.compute_max_gradient_error(
@@ -263,8 +259,8 @@ class BetaincTest(test_util.TestCase):
   def testBetaincDerivativeFinite(self, dtype):
     eps = np.finfo(dtype).eps
 
-    space = np.logspace(np.log10(eps), 5.).tolist()
-    space_x = np.linspace(eps, 1. - eps).tolist()
+    space = np.logspace(np.log10(eps), 5., 20).tolist()
+    space_x = np.linspace(eps, 1. - eps, 20).tolist()
     a, b, x = zip(*list(itertools.product(space, space, space_x)))
 
     a = np.array(a, dtype=dtype)
@@ -518,31 +514,12 @@ class BetaincTest(test_util.TestCase):
     def betainc_partials(a, b, x):
       return gradient.value_and_gradient(special.betainc, [a, b, x])[1]
 
-    def betainc_partials_of_partial_a(a, b, x):
-      return gradient.value_and_gradient(
-          lambda a, b, x: betainc_partials(a, b, x)[0], [a, b, x])[1]
+    # Wrap in tf.function for faster computations.
+    @tf.function(autograph=False)
+    def betainc_partials_of_partials(a, b, x):
+      return gradient.value_and_gradient(betainc_partials, [a, b, x])[1]
 
-    def betainc_partials_of_partial_b(a, b, x):
-      return gradient.value_and_gradient(
-          lambda a, b, x: betainc_partials(a, b, x)[1], [a, b, x])[1]
-
-    def betainc_partials_of_partial_x(a, b, x):
-      return gradient.value_and_gradient(
-          lambda a, b, x: betainc_partials(a, b, x)[2], [a, b, x])[1]
-
-    betainc_partials_of_partials = [
-        betainc_partials_of_partial_a,
-        betainc_partials_of_partial_b,
-        betainc_partials_of_partial_x]
-
-    # Wrap in tf.function and compile for faster computations.
-    betainc_partials_of_partials = [
-        tf.function(partial_fn, autograph=False, jit_compile=True)
-        for partial_fn in betainc_partials_of_partials]
-
-    partials_of_partials = [
-        partial_fn(a, b, x) for partial_fn in betainc_partials_of_partials]
-
+    partials_of_partials = betainc_partials_of_partials(a, b, x)
     self.assertAllFinite(self.evaluate(partials_of_partials))
 
 
@@ -563,7 +540,7 @@ class BetaincinvTest(test_util.TestCase):
     b = uniform.Uniform(low=tiny, high=dtype(b_high)).sample(n, strm())
     y = uniform.Uniform(low=tiny, high=dtype(1.)).sample(n, strm())
 
-    # Wrap in tf.function and compile for faster computations.
+    # Wrap in tf.function for faster computations.
     betaincinv = tf.function(special.betaincinv, autograph=False)
 
     result, a, b, y = self.evaluate(
@@ -622,7 +599,7 @@ class BetaincinvTest(test_util.TestCase):
     b = np.array([0.6, 0.6, -1., 0., 0.6, 0.6], dtype=dtype)
     y = np.array([0.5, 0.5, 0.5, 0.5, -1., 2.], dtype=dtype)
 
-    # Wrap in tf.function and compile for faster computations.
+    # Wrap in tf.function for faster computations.
     betaincinv = tf.function(special.betaincinv, autograph=False)
 
     result = self.evaluate(special.betaincinv(a, b, y))
@@ -699,8 +676,8 @@ class BetaincinvTest(test_util.TestCase):
     eps = np.finfo(dtype).eps
     small = np.sqrt(eps)
 
-    space = np.logspace(np.log10(small), 4.).tolist()
-    space_y = np.linspace(eps, 1. - small).tolist()
+    space = np.logspace(np.log10(small), 4., 20).tolist()
+    space_y = np.linspace(eps, 1. - small, 20).tolist()
     a, b, y = [
         tf.constant(z, dtype=dtype)
         for z in zip(*list(itertools.product(space, space, space_y)))]
@@ -782,31 +759,12 @@ class BetaincinvTest(test_util.TestCase):
     def betaincinv_partials(a, b, y):
       return gradient.value_and_gradient(special.betaincinv, [a, b, y])[1]
 
-    def betaincinv_partials_of_partial_a(a, b, y):
-      return gradient.value_and_gradient(
-          lambda a, b, y: betaincinv_partials(a, b, y)[0], [a, b, y])[1]
-
-    def betaincinv_partials_of_partial_b(a, b, y):
-      return gradient.value_and_gradient(
-          lambda a, b, y: betaincinv_partials(a, b, y)[1], [a, b, y])[1]
-
-    def betaincinv_partials_of_partial_y(a, b, y):
-      return gradient.value_and_gradient(
-          lambda a, b, y: betaincinv_partials(a, b, y)[2], [a, b, y])[1]
-
-    betaincinv_partials_of_partials = [
-        betaincinv_partials_of_partial_a,
-        betaincinv_partials_of_partial_b,
-        betaincinv_partials_of_partial_y]
-
     # Wrap in tf.function for faster computations.
-    betaincinv_partials_of_partials = [
-        tf.function(partial_fn, autograph=False)
-        for partial_fn in betaincinv_partials_of_partials]
+    @tf.function(autograph=False)
+    def betaincinv_partials_of_partials(a, b, y):
+      return gradient.value_and_gradient(betaincinv_partials, [a, b, y])[1]
 
-    partials_of_partials = [
-        partial_fn(a, b, y) for partial_fn in betaincinv_partials_of_partials]
-
+    partials_of_partials = betaincinv_partials_of_partials(a, b, y)
     self.assertAllFinite(self.evaluate(partials_of_partials))
 
 
@@ -822,7 +780,7 @@ class DawsnTest(test_util.TestCase):
     seed_stream = test_util.test_seed_stream()
     x = self.evaluate(
         tf.random.uniform(
-            [int(1e4)], 0., 100., dtype=dtype, seed=seed_stream()))
+            [int(1e3)], 0., 100., dtype=dtype, seed=seed_stream()))
     self.assertAllClose(
         self.evaluate(special.dawsn(x)), self.evaluate(-special.dawsn(-x)))
 
@@ -831,21 +789,21 @@ class DawsnTest(test_util.TestCase):
     seed_stream = test_util.test_seed_stream()
     x = self.evaluate(
         tf.random.uniform(
-            [int(1e4)], 0., 1., dtype=dtype, seed=seed_stream()))
+            [int(1e3)], 0., 1., dtype=dtype, seed=seed_stream()))
     self.assertAllClose(scipy_special.dawsn(x), self.evaluate(special.dawsn(x)))
 
   @parameterized.parameters(np.float32, np.float64)
   def testDawsnMedium(self, dtype):
     seed_stream = test_util.test_seed_stream()
     x = self.evaluate(
-        tf.random.uniform([int(1e4)], 1., 10., dtype=dtype, seed=seed_stream()))
+        tf.random.uniform([int(1e3)], 1., 10., dtype=dtype, seed=seed_stream()))
     self.assertAllClose(scipy_special.dawsn(x), self.evaluate(special.dawsn(x)))
 
   @parameterized.parameters(np.float32, np.float64)
   def testDawsnLarge(self, dtype):
     seed_stream = test_util.test_seed_stream()
     x = self.evaluate(tf.random.uniform(
-        [int(1e4)], 10., 100., dtype=dtype, seed=seed_stream()))
+        [int(1e3)], 10., 100., dtype=dtype, seed=seed_stream()))
     self.assertAllClose(scipy_special.dawsn(x), self.evaluate(special.dawsn(x)))
 
   @test_util.numpy_disable_gradient_test
@@ -885,32 +843,32 @@ class IgammainvTest(test_util.TestCase):
   @parameterized.parameters((np.float32, 1.5e-4), (np.float64, 1e-6))
   def test_igammainv_inverse_small_a(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
-    a = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
-    p = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
+    a = tf.random.uniform([int(1e3)], 0., 1., dtype=dtype, seed=seed_stream())
+    p = tf.random.uniform([int(1e3)], 0., 1., dtype=dtype, seed=seed_stream())
     igammainv, a, p = self.evaluate([special.igammainv(a, p), a, p])
     self.assertAllClose(scipy_special.gammaincinv(a, p), igammainv, rtol=rtol)
 
   @parameterized.parameters((np.float32, 1.5e-4), (np.float64, 1e-6))
   def test_igammacinv_inverse_small_a(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
-    a = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
-    p = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
+    a = tf.random.uniform([int(1e3)], 0., 1., dtype=dtype, seed=seed_stream())
+    p = tf.random.uniform([int(1e3)], 0., 1., dtype=dtype, seed=seed_stream())
     igammacinv, a, p = self.evaluate([special.igammacinv(a, p), a, p])
     self.assertAllClose(scipy_special.gammainccinv(a, p), igammacinv, rtol=rtol)
 
   @parameterized.parameters((np.float32, 1e-4), (np.float64, 1e-6))
   def test_igammainv_inverse_medium_a(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
-    a = tf.random.uniform([int(1e4)], 1., 100., dtype=dtype, seed=seed_stream())
-    p = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
+    a = tf.random.uniform([int(1e3)], 1., 100., dtype=dtype, seed=seed_stream())
+    p = tf.random.uniform([int(1e3)], 0., 1., dtype=dtype, seed=seed_stream())
     igammainv, a, p = self.evaluate([special.igammainv(a, p), a, p])
     self.assertAllClose(scipy_special.gammaincinv(a, p), igammainv, rtol=rtol)
 
   @parameterized.parameters((np.float32, 1e-4), (np.float64, 1e-6))
   def test_igammacinv_inverse_medium_a(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
-    a = tf.random.uniform([int(1e4)], 1., 100., dtype=dtype, seed=seed_stream())
-    p = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
+    a = tf.random.uniform([int(1e3)], 1., 100., dtype=dtype, seed=seed_stream())
+    p = tf.random.uniform([int(1e3)], 0., 1., dtype=dtype, seed=seed_stream())
     igammacinv, a, p = self.evaluate([special.igammacinv(a, p), a, p])
     self.assertAllClose(scipy_special.gammainccinv(a, p), igammacinv, rtol=rtol)
 
@@ -918,8 +876,8 @@ class IgammainvTest(test_util.TestCase):
   def test_igammainv_inverse_large_a(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
     a = tf.random.uniform(
-        [int(1e4)], 100., 10000., dtype=dtype, seed=seed_stream())
-    p = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
+        [int(1e3)], 100., 10000., dtype=dtype, seed=seed_stream())
+    p = tf.random.uniform([int(1e3)], 0., 1., dtype=dtype, seed=seed_stream())
     igammainv, a, p = self.evaluate([special.igammainv(a, p), a, p])
     self.assertAllClose(scipy_special.gammaincinv(a, p), igammainv, rtol=rtol)
 
@@ -927,8 +885,8 @@ class IgammainvTest(test_util.TestCase):
   def test_igammacinv_inverse_large_a(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
     a = tf.random.uniform(
-        [int(1e4)], 100., 10000., dtype=dtype, seed=seed_stream())
-    p = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
+        [int(1e3)], 100., 10000., dtype=dtype, seed=seed_stream())
+    p = tf.random.uniform([int(1e3)], 0., 1., dtype=dtype, seed=seed_stream())
     igammacinv, a, p = self.evaluate([special.igammacinv(a, p), a, p])
     self.assertAllClose(scipy_special.gammainccinv(a, p), igammacinv, rtol=rtol)
 
@@ -1031,13 +989,13 @@ class OwensTTest(test_util.TestCase):
   def testOwensTSmall(self, dtype):
     seed_stream = test_util.test_seed_stream()
     a = tf.random.uniform(
-        shape=[int(1e4)],
+        shape=[int(1e3)],
         minval=0.,
         maxval=1.,
         dtype=dtype,
         seed=seed_stream())
     h = tf.random.uniform(
-        shape=[int(1e4)],
+        shape=[int(1e3)],
         minval=0.,
         maxval=1.,
         dtype=dtype,
@@ -1049,13 +1007,13 @@ class OwensTTest(test_util.TestCase):
   def testOwensTLarger(self, dtype):
     seed_stream = test_util.test_seed_stream()
     a = tf.random.uniform(
-        shape=[int(1e4)],
+        shape=[int(1e3)],
         minval=1.,
         maxval=100.,
         dtype=dtype,
         seed=seed_stream())
     h = tf.random.uniform(
-        shape=[int(1e4)],
+        shape=[int(1e3)],
         minval=1.,
         maxval=100.,
         dtype=dtype,
@@ -1067,13 +1025,13 @@ class OwensTTest(test_util.TestCase):
   def testOwensTLarge(self, dtype):
     seed_stream = test_util.test_seed_stream()
     a = tf.random.uniform(
-        shape=[int(1e4)],
+        shape=[int(1e3)],
         minval=100.,
         maxval=1000.,
         dtype=dtype,
         seed=seed_stream())
     h = tf.random.uniform(
-        shape=[int(1e4)],
+        shape=[int(1e3)],
         minval=100.,
         maxval=1000.,
         dtype=dtype,
@@ -1119,13 +1077,13 @@ class SpecialTest(test_util.TestCase):
   def testAtanDifferenceSmall(self, dtype):
     seed_stream = test_util.test_seed_stream()
     x = tf.random.uniform(
-        shape=[int(1e5)],
+        shape=[int(1e3)],
         minval=-10.,
         maxval=10.,
         dtype=dtype,
         seed=seed_stream())
     y = tf.random.uniform(
-        shape=[int(1e5)],
+        shape=[int(1e3)],
         minval=-10.,
         maxval=10.,
         dtype=dtype,
@@ -1138,13 +1096,13 @@ class SpecialTest(test_util.TestCase):
   def testAtanDifferenceLarge(self, dtype):
     seed_stream = test_util.test_seed_stream()
     x = tf.random.uniform(
-        shape=[int(1e5)],
+        shape=[int(1e3)],
         minval=-100.,
         maxval=100.,
         dtype=dtype,
         seed=seed_stream())
     y = tf.random.uniform(
-        shape=[int(1e5)],
+        shape=[int(1e3)],
         minval=-100.,
         maxval=100.,
         dtype=dtype,
@@ -1166,7 +1124,7 @@ class SpecialTest(test_util.TestCase):
   def testAtanDifferenceProductIsNegativeOne(self, dtype):
     seed_stream = test_util.test_seed_stream()
     x = tf.random.uniform(
-        shape=[int(1e5)],
+        shape=[int(1e3)],
         minval=-10.,
         maxval=10.,
         dtype=dtype,
@@ -1180,7 +1138,7 @@ class SpecialTest(test_util.TestCase):
   def testErfcinvPreservesDtype(self, dtype):
     x = self.evaluate(
         tf.random.uniform(
-            shape=[int(1e5)],
+            shape=[int(1e3)],
             minval=0.,
             maxval=1.,
             dtype=dtype,
@@ -1190,7 +1148,7 @@ class SpecialTest(test_util.TestCase):
   def testErfcinv(self):
     x = self.evaluate(
         tf.random.uniform(
-            shape=[int(1e5)],
+            shape=[int(1e3)],
             minval=0.,
             maxval=1.,
             seed=test_util.test_seed()))
@@ -1206,7 +1164,7 @@ class SpecialTest(test_util.TestCase):
   @parameterized.parameters(tf.float32, tf.float64)
   def testErfcxSmall(self, dtype):
     x = tf.random.uniform(
-        shape=[int(1e5)],
+        shape=[int(1e3)],
         minval=0.,
         maxval=1.,
         dtype=dtype,
@@ -1218,7 +1176,7 @@ class SpecialTest(test_util.TestCase):
   @parameterized.parameters(tf.float32, tf.float64)
   def testErfcxMedium(self, dtype):
     x = tf.random.uniform(
-        shape=[int(1e5)],
+        shape=[int(1e3)],
         minval=1.,
         maxval=20.,
         dtype=dtype,
@@ -1230,7 +1188,7 @@ class SpecialTest(test_util.TestCase):
   @parameterized.parameters(tf.float32, tf.float64)
   def testErfcxLarge(self, dtype):
     x = tf.random.uniform(
-        shape=[int(1e5)],
+        shape=[int(1e3)],
         minval=20.,
         maxval=100.,
         dtype=dtype,
@@ -1242,7 +1200,7 @@ class SpecialTest(test_util.TestCase):
   @parameterized.parameters(tf.float32, tf.float64)
   def testErfcxSmallNegative(self, dtype):
     x = tf.random.uniform(
-        shape=[int(1e5)],
+        shape=[int(1e3)],
         minval=-1.,
         maxval=0.,
         dtype=dtype,
@@ -1254,7 +1212,7 @@ class SpecialTest(test_util.TestCase):
   @parameterized.parameters(tf.float32, tf.float64)
   def testErfcxMediumNegative(self, dtype):
     x = tf.random.uniform(
-        shape=[int(1e5)],
+        shape=[int(1e3)],
         minval=-20.,
         maxval=-1.,
         dtype=dtype,
@@ -1266,7 +1224,7 @@ class SpecialTest(test_util.TestCase):
   @parameterized.parameters(tf.float32, tf.float64)
   def testErfcxLargeNegative(self, dtype):
     x = tf.random.uniform(
-        shape=[int(1e5)],
+        shape=[int(1e3)],
         minval=-100.,
         maxval=-20.,
         dtype=dtype,
@@ -1291,7 +1249,7 @@ class SpecialTest(test_util.TestCase):
   @parameterized.parameters(tf.float32, tf.float64)
   def testLogErfc(self, dtype):
     x = tf.random.uniform(
-        shape=[int(1e5)],
+        shape=[int(1e3)],
         minval=-3.,
         maxval=3.,
         dtype=dtype,
@@ -1317,7 +1275,7 @@ class SpecialTest(test_util.TestCase):
   @parameterized.parameters(tf.float32, tf.float64)
   def testLogErfcx(self, dtype):
     x = tf.random.uniform(
-        shape=[int(1e5)],
+        shape=[int(1e3)],
         minval=-3.,
         maxval=3.,
         dtype=dtype,
@@ -1400,7 +1358,7 @@ class SpecialTest(test_util.TestCase):
 
   def testLogGammaCorrection(self):
     x = half_cauchy.HalfCauchy(
-        loc=8., scale=10.).sample(10000, test_util.test_seed())
+        loc=8., scale=10.).sample(int(1e3), test_util.test_seed())
     pi = 3.14159265
     stirling = x * tf.math.log(x) - x + 0.5 * tf.math.log(2 * pi / x)
     tfp_gamma_ = stirling + special.log_gamma_correction(x)
@@ -1409,12 +1367,13 @@ class SpecialTest(test_util.TestCase):
 
   def testLogGammaDifference(self):
     y = half_cauchy.HalfCauchy(
-        loc=8., scale=10.).sample(10000, test_util.test_seed())
+        loc=8., scale=10.).sample(int(1e3), test_util.test_seed())
     y_64 = tf.cast(y, tf.float64)
     # Not testing x near zero because the naive method is too inaccurate.
     # We will get implicit coverage in testLogBeta, where a good reference
     # implementation is available (scipy_special.betaln).
-    x = uniform.Uniform(low=4., high=12.).sample(10000, test_util.test_seed())
+    x = uniform.Uniform(
+        low=4., high=12.).sample(int(1e3), test_util.test_seed())
     x_64 = tf.cast(x, tf.float64)
     naive_64_ = tf.math.lgamma(y_64) - tf.math.lgamma(x_64 + y_64)
     naive_64, sophisticated, sophisticated_64 = self.evaluate([
@@ -1437,8 +1396,8 @@ class SpecialTest(test_util.TestCase):
       return tf.math.lgamma(y) - tf.math.lgamma(x + y)
 
     y = half_cauchy.HalfCauchy(
-        loc=8., scale=10.).sample(10000, test_util.test_seed())
-    x = uniform.Uniform(low=0., high=8.).sample(10000, test_util.test_seed())
+        loc=8., scale=10.).sample(int(1e3), test_util.test_seed())
+    x = uniform.Uniform(low=0., high=8.).sample(int(1e3), test_util.test_seed())
     _, [simple_gx_,
         simple_gy_] = gradient.value_and_gradient(simple_difference, [x, y])
     _, [gx_, gy_] = gradient.value_and_gradient(special.log_gamma_difference,
@@ -1465,9 +1424,9 @@ class SpecialTest(test_util.TestCase):
 
   def testLogBeta(self):
     strm = test_util.test_seed_stream()
-    x = half_cauchy.HalfCauchy(loc=1., scale=15.).sample(10000, strm())
+    x = half_cauchy.HalfCauchy(loc=1., scale=15.).sample(int(1e3), strm())
     x = self.evaluate(x)
-    y = half_cauchy.HalfCauchy(loc=1., scale=15.).sample(10000, strm())
+    y = half_cauchy.HalfCauchy(loc=1., scale=15.).sample(int(1e3), strm())
     y = self.evaluate(y)
     # Why not 1e-8?
     # - Could be because scipy does the reduction loops recommended
@@ -1484,8 +1443,8 @@ class SpecialTest(test_util.TestCase):
     def simple_lbeta(x, y):
       return tf.math.lgamma(x) + tf.math.lgamma(y) - tf.math.lgamma(x + y)
     strm = test_util.test_seed_stream()
-    x = half_cauchy.HalfCauchy(loc=1., scale=15.).sample(10000, strm())
-    y = half_cauchy.HalfCauchy(loc=1., scale=15.).sample(10000, strm())
+    x = half_cauchy.HalfCauchy(loc=1., scale=15.).sample(int(1e3), strm())
+    y = half_cauchy.HalfCauchy(loc=1., scale=15.).sample(int(1e3), strm())
     _, [simple_gx_,
         simple_gy_] = gradient.value_and_gradient(simple_lbeta, [x, y])
     _, [gx_, gy_] = gradient.value_and_gradient(special.lbeta, [x, y])

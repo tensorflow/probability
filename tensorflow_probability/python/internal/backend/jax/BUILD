@@ -150,8 +150,7 @@ py_test(
         # absl/testing:parameterized dep,
         # hypothesis dep,
         # jax dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:test_util.jax",
     ],
 )
 
@@ -160,7 +159,7 @@ py_test(
     srcs = ["numpy_test.py"],
     main = "numpy_test.py",
     shard_count = 8,
-    tags = ["tfp_jax"],
+    tags = ["tf1-broken"],  # This is broken in TF1 due to backwards incompatibilities with convolutions.
     deps = [
         ":jax",
         ":jax_testlib",

@@ -27,8 +27,6 @@ from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import gradient
 
-from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import
-
 
 @test_util.test_all_tf_execution_regimes
 class NormalTest(test_util.TestCase):
@@ -488,23 +486,6 @@ class NormalTest(test_util.TestCase):
         ValueError,
         r'Arguments `loc` and `scale` must have compatible shapes.'):
       normal.Normal(loc=tf.zeros([2, 3]), scale=scale, validate_args=True)
-
-
-class NormalEagerGCTest(test_util.TestCase):
-
-  @tf_test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
-  def testNormalMeanAndMode(self):
-    # Mu will be broadcast to [7, 7, 7].
-    mu = [7.]
-    sigma = [11., 12., 13.]
-
-    dist = normal.Normal(loc=mu, scale=sigma, validate_args=True)
-
-    self.assertAllEqual((3,), dist.mean().shape)
-    self.assertAllEqual([7., 7, 7], self.evaluate(dist.mean()))
-
-    self.assertAllEqual((3,), dist.mode().shape)
-    self.assertAllEqual([7., 7, 7], self.evaluate(dist.mode()))
 
 
 if __name__ == '__main__':

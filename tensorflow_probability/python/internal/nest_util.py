@@ -20,6 +20,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import tensor_util
 
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
@@ -410,7 +411,7 @@ def call_fn(fn, args):
 
 def convert_to_nested_tensor(value, dtype=None, dtype_hint=None,
                              allow_packing=False, as_shape_tensor=False,
-                             name=None):
+                             convert_ref=True, name=None):
   """Converts the given `value` to a (structure of) `Tensor`.
 
   This function converts Python objects of various types to a (structure of)
@@ -432,6 +433,8 @@ def convert_to_nested_tensor(value, dtype=None, dtype_hint=None,
     as_shape_tensor: Optional boolean when if `True` uses
       `prefer_static.convert_to_shape_tensor` instead of `tf.convert_to_tensor`
       for JAX compatibility.
+    convert_ref: Python `bool`, default `True`. If `True`, convert objects with
+      reference semantics to Tensor.
     name: Optional name to use if a new `Tensor` is created. If inputs are
       structured, elements are named accoring to '{name}/{path}.{to}.{elem}'.
 
@@ -467,8 +470,11 @@ def convert_to_nested_tensor(value, dtype=None, dtype_hint=None,
       # break the Bijector cache on forward/inverse log det jacobian,
       # because tf.convert_to_tensor is not a no-op thereon.
       return value
-    else:
+    elif convert_ref:
       return tf.convert_to_tensor(value, dtype, dtype_hint, name=name)
+    else:
+      return tensor_util.convert_nonref_to_tensor(
+          value, dtype, dtype_hint, name=name)
 
   ### The following branches only affect naming.
   # For unstructured calls, just use the provided name.

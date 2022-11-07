@@ -661,7 +661,7 @@ class JointDistributionNamedTest(test_util.TestCase):
     b = d.experimental_default_event_space_bijector()
     y = self.evaluate(d.sample(seed=test_util.test_seed()))
     y_ = self.evaluate(b.forward(b.inverse(y)))
-    self.assertAllClose(y, y_)
+    self.assertAllCloseNested(y, y_)
 
     # Verify that event shapes are passed through and flattened/unflattened
     # correctly.

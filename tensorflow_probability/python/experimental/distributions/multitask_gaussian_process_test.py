@@ -152,8 +152,12 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
         observation_noise_variance=observation_noise_variance,
         validate_args=True)
 
-    index_points = np.random.uniform(-1., 1., [10, 4])
+    index_points = np.random.uniform(-1., 1., [5, 10, 4])
     observations = np.random.uniform(-1., 1., [10, num_tasks])
+
+    # Check that the internal batch_shape and event_shape methods work.
+    self.assertAllEqual([5], mtgp._batch_shape(index_points=index_points))  # pylint: disable=protected-access
+    self.assertAllEqual([10, 3], mtgp._event_shape(index_points=index_points))  # pylint: disable=protected-access
 
     multi_task_log_prob = mtgp.log_prob(
         observations, index_points=index_points)
@@ -176,6 +180,10 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
     for i in range(3):
       self.assertAllClose(
           single_task_var_, multi_task_var_[..., i], rtol=1e-3)
+
+    # Check that late-binding samples work.
+    self.evaluate(mtgp.sample(
+        seed=test_util.test_seed(), index_points=index_points))
 
   def testConstantMeanFunction(self):
     # 5x5 grid of index points in R^2 and flatten to 25x2
@@ -381,6 +389,33 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
     self.assertAllClose(
         self.evaluate(actual_multitask_var),
         self.evaluate(multitask_var), rtol=4e-3)
+
+  def testLogProbValidateArgs(self):
+    index_points = np.linspace(-4., 4., 10, dtype=np.float32)
+    index_points = np.reshape(index_points, [-1, 2])
+
+    observation_noise_variance = 1e-4
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic()
+    multi_task_kernel = multitask_kernel.Independent(
+        num_tasks=3, base_kernel=kernel)
+    multitask_gp = multitask_gaussian_process.MultiTaskGaussianProcess(
+        multi_task_kernel,
+        index_points,
+        observation_noise_variance=observation_noise_variance,
+        validate_args=True)
+
+    with self.assertRaisesRegexp(ValueError, 'match the number of tasks'):
+      observations = np.linspace(-1., 1., 15).astype(np.float32)
+      multitask_gp.log_prob(observations)
+
+    with self.assertRaisesRegexp(ValueError, 'match the number of tasks'):
+      observations = np.linspace(-1., 1., 20).reshape(5, 4).astype(np.float32)
+      multitask_gp.log_prob(observations)
+
+    with self.assertRaisesRegexp(
+        ValueError, 'match the second to last dimension'):
+      observations = np.linspace(-1., 1., 18).reshape(6, 3).astype(np.float32)
+      multitask_gp.log_prob(observations)
 
   def testLogProbMatchesGP(self):
     # Check that the independent kernel parameterization matches using a

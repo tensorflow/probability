@@ -55,7 +55,6 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:all_util",
         "//tensorflow_probability/python/math/ode",
         "//tensorflow_probability/python/math/psd_kernels",
-        "//tensorflow_probability/python/random",
     ],
 )
 
@@ -148,8 +147,8 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:distribute_lib",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:variadic_reduce",
-        # tensorflow/compiler/jit dep,
     ],
 )
 
@@ -181,7 +180,6 @@ multi_substrate_py_library(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tensor_util",
-        "//tensorflow_probability/python/internal/backend/numpy:tf_inspect",
     ],
 )
 
@@ -288,6 +286,7 @@ multi_substrate_py_library(
         "linalg.py",
     ],
     deps = [
+        ":generic",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
@@ -498,6 +497,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:custom_gradient",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/math:generic",
     ],
 )
 

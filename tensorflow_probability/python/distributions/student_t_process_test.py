@@ -195,7 +195,7 @@ class _StudentTProcessTest(object):
     amp = np.float64(.5)
     len_scale = np.float64(.2)
     kernel = psd_kernels.ExponentiatedQuadratic(amp, len_scale)
-    mean_fn = lambda x: x[:, 0]**2
+    mean_fn = lambda x: x[..., 0]**2
     jitter = np.float64(1e-4)
 
     tp = student_t_process.StudentTProcess(
@@ -205,11 +205,19 @@ class _StudentTProcessTest(object):
         jitter=jitter,
         validate_args=True)
 
-    index_points = np.random.uniform(-1., 1., [10, 1]).astype(np.float64)
+    index_points = np.random.uniform(-1., 1., [5, 10, 1]).astype(np.float64)
+
+    # Check that the internal batch_shape and event_shape methods work.
+    self.assertAllEqual([5], tp._batch_shape(index_points=index_points))  # pylint: disable=protected-access
+    self.assertAllEqual([10], tp._event_shape(index_points=index_points))  # pylint: disable=protected-access
 
     expected_mean = mean_fn(index_points)
     self.assertAllClose(expected_mean,
                         self.evaluate(tp.mean(index_points=index_points)))
+
+    # Check that late-binding samples work.
+    self.evaluate(tp.sample(
+        seed=test_util.test_seed(), index_points=index_points))
 
     def _kernel_fn(x, y):
       return amp ** 2 * np.exp(-.5 * (np.squeeze((x - y)**2)) / (len_scale**2))
@@ -219,10 +227,11 @@ class _StudentTProcessTest(object):
 
     self.assertAllClose(expected_covariance,
                         self.evaluate(tp.covariance(index_points=index_points)))
-    self.assertAllClose(np.diag(expected_covariance),
+    self.assertAllClose(np.diagonal(expected_covariance, axis1=-2, axis2=-1),
                         self.evaluate(tp.variance(index_points=index_points)))
-    self.assertAllClose(np.sqrt(np.diag(expected_covariance)),
-                        self.evaluate(tp.stddev(index_points=index_points)))
+    self.assertAllClose(
+        np.sqrt(np.diagonal(expected_covariance, axis1=-2, axis2=-1)),
+        self.evaluate(tp.stddev(index_points=index_points)))
 
     # Calling mean with no index_points should raise an Error
     with self.assertRaises(ValueError):

@@ -75,32 +75,62 @@ class _MixtureSameFamily(distribution.Distribution):
   import matplotlib.pyplot as plt
   plt.plot(x, gm.prob(x));
 
-  ### Create a mixture of two Bivariate Gaussians:
+  ### Create a mixture of three Bivariate Gaussians:
 
   gm = tfd.MixtureSameFamily(
       mixture_distribution=tfd.Categorical(
-          probs=[0.3, 0.7]),
+          probs=[0.2, 0.4, 0.4]),
       components_distribution=tfd.MultivariateNormalDiag(
           loc=[[-1., 1],  # component 1
-               [1, -1]],  # component 2
-          scale_identity_multiplier=[.3, .6]))
+               [1, -1],  # component 2
+               [1, 1]],  # component 3
+          scale_identity_multiplier=[.3, .6, .7]))
+
+  gm.components_distribution.batch_shape
+  # ==> (3,)
+
+  gm.components_distribution.event_shape
+  # ==> (2,)
 
   gm.mean()
-  # ==> array([ 0.4, -0.4], dtype=float32)
+  # ==> array([ 0.6, 0.2], dtype=float32)
 
   gm.covariance()
-  # ==> array([[ 1.119, -0.84],
-  #            [-0.84,  1.119]], dtype=float32)
+  # ==> array([[ 0.998    , -0.32     ],
+  #            [-0.32     ,  1.3180001]], dtype=float32)
 
   # Plot PDF contours.
-  def meshgrid(x, y=x):
+  def meshgrid(x):
+    y = x
     [gx, gy] = np.meshgrid(x, y, indexing='ij')
     gx, gy = np.float32(gx), np.float32(gy)
     grid = np.concatenate([gx.ravel()[None, :], gy.ravel()[None, :]], axis=0)
     return grid.T.reshape(x.size, y.size, 2)
   grid = meshgrid(np.linspace(-2, 2, 100, dtype=np.float32))
   plt.contour(grid[..., 0], grid[..., 1], gm.prob(grid));
+  ```
 
+  Note that this distribution is *not* a joint distribution over categorical
+  and continuous values, but rather a mixture of continuous distributions
+  proportioned by the given categorical distribution. If you want a joint
+  distribution, you might write it as:
+
+  ```python
+  @tfd.JointDistributionCoroutineAutoBatched
+  def model():
+    mus = tf.constant([[-1., 1], # component 1
+                       [1, -1],  # component 2
+                       [1, 1]])  # component 3
+    scales = tf.constant([.3, .6, .7])
+    idx = yield tfd.Categorical(probs=[.2, .4, .4], name='idx')
+    val = yield tfd.MultivariateNormalDiag(
+        loc=mus[idx], scale_identity_multiplier=scales[idx], name='val')
+
+  model.sample()
+  # ==> StructTuple(
+  #       idx=2,
+  #       val=array([1.0582672, 1.3583777], dtype=float32)
+  #     )
   ```
 
   """

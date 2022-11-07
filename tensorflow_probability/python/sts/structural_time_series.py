@@ -84,6 +84,14 @@ class StructuralTimeSeries(object):
     """List of Parameter(name, prior, bijector) namedtuples for this model."""
     return self._parameters
 
+  def get_parameter(self, parameter_name):
+    """Returns the parameter with the given name, or a KeyError."""
+    for param in self.parameters:
+      if param.name == parameter_name:
+        return param
+    raise KeyError(f'No parameter named "{parameter_name}" in '
+                   f'StructureTimeSeries component {self.name}.')
+
   @property
   def latent_size(self):
     """Python `int` dimensionality of the latent space in this model."""

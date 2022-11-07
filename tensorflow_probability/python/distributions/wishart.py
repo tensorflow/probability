@@ -176,9 +176,7 @@ class WishartLinearOperator(distribution.AutoCompositeTensorDistribution):
     df = tf.convert_to_tensor(self.df)
     batch_shape = self._batch_shape_tensor(df=df)
     event_shape = self._event_shape_tensor()
-    batch_ndims = ps.shape(batch_shape)[0]
 
-    ndims = batch_ndims + 3  # sample_ndims=1, event_ndims=2
     shape = ps.concat([[n], batch_shape, event_shape], 0)
     normal_seed, gamma_seed = samplers.split_seed(seed, salt='Wishart')
 
@@ -207,24 +205,10 @@ class WishartLinearOperator(distribution.AutoCompositeTensorDistribution):
     # Complexity: O(nbk)
     x = tf.linalg.set_diag(x, tf.math.exp(g * 0.5))
 
-    # Make batch-op ready.
-    # Complexity: O(nbk**2)
-    perm = ps.concat([ps.range(1, ndims), [0]], 0)
-    x = tf.transpose(a=x, perm=perm)
-    shape = ps.concat([batch_shape, [event_shape[0]], [event_shape[1] * n]], 0)
-    x = tf.reshape(x, shape)
-
     # Complexity: O(nbM) where M is the complexity of the operator solving a
     # vector system. For LinearOperatorLowerTriangular, each matmul is O(k^3) so
     # this step has complexity O(nbk^3).
     x = self._scale.matmul(x)
-
-    # Undo make batch-op ready.
-    # Complexity: O(nbk**2)
-    shape = ps.concat([batch_shape, event_shape, [n]], 0)
-    x = tf.reshape(x, shape)
-    perm = ps.concat([[ndims - 1], ps.range(0, ndims - 1)], 0)
-    x = tf.transpose(a=x, perm=perm)
 
     if not self.input_output_cholesky:
       # Complexity: O(nbk**3)
@@ -240,63 +224,12 @@ class WishartLinearOperator(distribution.AutoCompositeTensorDistribution):
       x_sqrt = tf.linalg.cholesky(x)
 
     df = tf.convert_to_tensor(self.df)
-    batch_shape = self._batch_shape_tensor(df=df)
-    event_shape = self._event_shape_tensor()
     dimension = self._dimension()
-    x_ndims = ps.rank(x_sqrt)
-    num_singleton_axes_to_prepend = (
-        ps.maximum(ps.size(batch_shape) + 2, x_ndims) - x_ndims)
-    x_with_prepended_singletons_shape = ps.concat([
-        ps.ones([num_singleton_axes_to_prepend], dtype=tf.int32),
-        ps.shape(x_sqrt)
-    ], 0)
-    x_sqrt = tf.reshape(x_sqrt, x_with_prepended_singletons_shape)
-    ndims = ps.rank(x_sqrt)
-    # sample_ndims = ndims - batch_ndims - event_ndims
-    sample_ndims = ndims - ps.size(batch_shape) - 2
-    sample_shape = ps.shape(x_sqrt)[:sample_ndims]
-
-    # We need to be able to pre-multiply each matrix by its corresponding
-    # batch scale matrix. Since a Distribution Tensor supports multiple
-    # samples per batch, this means we need to reshape the input matrix `x`
-    # so that the first b dimensions are batch dimensions and the last two
-    # are of shape [dimension, dimensions*number_of_samples]. Doing these
-    # gymnastics allows us to do a batch_solve.
-    #
-    # After we're done with sqrt_solve (the batch operation) we need to undo
-    # this reshaping so what we're left with is a Tensor partitionable by
-    # sample, batch, event dimensions.
-
-    # Complexity: O(nbk**2) since transpose must access every element.
-    scale_sqrt_inv_x_sqrt = x_sqrt
-    perm = ps.concat([ps.range(sample_ndims, ndims),
-                      ps.range(0, sample_ndims)], 0)
-    scale_sqrt_inv_x_sqrt = tf.transpose(a=scale_sqrt_inv_x_sqrt, perm=perm)
-    last_dim_size = (
-        ps.cast(dimension, dtype=tf.int32) *
-        ps.reduce_prod(x_with_prepended_singletons_shape[:sample_ndims]))
-    shape = ps.concat(
-        [x_with_prepended_singletons_shape[sample_ndims:-2],
-         [ps.cast(dimension, dtype=tf.int32), last_dim_size]],
-        axis=0)
-    scale_sqrt_inv_x_sqrt = tf.reshape(scale_sqrt_inv_x_sqrt, shape)
 
     # Complexity: O(nbM*k) where M is the complexity of the operator solving a
     # vector system. For LinearOperatorLowerTriangular, each solve is O(k**2) so
     # this step has complexity O(nbk^3).
-    scale_sqrt_inv_x_sqrt = self._scale.solve(scale_sqrt_inv_x_sqrt)
-
-    # Undo make batch-op ready.
-    # Complexity: O(nbk**2)
-    shape = ps.concat(
-        [ps.shape(scale_sqrt_inv_x_sqrt)[:-2], event_shape, sample_shape],
-        axis=0)
-    scale_sqrt_inv_x_sqrt = tf.reshape(scale_sqrt_inv_x_sqrt, shape)
-    perm = ps.concat([
-        ps.range(ndims - sample_ndims, ndims),
-        ps.range(0, ndims - sample_ndims)
-    ], 0)
-    scale_sqrt_inv_x_sqrt = tf.transpose(a=scale_sqrt_inv_x_sqrt, perm=perm)
+    scale_sqrt_inv_x_sqrt = self._scale.solve(x_sqrt)
 
     # Write V = SS', X = LL'. Then:
     # tr[inv(V) X] = tr[inv(S)' inv(S) L L']

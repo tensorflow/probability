@@ -62,7 +62,8 @@ class TestKernel(psd_kernel.PositiveSemidefiniteKernel):
     dtype = None if multiplier is None else self._multiplier.dtype
     super(TestKernel, self).__init__(feature_ndims=feature_ndims,
                                      dtype=dtype,
-                                     parameters=parameters)
+                                     parameters=parameters,
+                                     validate_args=True)
 
   @classmethod
   def _parameter_properties(cls, dtype):
@@ -481,6 +482,66 @@ class PositiveSemidefiniteKernelTest(test_util.TestCase):
       return CompositeTensorTestKernel(multiplier=m)
 
     create_kernel(np.array([1., 2., 3.]))
+
+  @parameterized.parameters(
+      {'foo': 1, 'bar': 1},
+      {'foo': 1, 'bar': 2},
+      {'foo': 3, 'bar': 2})
+  def testMultipartKernelFeatureNdims(self, **feature_ndims):
+    k0 = TestKernel(multiplier=3.)
+    mk0 = test_util.MultipartKernel(k0, feature_ndims=feature_ndims)
+    k1 = TestKernel(multiplier=2.)
+    mk1 = test_util.MultipartKernel(k1, feature_ndims=feature_ndims)
+
+    # Define inputs to the multipart kernel. `x` has batch shape, `y` does not.
+    x = {'foo': np.random.normal(
+        size=[3, 4] + [5] * feature_ndims['foo']).astype(np.float32),
+         'bar': np.random.normal(
+             size=[4] + [6] * feature_ndims['bar']).astype(np.float32)}
+    y = {'foo': np.random.normal(
+        size=[5] * feature_ndims['foo']).astype(np.float32),
+         'bar': np.random.normal(
+             size=[6] * feature_ndims['bar']).astype(np.float32)}
+
+    # Reshape and concatenate the inputs for the simple kernel.
+    x_ = tf.concat(
+        [tf.reshape(x['foo'], [3, 4, -1]),
+         tf.stack([tf.reshape(x['bar'], [4, -1])] * 3, axis=0)], axis=-1)
+    y_ = tf.concat(
+        [tf.reshape(y['foo'], [-1]), tf.reshape(y['bar'], [-1])], axis=-1)
+
+    self.assertAllClose(k0.apply(x_, y_), mk0.apply(x, y), rtol=1e-5)
+    self.assertAllClose((k0 + k1).apply(x_, y_), (mk0 + mk1).apply(x, y),
+                        rtol=1e-5)
+    self.assertAllClose((k0 * k1).apply(x_, y_), (mk0 * mk1).apply(x, y),
+                        rtol=1e-5)
+
+  def testMultipartKernelBatchExampleShapesBroadcast(self):
+    k = TestKernel(multiplier=3.)
+    mk = test_util.MultipartKernel(k, feature_ndims={'foo': 2, 'bar': 1})
+
+    # x has broadcasted batch and example dims [2, 3, 4].
+    x = {'foo': tf.ones([3, 4, 2, 2]), 'bar': tf.ones([2, 3, 1, 5])}
+
+    # y has broadcasted batch and example dims [1, 3, 1]
+    y = {'foo': tf.ones([1, 3, 1, 2, 2]), 'bar': tf.ones([1, 1, 5])}
+
+    # All extra dimensions are in the batch shape and are broadcasted together.
+    self.assertAllEqual(mk.apply(x, y).shape, [2, 3, 4])
+
+    # The first two extra dimensions are broadcasted together, and the remaining
+    # extra dimensions come in sequence as example dims.
+    self.assertAllEqual(mk.matrix(x, y).shape, [2, 3, 4, 1])
+    self.assertAllEqual(mk.matrix(x, x).shape, [2, 3, 4, 4])
+
+    # The first extra dimension is the batch dimension, and the remaining extra
+    # dimensions come in sequence as example dimensions.
+    self.assertAllEqual(
+        mk.tensor(x, y, x1_example_ndims=2, x2_example_ndims=2).shape,
+        [2, 3, 4, 3, 1])
+    self.assertAllEqual(
+        mk.tensor(x, y, x1_example_ndims=2, x2_example_ndims=3).shape,
+        [2, 3, 4, 1, 3, 1])
 
 
 if __name__ == '__main__':

@@ -534,7 +534,7 @@ class ComparingMethodsTest(test_util.TestCase):
     """Check that the KF and EnKF solutions are the same."""
     # Tests pass with n_ensemble = 1e7. The KF vs. EnKF tolerance is
     # proportional to 1 / sqrt(n_ensemble), so this shows good agreement.
-    n_ensemble = int(1e4) if NUMPY_MODE else int(1e6)
+    n_ensemble = int(1e4) if NUMPY_MODE else int(1e5)
 
     salt = str(noise_level) + str(n_states) + str(n_observations)
     seed_stream = test_util.test_seed_stream(salt)
@@ -602,7 +602,7 @@ class ComparingMethodsTest(test_util.TestCase):
 
     # We know the EnKF converges at rate 1 / Sqrt(n_ensemble). The factor in
     # front is set empirically.
-    tol_scale = 1 / np.sqrt(n_ensemble)  # 1 / Sqrt(1e6) = 0.001
+    tol_scale = 1 / np.sqrt(n_ensemble)  # 1 / Sqrt(1e5) ~= 0.003
     self.assertAllCloseNested(
         kf_soln, enkf_soln, atol=20 * tol_scale, rtol=50 * tol_scale)
 

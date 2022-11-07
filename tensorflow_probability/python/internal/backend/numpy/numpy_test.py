@@ -1813,6 +1813,11 @@ class NumpyTest(test_util.TestCase):
     self.assertEqual(np.float64, x.dtype)
     self.assertAllEqual([0., 1., 2.], x)
 
+  def test_convert_variable_to_tensor_with_dtype_hint(self):
+    v = nptf.Variable(np.int32(0))
+    x = nptf.convert_to_tensor(v, dtype_hint=tf.float32)
+    self.assertEqual(np.int32, x.dtype)
+
   def test_get_static_value(self):
     x = nptf.get_static_value(nptf.zeros((3, 2), dtype=nptf.float32))
     self.assertEqual(onp.ndarray, type(x))

@@ -178,7 +178,8 @@ def _detect_anomalies_inner(observed_time_series,
         seed=seed)
     if use_gibbs_predictive_dist:
       predictive_dist = gibbs_sampler.one_step_predictive(model,
-                                                          posterior_samples)
+                                                          posterior_samples,
+                                                          thin_every=10)
     else:
       # Rebuild the model using appropriate Seasonal components, throwing away
       # the seasonal effects fit by the Gibbs sampler. Instead, the predictive

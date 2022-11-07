@@ -18,9 +18,13 @@
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.layers import dense_variational_v2
+from tensorflow_probability.python.layers import distribution_layer
+from tensorflow_probability.python.layers import variable_input
 
 
 def create_dataset():
@@ -48,10 +52,10 @@ def posterior_mean_field(kernel_size, bias_size=0, dtype=None):
   n = kernel_size + bias_size
   c = np.log(np.expm1(1.))
   return tf.keras.Sequential([
-      tfp.layers.VariableLayer(2 * n, dtype=dtype),
-      tfp.layers.DistributionLambda(lambda t: tfd.Independent(  # pylint: disable=g-long-lambda
-          tfd.Normal(loc=t[..., :n],
-                     scale=1e-5 + tf.nn.softplus(c + t[..., n:])),
+      variable_input.VariableLayer(2 * n, dtype=dtype),
+      distribution_layer.DistributionLambda(lambda t: independent.Independent(  # pylint: disable=g-long-lambda
+          normal.Normal(loc=t[..., :n],
+                        scale=1e-5 + tf.nn.softplus(c + t[..., n:])),
           reinterpreted_batch_ndims=1)),
   ])
 
@@ -59,10 +63,10 @@ def posterior_mean_field(kernel_size, bias_size=0, dtype=None):
 def prior_trainable(kernel_size, bias_size=0, dtype=None):
   n = kernel_size + bias_size
   return tf.keras.Sequential([
-      tfp.layers.VariableLayer(n, dtype=dtype),
-      tfp.layers.DistributionLambda(
-          lambda t: tfd.Independent(tfd.Normal(loc=t, scale=1),  # pylint: disable=g-long-lambda
-                                    reinterpreted_batch_ndims=1)),
+      variable_input.VariableLayer(n, dtype=dtype),
+      distribution_layer.DistributionLambda(
+          lambda t: independent.Independent(normal.Normal(loc=t, scale=1),  # pylint: disable=g-long-lambda
+                                            reinterpreted_batch_ndims=1)),
   ])
 
 
@@ -76,12 +80,13 @@ class DenseVariationalLayerTest(test_util.TestCase):
     # Get dataset.
     y, x, x_tst = create_dataset()
 
-    layer = tfp.layers.DenseVariational(1, posterior_mean_field,
-                                        prior_trainable)
+    layer = dense_variational_v2.DenseVariational(1, posterior_mean_field,
+                                                  prior_trainable)
 
     model = tf.keras.Sequential([
         layer,
-        tfp.layers.DistributionLambda(lambda t: tfd.Normal(loc=t, scale=1))
+        distribution_layer.DistributionLambda(
+            lambda t: normal.Normal(loc=t, scale=1))
     ])
 
     if tf.__internal__.tf2.enabled() and tf.executing_eagerly():
@@ -109,7 +114,7 @@ class DenseVariationalLayerTest(test_util.TestCase):
 
     # Profit.
     yhat = model(x_tst)
-    self.assertIsInstance(yhat, tfd.Distribution)
+    self.assertIsInstance(yhat, distribution.Distribution)
 
 
 if __name__ == '__main__':

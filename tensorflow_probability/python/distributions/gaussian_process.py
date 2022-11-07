@@ -14,6 +14,7 @@
 # ============================================================================
 """The GaussianProcess distribution class."""
 
+import functools
 import warnings
 
 # Dependency imports
@@ -31,6 +32,7 @@ from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
@@ -38,7 +40,7 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.psd_kernels.internal import util as psd_kernels_util
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.util import variable_utils  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -269,19 +271,20 @@ class GaussianProcess(
     Args:
       kernel: `PositiveSemidefiniteKernel`-like instance representing the
         GP's covariance function.
-      index_points: `float` `Tensor` representing finite (batch of) vector(s) of
-        points in the index set over which the GP is defined. Shape has the form
-        `[b1, ..., bB, e, f1, ..., fF]` where `F` is the number of feature
-        dimensions and must equal `kernel.feature_ndims` and `e` is the number
-        (size) of index points in each batch. Ultimately this distribution
-        corresponds to a `e`-dimensional multivariate normal. The batch shape
-        must be broadcastable with `kernel.batch_shape` and any batch dims
-        yielded by `mean_fn`.
+      index_points: (nested) `Tensor` representing finite (batch of) vector(s)
+        of points in the index set over which the GP is defined. Shape (or
+        shape of each nested component) has the form `[b1, ..., bB, e, f1,
+        ..., fF]` where `F` is the number of feature dimensions and must
+        equal `kernel.feature_ndims` (or its corresponding nested component)
+        and `e` is the number (size) of index points in each batch.
+        Ultimately this distribution corresponds to a `e`-dimensional
+        multivariate normal. The batch shape must be broadcastable with
+        `kernel.batch_shape` and any batch dims yielded by `mean_fn`.
       mean_fn: Python `callable` that acts on `index_points` to produce a (batch
-        of) vector(s) of mean values at `index_points`. Takes a `Tensor` of
-        shape `[b1, ..., bB, f1, ..., fF]` and returns a `Tensor` whose shape is
-        broadcastable with `[b1, ..., bB]`. Default value: `None` implies
-        constant zero function.
+        of) vector(s) of mean values at `index_points`. Takes a (nested)
+        `Tensor` of shape `[b1, ..., bB, f1, ..., fF]` and returns a `Tensor`
+        whose shape is broadcastable with `[b1, ..., bB]`. Default value:
+        `None` implies constant zero function.
       observation_noise_variance: `float` `Tensor` representing (batch of)
         scalar variance(s) of the noise in the Normal likelihood
         distribution of the model. If batched, the batch shape must be
@@ -328,14 +331,28 @@ class GaussianProcess(
     """
     parameters = dict(locals()) if parameters is None else parameters
     with tf.name_scope(name) as name:
-      dtype = dtype_util.common_dtype(
-          {
-              'index_points': index_points,
-              'observation_noise_variance': observation_noise_variance,
-              'jitter': jitter
-          }, tf.float32)
-      index_points = tensor_util.convert_nonref_to_tensor(
-          index_points, dtype=dtype, name='index_points')
+      if tf.nest.is_nested(kernel.feature_ndims):
+        input_dtype = dtype_util.common_dtype(
+            [kernel, index_points],
+            dtype_hint=nest_util.broadcast_structure(
+                kernel.feature_ndims, tf.float32))
+        dtype = dtype_util.common_dtype(
+            [observation_noise_variance, jitter], tf.float32)
+      else:
+        # If the index points are not nested, we assume they are of the same
+        # float dtype as the GP.
+        dtype = dtype_util.common_dtype(
+            {
+                'index_points': index_points,
+                'observation_noise_variance': observation_noise_variance,
+                'jitter': jitter
+            }, tf.float32)
+        input_dtype = dtype
+
+      if index_points is not None:
+        index_points = nest_util.convert_to_nested_tensor(
+            index_points, dtype=input_dtype, name='index_points',
+            convert_ref=False, allow_packing=True)
       jitter = tensor_util.convert_nonref_to_tensor(
           jitter, dtype=dtype, name='jitter')
       observation_noise_variance = tensor_util.convert_nonref_to_tensor(
@@ -396,15 +413,25 @@ class GaussianProcess(
     if self._always_yield_multivariate_normal:
       return False
 
-    num_index_points = tf.compat.dimension_value(
-        index_points.shape[-(self.kernel.feature_ndims + 1)])
-    if num_index_points is None:
+    num_index_points = tf.nest.map_structure(
+        lambda x, nd: tf.compat.dimension_value(x.shape[-(nd + 1)]),
+        index_points, self.kernel.feature_ndims)
+    flat_num_index_points = tf.nest.flatten(num_index_points)
+    static_non_singleton_num_points = set(
+        n for n in flat_num_index_points if n is not None and n != 1)
+    if len(static_non_singleton_num_points) > 1:
+      raise ValueError(
+          'Nested components of `index_points` must contain the same or '
+          'broadcastable numbers of examples. Saw components with '
+          f'{", ".join(list(str(n) for n in static_non_singleton_num_points))} '
+          'examples.')
+    if None in flat_num_index_points:
       warnings.warn(
           'Unable to detect statically whether the number of index_points is '
           '1. As a result, defaulting to treating the marginal GP at '
           '`index_points` as a multivariate Gaussian. This makes some methods, '
           'like `cdf` unavailable.')
-    return num_index_points == 1
+    return all(n == 1 for n in flat_num_index_points)
 
   def _compute_covariance(self, index_points):
     kernel_matrix = self.kernel.matrix(index_points, index_points)
@@ -433,14 +460,15 @@ class GaussianProcess(
     """Compute the marginal of this GP over function values at `index_points`.
 
     Args:
-      index_points: `float` `Tensor` representing finite (batch of) vector(s) of
-        points in the index set over which the GP is defined. Shape has the form
-        `[b1, ..., bB, e, f1, ..., fF]` where `F` is the number of feature
-        dimensions and must equal `kernel.feature_ndims` and `e` is the number
-        (size) of index points in each batch. Ultimately this distribution
-        corresponds to a `e`-dimensional multivariate normal. The batch shape
-        must be broadcastable with `kernel.batch_shape` and any batch dims
-        yielded by `mean_fn`.
+      index_points: (nested) `Tensor` representing finite (batch of) vector(s)
+        of points in the index set over which the GP is defined. Shape (or
+        the shape of each nested component) has the form `[b1, ..., bB, e,
+        f1, ..., fF]` where `F` is the number of feature dimensions and must
+        equal `kernel.feature_ndims` (or its corresponding nested component)
+        and `e` is the number (size) of index points in each batch.
+        Ultimately this distribution corresponds to a `e`-dimensional
+        multivariate normal. The batch shape must be broadcastable with
+        `kernel.batch_shape` and any batch dims yielded by `mean_fn`.
 
     Returns:
       marginal: a `Normal` or `MultivariateNormalLinearOperator` distribution,
@@ -523,7 +551,8 @@ class GaussianProcess(
   def _parameter_properties(cls, dtype, num_classes=None):
     return dict(
         index_points=parameter_properties.ParameterProperties(
-            event_ndims=lambda self: self.kernel.feature_ndims + 1,
+            event_ndims=lambda self: tf.nest.map_structure(  # pylint: disable=g-long-lambda
+                lambda nd: nd + 1, self.kernel.feature_ndims),
             shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
         ),
         kernel=parameter_properties.BatchedComponentProperties(),
@@ -558,20 +587,22 @@ class GaussianProcess(
           'an argument and returns a `Normal` or '
           '`MultivariateNormalLinearOperator` instance, whose KL can be '
           'computed.')
-    return tf.convert_to_tensor(
-        index_points if index_points is not None else  self._index_points)
+    return nest_util.convert_to_nested_tensor(
+        index_points if index_points is not None else self._index_points,
+        dtype_hint=self.kernel.dtype, allow_packing=True)
 
   @distribution_util.AppendDocstring(kwargs_dict={
       'index_points':
           'optional `float` `Tensor` representing a finite (batch of) of '
-          'points in the index set over which this GP is defined.  The shape '
-          'has the form `[b1, ..., bB, e, f1, ..., fF]` where `F` is the '
-          'number of feature dimensions and must equal '
-          '`self.kernel.feature_ndims` and `e` is the number of index points '
-          'in each batch.  Ultimately, this distribution  corresponds to an '
+          'points in the index set over which this GP is defined. The shape '
+          '(or shape of each nested component) has the form `[b1, ..., bB, e,'
+          'f1, ..., fF]` where `F` is the ' 'number of feature dimensions and '
+          'must equal ' '`self.kernel.feature_ndims` (or its corresponding '
+          'nested component) and `e` is the number of index points in each '
+          'batch. Ultimately, this distribution corresponds to an '
           '`e`-dimensional multivariate normal. The batch shape must be '
-          'broadcastable with `kernel.batch_shape` and any batch dims yielded '
-          'by `mean_fn`.  If not specified, `self.index_points` is used.  '
+          'broadcastable with `kernel.batch_shape` and any batch dims yielded'
+          'by `mean_fn`. If not specified, `self.index_points` is used. '
           'Default value: `None`.',
       'is_missing':
           'optional `bool` `Tensor` of shape `[..., e]`, where `e` is the '
@@ -609,8 +640,11 @@ class GaussianProcess(
       return ps.constant([], dtype=tf.int32)
     else:
       # The examples index is one position to the left of the feature dims.
-      examples_index = -(self.kernel.feature_ndims + 1)
-      return ps.shape(index_points)[examples_index:examples_index + 1]
+      example_shape = tf.nest.map_structure(
+          lambda t, nd: ps.shape(t)[-(nd + 1):-nd],
+          index_points, self.kernel.feature_ndims)
+      return functools.reduce(ps.broadcast_shape,
+                              tf.nest.flatten(example_shape), [])
 
   def _event_shape(self, index_points=None):
     index_points = (
@@ -619,17 +653,27 @@ class GaussianProcess(
       return tf.TensorShape([])
     else:
       # The examples index is one position to the left of the feature dims.
-      examples_index = -(self.kernel.feature_ndims + 1)
-      shape = index_points.shape[examples_index:examples_index + 1]
-      if tensorshape_util.rank(shape) is None:
+      example_shape = tf.nest.map_structure(
+          lambda t, nd: tf.TensorShape(t.shape[-(nd + 1):-nd]),
+          index_points, self.kernel.feature_ndims)
+      flat_shapes = nest.flatten_up_to(self.kernel.feature_ndims, example_shape)
+
+      if None in [tensorshape_util.rank(s) for s in flat_shapes]:
         return tf.TensorShape([None])
-      return shape
+      return functools.reduce(
+          tf.broadcast_static_shape, flat_shapes, tf.TensorShape([]))
 
   def _batch_shape(self, index_points=None):
-    kwargs = {}
+    # TODO(b/249858459): Update `batch_shape_lib` so it can take override
+    # parameters.
+    result = batch_shape_lib.inferred_batch_shape(self)
     if index_points is not None:
-      kwargs = {'index_points': index_points}
-    return batch_shape_lib.inferred_batch_shape(self, **kwargs)
+      shapes = tf.nest.map_structure(
+          lambda t, nd: t.shape[:-(nd + 1)],
+          index_points, self.kernel.feature_ndims)
+      flat_shapes = nest.flatten_up_to(self.kernel.feature_ndims, shapes)
+      return functools.reduce(ps.broadcast_shape, flat_shapes, result)
+    return result
 
   def _batch_shape_tensor(self, index_points=None):
     kwargs = {}
@@ -639,6 +683,17 @@ class GaussianProcess(
 
   def _sample_n(self, n, seed=None, index_points=None):
     return self.get_marginal_distribution(index_points).sample(n, seed=seed)
+
+  # Override to incorporate `index_points`
+  def _set_sample_static_shape(self, x, sample_shape, index_points=None):
+    """Helper to `sample`; sets static shape info."""
+    batch_shape = self._batch_shape(index_points=index_points)
+    event_shape = tf.TensorShape(self._event_shape(index_points=index_points))
+    return distribution._set_sample_static_shape_for_tensor(  # pylint:disable=protected-access
+        x,
+        sample_shape=sample_shape,
+        event_shape=event_shape,
+        batch_shape=batch_shape)
 
   def _sample_and_log_prob(self,
                            sample_shape,
@@ -726,14 +781,14 @@ class GaussianProcess(
         must be broadcastable with the batch and example shapes of
         `self.index_points`. The batch shape `[b1, ..., bB]` must be
         broadcastable with the shapes of all other batched parameters
-      predictive_index_points: `float` `Tensor` representing finite collection,
+      predictive_index_points: (nested) `Tensor` representing finite collection,
         or batch of collections, of points in the index set over which the GP
-        is defined.
-        Shape has the form `[b1, ..., bB, e, f1, ..., fF]` where `F` is the
-        number of feature dimensions and must equal `kernel.feature_ndims` and
-        `e` is the number (size) of predictive index points in each batch.
-        The batch shape must be broadcastable with this distributions
-        `batch_shape`.
+        is defined. Shape (or shape of each nested component) has the form
+        `[b1, ..., bB, e, f1, ..., fF]` where `F` is the number of feature
+        dimensions and must equal `kernel.feature_ndims` (or its
+        corresponding nested component) and `e` is the number (size) of
+        predictive index points in each batch. The batch shape must be
+        broadcastable with this distributions `batch_shape`.
         Default value: `None`.
       **kwargs: Any other keyword arguments to pass / override.
 
@@ -756,6 +811,8 @@ class GaussianProcess(
         'cholesky_fn': self.cholesky_fn,
         'mean_fn': self.mean_fn,
         'jitter': self.jitter,
+        'always_yield_multivariate_normal':
+            self._always_yield_multivariate_normal,
         'validate_args': self.validate_args,
         'allow_nan_stats': self.allow_nan_stats
     }

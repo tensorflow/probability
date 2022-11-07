@@ -589,16 +589,17 @@ class JointDistributionSequentialAutoBatched(
 
   def __new__(cls, *args, **kwargs):
     """Maybe returns a `_JointDistributionSequentialAutobatched`."""
-    if args:
-      model = args[0]
-    else:
-      model = kwargs.get('model')
+    if cls is JointDistributionSequentialAutoBatched:
+      if args:
+        model = args[0]
+      else:
+        model = kwargs.get('model')
 
-    # Return a `_JointDistributionSequentialAutoBatched` instance if `model`
-    # contains distributions that are not CompositeTensors.
-    if not all(isinstance(d, tf.__internal__.CompositeTensor) or callable(d)
-               for d in model):
-      return _JointDistributionSequentialAutoBatched(*args, **kwargs)
+      # Return a `_JointDistributionSequentialAutoBatched` instance if `model`
+      # contains distributions that are not CompositeTensors.
+      if not all(isinstance(d, tf.__internal__.CompositeTensor) or callable(d)
+                 for d in model):
+        return _JointDistributionSequentialAutoBatched(*args, **kwargs)
     return super(JointDistributionSequentialAutoBatched, cls).__new__(cls)
 
   @property
@@ -625,16 +626,17 @@ class JointDistributionNamedAutoBatched(
 
   def __new__(cls, *args, **kwargs):
     """Maybe returns a `_JointDistributionNamedAutoBatched`."""
-    if args:
-      model = args[0]
-    else:
-      model = kwargs.get('model')
+    if cls is JointDistributionNamedAutoBatched:
+      if args:
+        model = args[0]
+      else:
+        model = kwargs.get('model')
 
-    # Return a `_JointDistributionNamedAutoBatched` instance if `model` contains
-    # distributions that are not CompositeTensors.
-    if not all(isinstance(d, tf.__internal__.CompositeTensor) or callable(d)
-               for d in tf.nest.flatten(model)):
-      return _JointDistributionNamedAutoBatched(*args, **kwargs)
+      # Return a `_JointDistributionNamedAutoBatched` instance if `model`
+      # contains distributions that are not CompositeTensors.
+      if not all(isinstance(d, tf.__internal__.CompositeTensor) or callable(d)
+                 for d in tf.nest.flatten(model)):
+        return _JointDistributionNamedAutoBatched(*args, **kwargs)
     return super(JointDistributionNamedAutoBatched, cls).__new__(cls)
 
   @property

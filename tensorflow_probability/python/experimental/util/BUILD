@@ -156,7 +156,6 @@ py_library(
     srcs = ["composite_tensor.py"],
     deps = [
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions",
     ],
 )
 

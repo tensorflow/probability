@@ -21,16 +21,15 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import inverse_gamma
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.experimental.sts_gibbs import gibbs_sampler
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.sts.internal import missing_values_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 tfl = tf.linalg
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class XLABenchmarkTests(tfp_test_util.TestCase):
+@test_util.test_graph_and_eager_modes
+class XLABenchmarkTests(test_util.TestCase):
 
   def _build_test_model(self,
                         num_timesteps=5,
@@ -40,7 +39,7 @@ class XLABenchmarkTests(tfp_test_util.TestCase):
                         true_noise_scale=0.1,
                         true_level_scale=0.04,
                         dtype=tf.float32):
-    strm = tfp_test_util.test_seed_stream()
+    strm = test_util.test_seed_stream()
     design_matrix = tf.random.normal([num_timesteps, num_features],
                                      dtype=dtype, seed=strm())
     weights = tf.random.normal(list(batch_shape) + [num_features],
@@ -72,7 +71,7 @@ class XLABenchmarkTests(tfp_test_util.TestCase):
   def test_benchmark_sampling_with_xla(self):
     if not tf.executing_eagerly():
       return
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
 
     @tf.function(autograph=False, jit_compile=True)
     def _run():
@@ -100,4 +99,4 @@ class XLABenchmarkTests(tfp_test_util.TestCase):
 
 
 if __name__ == '__main__':
-  tfp_test_util.main()
+  test_util.main()

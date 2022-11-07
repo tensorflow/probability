@@ -24,8 +24,6 @@ from tensorflow_probability.python.distributions import generalized_normal
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import gradient
 
-from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import
-
 
 @test_util.test_all_tf_execution_regimes
 class _GeneralizedNormalTest(object):
@@ -458,25 +456,6 @@ class _GeneralizedNormalTest(object):
           power=power,
           validate_args=True)
       self.evaluate(d.mean())
-
-
-class GeneralizedNormalEagerGCTest(test_util.TestCase):
-
-  @tf_test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
-  def testGeneralizedNormalMeanAndMode(self):
-    # Mu will be broadcast to [7, 7, 7].
-    mu = [7.]
-    sigma = [11., 12., 13.]
-    power = [1., 2., 3.]
-
-    gnormal = generalized_normal.GeneralizedNormal(
-        loc=mu, scale=sigma, power=power, validate_args=True)
-
-    self.assertAllEqual((3,), gnormal.mean().shape)
-    self.assertAllEqual([7., 7, 7], self.evaluate(gnormal.mean()))
-
-    self.assertAllEqual((3,), gnormal.mode().shape)
-    self.assertAllEqual([7., 7, 7], self.evaluate(gnormal.mode()))
 
 
 @test_util.test_all_tf_execution_regimes
