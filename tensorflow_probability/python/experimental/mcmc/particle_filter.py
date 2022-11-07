@@ -46,14 +46,17 @@ def _default_trace_fn(state, kernel_results):
 particle_filter_arg_str = """\
 Each latent state is a `Tensor` or nested structure of `Tensor`s, as defined
 by the `initial_state_prior`.
+
 The `transition_fn` and `proposal_fn` args, if specified, have signature
 `next_state_dist = fn(step, state)`, where `step` is an `int` `Tensor` index
 of the current time step (beginning at zero), and `state` represents
 the latent state at time `step`. The return value is a `tfd.Distribution`
 instance over the state at time `step + 1`.
+
 Similarly, the `observation_fn` has signature
 `observation_dist = observation_fn(step, state)`, where the return value
 is a distribution over the value(s) observed at time `step`.
+
 Args:
   observations: a (structure of) Tensors, each of shape
     `concat([[num_observation_steps, b1, ..., bN], event_shape])` with
@@ -130,6 +133,7 @@ def infer_trajectories(observations,
                        seed=None,
                        name=None):  # pylint: disable=g-doc-args
   """Use particle filtering to sample from the posterior over trajectories.
+  
   ${particle_filter_arg_str}
     seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: Python `str` name for ops created by this method.
@@ -148,24 +152,30 @@ def infer_trajectories(observations,
       https://en.wikipedia.org/wiki/Jensen%27s_inequality))
       this is *smaller* in expectation than the true
       `log p(observations[t] | observations[:t])`.
+  
   #### Examples
+  
   **Tracking unknown position and velocity**: Let's consider tracking an object
   moving in a one-dimensional space. We'll define a dynamical system
   by specifying an `initial_state_prior`, a `transition_fn`,
   and `observation_fn`.
+  
   The structure of the latent state space is determined by the prior
   distribution. Here, we'll define a state space that includes the object's
   current position and velocity:
+  
   ```python
   initial_state_prior = tfd.JointDistributionNamed({
       'position': tfd.Normal(loc=0., scale=1.),
       'velocity': tfd.Normal(loc=0., scale=0.1)})
   ```
+  
   The `transition_fn` specifies the evolution of the system. It should
   return a distribution over latent states of the same structure as the prior.
   Here, we'll assume that the position evolves according to the velocity,
   with a small random drift, and the velocity also changes slowly, following
   a random drift:
+  
   ```python
   def transition_fn(_, previous_state):
     return tfd.JointDistributionNamed({
@@ -174,15 +184,19 @@ def infer_trajectories(observations,
             scale=0.1),
         'velocity': tfd.Normal(loc=previous_state['velocity'], scale=0.01)})
   ```
+  
   The `observation_fn` specifies the process by which the system is observed
   at each time step. Let's suppose we observe only a noisy version of the =
   current position.
+  
   ```python
     def observation_fn(_, state):
       return tfd.Normal(loc=state['position'], scale=0.1)
   ```
+  
   Now let's track our object. Suppose we've been given observations
   corresponding to an initial position of `0.4` and constant velocity of `0.01`:
+  
   ```python
   # Generate simulated observations.
   observed_positions = tfd.Normal(loc=tf.linspace(0.4, 0.8, 0.01),
@@ -196,6 +210,7 @@ def infer_trajectories(observations,
             observation_fn=observation_fn,
             num_particles=1000)
   ```
+  
   For all `i`, `trajectories['position'][:, i]` is a sample from the
   posterior over position sequences, given the observations:
   `p(state[0:T] | observations[0:T])`. Often, the sampled trajectories
@@ -207,7 +222,9 @@ def infer_trajectories(observations,
   distributions `p(state[t] | observations[:t])`, in which each latent state
   is inferred conditioned only on observations up to that point in time; these
   may be computed using `tfp.mcmc.experimental.particle_filter`.
+  
   #### References
+  
   [1] Arnaud Doucet and Adam M. Johansen. A tutorial on particle
       filtering and smoothing: Fifteen years later.
       _Handbook of nonlinear filtering_, 12(656-704), 2009.
@@ -215,6 +232,7 @@ def infer_trajectories(observations,
   [2] Adam Scibior, Vaden Masrani, and Frank Wood. Differentiable Particle
       Filtering without Modifying the Forward Pass. _arXiv preprint
       arXiv:2106.10314_, 2021. https://arxiv.org/abs/2106.10314
+  
   """
   with tf.name_scope(name or 'infer_trajectories') as name:
     pf_seed, resample_seed = samplers.split_seed(
