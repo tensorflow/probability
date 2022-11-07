@@ -286,6 +286,8 @@ class MultiTaskGaussianProcessRegressionModel(
       self._observations = observations
       self._observations_is_missing = observations_is_missing
 
+      self._check_observations_valid(observations)
+
       if _flattened_conditional_mean_fn is None:
 
         def flattened_conditional_mean_fn(x):
@@ -318,6 +320,38 @@ class MultiTaskGaussianProcessRegressionModel(
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
           name=name)
+
+  def _check_observations_valid(self, observations):
+    observation_rank = tensorshape_util.rank(observations.shape)
+
+    if observation_rank is None:
+      return
+
+    if observation_rank >= 1:
+      # Check that the last dimension of observations matches the number of
+      # tasks.
+      num_observations = tf.compat.dimension_value(observations.shape[-1])
+      if (num_observations is not None and
+          num_observations != 1 and
+          num_observations != self.kernel.num_tasks):
+        raise ValueError(
+            f'Expected the number of observations {num_observations} '
+            f'to broadcast / match the number of tasks '
+            f'{self.kernel.num_tasks}')
+
+    if observation_rank >= 2:
+      num_index_points = tf.compat.dimension_value(observations.shape[-2])
+
+      expected_num_index_points = self.observation_index_points.shape[
+          -(self.kernel.feature_ndims + 1)]
+      if (num_index_points is not None and
+          expected_num_index_points is not None and
+          num_index_points != 1 and
+          num_index_points != expected_num_index_points):
+        raise ValueError(
+            f'Expected number of observation index points '
+            f'{expected_num_index_points} to broadcast / match the second '
+            f'to last dimension of `observations` {num_index_points}')
 
   @staticmethod
   def precompute_regression_model(

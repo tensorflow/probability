@@ -205,13 +205,12 @@ class WindowedSamplingTest(test_util.TestCase):
     model = model_fn()
     pins = {'treatment_effects': tf.constant(TREATMENT_EFFECTS)}
 
-    @tf.function(autograph=False)
     def do_sample(seed):
       return windowed_sampling.windowed_adaptive_hmc(
           3,
           model,
           num_leapfrog_steps=2,
-          num_adaptation_steps=21,
+          num_adaptation_steps=2,
           seed=seed,
           **pins)
 
@@ -226,13 +225,12 @@ class WindowedSamplingTest(test_util.TestCase):
     model = model_fn()
     pins = {'treatment_effects': tf.constant(TREATMENT_EFFECTS)}
 
-    @tf.function
     def do_sample(seed):
       return windowed_sampling.windowed_adaptive_nuts(
           3,
           model,
           max_tree_depth=2,
-          num_adaptation_steps=50,
+          num_adaptation_steps=3,
           seed=seed,
           **pins)
 
@@ -240,6 +238,8 @@ class WindowedSamplingTest(test_util.TestCase):
     self.evaluate(draws)
 
   def test_hmc_samples_well(self):
+    if tf.executing_eagerly() and not JAX_MODE:
+      self.skipTest('Eager test is slow.')
     model = eight_schools_named()
     pins = {'treatment_effects': tf.constant(TREATMENT_EFFECTS)}
 
@@ -257,6 +257,8 @@ class WindowedSamplingTest(test_util.TestCase):
     self.assertLess(self.evaluate(max_scale_reduction), 1.5)
 
   def test_nuts_samples_well(self):
+    if tf.executing_eagerly() and not JAX_MODE:
+      self.skipTest('Eager test is slow.')
     model = eight_schools_named()
     pins = {'treatment_effects': tf.constant(TREATMENT_EFFECTS)}
 
@@ -307,6 +309,8 @@ class WindowedSamplingTest(test_util.TestCase):
                         tf.convert_to_tensor(bijector(explicit_init)))
 
   def test_explicit_init_samples(self):
+    if tf.executing_eagerly() and not JAX_MODE:
+      self.skipTest('Eager test is slow.')
     stream = test_util.test_seed_stream()
 
     # Compute everything in a function so it is consistent in graph mode
@@ -366,6 +370,8 @@ class WindowedSamplingTest(test_util.TestCase):
     self.assertLen(init, 1)
 
   def test_hmc_fitting_gaussian(self):
+    if tf.executing_eagerly() and not JAX_MODE:
+      self.skipTest('Eager test is slow.')
     # See docstring to _gen_gaussian_updating_example
     x_dim = 3
     y_dim = 12
@@ -396,6 +402,8 @@ class WindowedSamplingTest(test_util.TestCase):
     self.assertAllClose(true_var, final_scaling, rtol=0.15)
 
   def test_nuts_fitting_gaussian(self):
+    if tf.executing_eagerly() and not JAX_MODE:
+      self.skipTest('Eager test is slow.')
     # See docstring to _gen_gaussian_updating_example
     x_dim = 3
     y_dim = 12
@@ -457,7 +465,7 @@ class WindowedSamplingTest(test_util.TestCase):
             2,
             model.experimental_pin(y=samp.y),
             num_leapfrog_steps=3,
-            num_adaptation_steps=100,
+            num_adaptation_steps=21,
             init_step_size=tf.ones([10, 1]),
             seed=test_util.test_seed()))
     self.assertEqual((2, 64, 10, 3), states.x.shape)
@@ -483,7 +491,7 @@ class WindowedSamplingTest(test_util.TestCase):
             2,
             model.experimental_pin(y=samp['y']),
             num_leapfrog_steps=3,
-            num_adaptation_steps=100,
+            num_adaptation_steps=21,
             init_step_size=tf.ones([10, 1]),
             seed=test_util.test_seed()))
     self.assertEqual((2, 64, 10, 3), states['x'].shape)
@@ -514,7 +522,7 @@ class WindowedSamplingTest(test_util.TestCase):
             model.experimental_pin(y=samp.y),
             n_chains=n_chains,
             num_leapfrog_steps=3,
-            num_adaptation_steps=100,
+            num_adaptation_steps=25,
             seed=test_util.test_seed()))
     if isinstance(n_chains, int):
       n_chains = [n_chains]
@@ -525,6 +533,8 @@ class WindowedSamplingTest(test_util.TestCase):
     """Test correct handling of `TensorShape(None)`."""
     if JAX_MODE:
       self.skipTest('b/203858802')
+    if tf.executing_eagerly():
+      self.skipTest('Eager does not support dynamic batch shapes.')
 
     n_features = 5
     n_timepoints = 100
@@ -571,7 +581,7 @@ class WindowedSamplingTest(test_util.TestCase):
         5,
         normal.Normal(tf.constant(0., tf.float64), 1.),
         n_chains=2,
-        num_adaptation_steps=100,
+        num_adaptation_steps=25,
         seed=test_util.test_seed(),
         **method_kwargs))
 
@@ -582,6 +592,8 @@ class WindowedSamplingTest(test_util.TestCase):
 class WindowedSamplingStepSizeTest(test_util.TestCase):
 
   def test_supply_full_step_size(self):
+    if tf.executing_eagerly() and not JAX_MODE:
+      self.skipTest('Eager test is slow.')
     stream = test_util.test_seed_stream()
 
     jd_model = jdn.JointDistributionNamed({
@@ -613,6 +625,8 @@ class WindowedSamplingStepSizeTest(test_util.TestCase):
                               [j[0] for j in actual_step_size])
 
   def test_supply_partial_step_size(self):
+    if tf.executing_eagerly() and not JAX_MODE:
+      self.skipTest('Eager test is slow.')
     stream = test_util.test_seed_stream()
 
     jd_model = jdn.JointDistributionNamed({
@@ -641,6 +655,8 @@ class WindowedSamplingStepSizeTest(test_util.TestCase):
     self.assertAllCloseNested(expected_step, actual_step)
 
   def test_supply_single_step_size(self):
+    if tf.executing_eagerly() and not JAX_MODE:
+      self.skipTest('Eager test is slow.')
     stream = test_util.test_seed_stream()
 
     jd_model = jdn.JointDistributionNamed({
@@ -668,6 +684,9 @@ class WindowedSamplingStepSizeTest(test_util.TestCase):
     self.assertAllClose(1., traced_step_size[0])
 
   def test_sequential_step_size(self):
+    if tf.executing_eagerly() and not JAX_MODE:
+      self.skipTest('Eager test is slow.')
+    # Disable eager mode since it is slow.
     stream = test_util.test_seed_stream()
 
     jd_model = jds.JointDistributionSequential([

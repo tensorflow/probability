@@ -332,6 +332,12 @@ class Beta(distribution.AutoCompositeTensorDistribution):
     return distribution_util.extend_cdf_outside_support(
         x, answer, low=0., high=1.)
 
+  @distribution_util.AppendDocstring(_beta_sample_note)
+  def _quantile(self, p):
+    concentration1 = tf.convert_to_tensor(self.concentration1)
+    concentration0 = tf.convert_to_tensor(self.concentration0)
+    return special.betaincinv(concentration1, concentration0, p)
+
   def _log_unnormalized_prob(self, x, concentration1, concentration0):
     return (tf.math.xlogy(concentration1 - 1., x) +
             tf.math.xlog1py(concentration0 - 1., -x))

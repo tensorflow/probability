@@ -1271,7 +1271,7 @@ class REMCTest(test_util.TestCase):
     inverse_temperatures = tf.convert_to_tensor([1., 0.0005, 0.])
 
     if tf.executing_eagerly():
-      num_results = 50
+      num_results = 25
     else:
       num_results = 1000
 

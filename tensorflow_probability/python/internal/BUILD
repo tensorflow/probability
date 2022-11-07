@@ -101,6 +101,7 @@ multi_substrate_py_test(
     srcs = ["batch_shape_lib_test.py"],
     deps = [
         ":test_util",
+        # mock dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:exp",
@@ -132,6 +133,7 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["distribute_lib_test.py"],
     disabled_substrates = ["numpy"],
+    shard_count = 3,
     deps = [
         ":distribute_lib",
         ":distribute_test_lib",
@@ -344,7 +346,6 @@ multi_substrate_py_library(
     srcs = ["implementation_selection.py"],
     deps = [
         # tensorflow dep,
-        "//tensorflow_probability/python/internal/backend/numpy",
     ],
 )
 
@@ -421,6 +422,7 @@ multi_substrate_py_library(
     srcs = ["nest_util.py"],
     deps = [
         ":prefer_static",
+        ":tensor_util",
         # numpy dep,
         # tensorflow dep,
     ],
@@ -748,6 +750,8 @@ multi_substrate_py_library(
     srcs = ["test_util.py"],
     deps = [
         ":dtype_util",
+        ":parameter_properties",
+        ":prefer_static",
         ":samplers",
         ":test_combinations",
         # absl/flags dep,
@@ -756,8 +760,9 @@ multi_substrate_py_library(
         # six dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:bijector",
+        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:empirical_statistical_testing",
-        "//tensorflow_probability/python/internal/backend/numpy",
+        "//tensorflow_probability/python/math/psd_kernels",
         "//tensorflow_probability/python/util:deferred_tensor",
         "//tensorflow_probability/python/util:seed_stream",
     ],

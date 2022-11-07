@@ -75,10 +75,12 @@ class FeatureScaled(feature_transformed.FeatureTransformed):
       raise ValueError(
           'Must specify exactly one of `scale_diag` and `inverse_scale_diag`.')
     with tf.name_scope(name):
+      dtype = util.maybe_get_common_dtype(
+          [kernel, scale_diag, inverse_scale_diag])
       self._scale_diag = tensor_util.convert_nonref_to_tensor(
-          scale_diag, name='scale_diag')
+          scale_diag, dtype=dtype, name='scale_diag')
       self._inverse_scale_diag = tensor_util.convert_nonref_to_tensor(
-          inverse_scale_diag, name='inverse_scale_diag')
+          inverse_scale_diag, dtype=dtype, name='inverse_scale_diag')
 
       def rescale_input(x, feature_ndims, example_ndims):
         """Computes `x / scale_diag`."""

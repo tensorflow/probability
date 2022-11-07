@@ -58,6 +58,7 @@ py_test(
     name = "anomaly_detection_test",
     size = "large",
     srcs = ["anomaly_detection_test.py"],
+    shard_count = 3,
     deps = [
         ":anomaly_detection",
         # absl/testing:parameterized dep,

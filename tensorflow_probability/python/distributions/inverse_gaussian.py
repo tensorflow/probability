@@ -316,13 +316,9 @@ def _random_inverse_gaussian_bwd(shape, aux, g):
       concentration.shape == loc.shape):
     return grad_concentration, grad_loc, None  # seed=None
 
-  ax_loc, ax_conc = tf.raw_ops.BroadcastGradientArgs(
-      s0=ps.shape(loc), s1=ps.shape(concentration))
-  grad_concentration = tf.reshape(
-      tf.math.reduce_sum(grad_concentration, axis=ax_conc),
-      ps.shape(concentration))
-  grad_loc = tf.reshape(
-      tf.math.reduce_sum(grad_loc, axis=ax_loc), ps.shape(loc))
+  grad_loc, grad_concentration = generic.fix_gradient_for_broadcasting(
+      [loc, concentration],
+      [grad_loc, grad_concentration])
 
   return grad_loc, grad_concentration, None  # seed=None
 

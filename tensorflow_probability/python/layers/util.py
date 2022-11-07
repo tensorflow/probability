@@ -16,6 +16,7 @@
 
 import types
 # Dependency imports
+from keras.utils import generic_utils
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
@@ -24,7 +25,6 @@ from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.distributions import deterministic as deterministic_lib
 from tensorflow_probability.python.distributions import independent as independent_lib
 from tensorflow_probability.python.distributions import normal as normal_lib
-from tensorflow.python.keras.utils import generic_utils  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [

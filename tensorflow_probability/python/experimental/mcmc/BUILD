@@ -209,6 +209,7 @@ multi_substrate_py_test(
     timeout = "long",
     srcs = ["diagonal_mass_matrix_adaptation_test.py"],
     disabled_substrates = ["numpy"],
+    shard_count = 3,
     deps = [
         ":diagonal_mass_matrix_adaptation",
         ":preconditioned_hmc",
@@ -334,6 +335,7 @@ multi_substrate_py_test(
     timeout = "long",
     srcs = ["preconditioned_hmc_test.py"],
     disabled_substrates = ["numpy"],
+    shard_count = 3,
     deps = [
         ":preconditioned_hmc",
         # tensorflow dep,
@@ -411,7 +413,7 @@ py_test(
     deps = [
         ":elliptical_slice_sampler",
         # numpy dep,
-        # tensorflow:tensorflow_no_contrib dep,
+        # tensorflow dep,
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/mcmc:sample",
@@ -423,7 +425,7 @@ py_library(
     srcs = ["nuts_autobatching.py"],
     deps = [
         # numpy dep,
-        # tensorflow:tensorflow_no_contrib dep,
+        # tensorflow dep,
         "//tensorflow_probability/python/experimental/auto_batching",
         "//tensorflow_probability/python/math:gradient",
         "//tensorflow_probability/python/mcmc:kernel",
@@ -554,6 +556,7 @@ multi_substrate_py_test(
     size = "large",
     srcs = ["particle_filter_test.py"],
     numpy_tags = ["notap"],
+    shard_count = 3,
     deps = [
         ":particle_filter",
         # numpy dep,
@@ -1135,7 +1138,6 @@ multi_substrate_py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        # tensorflow:tensorflow_no_contrib dep,
         "//tensorflow_probability/python/bijectors:exp",
         "//tensorflow_probability/python/bijectors:identity",
         "//tensorflow_probability/python/distributions:beta",

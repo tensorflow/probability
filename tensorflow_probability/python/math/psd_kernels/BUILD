@@ -62,6 +62,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:nest_util",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:slicing",
         "//tensorflow_probability/python/internal:tensorshape_util",
@@ -290,6 +291,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/bijectors:invert",
         "//tensorflow_probability/python/distributions:cholesky_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:nest_util",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
@@ -368,6 +370,7 @@ multi_substrate_py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

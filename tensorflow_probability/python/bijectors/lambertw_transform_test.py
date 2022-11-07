@@ -93,13 +93,12 @@ class HeavyTailOnlyBijectorTest(test_util.TestCase, parameterized.TestCase):
     vals = np.linspace(-1, 1, num=10)
     ht = lambertw_transform.LambertWTail(
         shift=0., scale=1., tailweight=tf.constant(delta, tf.float64))
-    with self.session():
-      # Gaussianizing makes the values be further away from zero, i.e., their
-      # ratio > 1 (for vals != 0).
-      self.assertTrue(np.all(self.evaluate(ht.forward(vals)) / vals > 1.))
-      self.assertAllClose(ht.inverse(ht.forward(vals)), vals)
-      self.assertAllClose(
-          ht.forward(vals), _xexp_delta_squared_numpy(vals, delta))
+    # Gaussianizing makes the values be further away from zero, i.e., their
+    # ratio > 1 (for vals != 0).
+    self.assertTrue(np.all(self.evaluate(ht.forward(vals)) / vals > 1.))
+    self.assertAllClose(ht.inverse(ht.forward(vals)), vals)
+    self.assertAllClose(
+        ht.forward(vals), _xexp_delta_squared_numpy(vals, delta))
 
   @parameterized.named_parameters(("0", 0.0, 0.1, 0.),
                                   ("1", 1.0, 0.2,
@@ -149,20 +148,19 @@ class LambertWGaussianizationTest(test_util.TestCase, parameterized.TestCase):
     vals = np.linspace(-1, 1, 10) + self.loc
     lsht = lambertw_transform.LambertWTail(
         shift=self.loc, scale=self.scale, tailweight=delta)
-    with self.session():
-      scaled_vals = (vals - self.loc) / self.scale
-      ht_vals = _xexp_delta_squared_numpy(scaled_vals, delta=delta)
-      ht_vals *= self.scale
-      ht_vals += self.loc
-      self.assertAllClose(
-          ht_vals, self.evaluate(lsht.forward(vals)), rtol=0.0001)
-      # Inverse-Gaussianizing pushes the values be further away from the mean,
-      # i.e., their centered ratio > 1 (for vals - loc != 0).
-      self.assertTrue(np.all((self.evaluate(lsht.forward(vals)) - self.loc) /
-                             (vals - self.loc)
-                             > 1.))
-      # Inverse function is correct.
-      self.assertAllClose(lsht.inverse(lsht.forward(vals)), vals)
+    scaled_vals = (vals - self.loc) / self.scale
+    ht_vals = _xexp_delta_squared_numpy(scaled_vals, delta=delta)
+    ht_vals *= self.scale
+    ht_vals += self.loc
+    self.assertAllClose(
+        ht_vals, self.evaluate(lsht.forward(vals)), rtol=0.0001)
+    # Inverse-Gaussianizing pushes the values be further away from the mean,
+    # i.e., their centered ratio > 1 (for vals - loc != 0).
+    self.assertTrue(np.all((self.evaluate(lsht.forward(vals)) - self.loc) /
+                           (vals - self.loc)
+                           > 1.))
+    # Inverse function is correct.
+    self.assertAllClose(lsht.inverse(lsht.forward(vals)), vals)
 
   def testLambertWGaussianizationDeltaNonZero(self):
     """Tests that the inverse of the heavy tail transform is Normal."""
@@ -170,14 +168,13 @@ class LambertWGaussianizationTest(test_util.TestCase, parameterized.TestCase):
                             size=100).astype(np.float64)
     lsht = lambertw_transform.LambertWTail(
         shift=self.loc, scale=self.scale, tailweight=self.tailweight)
-    with self.session():
-      heavy_tailed_vals = lsht.forward(vals)
-      _, p = stats.normaltest(self.evaluate(heavy_tailed_vals))
-      self.assertLess(p, 1e-2)
-      gaussianized_vals = lsht.inverse(heavy_tailed_vals)
-      _, p = stats.normaltest(self.evaluate(gaussianized_vals))
-      self.assertGreater(p, 0.05)
-      self.assertAllClose(vals, gaussianized_vals)
+    heavy_tailed_vals = lsht.forward(vals)
+    _, p = stats.normaltest(self.evaluate(heavy_tailed_vals))
+    self.assertLess(p, 1e-2)
+    gaussianized_vals = lsht.inverse(heavy_tailed_vals)
+    _, p = stats.normaltest(self.evaluate(gaussianized_vals))
+    self.assertGreater(p, 0.05)
+    self.assertAllClose(vals, gaussianized_vals)
 
 
 if __name__ == "__main__":

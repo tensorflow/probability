@@ -22,13 +22,11 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import soft_clip
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class _SoftClipBijectorBase(tfp_test_util.TestCase):
+@test_util.test_graph_and_eager_modes
+class _SoftClipBijectorBase(test_util.TestCase):
   """Tests correctness of the softclip transformation."""
 
   @parameterized.named_parameters(
@@ -79,8 +77,8 @@ class _SoftClipBijectorBase(tfp_test_util.TestCase):
     xs_inverted = self.evaluate(b.inverse(ys))
     self.assertAllClose(ys, xs_inverted)
 
-  @tfp_test_util.jax_disable_test_missing_functionality('TF Exceptions')
-  @tfp_test_util.numpy_disable_test_missing_functionality('TF Exceptions')
+  @test_util.jax_disable_test_missing_functionality('TF Exceptions')
+  @test_util.numpy_disable_test_missing_functionality('TF Exceptions')
   def test_raises_exception_on_invalid_params(self):
     with self.assertRaisesRegex(tf.errors.InvalidArgumentError,
                                 'Argument `high` must be greater than `low`'):
@@ -93,8 +91,8 @@ class _SoftClipBijectorBase(tfp_test_util.TestCase):
       with tf.control_dependencies([low.assign(5.)]):
         self.evaluate(b.forward(4.))
 
-  @tfp_test_util.jax_disable_test_missing_functionality('TF Exceptions')
-  @tfp_test_util.numpy_disable_test_missing_functionality('TF Exceptions')
+  @test_util.jax_disable_test_missing_functionality('TF Exceptions')
+  @test_util.numpy_disable_test_missing_functionality('TF Exceptions')
   def test_raises_exception_on_invalid_input(self):
     b = soft_clip.SoftClip(3., 5., validate_args=True)
     with self.assertRaisesRegex(tf.errors.InvalidArgumentError,
@@ -106,8 +104,8 @@ class _SoftClipBijectorBase(tfp_test_util.TestCase):
       x = b.inverse(dynamic_y)
       self.evaluate(x)
 
-  @tfp_test_util.jax_disable_variable_test
-  @tfp_test_util.numpy_disable_gradient_test
+  @test_util.jax_disable_variable_test
+  @test_util.numpy_disable_gradient_test
   def test_variable_gradients(self):
     b = soft_clip.SoftClip(low=tf.Variable(2.), high=tf.Variable(6.))
     with tf.GradientTape() as tape:
@@ -125,4 +123,4 @@ class SoftClip64Test(_SoftClipBijectorBase):
 del _SoftClipBijectorBase
 
 if __name__ == '__main__':
-  tfp_test_util.main()
+  test_util.main()

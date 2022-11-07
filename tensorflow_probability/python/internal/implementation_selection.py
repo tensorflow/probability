@@ -140,9 +140,6 @@ def implementation_selecting(fn_name, default_fn, cpu_fn):
     if NUMPY_MODE:  # Numpy breakout.
       return cpu_fn(**kwargs)
 
-    # Import locally to avoid TF dependency for TFP-on-JAX.
-    from tensorflow.python.eager import function  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
-
     # Each time a `tf.function` is called, we will give it a unique
     # identifiable API name, so that Grappler won't get confused when it
     # sees multiple samplers in same graph, and it will be able
@@ -156,6 +153,8 @@ def implementation_selecting(fn_name, default_fn, cpu_fn):
     # Call the default sampling impl and register the CPU-specialized impl.
     # Grappler will kick in during session execution to optimize the graph.
     samples, runtime = defun_default_fn(**kwargs)
-    function.register(defun_cpu_fn, **kwargs)
+    concrete_func = defun_cpu_fn.get_concrete_function(**kwargs)
+    concrete_func.add_to_graph()
+    concrete_func.add_gradient_functions_to_graph()
     return samples, runtime
   return impl_selecting_fn

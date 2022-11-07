@@ -26,7 +26,7 @@ class JaxIntegrationTest(absltest.TestCase):
 
     x, _ = fun_mc.trace(state=0., fn=fun, num_steps=5)
 
-    self.assertIsInstance(x, jax.xla.DeviceArray)
+    self.assertIsInstance(x, jax.Array)
 
 
 if __name__ == '__main__':

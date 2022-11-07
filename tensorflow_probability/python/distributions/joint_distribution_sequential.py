@@ -728,14 +728,15 @@ class JointDistributionSequential(_JointDistributionSequential,
 
   def __new__(cls, *args, **kwargs):
     """Returns a `_JointDistributionSequential` if `model` has non-CT dists."""
-    if args:
-      model = args[0]
-    else:
-      model = kwargs.get('model')
+    if cls is JointDistributionSequential:
+      if args:
+        model = args[0]
+      else:
+        model = kwargs.get('model')
 
-    if not all(isinstance(d, tf.__internal__.CompositeTensor) or callable(d)
-               for d in model):
-      return _JointDistributionSequential(*args, **kwargs)
+      if not all(isinstance(d, tf.__internal__.CompositeTensor) or callable(d)
+                 for d in model):
+        return _JointDistributionSequential(*args, **kwargs)
     return super(JointDistributionSequential, cls).__new__(cls)
 
   @property

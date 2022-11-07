@@ -429,26 +429,14 @@ matvec = utils.copy_docstring(
     'tf.linalg.matvec',
     _matvec)
 
-# TODO(b/140157055): Remove the try/except.
-matrix_rank = lambda input, name=None: np.linalg.matrix_rank(input)
-
-try:
-  matrix_rank = utils.copy_docstring(
-      'tf.linalg.matrix_rank',
-      lambda input, name=None: np.linalg.matrix_rank(input))
-except AttributeError:
-  pass
+matrix_rank = utils.copy_docstring(
+    'tf.linalg.matrix_rank',
+    lambda input, name=None: np.linalg.matrix_rank(input))
 
 norm = utils.copy_docstring('tf.norm', _norm)
 
-# TODO(b/140157055): Remove the try/except.
-pinv = lambda input, name=None: np.linalg.pinv(input)
-
-try:
-  pinv = utils.copy_docstring(
-      'tf.linalg.pinv', lambda input, name=None: np.linalg.pinv(input))
-except AttributeError:
-  pass
+pinv = utils.copy_docstring(
+    'tf.linalg.pinv', lambda input, name=None: np.linalg.pinv(input))
 
 qr = utils.copy_docstring('tf.linalg.qr', _qr)
 

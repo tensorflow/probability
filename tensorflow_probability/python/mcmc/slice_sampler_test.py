@@ -86,6 +86,12 @@ class SliceSamplerTest(test_util.TestCase):
   )
   def testTwoDimNormal(self, static_shape, static_rank):
     """Sampling from a 2-D Multivariate Normal distribution."""
+
+    # Disabling this test in eager mode as it is very slow.
+    # Other tests check eager behavior, so we can safely disable this test.
+    if tf.executing_eagerly() and not JAX_MODE:
+      return
+
     dtype = np.float32
     true_mean = dtype([0, 0])
     true_cov = dtype([[1, 0.5], [0.5, 1]])

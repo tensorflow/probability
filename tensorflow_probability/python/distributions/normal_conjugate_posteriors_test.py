@@ -16,7 +16,6 @@
 
 import math
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import fill_scale_tril
@@ -29,82 +28,78 @@ from tensorflow_probability.python.internal import test_util
 class NormalTest(test_util.TestCase):
 
   def testNormalConjugateKnownSigmaPosterior(self):
-    with tf1.Session():
-      mu0 = tf.constant([3.0])
-      sigma0 = tf.constant([math.sqrt(10.0)])
-      sigma = tf.constant([math.sqrt(2.0)])
-      x = tf.constant([-2.5, 2.5, 4.0, 0.0, -1.0, 2.0])
-      s = tf.reduce_sum(x)
-      n = tf.size(x)
-      prior = normal.Normal(loc=mu0, scale=sigma0)
-      posterior = ncp.normal_conjugates_known_scale_posterior(
-          prior=prior, scale=sigma, s=s, n=n)
+    mu0 = tf.constant([3.0])
+    sigma0 = tf.constant([math.sqrt(10.0)])
+    sigma = tf.constant([math.sqrt(2.0)])
+    x = tf.constant([-2.5, 2.5, 4.0, 0.0, -1.0, 2.0])
+    s = tf.reduce_sum(x)
+    n = tf.size(x)
+    prior = normal.Normal(loc=mu0, scale=sigma0)
+    posterior = ncp.normal_conjugates_known_scale_posterior(
+        prior=prior, scale=sigma, s=s, n=n)
 
-      # Smoke test
-      self.assertIsInstance(posterior, normal.Normal)
-      posterior_log_pdf = self.evaluate(posterior.log_prob(x))
-      self.assertEqual(posterior_log_pdf.shape, (6,))
+    # Smoke test
+    self.assertIsInstance(posterior, normal.Normal)
+    posterior_log_pdf = self.evaluate(posterior.log_prob(x))
+    self.assertEqual(posterior_log_pdf.shape, (6,))
 
   def testNormalConjugateKnownSigmaPosteriorND(self):
-    with tf1.Session():
-      batch_size = 6
-      mu0 = tf.constant([[3.0, -3.0]] * batch_size)
-      sigma0 = tf.constant([[math.sqrt(10.0), math.sqrt(15.0)]] * batch_size)
-      sigma = tf.constant([[math.sqrt(2.0)]] * batch_size)
-      x = tf.transpose(
-          a=tf.constant([[-2.5, 2.5, 4.0, 0.0, -1.0, 2.0]], dtype=tf.float32))
-      s = tf.reduce_sum(x)
-      n = tf.size(x)
-      prior = normal.Normal(loc=mu0, scale=sigma0)
-      posterior = ncp.normal_conjugates_known_scale_posterior(
-          prior=prior, scale=sigma, s=s, n=n)
+    batch_size = 6
+    mu0 = tf.constant([[3.0, -3.0]] * batch_size)
+    sigma0 = tf.constant([[math.sqrt(10.0), math.sqrt(15.0)]] * batch_size)
+    sigma = tf.constant([[math.sqrt(2.0)]] * batch_size)
+    x = tf.transpose(
+        a=tf.constant([[-2.5, 2.5, 4.0, 0.0, -1.0, 2.0]], dtype=tf.float32))
+    s = tf.reduce_sum(x)
+    n = tf.size(x)
+    prior = normal.Normal(loc=mu0, scale=sigma0)
+    posterior = ncp.normal_conjugates_known_scale_posterior(
+        prior=prior, scale=sigma, s=s, n=n)
 
-      # Smoke test
-      self.assertIsInstance(posterior, normal.Normal)
-      posterior_log_pdf = self.evaluate(posterior.log_prob(x))
-      self.assertEqual(posterior_log_pdf.shape, (6, 2))
+    # Smoke test
+    self.assertIsInstance(posterior, normal.Normal)
+    posterior_log_pdf = self.evaluate(posterior.log_prob(x))
+    self.assertEqual(posterior_log_pdf.shape, (6, 2))
 
   def testNormalConjugateKnownSigmaNDPosteriorND(self):
-    with tf1.Session():
-      batch_size = 6
-      mu0 = tf.constant([[3.0, -3.0]] * batch_size)
-      sigma0 = tf.constant([[math.sqrt(10.0), math.sqrt(15.0)]] * batch_size)
-      sigma = tf.constant([[math.sqrt(2.0), math.sqrt(4.0)]] * batch_size)
-      x = tf.constant(
-          [[-2.5, 2.5, 4.0, 0.0, -1.0, 2.0], [2.5, -2.5, -4.0, 0.0, 1.0, -2.0]],
-          dtype=tf.float32)
-      s = tf.reduce_sum(x, axis=[1])
-      x = tf.transpose(a=x)  # Reshape to shape (6, 2)
-      n = tf.constant([6] * 2)
-      prior = normal.Normal(loc=mu0, scale=sigma0)
-      posterior = ncp.normal_conjugates_known_scale_posterior(
-          prior=prior, scale=sigma, s=s, n=n)
+    batch_size = 6
+    mu0 = tf.constant([[3.0, -3.0]] * batch_size)
+    sigma0 = tf.constant([[math.sqrt(10.0), math.sqrt(15.0)]] * batch_size)
+    sigma = tf.constant([[math.sqrt(2.0), math.sqrt(4.0)]] * batch_size)
+    x = tf.constant(
+        [[-2.5, 2.5, 4.0, 0.0, -1.0, 2.0], [2.5, -2.5, -4.0, 0.0, 1.0, -2.0]],
+        dtype=tf.float32)
+    s = tf.reduce_sum(x, axis=[1])
+    x = tf.transpose(a=x)  # Reshape to shape (6, 2)
+    n = tf.constant([6] * 2)
+    prior = normal.Normal(loc=mu0, scale=sigma0)
+    posterior = ncp.normal_conjugates_known_scale_posterior(
+        prior=prior, scale=sigma, s=s, n=n)
 
-      # Smoke test
-      self.assertIsInstance(posterior, normal.Normal)
+    # Smoke test
+    self.assertIsInstance(posterior, normal.Normal)
 
-      # Calculate log_pdf under the 2 models
-      posterior_log_pdf = posterior.log_prob(x)
-      self.assertEqual(posterior_log_pdf.shape, (6, 2))
-      self.assertEqual(self.evaluate(posterior_log_pdf).shape, (6, 2))
+    # Calculate log_pdf under the 2 models
+    posterior_log_pdf = posterior.log_prob(x)
+    self.assertEqual(posterior_log_pdf.shape, (6, 2))
+    self.assertEqual(self.evaluate(posterior_log_pdf).shape, (6, 2))
 
   def testNormalConjugateKnownSigmaPredictive(self):
-    with tf1.Session():
-      batch_size = 6
-      mu0 = tf.constant([3.0] * batch_size)
-      sigma0 = tf.constant([math.sqrt(10.0)] * batch_size)
-      sigma = tf.constant([math.sqrt(2.0)] * batch_size)
-      x = tf.constant([-2.5, 2.5, 4.0, 0.0, -1.0, 2.0])
-      s = tf.reduce_sum(x)
-      n = tf.size(x)
-      prior = normal.Normal(loc=mu0, scale=sigma0)
-      predictive = ncp.normal_conjugates_known_scale_predictive(
-          prior=prior, scale=sigma, s=s, n=n)
+    batch_size = 6
+    mu0 = tf.constant([3.0] * batch_size)
+    sigma0 = tf.constant([math.sqrt(10.0)] * batch_size)
+    sigma = tf.constant([math.sqrt(2.0)] * batch_size)
+    x = tf.constant([-2.5, 2.5, 4.0, 0.0, -1.0, 2.0])
+    s = tf.reduce_sum(x)
+    n = tf.size(x)
+    prior = normal.Normal(loc=mu0, scale=sigma0)
+    predictive = ncp.normal_conjugates_known_scale_predictive(
+        prior=prior, scale=sigma, s=s, n=n)
 
-      # Smoke test
-      self.assertIsInstance(predictive, normal.Normal)
-      predictive_log_pdf = self.evaluate(predictive.log_prob(x))
-      self.assertEqual(predictive_log_pdf.shape, (6,))
+    # Smoke test
+    self.assertIsInstance(predictive, normal.Normal)
+    predictive_log_pdf = self.evaluate(predictive.log_prob(x))
+    self.assertEqual(predictive_log_pdf.shape, (6,))
 
   def _mvn_linear_update_test_helper(self,
                                      prior_mean,
@@ -208,9 +203,8 @@ class NormalTest(test_util.TestCase):
             linear_transformation=linear_transformation,
             likelihood_scale=likelihood_scale,
             observation=observation))
-    # TODO(davmre): enable next line once internal CI is updated to recent TF.
-    # self.assertIsInstance(posterior_prec,
-    #                       tf.linalg.LinearOperatorScaledIdentity)
+    self.assertIsInstance(posterior_prec,
+                          tf.linalg.LinearOperatorScaledIdentity)
 
     self._mvn_linear_update_test_helper(
         prior_mean=tf.zeros([num_outputs]),

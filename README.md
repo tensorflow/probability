@@ -7,6 +7,10 @@ gradient-based inference via automatic differentiation, and scalability to
 large datasets and models via hardware acceleration (e.g., GPUs) and distributed
 computation.
 
+__TFP also works as "Tensor-friendly Probability" in pure JAX!__:
+`from tensorflow_probability.substrates import jax as tfp` --
+Learn more [here](https://www.tensorflow.org/probability/examples/TensorFlow_Probability_on_JAX).
+
 Our probabilistic machine learning tools are structured as follows.
 
 __Layer 0: TensorFlow.__ Numerical operations. In particular, the LinearOperator

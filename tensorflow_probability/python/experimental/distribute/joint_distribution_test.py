@@ -243,7 +243,7 @@ class JointDistributionTest(test_lib.DistributedTest):
         yield sample_dist_lib.Sample(
             normal.Normal(1., 1.), test_lib.NUM_DEVICES)
       return tf.reduce_mean(
-          model.log_prob(surrogate.sample(sample_shape=1e6, seed=self.key)))
+          model.log_prob(surrogate.sample(sample_shape=1e5, seed=self.key)))
 
     true_log_prob, true_log_prob_grad = gradient.value_and_gradient(
         log_prob_fn, 0.)
@@ -262,7 +262,7 @@ class JointDistributionTest(test_lib.DistributedTest):
           yield Root(normal.Normal(1., 1.))
           yield sharded.Sharded(normal.Normal(1., 1.), self.axis_name)
         return tf.reduce_mean(
-            model.log_prob(surrogate.sample(sample_shape=1e6, seed=seed)))
+            model.log_prob(surrogate.sample(sample_shape=1e5, seed=seed)))
 
       sharded_log_prob, sharded_log_prob_grad = gradient.value_and_gradient(
           sharded_log_prob_fn, 0.)
@@ -272,9 +272,9 @@ class JointDistributionTest(test_lib.DistributedTest):
         self.strategy_run(
             run, (self.key,), in_axes=None))
     for i in range(test_lib.NUM_DEVICES):
-      self.assertAllClose(sharded_log_prob[i], true_log_prob, atol=1e-2)
+      self.assertAllClose(sharded_log_prob[i], true_log_prob, atol=2e-2)
       self.assertAllClose(sharded_log_prob_grad[i], true_log_prob_grad,
-                          atol=1e-2)
+                          atol=2e-2)
 
   def test_jd_has_correct_sample_path_gradients_with_partial_values(self):
 

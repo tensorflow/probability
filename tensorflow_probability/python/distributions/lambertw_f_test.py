@@ -27,7 +27,6 @@ from tensorflow_probability.python.distributions import student_t
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.layers import distribution_layer
 
 
 @test_util.test_all_tf_execution_regimes
@@ -189,6 +188,7 @@ class LambertWNormalTest(test_util.TestCase):
           scale=1e-3 + tf.math.softplus(t[..., 1:2]),
           tailweight=1e-3 + tf.math.softplus(t[..., 2:]))
 
+    from tensorflow_probability.python.layers import distribution_layer  # pylint:disable=g-import-not-at-top
     dist_layer = distribution_layer.DistributionLambda(dist_lambda)
     model = tf.keras.Sequential([
         tf.keras.layers.Dense(10, "relu"),

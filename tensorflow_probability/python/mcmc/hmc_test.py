@@ -986,7 +986,7 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
   def test_mcem_converges(self):
     # Setup assumptions.
     dtype = np.float32
-    num_samples = 500
+    num_samples = 300
     dims = 10
 
     weights_prior_true_scale = np.array(0.3, dtype)

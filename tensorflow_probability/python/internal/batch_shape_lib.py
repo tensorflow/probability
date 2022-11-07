@@ -333,8 +333,10 @@ def map_fn_over_parameters_with_event_ndims(batch_object,
 
     # Ndims of base shape used for a *minimal* event.
     properties = parameter_properties[param_name]
+
+    from tensorflow_probability.python.internal import parameter_properties as pp  # pylint:disable=g-import-not-at-top
     if (properties.event_ndims is None or
-        properties.event_ndims is properties.NO_EVENT_NDIMS):
+        properties.event_ndims is pp.NO_EVENT_NDIMS):
       continue
     if bijector_x_event_ndims is not None:
       param_event_ndims = properties.bijector_instance_event_ndims(
@@ -346,7 +348,7 @@ def map_fn_over_parameters_with_event_ndims(batch_object,
           batch_object,
           require_static=require_static)
 
-    if param_event_ndims is properties.NO_EVENT_NDIMS:
+    if param_event_ndims is pp.NO_EVENT_NDIMS:
       continue
 
     if param_name not in parameter_kwargs:

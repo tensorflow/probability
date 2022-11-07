@@ -52,7 +52,8 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+JAX_MODE = False
+NUMPY_MODE = False
 
 
 class TupleDistribution(distribution.Distribution):
@@ -749,11 +750,6 @@ class ParametersTest(test_util.TestCase):
                      actual_d_parameters)
     self.assertEqual(actual_d_parameters, d.parameters)
 
-  @tf_test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
-  def testNoSelfRefs(self):
-    d = Dummy(1., arg2=2.)
-    self.assertAllEqual(1. + 2., self.evaluate(d.mean()))
-
   def testTfFunction(self):
     if not tf.executing_eagerly(): return
     @tf.function
@@ -966,7 +962,7 @@ class ConditionalDistributionTest(test_util.TestCase):
       method(arg1='b1', arg2='b2')
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@test_util.test_graph_and_eager_modes
 class BatchShapeInferenceTests(test_util.TestCase):
 
   @parameterized.named_parameters(

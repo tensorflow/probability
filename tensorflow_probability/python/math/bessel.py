@@ -20,7 +20,6 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
-from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math import generic as tfp_math
 
 
@@ -312,8 +311,8 @@ def _bessel_iv_ratio_bwd(aux, g):
   v, z = aux
   pz = _bessel_iv_ratio_partial(v, z)
   grad_z = pz * g
-  _, grad_z = _fix_gradient_for_broadcasting(
-      v, z, tf.ones_like(grad_z), grad_z)
+  _, grad_z = tfp_math.fix_gradient_for_broadcasting(
+      [v, z], [tf.ones_like(grad_z), grad_z])
   return None, grad_z
 
 
@@ -947,8 +946,8 @@ def _bessel_ive_bwd(aux, g):
   ive = _bessel_ive_custom_gradient(v, z)
   grad_z = g * (
       _bessel_ive_custom_gradient(v + 1., z) + (v / z - tf.math.sign(z)) * ive)
-  _, grad_z = _fix_gradient_for_broadcasting(
-      v, z, tf.ones_like(grad_z), grad_z)
+  _, grad_z = tfp_math.fix_gradient_for_broadcasting(
+      [v, z], [tf.ones_like(grad_z), grad_z])
 
   # No gradient for v at the moment. This is a complicated expression
   # The gradient with respect to the parameter doesn't have an easy closed
@@ -1061,8 +1060,8 @@ def _bessel_kve_bwd(aux, g):
   v, z = aux
   kve = _bessel_kve_custom_gradient(v, z)
   grad_z = g * ((z - v) / z * kve - _bessel_kve_custom_gradient(v - 1., z))
-  _, grad_z = _fix_gradient_for_broadcasting(
-      v, z, tf.ones_like(grad_z), grad_z)
+  _, grad_z = tfp_math.fix_gradient_for_broadcasting(
+      [v, z], [tf.ones_like(grad_z), grad_z])
 
   # No gradient for v at the moment. This is a complicated expression
   # The gradient with respect to the parameter doesn't have an easy closed
@@ -1147,8 +1146,8 @@ def _log_bessel_ive_bwd(aux, g):
   """Reverse mode impl for log_bessel_ive."""
   v, z = aux
   grad_z = g * (bessel_iv_ratio(v + 1., z) + (v / z - tf.math.sign(z)))
-  _, grad_z = _fix_gradient_for_broadcasting(
-      v, z, tf.ones_like(grad_z), grad_z)
+  _, grad_z = tfp_math.fix_gradient_for_broadcasting(
+      [v, z], [tf.ones_like(grad_z), grad_z])
 
   # No gradient for v at the moment. This is a complicated expression
   # The gradient with respect to the parameter doesn't have an easy closed
@@ -1243,8 +1242,8 @@ def _log_bessel_kve_bwd(aux, g):
       _log_bessel_kve_custom_gradient(v + 1., z)) - numpy_dtype(
           np.log(2.)) - log_kve
   grad_z = g * -tf.math.expm1(grad_z)
-  _, grad_z = _fix_gradient_for_broadcasting(
-      v, z, tf.ones_like(grad_z), grad_z)
+  _, grad_z = tfp_math.fix_gradient_for_broadcasting(
+      [v, z], [tf.ones_like(grad_z), grad_z])
 
   # No gradient for v at the moment. This is a complicated expression
   # The gradient with respect to the parameter doesn't have an easy closed
@@ -1319,17 +1318,3 @@ def log_bessel_kve(v, z, name=None):
     v = tf.convert_to_tensor(v, dtype=dtype)
     z = tf.convert_to_tensor(z, dtype=dtype)
     return _log_bessel_kve_custom_gradient(v, z)
-
-
-def _fix_gradient_for_broadcasting(a, b, grad_a, grad_b):
-  """Reduces broadcast dimensions for a custom gradient."""
-  if (tensorshape_util.is_fully_defined(a.shape) and
-      tensorshape_util.is_fully_defined(b.shape) and
-      a.shape == b.shape):
-    return [grad_a, grad_b]
-  a_shape = ps.shape(a)
-  b_shape = ps.shape(b)
-  ra, rb = tf.raw_ops.BroadcastGradientArgs(s0=a_shape, s1=b_shape)
-  grad_a = tf.reshape(tf.reduce_sum(grad_a, axis=ra), a_shape)
-  grad_b = tf.reshape(tf.reduce_sum(grad_b, axis=rb), b_shape)
-  return [grad_a, grad_b]

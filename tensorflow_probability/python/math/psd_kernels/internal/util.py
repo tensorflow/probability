@@ -204,7 +204,7 @@ def pairwise_square_distance_matrix(x1, x2, feature_ndims):
 
   The latter term can be written as a matmul between `x1` and `x2`.
   This reduces the memory from the naive approach of computing the
-  squared difference of `x1` and `x2` by a factor of `(prod_k D_k) ** 2`.
+  squared difference of `x1` and `x2` by a factor of `prod_k D_k`.
   This is at the cost of the computation being more numerically unstable.
 
   Args:
@@ -232,24 +232,7 @@ def pairwise_square_distance_matrix(x1, x2, feature_ndims):
           ps.reduce_prod(ps.shape(x2)[-feature_ndims:])]], axis=0))
   pairwise_sq = row_norm_x1 + row_norm_x2 - 2 * tf.linalg.matmul(
       reshaped_x1, reshaped_x2, transpose_b=True)
-  pairwise_sq = tf.clip_by_value(pairwise_sq, 0., np.inf)
-
-  # If we statically know that `x1` and `x2` have the same number of examples,
-  # then we check if they are equal so that we can ensure that the diagonal
-  # distances are zero in this case.
-  num_examples1 = tf.compat.dimension_value(x1.shape[-feature_ndims - 1])
-  num_examples2 = tf.compat.dimension_value(x2.shape[-feature_ndims - 1])
-  if num_examples1 is not None and num_examples2 is not None:
-    if num_examples1 == num_examples2:
-      all_equal = tf.reduce_all(
-          tf.equal(x1, x2), axis=range(-1, -feature_ndims - 2, -1))
-      eye = tf.eye(num_examples1, dtype=pairwise_sq.dtype)
-      pairwise_sq = tf.where(
-          all_equal[..., tf.newaxis, tf.newaxis] & (eye == 1.),
-          tf.zeros([], dtype=pairwise_sq.dtype),
-          pairwise_sq)
-
-  return pairwise_sq
+  return tf.clip_by_value(pairwise_sq, 0., np.inf)
 
 
 def pairwise_square_distance_tensor(

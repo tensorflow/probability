@@ -18,13 +18,19 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import chain
+from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.bijectors import scale
 from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.bijectors import square
+from tensorflow_probability.python.distributions import inverse_gamma
 from tensorflow_probability.python.distributions import linear_gaussian_ssm
 from tensorflow_probability.python.distributions import lognormal
 from tensorflow_probability.python.distributions import mvn_diag
 from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.experimental.sts_gibbs import sample_parameters
+
 
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import docstring_util
@@ -304,10 +310,12 @@ class ConstrainedSeasonalStateSpaceModel(
     we've defined the invertible linear reparameterization `Z = R E`, where
 
     ```
-    R = [1 - 1/N, -1/N,    ..., -1/N
-         -1/N,    1 - 1/N, ..., -1/N,
+    R = [1 - 1/N, -1/N,    ..., -1/N,      -1/N
+         -1/N,    1 - 1/N, ..., -1/N,      -1/N
          ...
-         1/N,     1/N,     ...,  1/N]
+         -1/N,    -1/N,    ...,  1/ - 1/N, -1/N
+         1/N,     1/N,     ...,  1/N,       1/N]
+    E = [e_1, ..., e_(N-1), z_N]
     ```
 
     represents the change of basis from 'effect coordinates' E to
@@ -831,9 +839,9 @@ class Seasonal(StructuralTimeSeries):
         initial_effect_prior = normal.Normal(
             loc=observed_initial,
             scale=tf.abs(observed_initial) + observed_stddev)
-      dtype = initial_effect_prior.dtype
+      self.dtype = initial_effect_prior.dtype
       if drift_scale_prior is None:
-        scale_factor = tf.convert_to_tensor(.01, dtype=dtype)
+        scale_factor = tf.convert_to_tensor(.01, dtype=self.dtype)
         drift_scale_prior = lognormal.LogNormal(
             loc=tf.math.log(scale_factor * observed_stddev), scale=3.)
 
@@ -851,7 +859,7 @@ class Seasonal(StructuralTimeSeries):
         # This doesn't change the marginal prior on individual effects, but
         # does introduce dependence between the effects.
         (effects_to_residuals, _) = build_effects_to_residuals_matrix(
-            num_seasons, dtype=dtype)
+            num_seasons, dtype=self.dtype)
         effects_to_residuals_linop = tf.linalg.LinearOperatorFullMatrix(
             effects_to_residuals)  # Use linop so that matmul broadcasts.
         initial_state_prior_loc = effects_to_residuals_linop.matvec(
@@ -875,7 +883,7 @@ class Seasonal(StructuralTimeSeries):
                 'drift_scale', drift_scale_prior,
                 chain.Chain([
                     scale.Scale(scale=observed_stddev),
-                    softplus.Softplus(low=dtype_util.eps(dtype))
+                    softplus.Softplus(low=dtype_util.eps(self.dtype))
                 ])))
       self._allow_drift = allow_drift
 
@@ -910,6 +918,121 @@ class Seasonal(StructuralTimeSeries):
   def initial_state_prior(self):
     """Prior distribution on the initial latent state (level and scale)."""
     return self._initial_state_prior
+
+  def experimental_resample_drift_scale(self,
+                                        latents,
+                                        sample_shape=(),
+                                        seed=None):
+    """Returns a posterior sample of `drift scale` given the latents and prior.
+
+    This is experimental, and compatibility may be broken in the future.
+
+    Args:
+      latents: A value convertible to a tensor of shape [batch shape, timeseries
+        length, latent size].
+      sample_shape: Shape of the sample.
+      seed: The seed to sample with.
+    """
+    if not self.allow_drift:
+      raise NotImplementedError(
+          'experimental_resample_drift_scale is implemented only for seasonal '
+          'effects with drift.')
+    # The drift_scale prior is a scale prior, but this requires the variance
+    # prior, thus extract it from the transformed distribution.
+    prior = self.get_parameter('drift_scale').prior
+    if not (isinstance(prior, transformed_distribution.TransformedDistribution)
+            and isinstance(prior.bijector, invert.Invert) and
+            isinstance(prior.bijector.bijector, square.Square) and
+            isinstance(prior.distribution, inverse_gamma.InverseGamma)):
+      raise NotImplementedError(
+          'experimental_resample_drift_scale requires drift scale prior be '
+          'the square root of an inverse gamma distribution; got {}'.format(
+              prior))
+    drift_scale_variance_prior = prior.distribution
+
+    latents = tf.convert_to_tensor(latents, dtype_hint=self.dtype)
+    batch_shape = ps.shape(latents)[:-2]
+    num_observed_steps = tf.compat.dimension_value(latents.shape[-2])
+    drift_scale_shape = ps.concat([batch_shape, [1]], axis=0)
+    sssm = self.make_state_space_model(
+        num_timesteps=num_observed_steps,
+        initial_state_prior=self.initial_state_prior,
+        param_vals={},
+        # The scale value does not matter, since we are just using this to
+        # access the transition matrices.
+        drift_scale=tf.ones(shape=drift_scale_shape, dtype=self.dtype))
+
+    if num_observed_steps < 2:
+      # This needs to be special-cased only because:
+      #   1) Running with Numpy returns an empty matrix with vectorized_map
+      #      (size=(0,)) rather than size=(0, num_latents, num_latents).
+      #   2) An issue with Numpy matrix multiplication when sizes are 0, which
+      #      occurs if there is a single timestep (and thus no transition noise
+      #      to observe).
+      #
+      # When there are no observed steps, there are no observations of noise.
+      transition_noise_observations = tf.zeros(shape=(0), dtype=self.dtype)
+      season_diffs_mask = tf.constant(
+          # Value does not matter, not used with empty shape.
+          value=True,
+          shape=[0],
+          dtype=tf.bool)
+    else:
+      # Transition matrices represent a mapping from t -> t+1 time, hence
+      # all but last.
+      @tf.function
+      def get_all_but_last_transition_matrices():
+        return tf.vectorized_map(
+            lambda i: sssm.get_transition_matrix_for_timestep(i).to_dense(),
+            tf.range(start=0, limit=num_observed_steps - 1))
+
+      all_but_last_transition_matrices = get_all_but_last_transition_matrices()
+      # Compute the residuals of transition noise by comparing time-adjacent
+      # latents, with the transition matrix applied to the previous timestep
+      # so that what remains is the addition of transition noise. Since
+      # we know that that there is a single transition noise for an entire
+      # seasonal component, these residuals can be used to sample the
+      # scale of transition noise.
+      all_but_first_latents = latents[..., 1:, :]
+      all_but_last_latents = latents[..., :-1, :]
+
+      # For unconstrained seasonality, the transition noise is added to the
+      # latent. For constrained seasonality, it is divided by the number of
+      # seasons first, so it that scale needs to be undone.
+      latent_to_transition_noise_scale = (
+          self.num_seasons if self.constrain_mean_effect_to_zero else 1.)
+      transition_noise_observations = latent_to_transition_noise_scale * (
+          all_but_first_latents - tf.linalg.matvec(
+              # Transition matrices represent a mapping from t -> t+1 time,
+              # hence all but last is used to translate the previous latents to
+              # the next latent space.
+              all_but_last_transition_matrices,
+              all_but_last_latents)
+      )[...,
+        # Using just the last element as:
+        #  1) For unconstrained seasonality, the transition noise is added
+        #     to the last latent.
+        #  2) For constrained seasonality, the transition noise, divided by
+        #     the number of seasons is added to each dimension, so it does
+        #     not matter which is sampled.
+        -1]
+      # Transition noise is only observed when there is a season change, which
+      # occurs when there is a non-identity transition matrix. Since both
+      # constrained and unconstrained seasonality use a zero in the first-row,
+      # first-column value when it is not an identity matrix, this optimization
+      # is used instead of checking for identity.
+      #
+      # Using this as a mask allows us to ignore all the non-changing residual
+      # samples, and even handle the case where we, by-chance, observe
+      # exactly 0 for transition noise.
+      season_diffs_mask = tf.math.not_equal(
+          all_but_last_transition_matrices[..., 0, 0], 0)
+    posterior = sample_parameters.normal_scale_posterior_inverse_gamma_conjugate(
+        variance_prior=drift_scale_variance_prior,
+        observations=transition_noise_observations,
+        is_missing=season_diffs_mask)
+    return sample_parameters.sample_with_optional_upper_bound(
+        posterior, sample_shape=sample_shape, seed=seed)
 
   def _make_state_space_model(self,
                               num_timesteps,

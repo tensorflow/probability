@@ -284,6 +284,7 @@ multi_substrate_py_test(
     timeout = "long",
     srcs = ["langevin_test.py"],
     disabled_substrates = ["numpy"],
+    shard_count = 3,
     deps = [
         ":langevin",
         ":sample",
@@ -349,6 +350,7 @@ multi_substrate_py_test(
     name = "random_walk_metropolis_test",
     size = "medium",
     srcs = ["random_walk_metropolis_test.py"],
+    shard_count = 2,
     deps = [
         ":random_walk_metropolis",
         ":sample",
@@ -425,6 +427,7 @@ multi_substrate_py_test(
     size = "medium",
     timeout = "long",
     srcs = ["sample_test.py"],
+    shard_count = 3,
     deps = [
         ":hmc",
         ":kernel",
@@ -473,6 +476,7 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["sample_annealed_importance_test.py"],
     numpy_tags = ["notap"],
+    shard_count = 3,
     deps = [
         ":hmc",
         ":sample_annealed_importance",

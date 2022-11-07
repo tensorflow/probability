@@ -157,16 +157,16 @@ class _MatrixNormalTest(object):
     loc, scale_row, scale_col = self._random_loc_and_scale(
         batch_shape=[5, 2], matrix_shape=[2, 3], seed_stream=seed_stream)
     matrix_normal = mnlo.MatrixNormalLinearOperator(loc, scale_row, scale_col)
-    samples = matrix_normal.sample(int(1e6), seed=seed_stream())
+    samples = matrix_normal.sample(int(1e5), seed=seed_stream())
     mean_, samples_ = self.evaluate([matrix_normal.mean(), samples])
-    self.assertAllClose(mean_, np.mean(samples_, axis=0), rtol=1e-2)
+    self.assertAllClose(mean_, np.mean(samples_, axis=0), rtol=6e-2)
 
   def testSampleVariance(self):
     seed_stream = test_util.test_seed_stream()
     loc, scale_row, scale_col = self._random_loc_and_scale(
         batch_shape=[5, 2], matrix_shape=[2, 3], seed_stream=seed_stream)
     matrix_normal = mnlo.MatrixNormalLinearOperator(loc, scale_row, scale_col)
-    samples = matrix_normal.sample(int(2e6), seed=seed_stream())
+    samples = matrix_normal.sample(int(2e5), seed=seed_stream())
     variance_, samples_ = self.evaluate([matrix_normal.variance(), samples])
     self.assertAllClose(variance_, np.var(samples_, axis=0), rtol=1e-2)
 

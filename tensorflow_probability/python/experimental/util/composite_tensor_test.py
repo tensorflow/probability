@@ -38,9 +38,8 @@ from tensorflow_probability.python.distributions import onehot_categorical
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.experimental.util import composite_tensor
 from tensorflow_probability.python.experimental.util.composite_tensor import _registry as clsid_registry
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.layers import distribution_layer
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 def normal_composite(*args, **kwargs):
@@ -57,8 +56,8 @@ def onehot_cat_composite(*args, **kwargs):
       onehot_categorical.OneHotCategorical(*args, **kwargs))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class CompositeTensorTest(tfp_test_util.TestCase):
+@test_util.test_graph_and_eager_modes
+class CompositeTensorTest(test_util.TestCase):
 
   def test_basics(self):
     dist = normal_composite(0, 1, validate_args=True)
@@ -68,7 +67,7 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     self.evaluate(unflat.log_prob(.5))
 
     d2 = normal_composite(
-        loc=dist.sample(seed=tfp_test_util.test_seed()),
+        loc=dist.sample(seed=test_util.test_seed()),
         scale=1,
         validate_args=True)
     tf.nest.assert_same_structure(dist, d2, expand_composites=True)
@@ -134,7 +133,7 @@ class CompositeTensorTest(tfp_test_util.TestCase):
         cond=lambda _: True,
         body=lambda d: [  # pylint: disable=g-long-lambda
             normal_composite(
-                loc=d.sample(seed=tfp_test_util.test_seed()),
+                loc=d.sample(seed=test_util.test_seed()),
                 scale=1,
                 validate_args=True)
         ],
@@ -490,4 +489,4 @@ class CompositeTensorTest(tfp_test_util.TestCase):
 
 
 if __name__ == '__main__':
-  tfp_test_util.main()
+  test_util.main()

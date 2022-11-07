@@ -146,22 +146,21 @@ class _VonMisesTest(object):
     if tf.executing_eagerly() or not self.use_static_shape:
       return
 
-    with self.cached_session():
-      n = 10
-      locs = tf.cast(tf.constant([1.] * n), self.dtype)
-      concentrations = tf.cast(tf.constant(np.logspace(-3, 3, n)), self.dtype)
-      dist = von_mises.VonMises(locs, concentrations)
-      x = tf.constant(self.evaluate(dist.sample(seed=test_util.test_seed())))
-      cdf = dist.cdf(x)
+    n = 10
+    locs = tf.cast(tf.constant([1.] * n), self.dtype)
+    concentrations = tf.cast(tf.constant(np.logspace(-3, 3, n)), self.dtype)
+    dist = von_mises.VonMises(locs, concentrations)
+    x = tf.constant(self.evaluate(dist.sample(seed=test_util.test_seed())))
+    cdf = dist.cdf(x)
 
-      self.assertLess(
-          tf1.test.compute_gradient_error(x, x.shape, cdf, cdf.shape), 1e-4)
-      self.assertLess(
-          tf1.test.compute_gradient_error(locs, locs.shape, cdf, cdf.shape),
-          1e-4)
-      self.assertLess(
-          tf1.test.compute_gradient_error(concentrations, concentrations.shape,
-                                          cdf, cdf.shape), 1e-4)
+    self.assertLess(
+        tf1.test.compute_gradient_error(x, x.shape, cdf, cdf.shape), 1e-4)
+    self.assertLess(
+        tf1.test.compute_gradient_error(locs, locs.shape, cdf, cdf.shape),
+        1e-4)
+    self.assertLess(
+        tf1.test.compute_gradient_error(concentrations, concentrations.shape,
+                                        cdf, cdf.shape), 1e-4)
 
   @test_util.numpy_disable_gradient_test
   def testVonMisesCdfGradientSimple(self):

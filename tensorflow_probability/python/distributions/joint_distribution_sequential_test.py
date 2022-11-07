@@ -15,6 +15,7 @@
 """Tests for the JointDistributionSequential."""
 
 import collections
+import inspect
 
 # Dependency imports
 from absl.testing import parameterized
@@ -46,8 +47,6 @@ from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.util import deferred_tensor
-
-from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
 # Defer creating test dists (by hiding them in functions) until we know what
@@ -312,7 +311,7 @@ class JointDistributionSequentialTest(test_util.TestCase):
     self.assertEqual((2, 3), lp.shape)
 
   def test_argspec(self):
-    argspec = tf_inspect.getfullargspec(Dummy)
+    argspec = inspect.getfullargspec(Dummy)
     self.assertAllEqual(['me', 'arg1', 'arg2', 'arg3'], argspec.args)
     self.assertIs(None, argspec.varargs)
     self.assertIs('named', argspec.varkw)

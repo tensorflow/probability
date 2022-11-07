@@ -33,6 +33,7 @@ try:
   from tensorflow_probability.python.internal.backend.numpy.gen import solve_registrations as _solve_registrations
 
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator import *
+  from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_addition import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_block_diag import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_block_lower_triangular import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_circulant import *

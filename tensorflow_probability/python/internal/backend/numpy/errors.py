@@ -17,11 +17,16 @@
 
 __all__ = [
     'InvalidArgumentError',
+    'OpError',
     'UnimplementedError',
 ]
 
 
 class InvalidArgumentError(Exception):
+  pass
+
+
+class OpError(Exception):
   pass
 
 

@@ -417,7 +417,7 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
          })
 
     self.assertIsInstance(transformed_init_state, dict)
-    self.assertAllClose({
+    self.assertAllCloseNested({
         'x': self._constant(1.),
         'y': self._constant(1.),
     }, transformed_init_state)
@@ -429,7 +429,7 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
             b.forward_log_det_jacobian(self._constant(1.), event_ndims=0)
             for b in bijectors.values())
 
-    self.assertAllClose({
+    self.assertAllCloseNested({
         'x': self._constant(2.),
         'y': self._constant(3.)
     }, orig_space)
@@ -1683,8 +1683,8 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     # The default is 0.
     self.assertAllClose(0., ret)
     # The gradients of the surrogate loss are state + 1.
-    self.assertAllClose(util.map_tree(lambda x: x + 1., state), grads)
-    self.assertAllClose(state, extra)
+    self.assertAllCloseNested(util.map_tree(lambda x: x + 1., state), grads)
+    self.assertAllCloseNested(state, extra)
 
   def testSurrogateLossFnDecorator(self):
     @fun_mc.make_surrogate_loss_fn(loss_value=1.)

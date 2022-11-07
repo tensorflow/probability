@@ -218,7 +218,7 @@ def _trainable_linear_operator_tril(
     scale_tril_bijector = fill_scale_tril.FillScaleTriL(
         diag_bijector, diag_shift=tf.zeros([], dtype=dtype))
     scale_tril = yield trainable_state_util.Parameter(
-        init_fn=lambda seed: scale_tril_bijector(  # pylint: disable=g-long-lambda
+        init_fn=lambda seed: scale_tril_bijector.forward(  # pylint: disable=g-long-lambda
             samplers.normal(
                 mean=0.,
                 stddev=scale_initializer,
@@ -262,7 +262,7 @@ def _trainable_linear_operator_diag(
 
     diag_bijector = diag_bijector or _DefaultScaleDiagonal()
     scale_diag = yield trainable_state_util.Parameter(
-        init_fn=lambda seed: diag_bijector(  # pylint: disable=g-long-lambda
+        init_fn=lambda seed: diag_bijector.forward(  # pylint: disable=g-long-lambda
             samplers.normal(
                 mean=0.,
                 stddev=scale_initializer,

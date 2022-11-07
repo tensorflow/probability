@@ -258,7 +258,6 @@ class SoftplusInverseTest(test_util.TestCase):
     self.assertAllEqual(np.ones_like(tf_softplus_inverse).astype(np.bool_),
                         np.isfinite(tf_softplus_inverse))
 
-  @test_util.numpy_disable_gradient_test  # TODO(sharadmv): fix Numpy test
   def testNumbers(self):
     for t in [np.float32, np.float64]:
       lower = {np.float32: -50, np.float64: -50}.get(t, -100)
@@ -625,7 +624,6 @@ class SoftSortingMatrixTest(test_util.TestCase):
     self.assertAllClose(expected_sort, actual_sort_)
 
 
-@test_util.test_all_tf_execution_regimes
 class _KahanSumTest(test_util.TestCase):
 
   @parameterized.named_parameters(
@@ -693,6 +691,7 @@ class KahanSumJitTest(_KahanSumTest):
   jit = True
 
 
+@test_util.test_all_tf_execution_regimes
 class KahanSumTest(_KahanSumTest):
   jit = False
 

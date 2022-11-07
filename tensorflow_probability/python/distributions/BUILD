@@ -119,6 +119,7 @@ multi_substrate_py_library(
         ":mvn_linear_operator",
         ":mvn_tril",
         ":negative_binomial",
+        ":noncentral_chi2",
         ":normal",
         ":normal_conjugate_posteriors",
         ":normal_inverse_gaussian",
@@ -706,6 +707,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math:generic",
         "//tensorflow_probability/python/math:special",
     ],
 )
@@ -746,6 +748,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:nest_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
@@ -764,6 +767,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:nest_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/math/psd_kernels:schur_complement",
         "//tensorflow_probability/python/util",
@@ -1014,6 +1018,8 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/util:deferred_tensor",
     ],
@@ -1492,9 +1498,9 @@ multi_substrate_py_library(
     deps = [
         ":mvn_linear_operator",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
@@ -1583,7 +1589,6 @@ multi_substrate_py_library(
         ":mvn_linear_operator",
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:fill_scale_tril",
-        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:prefer_static",
@@ -1653,6 +1658,32 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/math:special",
         "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "noncentral_chi2",
+    srcs = ["noncentral_chi2.py"],
+    deps = [
+        ":chi2",
+        ":distribution",
+        ":gamma",
+        ":poisson",
+        # numpy dep,
+        # tensorflow:tensorflow_no_contrib dep,
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:custom_gradient",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:special_math",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math:bessel",
+        "//tensorflow_probability/python/math:generic",
+        "//tensorflow_probability/python/math:root_search",
+        "//tensorflow_probability/python/random",
     ],
 )
 
@@ -2134,6 +2165,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/bijectors:identity",
         "//tensorflow_probability/python/bijectors:softplus",
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:batch_shape_lib",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -3048,6 +3080,7 @@ multi_substrate_py_test(
         ":mvn_diag",
         ":mvn_linear_operator",
         ":normal",
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tensorshape_util",
@@ -3255,13 +3288,16 @@ multi_substrate_py_test(
     name = "inflated_test",
     srcs = ["inflated_test.py"],
     deps = [
+        ":gamma",
         ":inflated",
+        ":lognormal",
         ":negative_binomial",
         ":normal",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/experimental/util",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
     ],
 )
 
@@ -3628,6 +3664,7 @@ multi_substrate_py_test(
     name = "markov_chain_test",
     size = "medium",
     srcs = ["markov_chain_test.py"],
+    shard_count = 3,
     deps = [
         ":deterministic",
         ":dirichlet",
@@ -3659,6 +3696,7 @@ multi_substrate_py_test(
     name = "matrix_normal_linear_operator_test",
     size = "medium",
     srcs = ["matrix_normal_linear_operator_test.py"],
+    shard_count = 2,
     deps = [
         ":matrix_normal_linear_operator",
         # numpy dep,
@@ -3676,6 +3714,7 @@ multi_substrate_py_test(
     name = "matrix_t_linear_operator_test",
     size = "medium",
     srcs = ["matrix_t_linear_operator_test.py"],
+    shard_count = 2,
     deps = [
         ":matrix_t_linear_operator",
         # numpy dep,
@@ -3947,6 +3986,22 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math:gradient",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "noncentral_chi2_test",
+    size = "medium",
+    srcs = ["noncentral_chi2_test.py"],
+    shard_count = 3,
+    tags = ["tf1-broken"],  # log_bessel_ive gives an error
+    deps = [
+        ":noncentral_chi2",
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -4483,8 +4538,8 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "truncated_normal_test",
+    size = "medium",
     srcs = ["truncated_normal_test.py"],
-    jax_size = "medium",
     shard_count = 10,
     deps = [
         ":normal",
@@ -4503,8 +4558,10 @@ multi_substrate_py_test(
     name = "two_piece_normal_test",
     size = "medium",
     srcs = ["two_piece_normal_test.py"],
+    shard_count = 4,
     deps = [
         ":two_piece_normal",
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
@@ -4705,7 +4762,6 @@ py_test(
         # hypothesis dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/experimental",
         "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:numerics_testing",
         "//tensorflow_probability/python/internal:test_util",

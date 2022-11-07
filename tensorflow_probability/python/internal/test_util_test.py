@@ -28,7 +28,6 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_combinations
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
-from tensorflow.python.eager import context  # pylint: disable=g-direct-tensorflow-import
 
 
 FLAGS = flags.FLAGS
@@ -321,13 +320,13 @@ class TestCombinationsTest(test_util.TestCase):
       test_combinations.combine(mode='graph'),
       test_combinations=[test_util.EagerGraphCombination()])
   def test_graph_mode_combination(self):
-    self.assertFalse(context.executing_eagerly())
+    self.assertFalse(tf.executing_eagerly())
 
   @test_combinations.generate(
       test_combinations.combine(mode='eager'),
       test_combinations=[test_util.EagerGraphCombination()])
   def test_eager_mode_combination(self):
-    self.assertTrue(context.executing_eagerly())
+    self.assertTrue(tf.executing_eagerly())
 
   @test_combinations.generate(
       test_combinations.combine(tf_function=''),

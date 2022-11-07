@@ -20,6 +20,7 @@ import functools
 from absl.testing import parameterized
 
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import pad
@@ -42,8 +43,6 @@ from tensorflow_probability.python.experimental.distributions import joint_distr
 from tensorflow_probability.python.internal import structural_tuple
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import generic
-
-from tensorflow.python import tf2  # pylint: disable=g-direct-tensorflow-import
 
 Root = jdc.JointDistributionCoroutine.Root
 
@@ -416,7 +415,7 @@ class JointDistributionPinnedTest(test_util.TestCase):
       ('batch_scalar', [3], []),
       ('batch_batch', [3], [4]))
   def test_bijector_for_autobatched_model(self, pin_batch_shape, sample_shape):
-    if not tf2.enabled():
+    if not tf1.control_flow_v2_enabled():
       self.skipTest('b/183994961')
 
     @jdab.JointDistributionCoroutineAutoBatched

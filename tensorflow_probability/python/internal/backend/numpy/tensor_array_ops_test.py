@@ -17,10 +17,9 @@
 # Dependency imports
 
 import numpy as np  # Rewritten by script to import jax.numpy
-import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.internal import test_util as test_util
 from tensorflow_probability.python.internal.backend import numpy as nptf
+from tensorflow_probability.substrates.numpy.internal import test_util
 
 JAX_MODE = False
 
@@ -37,7 +36,7 @@ class TensorArrayTest(test_util.TestCase):
       return ta.write(index, value)
 
     ta = nptf.compat.v2.TensorArray(
-        dtype=tf.float32, size=4, element_shape=(3,))
+        dtype=np.float32, size=4, element_shape=(3,))
     ta = f(ta, 1, [2, 3, 4.])
     ta = f(ta, 3, [4, 5, 6.])
     self.assertAllEqual([[0, 0, 0], [2, 3, 4], [0, 0, 0], [4, 5, 6.]],
@@ -45,7 +44,7 @@ class TensorArrayTest(test_util.TestCase):
 
   def test_write_read(self):
     ta = nptf.compat.v2.TensorArray(
-        dtype=tf.float32,
+        dtype=np.float32,
         tensor_array_name='foo',
         infer_shape=False,
         dynamic_size=True)
@@ -61,7 +60,7 @@ class TensorArrayTest(test_util.TestCase):
 
   def test_gather(self):
     ta = nptf.compat.v2.TensorArray(
-        dtype=tf.float32, tensor_array_name='foo', size=3)
+        dtype=np.float32, tensor_array_name='foo', size=3)
     w0 = ta.write(0, -3.)
     w1 = w0.write(1, -2.)
     w2 = w1.write(2, -1.)
@@ -69,13 +68,13 @@ class TensorArrayTest(test_util.TestCase):
 
   def test_gather_nonscalar_elements(self):
     ta = nptf.compat.v2.TensorArray(
-        dtype=tf.int32, tensor_array_name='foo', size=3).unstack(
+        dtype=np.int32, tensor_array_name='foo', size=3).unstack(
             np.int32([[0, 0], [1, 1], [2, 2]]))
     self.assertAllEqual([1, 1], ta.gather([1])[0])
 
   def test_stack(self):
     ta = nptf.compat.v2.TensorArray(
-        dtype=tf.float32, tensor_array_name='foo', size=3)
+        dtype=np.float32, tensor_array_name='foo', size=3)
     w0 = ta.write(0, -3.)
     w1 = w0.write(1, -2.)
     w2 = w1.write(2, -1.)
@@ -83,13 +82,17 @@ class TensorArrayTest(test_util.TestCase):
 
   def test_unstack(self):
     ta = nptf.compat.v2.TensorArray(
-        dtype=tf.float32, size=3, tensor_array_name='foo')
+        dtype=np.float32, size=3, tensor_array_name='foo')
     value = np.array([[1., -1.], [10., -10.]])
     w = ta.unstack(value)
     r0 = w.read(0)
     r1 = w.read(1)
     self.assertAllEqual([1., -1.], r0)
     self.assertAllEqual([10., -10.], r1)
+
+  def assertAllEqual(self, x, y):
+    import numpy as onp  # pylint:disable=g-import-not-at-top,reimported
+    onp.testing.assert_array_equal(x, y)
 
 
 if __name__ == '__main__':

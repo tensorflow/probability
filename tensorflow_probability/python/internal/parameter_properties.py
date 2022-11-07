@@ -26,6 +26,9 @@ __all__ = [
 ]
 
 
+NO_EVENT_NDIMS = 'INTERNAL_NO_EVENT_NDIMS'
+
+
 def BIJECTOR_NOT_IMPLEMENTED():  # pylint: disable=invalid-name
   raise NotImplementedError('No constraining bijector is implemented for this '
                             'parameter.')
@@ -291,7 +294,7 @@ class ParameterProperties(
 
   __slots__ = ()
 
-  NO_EVENT_NDIMS = object()
+  NO_EVENT_NDIMS = NO_EVENT_NDIMS
 
   # Specify default properties.
   def __new__(cls,
@@ -385,7 +388,7 @@ class ShapeParameterProperties(ParameterProperties):
   def __new__(cls, is_preferred=True):
     return super(ShapeParameterProperties, cls).__new__(  # pylint: disable=redundant-keyword-arg
         cls=cls,
-        event_ndims=None,
+        event_ndims=NO_EVENT_NDIMS,
         shape_fn=SHAPE_FN_NOT_IMPLEMENTED,
         default_constraining_bijector_fn=BIJECTOR_NOT_IMPLEMENTED,
         is_preferred=is_preferred,

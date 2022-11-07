@@ -65,6 +65,27 @@ class TensorSpec(object):
         self.shape, self.dtype, self.name)
 
 
+class VariableSpec(TensorSpec):
+  """Stub for VariableSpec to simplify tests in np/jax backends."""
+
+  def __init__(self, shape, dtype=tf.float32, trainable=True, name=None):
+    super(VariableSpec, self).__init__(shape, dtype, name=name)
+    self.trainable = trainable
+
+  @classmethod
+  def from_value(cls, variable):
+    return cls(
+        variable.shape, variable.dtype, variable.trainable, variable.name)
+
+  def __eq__(self, other):
+    return (super(VariableSpec, self).__eq__(other)
+            and self.trainable == other.trainable)
+
+  def __repr__(self):
+    return 'VariableSpec(shape={}, dtype={}, trainable={}, name={})'.format(
+        self.shape, self.dtype, self.trainable, self.name)
+
+
 class LeafList(list):
   _tfp_nest_expansion_force_leaf = ()
 
@@ -297,12 +318,13 @@ class NestUtilTest(test_util.TestCase):
                    'b': TensorSpec([], tf.int64, name='c2t/b')}
   },{
       'testcase_name': '_tensor_with_hint',
-      'value': [TensorSpec([], tf.int32)],
+      'value': [TensorSpec([], tf.int32, name='tensor')],
       'dtype_hint': [tf.float32],
       'expected': [TensorSpec([], tf.int32, name='tensor')]
   },{
       'testcase_name': '_tensor_struct',
-      'value': [TensorSpec([], tf.int32), TensorSpec([], tf.float32)],
+      'value': [TensorSpec([], tf.int32, name='tensor'),
+                TensorSpec([], tf.float32, name='tensor')],
       'dtype_hint': [tf.float32, tf.float32],
       'expected': [TensorSpec([], tf.int32, name='tensor'),
                    TensorSpec([], tf.float32, name='tensor_1')]
@@ -318,20 +340,46 @@ class NestUtilTest(test_util.TestCase):
       'name': None,
       'expected': [TensorSpec([], tf.float32, name='Const'),
                    TensorSpec([], tf.float32, name='Const_1')]
+  },{
+      'testcase_name': '_tensor_and_variable_struct',
+      'value': [TensorSpec([], tf.int32, name='tensor'),
+                VariableSpec([], tf.float32, trainable=False, name='variable')],
+      'dtype_hint': [tf.float32, tf.float32],
+      'convert_ref': False,
+      'expected': [
+          TensorSpec([], tf.int32, name='tensor'),
+          VariableSpec([], tf.float32, trainable=False, name='variable:0')]
+  },{
+      'testcase_name': '_tensor_and_variable_struct_convert_ref',
+      'value': [VariableSpec([], tf.int32, name='variable'),
+                TensorSpec([], tf.float32, name='tensor')],
+      'dtype_hint': [tf.float32, tf.float32],
+      'expected': [TensorSpec([], tf.int32, name='c2t/ReadVariableOp'),
+                   TensorSpec([], tf.float32, name='tensor')]
   })
   def testConvertToNestedTensor(
-      self, value, dtype=None, dtype_hint=None, name='c2t', expected=None):
-    # Convert specs to tensors
+      self, value, dtype=None, dtype_hint=None, name='c2t', convert_ref=True,
+      expected=None):
+    # Convert specs to tensors or variables.
     def maybe_spec_to_tensor(x):
+      if isinstance(x, VariableSpec):
+        return tf.Variable(
+            tf.zeros(x.shape, x.dtype), trainable=x.trainable, name=x.name)
       if isinstance(x, TensorSpec):
-        return tf.zeros(x.shape, x.dtype, name='tensor')
+        return tf.zeros(x.shape, x.dtype, name=x.name)
       return x
     value = nest.map_structure(maybe_spec_to_tensor, value)
 
     # Grab shape/dtype from convert_to_nested_tensor for comparison.
+    def spec_from_value(x):
+      if isinstance(x, tf.Variable):
+        return VariableSpec.from_value(x)
+      return TensorSpec.from_tensor(x)
+
     observed = nest.map_structure(
-        TensorSpec.from_tensor,
-        nest_util.convert_to_nested_tensor(value, dtype, dtype_hint, name=name))
+        spec_from_value,
+        nest_util.convert_to_nested_tensor(
+            value, dtype, dtype_hint, convert_ref=convert_ref, name=name))
     self.assertAllEqualNested(observed, expected)
 
   @parameterized.named_parameters({

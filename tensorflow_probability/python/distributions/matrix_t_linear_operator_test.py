@@ -161,18 +161,18 @@ class _MatrixTTest(object):
     df, loc, scale_row, scale_col = self._random_df_loc_and_scale(
         batch_shape=[5, 2], matrix_shape=[2, 3], seed_stream=seed_stream)
     matrix_t = mtlo.MatrixTLinearOperator(df, loc, scale_row, scale_col)
-    samples = matrix_t.sample(int(1e6), seed=seed_stream())
+    samples = matrix_t.sample(int(1e5), seed=seed_stream())
     mean_, samples_ = self.evaluate([matrix_t.mean(), samples])
-    self.assertAllClose(np.mean(samples_, axis=0), mean_, rtol=2e-2)
+    self.assertAllClose(np.mean(samples_, axis=0), mean_, rtol=9e-2)
 
   def testSampleVariance(self):
     seed_stream = test_util.test_seed_stream()
     df, loc, scale_row, scale_col = self._random_df_loc_and_scale(
         batch_shape=[5, 2], matrix_shape=[2, 3], seed_stream=seed_stream)
     matrix_t = mtlo.MatrixTLinearOperator(df, loc, scale_row, scale_col)
-    samples = matrix_t.sample(int(2e6), seed=seed_stream())
+    samples = matrix_t.sample(int(1e5), seed=seed_stream())
     variance_, samples_ = self.evaluate([matrix_t.variance(), samples])
-    self.assertAllClose(np.var(samples_, axis=0), variance_, rtol=4e-2)
+    self.assertAllClose(np.var(samples_, axis=0), variance_, rtol=6e-2)
 
   @test_util.tf_tape_safety_test
   def testVariableLocation(self):

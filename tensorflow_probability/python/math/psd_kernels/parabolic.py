@@ -30,7 +30,7 @@ class Parabolic(psd_kernel.AutoCompositeTensorPsdKernel):
   """The Parabolic kernel.
 
   ```none
-  k(x, y) = 3 / 4 * amplitude * max(0, 1 - (||x_k - y_k|| / length_scale**2)
+  k(x, y) = 3 / 4 * amplitude * max(0, 1 - (||x_k - y_k|| / length_scale)**2)
   ```
 
   where the double-bars represent vector length (ie, Euclidean, or L2 norm).

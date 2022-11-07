@@ -39,6 +39,10 @@ class _MaternTestCase(test_util.TestCase):
     with self.assertRaises(TypeError):
       self._kernel_type(np.float32(1.), np.float64(1.))
 
+    with self.assertRaises(TypeError):
+      self._kernel_type(
+          amplitude=np.float32(1.), inverse_length_scale=np.float64(1.))
+
   def testBatchShape(self):
     amplitude = np.random.uniform(2, 3., size=[3, 1, 2]).astype(np.float32)
     length_scale = np.random.uniform(2, 3., size=[1, 3, 1]).astype(np.float32)

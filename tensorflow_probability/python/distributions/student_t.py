@@ -120,6 +120,28 @@ def cdf(x, df, loc, scale):
   return tf.where(y < 0., neg_cdf, 1. - neg_cdf)
 
 
+def quantile(p, df, loc, scale):
+  """Compute quantile function of Student T distribution.
+
+  Note that scale can be negative.
+
+  Args:
+    p: Floating-point `Tensor`. Probabilities from 0 to 1.
+    df: Floating-point `Tensor`. The degrees of freedom of the
+      distribution(s). `df` must contain only positive values.
+    loc: Floating-point `Tensor`; the location(s) of the distribution(s).
+    scale: Floating-point `Tensor`; the scale(s) of the distribution(s).
+
+  Returns:
+    A `Tensor` with shape broadcast according to the arguments.
+  """
+  df = tf.convert_to_tensor(df)
+  p_adjusted = tf.where(p < 0.5, p, 1. - p)
+  y = special.betaincinv(0.5 * df, 0.5, 2 * p_adjusted)
+  return loc + tf.math.abs(
+      scale) * tf.math.sign(p - 0.5) * tf.math.sqrt(df * (1 - y) / y)
+
+
 def entropy(df, scale, batch_shape, dtype):
   """Compute entropy of the StudentT distribution.
 
@@ -349,6 +371,10 @@ class StudentT(distribution.AutoCompositeTensorDistribution):
   def _cdf(self, x):
     df = tf.convert_to_tensor(self.df)
     return cdf(x, df, self.loc, self.scale)
+
+  def _quantile(self, x):
+    df = tf.convert_to_tensor(self.df)
+    return quantile(x, df, self.loc, self.scale)
 
   def _entropy(self):
     df = tf.convert_to_tensor(self.df)
