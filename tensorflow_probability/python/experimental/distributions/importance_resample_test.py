@@ -16,6 +16,7 @@
 
 from absl.testing import parameterized
 
+import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
@@ -90,11 +91,13 @@ class ImportanceResampleTest(test_util.TestCase):
         resampled.experimental_sample_and_log_prob(500, seed=seed))
     lp_lower_bound = resampled.log_prob(xs, sample_size=3, seed=seed)
     lp_tight = resampled.log_prob(xs, sample_size=1000, seed=seed)
-    self.assertAllGreater(tf.reduce_sum(lp_upper_bound - lp_tight), 0.)
-    self.assertAllLess(tf.reduce_sum(lp_lower_bound - lp_tight), 0.)
+    self.assertAllGreater(tf.reduce_sum(lp_upper_bound),
+                          tf.reduce_sum(lp_tight))
+    self.assertAllLess(tf.reduce_sum(lp_lower_bound),
+                       tf.reduce_sum(lp_tight))
 
   def test_samples_approach_target_distribution(self):
-    num_samples = 10000
+    num_samples = 10_000
     seeds = samplers.split_seed(
         test_util.test_seed(sampler_type='stateless'), n=6)
 
@@ -118,7 +121,7 @@ class ImportanceResampleTest(test_util.TestCase):
 
       expectation_no_resampling = resampled2.self_normalized_expectation(
           statistic_fn, importance_sample_size=10000, seed=seeds[3])
-      self.assertAllClose(true_statistic, expectation_no_resampling, atol=0.1)
+      self.assertAllClose(true_statistic, expectation_no_resampling, atol=0.15)
 
   def test_log_prob_approaches_target_distribution(self):
     seed = test_util.test_seed(sampler_type='stateless')
@@ -133,7 +136,7 @@ class ImportanceResampleTest(test_util.TestCase):
         target.experimental_sample_and_log_prob(100, seed=seed))
     self.assertAllClose(target_lp,
                         resampled.log_prob(xs, seed=seed),
-                        atol=0.1)
+                        atol=0.17)
 
   def test_supports_joint_events(self):
     root = jdc.JointDistributionCoroutine.Root
@@ -165,7 +168,7 @@ class ImportanceResampleTest(test_util.TestCase):
                                                            sample_size=10000,
                                                            seed=seed)
     self.assertAllClose(estimated_mean.x, -1., atol=0.2)
-    self.assertAllClose(estimated_mean.y, [1.], atol=0.2)
+    self.assertAllClose(estimated_mean.y, [1.], atol=0.22)
 
   @parameterized.named_parameters(
       ('_static_shape', False),
@@ -192,23 +195,22 @@ class ImportanceResampleTest(test_util.TestCase):
         'Shape of importance weights does not match the batch'):
       self.evaluate(resampled.sample(seed=test_util.test_seed()))
 
-  @test_util.numpy_disable_test_missing_functionality('tfp.vi')
-  @test_util.jax_disable_test_missing_functionality('tfp.vi')
   def test_importance_resampled_surrogate_is_equivalent_to_iwae(self):
-    importance_sample_size = 5
+    importance_sample_size = 10
     sample_size = 1e4
     target = mvn_tril.MultivariateNormalTriL(
         loc=[1., -1.], scale_tril=[[1., 0.], [-2., 0.2]])
     proposal = mvn_diag.MultivariateNormalDiag(
         loc=[0., 0.], scale_diag=[1., 1.])
 
+    stream = test_util.test_seed_stream()
     iwae_bound = self.evaluate(
         csiszar_divergence.monte_carlo_variational_loss(
             target_log_prob_fn=target.log_prob,
             surrogate_posterior=proposal,
-            importance_sample_size=5,
+            importance_sample_size=importance_sample_size,
             sample_size=sample_size,
-            seed=test_util.test_seed(sampler_type='stateless')))
+            seed=stream()))
 
     elbo_with_resampled_surrogate = self.evaluate(
         csiszar_divergence.monte_carlo_variational_loss(
@@ -218,9 +220,9 @@ class ImportanceResampleTest(test_util.TestCase):
                 target_log_prob_fn=target.log_prob,
                 importance_sample_size=importance_sample_size),
             sample_size=sample_size,
-            seed=test_util.test_seed(sampler_type='stateless')))
-    # Passes with `atol=0.01` and `sample_size = 1e6`.
-    self.assertAllClose(iwae_bound, elbo_with_resampled_surrogate, atol=0.1)
+            seed=stream()))
+    # Passes with `atol=0.015` and `sample_size = 1e6`.
+    self.assertAllClose(iwae_bound, elbo_with_resampled_surrogate, atol=0.15)
 
   def test_docstring_example_runs(self):
 
@@ -260,6 +262,22 @@ class ImportanceResampleTest(test_util.TestCase):
     # Approximate the posterior density.
     xs = tf.linspace(-3., 3., 101)
     approximate_posterior.prob(xs, sample_size=10, seed=seed)
+
+  def test_log_prob_independence_per_x(self):
+    dist = importance_resample.ImportanceResample(
+        proposal_distribution=normal.Normal(loc=0., scale=1.),
+        target_log_prob_fn=normal.Normal(loc=0.85, scale=0.1).log_prob,
+        importance_sample_size=20)
+
+    seed = test_util.test_seed(sampler_type='stateless')
+    xs = np.linspace(0, 1.6, 100)
+    aucs = []
+    for s in samplers.split_seed(seed, n=30):
+      aucs.append(np.trapz(
+          self.evaluate(dist.prob(xs, seed=s, sample_size=100)), xs))
+
+    self.assertAllClose(aucs, np.ones_like(aucs), atol=.05)
+
 
 if __name__ == '__main__':
   test_util.main()
