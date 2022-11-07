@@ -124,6 +124,10 @@ def ess_below_threshold(weighted_particles, threshold=0.5):
                       ps.log(threshold))
 
 
+def rejuvenation_criterion_fn(weighted_particles):
+  return 0
+
+
 class SequentialMonteCarlo(kernel_base.TransitionKernel):
   """Sequential Monte Carlo transition kernel.
 
@@ -138,6 +142,8 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
                propose_and_update_log_weights_fn,
                resample_fn=weighted_resampling.resample_systematic,
                resample_criterion_fn=ess_below_threshold,
+               rejuvenation_fn=None,  #TODO: Add rejuvenation fn
+               rejuvenation_criterion_fn=rejuvenation_criterion_fn,
                unbiased_gradients=True,
                name=None):
     """Initializes a sequential Monte Carlo transition kernel.
@@ -195,6 +201,8 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
     self._propose_and_update_log_weights_fn = propose_and_update_log_weights_fn
     self._resample_fn = resample_fn
     self._resample_criterion_fn = resample_criterion_fn
+    self._rejuvenation_fn = rejuvenation_fn
+    self._rejuvenation_criterion_fn = rejuvenation_criterion_fn
     self._unbiased_gradients = unbiased_gradients
     self._name = name or 'SequentialMonteCarlo'
 
@@ -213,6 +221,14 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
   @property
   def resample_criterion_fn(self):
     return self._resample_criterion_fn
+
+  @property
+  def rejuvenation_fn(self):
+    return self._rejuvenation_fn
+
+  @property
+  def rejuvenation_criterion_fn(self):
+    return self._rejuvationan_criterion_fn
 
   @property
   def unbiased_gradients(self):
@@ -271,43 +287,69 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
                                                normalized_log_weights[0])
 
         do_resample = self.resample_criterion_fn(state)
+        do_rejuvenation = self._rejuvenation_criterion_fn(state)
 
-        # Some batch elements may require resampling and others not, so
-        # we first do the resampling for all elements, then select whether to
-        # use the resampled values for each batch element according to
-        # `do_resample`. If there were no batching, we might prefer to use
-        # `tf.cond` to avoid the resampling computation on steps where it's not
-        # needed---but we're ultimately interested in adaptive resampling
-        # for statistical (not computational) purposes, so this isn't a
-        # dealbreaker.
-        [
-            resampled_particles,
-            resample_indices,
-            weights_after_resampling
-        ] = weighted_resampling.resample(
-            particles=state.particles,
-            # The `stop_gradient` here does not affect discrete resampling
-            # (which is nondifferentiable anyway), but avoids canceling out
-            # the gradient signal from the 'target' log weights, as described in
-            # Scibior, Masrani, and Wood (2021).
-            log_weights=tf.stop_gradient(state.log_weights),
-            resample_fn=self.resample_fn,
-            target_log_weights=(normalized_log_weights
-                                if self.unbiased_gradients else None),
-            seed=resample_seed)
-        (resampled_particles,
-         resample_indices,
-         log_weights) = tf.nest.map_structure(
-             lambda r, p: tf.where(do_resample, r, p),
-             (resampled_particles, resample_indices, weights_after_resampling),
-             (state.particles, _dummy_indices_like(resample_indices),
-              normalized_log_weights))
+        if not do_rejuvenation:
+            # Some batch elements may require resampling and others not, so
+            # we first do the resampling for all elements, then select whether to
+            # use the resampled values for each batch element according to
+            # `do_resample`. If there were no batching, we might prefer to use
+            # `tf.cond` to avoid the resampling computation on steps where it's not
+            # needed---but we're ultimately interested in adaptive resampling
+            # for statistical (not computational) purposes, so this isn't a
+            # dealbreaker.
+            [
+                new_particles,
+                new_indices,
+                new_weights
+            ] = weighted_resampling.resample(
+                particles=state.particles,
+                # The `stop_gradient` here does not affect discrete resampling
+                # (which is nondifferentiable anyway), but avoids canceling out
+                # the gradient signal from the 'target' log weights, as described in
+                # Scibior, Masrani, and Wood (2021).
+                log_weights=tf.stop_gradient(state.log_weights),
+                resample_fn=self.resample_fn,
+                target_log_weights=(normalized_log_weights
+                                    if self.unbiased_gradients else None),
+                seed=resample_seed)
+            (new_particles,
+             new_indices,
+             log_weights) = tf.nest.map_structure(
+                 lambda r, p: tf.where(do_resample, r, p),
+                 (new_particles, new_indices, new_weights),
+                 (state.particles, _dummy_indices_like(new_indices),
+                  normalized_log_weights))
 
-      return (WeightedParticles(particles=resampled_particles,
+        else:
+            [
+                new_particles,
+                new_indices,
+                new_weights
+            ] = weighted_resampling.resample(
+                particles=state.particles,
+                # The `stop_gradient` here does not affect discrete resampling
+                # (which is nondifferentiable anyway), but avoids canceling out
+                # the gradient signal from the 'target' log weights, as described in
+                # Scibior, Masrani, and Wood (2021).
+                log_weights=tf.stop_gradient(state.log_weights),
+                resample_fn=self.rejuvenate_fn,
+                target_log_weights=(normalized_log_weights
+                                    if self.unbiased_gradients else None),
+                seed=resample_seed)
+            (new_particles,
+             new_indices,
+             log_weights) = tf.nest.map_structure(
+                lambda r, p: tf.where(do_rejuvenation, r, p),
+                (new_particles, new_indices, new_weights),
+                (state.particles, _dummy_indices_like(new_indices),
+                 normalized_log_weights))
+
+      return (WeightedParticles(particles=new_particles,
                                 log_weights=log_weights),
               SequentialMonteCarloResults(
                   steps=kernel_results.steps + 1,
-                  parent_indices=resample_indices,
+                  parent_indices=new_indices,
                   incremental_log_marginal_likelihood=(
                       incremental_log_marginal_likelihood),
                   accumulated_log_marginal_likelihood=(
