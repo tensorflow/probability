@@ -133,7 +133,7 @@ def infer_trajectories(observations,
                        seed=None,
                        name=None):  # pylint: disable=g-doc-args
   """Use particle filtering to sample from the posterior over trajectories.
-  
+
   ${particle_filter_arg_str}
     seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: Python `str` name for ops created by this method.
@@ -152,30 +152,30 @@ def infer_trajectories(observations,
       https://en.wikipedia.org/wiki/Jensen%27s_inequality))
       this is *smaller* in expectation than the true
       `log p(observations[t] | observations[:t])`.
-  
+
   #### Examples
-  
+
   **Tracking unknown position and velocity**: Let's consider tracking an object
   moving in a one-dimensional space. We'll define a dynamical system
   by specifying an `initial_state_prior`, a `transition_fn`,
   and `observation_fn`.
-  
+
   The structure of the latent state space is determined by the prior
   distribution. Here, we'll define a state space that includes the object's
   current position and velocity:
-  
+
   ```python
   initial_state_prior = tfd.JointDistributionNamed({
       'position': tfd.Normal(loc=0., scale=1.),
       'velocity': tfd.Normal(loc=0., scale=0.1)})
   ```
-  
+
   The `transition_fn` specifies the evolution of the system. It should
   return a distribution over latent states of the same structure as the prior.
   Here, we'll assume that the position evolves according to the velocity,
   with a small random drift, and the velocity also changes slowly, following
   a random drift:
-  
+
   ```python
   def transition_fn(_, previous_state):
     return tfd.JointDistributionNamed({
@@ -184,19 +184,19 @@ def infer_trajectories(observations,
             scale=0.1),
         'velocity': tfd.Normal(loc=previous_state['velocity'], scale=0.01)})
   ```
-  
+
   The `observation_fn` specifies the process by which the system is observed
   at each time step. Let's suppose we observe only a noisy version of the =
   current position.
-  
+
   ```python
     def observation_fn(_, state):
       return tfd.Normal(loc=state['position'], scale=0.1)
   ```
-  
+
   Now let's track our object. Suppose we've been given observations
   corresponding to an initial position of `0.4` and constant velocity of `0.01`:
-  
+
   ```python
   # Generate simulated observations.
   observed_positions = tfd.Normal(loc=tf.linspace(0.4, 0.8, 0.01),
@@ -210,7 +210,7 @@ def infer_trajectories(observations,
             observation_fn=observation_fn,
             num_particles=1000)
   ```
-  
+
   For all `i`, `trajectories['position'][:, i]` is a sample from the
   posterior over position sequences, given the observations:
   `p(state[0:T] | observations[0:T])`. Often, the sampled trajectories
@@ -222,9 +222,9 @@ def infer_trajectories(observations,
   distributions `p(state[t] | observations[:t])`, in which each latent state
   is inferred conditioned only on observations up to that point in time; these
   may be computed using `tfp.mcmc.experimental.particle_filter`.
-  
+
   #### References
-  
+
   [1] Arnaud Doucet and Adam M. Johansen. A tutorial on particle
       filtering and smoothing: Fifteen years later.
       _Handbook of nonlinear filtering_, 12(656-704), 2009.
@@ -232,7 +232,7 @@ def infer_trajectories(observations,
   [2] Adam Scibior, Vaden Masrani, and Frank Wood. Differentiable Particle
       Filtering without Modifying the Forward Pass. _arXiv preprint
       arXiv:2106.10314_, 2021. https://arxiv.org/abs/2106.10314
-  
+
   """
   with tf.name_scope(name or 'infer_trajectories') as name:
     pf_seed, resample_seed = samplers.split_seed(
@@ -290,6 +290,7 @@ def sequential_monte_carlo(loop_seed,
         never_trace=lambda *_: False
         ):
     """Samples a series of particles representing filtered latent states.
+
       The particle filter samples from the sequence of "filtering" distributions
       `p(state[t] | observations[:t])` over latent
       states: at each point in time, this is a sample from the distribution conditioned
@@ -297,6 +298,7 @@ def sequential_monte_carlo(loop_seed,
       at time `t` may be different from the particle with the same index at time
       `t + 1`. To reconstruct trajectories by tracing back through the resampling
       process, see `tfp.mcmc.experimental.reconstruct_trajectories`.
+  
       ${particle_filter_arg_str}
         trace_fn: Python `callable` defining the values to be traced at each step,
           with signature `traced_values = trace_fn(weighted_particles, results)`
@@ -328,7 +330,9 @@ def sequential_monte_carlo(loop_seed,
           `trace_criterion_fn==None`, this is computed from the final step;
           otherwise, each Tensor will have initial dimension `num_steps_traced`
           and stacks the traced results across all steps.
+  
       #### References
+
       [1] Adam Scibior, Vaden Masrani, and Frank Wood. Differentiable Particle
           Filtering without Modifying the Forward Pass. _arXiv preprint
           arXiv:2106.10314_, 2021. https://arxiv.org/abs/2106.10314
@@ -563,6 +567,7 @@ def _compute_observation_log_weights(step,
                                      observation_fn,
                                      num_transitions_per_observation=1):
   """Computes particle importance weights from an observation step.
+
   Args:
     step: int `Tensor` current step.
     particles: Nested structure of `Tensor`s, each of shape
