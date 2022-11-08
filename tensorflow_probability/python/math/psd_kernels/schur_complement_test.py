@@ -187,7 +187,7 @@ class SchurComplementTest(test_util.TestCase):
 
   def testTensorShapesAreCorrect(self):
     for x1_example_ndims in range(0, 3):
-      for x2_example_ndims in range(0, 3):
+      for x2_example_ndims in range(0, 2):
         # An integer generator.
         ints = itertools.count(start=2, step=1)
         feature_shape = [next(ints), next(ints)]
