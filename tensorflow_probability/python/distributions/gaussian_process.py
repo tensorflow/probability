@@ -38,6 +38,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import linalg
 from tensorflow_probability.python.math.psd_kernels.internal import util as psd_kernels_util
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
@@ -478,7 +479,8 @@ class GaussianProcess(
     with self._name_and_control_scope('get_marginal_distribution'):
       return self._get_marginal_distribution(index_points=index_points)
 
-  def _get_marginal_distribution(self, index_points=None, is_missing=None):
+  def _get_loc_and_covariance(
+      self, index_points=None, is_missing=None, mask_loc=True):
     # TODO(cgs): consider caching the result here, keyed on `index_points`.
     index_points = self._get_index_points(index_points)
     covariance = self._compute_covariance(index_points)
@@ -490,16 +492,23 @@ class GaussianProcess(
       loc = tf.squeeze(loc, axis=-1)
 
     if is_missing is not None:
-      loc = tf.where(is_missing, 0., loc)
+      if mask_loc:
+        loc = tf.where(is_missing, 0., loc)
       if is_univariate_marginal:
         covariance = tf.where(is_missing, 1., covariance)
       else:
-        covariance = psd_kernels_util.mask_matrix(covariance, is_missing)  # pylint:disable=invalid-unary-operand-type
+        covariance = psd_kernels_util.mask_matrix(covariance, is_missing)
+    return loc, covariance
+
+  def _get_marginal_distribution(self, index_points=None, is_missing=None):
+    index_points = self._get_index_points(index_points)
+    loc, covariance = self._get_loc_and_covariance(
+        index_points=index_points, is_missing=is_missing)
 
     # If we're sure the number of index points is 1, we can just construct a
     # scalar Normal. This has computational benefits and supports things like
     # CDF that aren't otherwise straightforward to provide.
-    if is_univariate_marginal:
+    if self._is_univariate_marginal(index_points):
       scale = tf.sqrt(covariance)
       return normal.Normal(
           loc=loc,
@@ -617,22 +626,30 @@ class GaussianProcess(
   def _log_prob(self, value, index_points=None, is_missing=None):
     if is_missing is not None:
       is_missing = tf.convert_to_tensor(is_missing)
+    value = tf.convert_to_tensor(value, dtype=self.dtype)
     index_points = self._get_index_points(index_points)
-    mvn = self._get_marginal_distribution(index_points, is_missing=is_missing)
-    if is_missing is None:
-      return mvn.log_prob(value)
+    loc, covariance = self._get_loc_and_covariance(
+        index_points=index_points, is_missing=is_missing, mask_loc=False)
 
-    # Subtract out the Normal distribution's log normalizer for each dimension
-    # that is masked out.
-    lp = mvn.log_prob(tf.where(is_missing, 0., value))
-    num_masked_dims = tf.cast(is_missing, mvn.dtype)
-    if not self._is_univariate_marginal(index_points):
-      event_shape = self._event_shape_tensor(index_points=index_points)
-      num_masked_dims = tf.reduce_sum(
-          num_masked_dims * tf.ones(event_shape, dtype=mvn.dtype),
-          axis=-1)
-    correction = num_masked_dims * -0.5 * np.log(2. * np.pi)
-    return lp - correction
+    if self._is_univariate_marginal(index_points):
+      return _get_univariate_log_prob(
+          loc=loc,
+          covariance=covariance,
+          value=value,
+          dtype=self.dtype,
+          is_missing=is_missing)
+
+    event_shape = self._event_shape_tensor(index_points=index_points)
+
+    return _get_multivariate_log_prob(
+        loc=loc,
+        covariance=covariance,
+        value=value,
+        event_shape=event_shape,
+        dtype=self.dtype,
+        cholesky_fn=self.cholesky_fn,
+        marginal_fn=self.marginal_fn,
+        is_missing=is_missing)
 
   def _event_shape_tensor(self, index_points=None):
     index_points = self._get_index_points(index_points)
@@ -863,6 +880,59 @@ class _GaussianProcessTypeSpec(
     # passed to the constructor, since both may have been set internally.
     components['_check_marginal_cholesky_fn'] = False
     return super(_GaussianProcessTypeSpec, self)._from_components(components)
+
+
+def _get_univariate_log_prob(
+    loc, covariance, value, dtype, is_missing=None):
+  """Compute GP logprob over one index point."""
+  value = value - loc
+  log_normalizer_constant = dtype_util.as_numpy_dtype(
+      value.dtype)(np.log(2. * np.pi))
+  if is_missing is not None:
+    value = tf.where(is_missing, 0., value)
+  lp = -0.5 * (tf.math.square(value) / covariance +
+               tf.math.log(covariance) +
+               log_normalizer_constant)
+  if is_missing is not None:
+    num_masked_dims = tf.cast(is_missing, dtype)
+    lp = lp + 0.5 * log_normalizer_constant * num_masked_dims
+  return lp
+
+
+def _get_multivariate_log_prob(
+    loc, covariance, value,
+    event_shape, dtype,
+    cholesky_fn=None,
+    marginal_fn=None,
+    is_missing=None):
+  """Compute GP logprob over multiple index points."""
+  # Use marginal_fn if cholesky_fn doesn't exist.
+  log_normalizer_constant = dtype_util.as_numpy_dtype(dtype)(np.log(2. * np.pi))
+  half = dtype_util.as_numpy_dtype(dtype)(0.5)
+
+  if cholesky_fn is None:
+    if is_missing is not None:
+      loc = tf.where(is_missing, 0., loc)
+      value = tf.where(is_missing, 0., value)
+    lp = marginal_fn(
+        loc=loc,
+        covariance=covariance,
+        name='marginal_distribution').log_prob(value)
+  else:
+    value = value - loc
+    if is_missing is not None:
+      value = tf.where(is_missing, 0., value)
+    chol_covariance = cholesky_fn(covariance)
+    lp = -0.5 * (
+        linalg.hpsd_quadratic_form_solvevec(
+            covariance, value, cholesky_matrix=chol_covariance) +
+        linalg.hpsd_logdet(covariance, cholesky_matrix=chol_covariance))
+    lp = lp - (half * log_normalizer_constant * tf.cast(event_shape[-1], dtype))
+
+  if is_missing is not None:
+    num_masked_dims = tf.cast(tf.math.count_nonzero(is_missing, axis=-1), dtype)
+    lp = lp + half * log_normalizer_constant * num_masked_dims
+  return lp
 
 
 def _assert_kl_compatible(marginal, other):
