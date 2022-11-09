@@ -1203,6 +1203,16 @@ NUMPY_TEST_CASES = [
                 hps.booleans()).map(lambda x: x[0] + (x[1], x[2]))
         ],
         xla_const_args=(1, 2, 3)),
+    TestCase(
+        'math.cumulative_logsumexp', [
+            hps.tuples(
+                array_axis_tuples(
+                    elements=floats(min_value=-1e12, max_value=1e12)),
+                hps.booleans(),
+                hps.booleans()).map(lambda x: x[0] + (x[1], x[2]))
+        ],
+        rtol=6e-5,
+        xla_const_args=(1, 2, 3)),
 ]
 
 NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
