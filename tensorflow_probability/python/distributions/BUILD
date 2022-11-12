@@ -3994,7 +3994,7 @@ multi_substrate_py_test(
     name = "noncentral_chi2_test",
     size = "medium",
     srcs = ["noncentral_chi2_test.py"],
-    shard_count = 3,
+    shard_count = 4,
     tags = ["tf1-broken"],  # log_bessel_ive gives an error
     deps = [
         ":noncentral_chi2",

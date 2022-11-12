@@ -102,7 +102,7 @@ multi_substrate_py_test(
     name = "distribution_bijectors_test",
     size = "medium",
     srcs = ["distribution_bijectors_test.py"],
-    shard_count = 5,
+    shard_count = 7,
     deps = [
         ":distribution_bijectors",
         # absl/testing:parameterized dep,

@@ -349,10 +349,15 @@ def _nc2_quantile_numeric(p, df, noncentrality, tol):
   `tf.Tensor` of quantiles corresponding to the CDF locations.
   """
   # Ensure that pathological values don't affect the numerical root search
+
+  numpy_dtype = dtype_util.as_numpy_dtype(p.dtype)
+
   p_zero_mask = tf.math.equal(p, 0.)
   p_one_mask = tf.math.equal(p, 1.)
+  p_invalid_mask = tf.math.less(p, 0.) & tf.math.greater(p, 1.)
 
-  safe_p = tf.where(p_zero_mask | p_one_mask, 0.5 * tf.ones_like(p), p)
+  safe_p = tf.where(
+      p_zero_mask | p_one_mask | p_invalid_mask, 0.5 * tf.ones_like(p), p)
 
   df_plus_nc = df + noncentrality
   wilson_hilferty_coef = 2. / 9. * (df_plus_nc + noncentrality)
@@ -361,19 +366,24 @@ def _nc2_quantile_numeric(p, df, noncentrality, tol):
   quant_approx = tf.math.ndtri(safe_p) * tf.math.sqrt(wilson_hilferty_coef)
   quant_approx = quant_approx + (1. - wilson_hilferty_coef)
   quant_approx = df_plus_nc * quant_approx**3.
-  quant_approx = tf.nn.relu(quant_approx)  # Ensure the approx is nonnegative
+  quant_approx = tf.nn.relu(quant_approx) + 1e-2  # Ensure approx is positive
 
-  numeric_root_search_results = root_search.find_root_secant(
-      objective_fn=lambda x: _nc2_cdf_naive(x, df, noncentrality) - safe_p,
-      initial_position=quant_approx,
+  def objective_fn(ux):
+    return _nc2_cdf_naive(tf.nn.softplus(ux), df, noncentrality) - safe_p
+
+  unconstrained_numeric_root_search_results = root_search.find_root_secant(
+      objective_fn=objective_fn,
+      initial_position=generic.softplus_inverse(quant_approx),
       position_tolerance=tol,
       value_tolerance=tol)
 
-  numeric_root = numeric_root_search_results.estimated_root
+  numeric_root = tf.nn.softplus(
+      unconstrained_numeric_root_search_results.estimated_root)
+
   numeric_root = tf.where(p_zero_mask, tf.zeros_like(numeric_root),
                           numeric_root)
-  numeric_root = tf.where(p_one_mask, np.inf * tf.ones_like(numeric_root),
-                          numeric_root)
+  numeric_root = tf.where(p_one_mask, numpy_dtype(np.inf), numeric_root)
+  numeric_root = tf.where(p_invalid_mask, numpy_dtype(np.nan), numeric_root)
 
   return numeric_root
 
@@ -575,7 +585,9 @@ class NoncentralChi2(distribution.AutoCompositeTensorDistribution):
     df = tf.broadcast_to(df, param_shape)
     noncentrality = tf.broadcast_to(noncentrality, param_shape)
 
-    return _nc2_cdf_naive(x, df, noncentrality)
+    cdf = _nc2_cdf_naive(x, df, noncentrality)
+
+    return distribution_util.extend_cdf_outside_support(x, cdf, low=0.)
 
   def _mean(self):
     return self.df + self.noncentrality
@@ -585,6 +597,9 @@ class NoncentralChi2(distribution.AutoCompositeTensorDistribution):
 
   def _default_event_space_bijector(self):
     return softplus_bijector.Softplus(validate_args=self.validate_args)
+
+  def _quantile(self, value):
+    return self.quantile_approx(value)
 
   def quantile_approx(self, value, tol=None):
     """Approximates the quantile function of a noncentral X2 random variable by numerically inverting its CDF.

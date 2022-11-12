@@ -377,7 +377,7 @@ CONSTRAINTS = {
     'TwoPieceNormal.skewness':
         tfp_hps.softplus_plus_eps(),
     'NoncentralChi2.noncentrality':
-        tfp_hps.softplus_plus_eps()
+        tf.math.softplus,
 }
 
 
