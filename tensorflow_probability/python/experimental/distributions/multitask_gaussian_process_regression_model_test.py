@@ -446,6 +446,36 @@ class MultiTaskGaussianProcessRegressionModelTest(
     self.assertAllNotNan(mtgp.mean())
     self.assertAllClose(tf.linalg.matrix_transpose(gp.mean()), mtgp.mean())
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, reason='Numpy has no jitting functionality')
+  def testMeanVarianceJit(self):
+    num_tasks = 3
+    amplitude = np.array([1., 2.], np.float64).reshape([2, 1])
+    length_scale = np.array([.1, .2, .3], np.float64).reshape([1, 3])
+    observation_noise_variance = np.array([1e-9], np.float64)
+
+    observation_index_points = (
+        np.random.uniform(-1., 1., (1, 1, 7, 2)).astype(np.float64))
+    observations = np.linspace(
+        -20., 20., 7 * num_tasks).reshape(7, num_tasks).astype(np.float64)
+
+    index_points = np.random.uniform(-1., 1., (6, 2)).astype(np.float64)
+
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(
+        amplitude, length_scale)
+    multi_task_kernel = multitask_kernel.Independent(
+        num_tasks=num_tasks, base_kernel=kernel)
+    mtgprm = mtgprm_lib.MultiTaskGaussianProcessRegressionModel(
+        kernel=multi_task_kernel,
+        index_points=index_points,
+        observation_index_points=observation_index_points,
+        observations=observations,
+        observation_noise_variance=observation_noise_variance,
+        validate_args=True)
+    # Check that Jit compiling mean and variance doesn't raise an error.
+    tf.function(jit_compile=True)(mtgprm.mean)()
+    tf.function(jit_compile=True)(mtgprm.variance)()
+
   def testMeanVarianceAndCovariancePrecomputed(self):
     num_tasks = 3
     amplitude = np.array([1., 2.], np.float64).reshape([2, 1])

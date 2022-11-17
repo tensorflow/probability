@@ -271,8 +271,8 @@ class MultiTaskGaussianProcessRegressionModel(
           # Shape B1 + [E, N], where E is the number of index points, and N is
           # the number of tasks.
           return tf.zeros(
-              tf.concat([
-                  tf.shape(x)[:-self.kernel.feature_ndims],
+              ps.concat([
+                  ps.shape(x)[:-self.kernel.feature_ndims],
                   [self.kernel.num_tasks]], axis=0), dtype=self.dtype)
         mean_fn = _mean_fn
       else:
@@ -657,8 +657,8 @@ class MultiTaskGaussianProcessRegressionModel(
 
   def _event_shape_tensor(self, index_points=None):
     index_points = self._get_index_points(index_points)
-    return tf.concat(
-        [[tf.shape(index_points)[-(self.kernel.feature_ndims + 1)]],
+    return ps.concat(
+        [[ps.shape(index_points)[-(self.kernel.feature_ndims + 1)]],
          [self.kernel.num_tasks]],
         axis=0)
 
