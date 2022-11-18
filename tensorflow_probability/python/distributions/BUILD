@@ -4878,16 +4878,19 @@ py_binary(
 
 multi_substrate_py_test(
     name = "batch_concat_test",
+    size = "large",
     srcs = ["batch_concat_test.py"],
     jax_size = "large",
     deps = [
         ":batch_concat",
         ":dirichlet",
         ":exponential",
+        ":independent",
         ":logistic",
         ":mvn_diag",
         ":normal",
         ":onehot_categorical",
+        # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
     ],
