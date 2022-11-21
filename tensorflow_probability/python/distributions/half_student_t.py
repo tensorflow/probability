@@ -263,15 +263,19 @@ class HalfStudentT(distribution.AutoCompositeTensorDistribution):
     df = tf.convert_to_tensor(self.df)
     loc = tf.convert_to_tensor(self.loc)
     scale = tf.convert_to_tensor(self.scale)
+    np_dtype = dtype_util.as_numpy_dtype(self.dtype)
+    half = np_dtype(0.5)
+    log_2 = np_dtype(np.log(2))
+    log_pi = np_dtype(np.log(np.pi))
+
     log_correction = (
-        tf.math.log(scale) + np.log(2.) + 0.5 *
-        (tf.math.log(df) - np.log(np.pi)) -
-        special.log_gamma_difference(0.5, 0.5 * df) -
+        tf.math.log(scale) + log_2 + half *
+        (tf.math.log(df) - log_pi) -
+        special.log_gamma_difference(half, half * df) -
         tf.math.log(df - 1))
     mean = tf.math.exp(log_correction) + loc
     if self.allow_nan_stats:
-      return tf.where(df > 1., mean,
-                      dtype_util.as_numpy_dtype(self.dtype)(np.nan))
+      return tf.where(df > 1., mean, np_dtype(np.nan))
     else:
       return distribution_util.with_dependencies([
           assert_util.assert_less(
