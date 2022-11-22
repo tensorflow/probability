@@ -21,6 +21,7 @@ import collections
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.bijectors import scale
 from tensorflow_probability.python.distributions import bernoulli
 from tensorflow_probability.python.distributions import beta
@@ -775,7 +776,7 @@ class JointDistributionNamedTest(test_util.TestCase):
             e=normal.Normal(loc=0, scale=2.),
             m=transformed_distribution.TransformedDistribution(
                 normal.Normal(loc=-1., scale=1.),
-                test_util.NonCompositeTensorExp()),
+                bijector_test_util.NonCompositeTensorExp()),
         ))
     self.assertNotIsInstance(non_ct_jd, tf.__internal__.CompositeTensor)
 

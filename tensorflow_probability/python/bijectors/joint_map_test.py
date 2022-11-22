@@ -18,6 +18,7 @@
 
 import numpy as np
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.bijectors import exp
 from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.bijectors import joint_map
@@ -164,7 +165,7 @@ class JointMapBijectorTest(test_util.TestCase):
 
   def testNonCompositeTensor(self):
     e = exp.Exp()
-    s = test_util.NonCompositeTensorScale(scale=tf.constant(3.))
+    s = bijector_test_util.NonCompositeTensorScale(scale=tf.constant(3.))
     bij = joint_map.JointMap(bijectors=[e, s])
     self.assertNotIsInstance(bij, tf.__internal__.CompositeTensor)
     self.assertAllCloseNested(

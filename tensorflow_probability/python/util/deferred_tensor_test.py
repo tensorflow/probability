@@ -19,6 +19,7 @@ import operator
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.bijectors import chain
 from tensorflow_probability.python.bijectors import exp
 from tensorflow_probability.python.bijectors import fill_scale_tril
@@ -166,7 +167,8 @@ class DeferredTensorTest(test_util.TestCase):
       reason='JAX and Numpy do not have `CompositeTensor`.')
   @parameterized.named_parameters(
       ('transform_fn_is_bijector', exp.Exp),
-      ('transform_fn_is_bijector_like', test_util.NonCompositeTensorExp),
+      ('transform_fn_is_bijector_like',
+       bijector_test_util.NonCompositeTensorExp),
       ('transform_fn_is_callable', lambda: tf.math.exp))
   def test_composite_tensor(self, make_transform_fn):
     initial_value = [0.2, 3.]
@@ -369,7 +371,7 @@ class TransformedVariableTest(test_util.TestCase):
       reason='JAX and Numpy do not have `CompositeTensor`.')
   @parameterized.named_parameters(
       ('composite_bijector', softplus.Softplus),
-      ('non_composite_bijector', test_util.NonCompositeTensorExp))
+      ('non_composite_bijector', bijector_test_util.NonCompositeTensorExp))
   def test_composite_tensor(self, make_bijector):
     x = deferred_tensor.TransformedVariable(5., make_bijector())
     add_val = 10.

@@ -33,6 +33,7 @@ multi_substrate_py_library(
     name = "internal",
     srcs = ["__init__.py"],
     deps = [
+        ":test_util",
         ":util",
     ],
 )
@@ -49,6 +50,17 @@ multi_substrate_py_library(
     ],
 )
 
+multi_substrate_py_library(
+    name = "test_util",
+    srcs = ["test_util.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/math/psd_kernels:positive_semidefinite_kernel",
+    ],
+)
+
 multi_substrate_py_test(
     name = "util_test",
     size = "small",
@@ -61,5 +73,17 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math:gradient",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "test_util_test",
+    size = "small",
+    srcs = ["test_util_test.py"],
+    deps = [
+        ":test_util",
+        # numpy dep,
+        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math/psd_kernels:exponentiated_quadratic",
     ],
 )

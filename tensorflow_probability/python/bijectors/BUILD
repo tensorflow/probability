@@ -1041,6 +1041,7 @@ multi_substrate_py_library(
     testonly = 1,
     srcs = ["bijector_test_util.py"],
     deps = [
+        ":bijector",
         ":reshape",
         # numpy dep,
         # scipy dep,

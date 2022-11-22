@@ -3092,6 +3092,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math/psd_kernels",
+        "//tensorflow_probability/python/math/psd_kernels/internal:test_util",
     ],
 )
 
@@ -3110,6 +3111,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math/psd_kernels:exp_sin_squared",
         "//tensorflow_probability/python/math/psd_kernels:exponentiated_quadratic",
+        "//tensorflow_probability/python/math/psd_kernels/internal:test_util",
     ],
 )
 
@@ -3394,6 +3396,7 @@ multi_substrate_py_test(
         ":uniform",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:bijector_test_util",
         "//tensorflow_probability/python/bijectors:exp",
         "//tensorflow_probability/python/bijectors:softplus",
         "//tensorflow_probability/python/internal:test_util",
@@ -3464,6 +3467,7 @@ multi_substrate_py_test(
         ":transformed_distribution",
         # absl/testing:parameterized dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:bijector_test_util",
         "//tensorflow_probability/python/bijectors:scale",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -3496,6 +3500,7 @@ multi_substrate_py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:bijector_test_util",
         "//tensorflow_probability/python/bijectors:scale",
         "//tensorflow_probability/python/bijectors:softplus",
         "//tensorflow_probability/python/internal:test_util",

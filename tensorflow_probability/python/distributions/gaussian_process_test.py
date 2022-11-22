@@ -28,6 +28,7 @@ from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import gradient
 from tensorflow_probability.python.math import psd_kernels
+from tensorflow_probability.python.math.psd_kernels.internal import test_util as psd_kernel_test_util
 
 
 class _GaussianProcessTest(test_util.TestCase):
@@ -475,7 +476,7 @@ class _GaussianProcessTest(test_util.TestCase):
   )
   def testStructuredIndexPoints(self, foo_feature_shape, bar_feature_shape):
     base_kernel = psd_kernels.ExponentiatedQuadratic()
-    structured_kernel = test_util.MultipartKernel(
+    structured_kernel = psd_kernel_test_util.MultipartTestKernel(
         base_kernel,
         feature_ndims={"foo": len(foo_feature_shape),
                        "bar": len(bar_feature_shape)})

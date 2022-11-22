@@ -25,6 +25,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.bijectors import exp
 from tensorflow_probability.python.bijectors import softplus
 from tensorflow_probability.python.distributions import bernoulli
@@ -520,7 +521,8 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
   def test_sample_distributions_not_composite_tensor_raises_error(self):
     def coroutine_model():
       yield transformed_distribution.TransformedDistribution(
-          normal.Normal(0., 1.), test_util.NonCompositeTensorExp(), name='td')
+          normal.Normal(0., 1.), bijector_test_util.NonCompositeTensorExp(),
+          name='td')
 
     joint = jdab.JointDistributionCoroutineAutoBatched(coroutine_model)
 

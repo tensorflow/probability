@@ -27,6 +27,7 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic
 from tensorflow_probability.python.math.psd_kernels import schur_complement
+from tensorflow_probability.python.math.psd_kernels.internal import test_util as psd_kernel_test_util
 
 
 # A shape broadcasting fn
@@ -365,7 +366,7 @@ class SchurComplementTest(test_util.TestCase):
 
   def testStructuredBaseKernel(self):
     base_kernel = exponentiated_quadratic.ExponentiatedQuadratic()
-    structured_kernel = test_util.MultipartKernel(base_kernel)
+    structured_kernel = psd_kernel_test_util.MultipartTestKernel(base_kernel)
     fixed_inputs = np.random.uniform(-1, 1, (10, 7)).astype(np.float32)
     structured_fixed_inputs = dict(
         zip(('foo', 'bar'), tf.split(fixed_inputs, [4, 3], axis=-1)))

@@ -23,6 +23,7 @@ from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.psd_kernels import exp_sin_squared
 from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic
+from tensorflow_probability.python.math.psd_kernels.internal import test_util as psd_kernel_test_util
 
 
 def _np_kernel_matrix_fn(amp, len_scale, x, y):
@@ -630,7 +631,7 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         observation_index_points=observation_index_points,
         observations=observations)
 
-    structured_kernel = test_util.MultipartKernel(base_kernel)
+    structured_kernel = psd_kernel_test_util.MultipartTestKernel(base_kernel)
     structured_obs_index_points = dict(
         zip(('foo', 'bar'),
             tf.split(observation_index_points, [5, 3], axis=-1)))

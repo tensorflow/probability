@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.bijectors import scale
 from tensorflow_probability.python.bijectors import softplus
 from tensorflow_probability.python.distributions import bernoulli
@@ -872,7 +873,8 @@ class JointDistributionSequentialTest(test_util.TestCase):
 
     non_ct_jd = jds.JointDistributionSequential([
         normal.Normal(loc=0., scale=1.),
-        test_util.NonCompositeTensorExp()(normal.Normal(loc=0., scale=1.)),
+        bijector_test_util.NonCompositeTensorExp()(
+            normal.Normal(loc=0., scale=1.)),
     ],
                                                 validate_args=True)
     self.assertNotIsInstance(non_ct_jd, tf.__internal__.CompositeTensor)
