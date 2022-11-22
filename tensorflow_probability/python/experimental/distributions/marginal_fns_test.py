@@ -44,6 +44,8 @@ class MarginalFnsTest(test_util.TestCase):
     test = self.evaluate(backoff(matrix))
     self.assertAllClose(test, matrix)
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, reason='No gradients available in numpy.')
   def testRetryingCholeskyWithBatchAndXLA(self):
     matrix = tf.convert_to_tensor([
         [[1.0, 0.5], [0.5, 1.0]],
@@ -61,15 +63,18 @@ class MarginalFnsTest(test_util.TestCase):
                          matrix))
 
     (res, shift), grad, grad_of_grad = self.evaluate(
-        _value_and_grads(marginal_fns.retrying_cholesky, matrix, has_aux=True))
+        _value_and_grads(
+            lambda x: marginal_fns.retrying_cholesky(x, max_iters=6),
+            matrix, has_aux=True))
     self.assertAllEqual(expected, res)
     self.assertAllClose(expected_shift[..., 0, 0], shift)
     self.assertAllEqual(expected_grad, grad)
     self.assertAllEqual(expected_grad_of_grad, grad_of_grad)
 
     # Test value and gradients of XLA-compiled `retrying_cholesky`.
-    xla_retrying_cholesky = tf.function(marginal_fns.retrying_cholesky,
-                                        autograph=False, jit_compile=True)
+    xla_retrying_cholesky = tf.function(
+        lambda x: marginal_fns.retrying_cholesky(x, max_iters=6),
+        autograph=False, jit_compile=True)
     (res, shift), grad, grad_of_grad = self.evaluate(
         _value_and_grads(xla_retrying_cholesky, matrix, has_aux=True))
     self.assertAllClose(expected, res)
@@ -80,7 +85,9 @@ class MarginalFnsTest(test_util.TestCase):
     # Test XLA-compilation of `retrying_cholesky` and its gradients.
     @tf.function(autograph=False, jit_compile=True)
     def xla_retrying_cholesky_with_grads(x):
-      return _value_and_grads(marginal_fns.retrying_cholesky, x, has_aux=True)
+      return _value_and_grads(
+          lambda x: marginal_fns.retrying_cholesky(x, max_iters=6),
+          x, has_aux=True)
     (res, shift), grad, grad_of_grad = self.evaluate(
         xla_retrying_cholesky_with_grads(matrix))
     self.assertAllClose(expected, res)
@@ -88,6 +95,8 @@ class MarginalFnsTest(test_util.TestCase):
     self.assertAllClose(expected_grad, grad)
     self.assertAllClose(expected_grad_of_grad, grad_of_grad, rtol=1e-3)
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, reason='No gradients available in numpy.')
   def testRetryingCholeskyFloat64(self):
     matrix = tf.convert_to_tensor(
         [[2., 2., 0.], [2., 2., 2e-5], [0., 2e-5, 0.5]], dtype=tf.float64)
@@ -98,7 +107,8 @@ class MarginalFnsTest(test_util.TestCase):
                          matrix))
 
     (res, shift), grad, grad_of_grad = self.evaluate(
-        _value_and_grads(marginal_fns.retrying_cholesky, matrix, has_aux=True))
+        _value_and_grads(
+            marginal_fns.retrying_cholesky, matrix, has_aux=True))
     self.assertAllEqual(expected, res)
     self.assertAllClose(expected_shift[..., 0, 0], shift)
     self.assertAllEqual(expected_grad, grad)
@@ -108,6 +118,8 @@ class MarginalFnsTest(test_util.TestCase):
         _value_and_grads(lambda x: tf.linalg.cholesky(x + expected_shift),
                          matrix))
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, reason='No gradients available in numpy.')
   def testRetryingCholeskyFailures(self):
     matrix = tf.convert_to_tensor([
         [[1.0, 0.5], [0.5, 1.0]],
@@ -125,7 +137,9 @@ class MarginalFnsTest(test_util.TestCase):
                          matrix))
 
     (res, _), grad, grad_of_grad = self.evaluate(
-        _value_and_grads(marginal_fns.retrying_cholesky, matrix, has_aux=True))
+        _value_and_grads(
+            lambda x: marginal_fns.retrying_cholesky(x, max_iters=6),
+            matrix, has_aux=True))
 
     self.assertAllEqual([expected[0], expected[2]], [res[0], res[2]])
     self.assertAllEqual([expected_grad[0], expected_grad[2]],

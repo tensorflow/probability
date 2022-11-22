@@ -16,6 +16,8 @@
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import mvn_linear_operator
+from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
+from tensorflow_probability.python.internal import prefer_static as ps
 
 
 def make_backoff_cholesky(alternate_cholesky, name='BackoffCholesky'):
@@ -125,6 +127,93 @@ def make_eigh_marginal_fn(tol=1e-6,
   return eigh_marginal_fn
 
 
+def _retrying_cholesky_fwd(matrix, jitter, max_iters):
+  """Forward method for `retrying_cholesky`."""
+  matrix = tf.convert_to_tensor(matrix)
+  jitter = tf.convert_to_tensor(jitter, dtype=matrix.dtype)
+
+  n = tf.compat.dimension_value(matrix.shape[-1])
+  if n is None:
+    n = tf.shape(matrix)[-1]
+
+  one = tf.convert_to_tensor(1., dtype=matrix.dtype)
+  ten = tf.convert_to_tensor(10., dtype=matrix.dtype)
+
+  def cond(i, _, triangular_factor):
+    return ((i < max_iters)
+            & tf.reduce_any(tf.math.is_nan(triangular_factor[..., 0, 0])))
+
+  def body(i, shift, triangular_factor):
+    triangular_factor = tf.linalg.cholesky(
+        tf.linalg.set_diag(matrix, tf.linalg.diag_part(matrix) + shift))
+    shift = shift * tf.where(
+        tf.math.is_nan(triangular_factor[..., :1, 0]), ten, one)
+    return [i + 1, shift, triangular_factor]
+
+  triangular_factor = tf.linalg.cholesky(matrix)
+  shift = tf.where(tf.math.is_nan(triangular_factor[..., :1, 0]), jitter, 0.)
+  _, shift, triangular_factor = tf.while_loop(
+      cond, body,
+      loop_vars=[tf.convert_to_tensor(0), shift, triangular_factor],
+      maximum_iterations=max_iters)
+  shift = tf.stop_gradient(shift)
+  return (triangular_factor, shift[..., 0]), (triangular_factor, matrix, shift)
+
+# Gradient implementation comes from https://arxiv.org/pdf/1602.07527.pdf
+
+
+def _retrying_cholesky_bwd(jitter, max_iters, aux, g):
+  """Reverse mode impl for retrying_cholesky."""
+  del jitter
+  del max_iters
+  _, matrix, shift = aux
+
+  # Recompute triangular factor so we can take gradients of gradients.
+  triangular_factor = tf.linalg.cholesky(
+      tf.linalg.set_diag(
+          matrix,
+          tf.linalg.diag_part(matrix) + shift))
+
+  num_rows = ps.shape(triangular_factor)[-1]
+  batch_shape = ps.shape(triangular_factor)[:-2]
+  t_inverse = tf.linalg.triangular_solve(
+      triangular_factor,
+      tf.linalg.eye(
+          num_rows, batch_shape=batch_shape, dtype=triangular_factor.dtype))
+  middle = tf.linalg.matmul(triangular_factor, g[0], adjoint_a=True)
+  middle = tf.linalg.set_diag(middle, 0.5 * tf.linalg.diag_part(middle))
+  middle = tf.linalg.band_part(middle, -1, 0)
+  grad = tf.linalg.matmul(
+      tf.linalg.matmul(t_inverse, middle, adjoint_a=True), t_inverse)
+  grad = grad + tf.linalg.adjoint(grad)
+  # Shift has no gradients.
+  return 0.5 * grad
+
+
+def _retrying_cholesky_jvp(jitter, max_iters, primals, tangents):
+  """JVP for retrying_cholesky."""
+  matrix, = primals
+  gmatrix, = tangents
+  gmatrix = 0.5 * (gmatrix + tf.linalg.adjoint(gmatrix))
+  output, shift = _retrying_cholesky_custom_gradient(matrix, jitter, max_iters)
+  triangular_linop = tf.linalg.LinearOperatorLowerTriangular(output)
+  middle = triangular_linop.solve(gmatrix, adjoint_arg=True)
+  middle = triangular_linop.solve(middle, adjoint_arg=True)
+  middle = tf.linalg.set_diag(middle, 0.5 * tf.linalg.diag_part(middle))
+  middle = tf.linalg.band_part(middle, -1, 0)
+  return ((output, shift),
+          (tf.linalg.matmul(output, middle), tf.zeros_like(shift)))
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_retrying_cholesky_fwd,
+    vjp_bwd=_retrying_cholesky_bwd,
+    jvp_fn=_retrying_cholesky_jvp,
+    nondiff_argnums=(1, 2))
+def _retrying_cholesky_custom_gradient(matrix, jitter, max_iters):
+  return _retrying_cholesky_fwd(matrix, jitter, max_iters)[0]
+
+
 def retrying_cholesky(
     matrix, jitter=None, max_iters=5, name='retrying_cholesky'):
   """Computes a modified Cholesky decomposition for a batch of square matrices.
@@ -178,37 +267,4 @@ def retrying_cholesky(
     if jitter is None:
       jitter = 1e-10 if matrix.dtype == tf.float64 else 1e-6
     jitter = tf.convert_to_tensor(jitter, dtype=matrix.dtype)
-
-    n = tf.compat.dimension_value(matrix.shape[-1])
-    if n is None:
-      n = tf.shape(matrix)[-1]
-
-    one = tf.convert_to_tensor(1., dtype=matrix.dtype)
-    ten = tf.convert_to_tensor(10., dtype=matrix.dtype)
-
-    def cond(i, _, triangular_factor):
-      return ((i < max_iters)
-              & tf.reduce_any(tf.math.is_nan(triangular_factor[..., 0, 0])))
-
-    def body(i, shift, triangular_factor):
-      triangular_factor = tf.linalg.cholesky(
-          tf.linalg.set_diag(matrix, tf.linalg.diag_part(matrix) + shift))
-      shift = shift * tf.where(
-          tf.math.is_nan(triangular_factor[..., :1, 0]), ten, one)
-      return [i + 1, shift, triangular_factor]
-
-    triangular_factor = tf.linalg.cholesky(matrix)
-    shift = tf.where(tf.math.is_nan(triangular_factor[..., :1, 0]), jitter, 0.)
-    _, shift, triangular_factor = tf.while_loop(
-        cond, body,
-        loop_vars=[tf.convert_to_tensor(0), shift, triangular_factor],
-        maximum_iterations=max_iters)
-
-    # To avoid NaN gradients, run the Cholesky decomposition again.
-    #
-    # TODO(jburnim): Implement a version of `retrying_cholesky` that uses
-    # `tf.custom_gradient` to avoid having this redundant `tf.linalg.cholesky`.
-    shift = tf.stop_gradient(shift)
-    triangular_factor = tf.linalg.cholesky(
-        tf.linalg.set_diag(matrix, tf.linalg.diag_part(matrix) + shift))
-    return triangular_factor, shift[..., 0]
+    return _retrying_cholesky_custom_gradient(matrix, jitter, max_iters)

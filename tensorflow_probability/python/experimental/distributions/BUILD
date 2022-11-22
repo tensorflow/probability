@@ -160,6 +160,8 @@ multi_substrate_py_library(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:mvn_linear_operator",
+        "//tensorflow_probability/python/internal:custom_gradient",
+        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
