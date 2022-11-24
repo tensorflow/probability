@@ -17,6 +17,7 @@
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import identity as identity_bijector
+from tensorflow_probability.python.bijectors import transpose as transpose_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import mvn_linear_operator
@@ -25,6 +26,7 @@ from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -259,6 +261,82 @@ class MatrixNormalLinearOperator(distribution.AutoCompositeTensorDistribution):
 @kullback_leibler.RegisterKL(MatrixNormalLinearOperator,
                              MatrixNormalLinearOperator)
 def _kl_matrix_normal_matrix_normal(a, b, name=None):
-  return kullback_leibler.kl_divergence(
-      a._as_multivariate_normal(),  # pylint:disable=protected-access
-      b._as_multivariate_normal(), name=name)  # pylint:disable=protected-access
+    """Batched KL divergence `KL(a || b)` for `MatrixNormalLinearOperator`-s.
+
+    With `X`, `Y` both multivariate Normals in `R^k` with means `mu_a`, `mu_b` and
+    covariance `C_a`, `C_b` respectively,
+
+    ```
+    KL(a || b) = 0.5 * ( L - k + T + Q ),
+    L := Log[Det(C_b)] - Log[Det(C_a)]
+    T := trace(C_b^{-1} C_a),
+    Q := (mu_b - mu_a)^T C_b^{-1} (mu_b - mu_a),
+    ```
+
+    By expanding in the case of the MatrixNormal, this can be optimized
+    without explicitly constructing the two multivariate normal distributions.
+
+    Args:
+      a: Instance of `MatrixNormalLinearOperator`.
+      b: Instance of `MatrixNormalLinearOperator`.
+      name: (optional) name to use for created ops. Default "kl_mn".
+
+    Returns:
+      Batchwise `KL(a || b)`.
+    """
+
+    def squared_frobenius_norm(x):
+        """Helper to make KL calculation slightly more readable."""
+        # http://mathworld.wolfram.com/FrobeniusNorm.html
+        # The gradient of KL[p,q] is not defined when p==q. The culprit is
+        # tf.norm, i.e., we cannot use the commented out code.
+        # return tf.square(tf.norm(x, ord="fro", axis=[-2, -1]))
+        return tf.reduce_sum(tf.square(x), axis=[-2, -1])
+
+    with tf.name_scope(name or "kl_mn"):
+        # Calculation is based on:
+        # http://stats.stackexchange.com/questions/60680/kl-divergence-between-two-multivariate-gaussians
+        # and,
+        # https://en.wikipedia.org/wiki/Matrix_norm#Frobenius_norm
+        # i.e.,
+        #   If Ca = AA', Cb = BB', then
+        #   tr[inv(Cb) Ca] = tr[inv(B)' inv(B) A A']
+        #                  = tr[inv(B) A A' inv(B)']
+        #                  = tr[(inv(B) A) (inv(B) A)']
+        #                  = sum_{ij} (inv(B) A)_{ij}**2
+        #                  = ||inv(B) A||_F**2
+        # where ||.||_F is the Frobenius norm and the second equality follows from
+        # the cyclic permutation property.
+        k_inv_s_h = b.scale_row.solve(a.scale_row.to_dense())
+        k_inv_s_x = b.scale_column.solve(a.scale_column.to_dense())
+
+        mt = b.mean() - a.mean()
+        transpose = transpose_bijector.Transpose(rightmost_transposed_ndims=2)
+
+        n = tf.cast(b.scale_row.domain_dimension_tensor(), b.dtype)
+        p = tf.cast(b.scale_column.domain_dimension_tensor(), b.dtype)
+
+        kl_div = (
+            p * (b.scale_row.log_abs_determinant() - a.scale_row.log_abs_determinant())
+            + n
+            * (
+                b.scale_column.log_abs_determinant()
+                - a.scale_column.log_abs_determinant()
+            )
+            - 0.5 * n * p
+            + 0.5 * squared_frobenius_norm(k_inv_s_h) * squared_frobenius_norm(k_inv_s_x)
+            + 0.5
+            * tf.reduce_sum(
+                tf.linalg.cholesky_solve(
+                    b.scale_column.to_dense(), transpose.forward(mt)
+                )
+                * transpose.forward(
+                    tf.linalg.cholesky_solve(b.scale_row.to_dense(), mt)
+                ),
+                [-1, -2],
+            )
+        )
+        tensorshape_util.set_shape(
+            kl_div, tf.broadcast_static_shape(a.batch_shape, b.batch_shape)
+        )
+        return kl_div
