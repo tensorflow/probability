@@ -44,6 +44,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/distributions:mvn_tril",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/math:linalg",
         "//tensorflow_probability/python/math:scan_associative",
     ],
 )

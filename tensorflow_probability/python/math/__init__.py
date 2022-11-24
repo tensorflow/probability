@@ -51,7 +51,10 @@ from tensorflow_probability.python.math.linalg import cholesky_update
 from tensorflow_probability.python.math.linalg import fill_triangular
 from tensorflow_probability.python.math.linalg import fill_triangular_inverse
 from tensorflow_probability.python.math.linalg import hpsd_logdet
+from tensorflow_probability.python.math.linalg import hpsd_quadratic_form_solve
 from tensorflow_probability.python.math.linalg import hpsd_quadratic_form_solvevec
+from tensorflow_probability.python.math.linalg import hpsd_solve
+from tensorflow_probability.python.math.linalg import hpsd_solvevec
 from tensorflow_probability.python.math.linalg import lu_matrix_inverse
 from tensorflow_probability.python.math.linalg import lu_reconstruct
 from tensorflow_probability.python.math.linalg import lu_solve
@@ -117,6 +120,9 @@ _allowed_symbols = [
     'fill_triangular_inverse',
     'gram_schmidt',
     'hpsd_logdet',
+    'hpsd_solve',
+    'hpsd_solvevec',
+    'hpsd_quadratic_form_solve',
     'hpsd_quadratic_form_solvevec',
     'interp_regular_1d_grid',
     'lambertw',

@@ -37,6 +37,10 @@ __all__ = [
     'fill_triangular',
     'fill_triangular_inverse',
     'hpsd_logdet',
+    'hpsd_quadratic_form_solve',
+    'hpsd_quadratic_form_solvevec',
+    'hpsd_solve',
+    'hpsd_solvevec',
     'lu_matrix_inverse',
     'lu_reconstruct',
     'lu_reconstruct_assertions',  # Internally visible for MatvecLU.
@@ -44,7 +48,6 @@ __all__ = [
     'pivoted_cholesky',
     'sparse_or_dense_matmul',
     'sparse_or_dense_matvecmul',
-    'hpsd_quadratic_form_solvevec',
 ]
 
 
@@ -1132,16 +1135,16 @@ def _hpsd_logdet_custom_gradient(matrix, cholesky_matrix):
 
 
 def hpsd_logdet(matrix, cholesky_matrix=None):
-  """Computes the `log|det(matrix)|`, where `matrix` is a HPSD matrix.
+  """Computes `log|det(matrix)|`, where `matrix` is a HPSD matrix.
 
   Given `matrix` computes `log|det(matrix)|`, where `matrix` is Hermitian
-  Positive Semi-definite matrix.
+  positive Semi-definite matrix.
 
   Args:
-    matrix: A Floating-point `Tensor` of shape `[..., N, N]`. Represents
-      a hermitian positive semi-definite matrix.
+    matrix: Floating-point `Tensor` of shape `[..., N, N]`. Represents
+      a Hermitian positive semi-definite matrix.
     cholesky_matrix: (Optional) Floating-point `Tensor` of shape `[..., N, N]`
-      that represents a cholesky factor of `matrix`.
+      that represents a Cholesky factor of `matrix`.
   Returns:
     hpsd_logdet: Scalar `Tensor`, retaining the batch shape of `matrix`.
   """
@@ -1151,6 +1154,195 @@ def hpsd_logdet(matrix, cholesky_matrix=None):
     if cholesky_matrix is not None:
       cholesky_matrix = tf.convert_to_tensor(cholesky_matrix, dtype=dtype)
     return _hpsd_logdet_custom_gradient(matrix, cholesky_matrix)
+
+
+def _hpsd_solve_fwd(matrix, rhs, cholesky_matrix):
+  del matrix
+  chol_linop = tf.linalg.LinearOperatorLowerTriangular(cholesky_matrix)
+  solve_rhs = chol_linop.solve(chol_linop.solve(rhs), adjoint=True)
+  return solve_rhs, (cholesky_matrix, rhs, solve_rhs)
+
+
+def _hpsd_solve_bwd(cholesky_matrix, aux, g):
+  """Reverse mode impl for hpsd_solve."""
+  del cholesky_matrix
+
+  cholesky_matrix, rhs, solve_rhs = aux
+  chol_linop = tf.linalg.LinearOperatorLowerTriangular(cholesky_matrix)
+
+  chol_inv = chol_linop.solve(
+      tf.eye(chol_linop.domain_dimension_tensor(), dtype=chol_linop.dtype))
+
+  rhs_grad = tf.linalg.matmul(
+      chol_inv, tf.linalg.matmul(chol_inv, g), transpose_a=True)
+  matrix_grad = -0.5 * (
+      tf.linalg.matmul(rhs_grad, solve_rhs, adjoint_b=True) +
+      tf.linalg.matmul(solve_rhs, rhs_grad, adjoint_b=True))
+
+  matrix_grad, rhs_grad = generic.fix_gradient_for_broadcasting(
+      [cholesky_matrix[..., tf.newaxis], rhs[..., tf.newaxis, :]],
+      [matrix_grad[..., tf.newaxis], rhs_grad[..., tf.newaxis, :]])
+  return tf.squeeze(matrix_grad, axis=-1), tf.squeeze(rhs_grad, axis=-2)
+
+
+def _hpsd_solve_jvp(cholesky_matrix, primals, tangents):
+  """JVP for hpsd_solve."""
+  matrix, rhs = primals
+  gmatrix, grhs = tangents
+  output, (cholesky_matrix, _, solve_rhs) = _hpsd_solve_fwd(
+      matrix, rhs, cholesky_matrix)
+  chol_linop = tf.linalg.LinearOperatorLowerTriangular(cholesky_matrix)
+  gmatrix_linop = tf.linalg.LinearOperatorFullMatrix(gmatrix)
+  grad = grhs - 0.5 * (gmatrix_linop.matmul(solve_rhs) +
+                       gmatrix_linop.matmul(solve_rhs, adjoint=True))
+  chol_inv = chol_linop.solve(
+      tf.eye(chol_linop.domain_dimension_tensor(), dtype=chol_linop.dtype))
+  grad = tf.linalg.matmul(
+      chol_inv, tf.linalg.matmul(chol_inv, grad), transpose_a=True)
+  return output, grad
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_hpsd_solve_fwd,
+    vjp_bwd=_hpsd_solve_bwd,
+    jvp_fn=_hpsd_solve_jvp,
+    nondiff_argnums=(2,))
+def _hpsd_solve_custom_gradient(matrix, rhs, cholesky_matrix):
+  return _hpsd_solve_fwd(matrix, rhs, cholesky_matrix)[0]
+
+
+def hpsd_solve(matrix, rhs, cholesky_matrix=None):
+  """Computes `matrix^-1 rhs`, where `matrix` is HPSD.
+
+  Given `matrix` and `rhs`, computes `matrix^-1 rhs`, where
+  `matrix` is a Hermitian positive semi-definite matrix.
+
+  Args:
+    matrix: Floating-point `Tensor` of shape `[..., N, N]`. Represents
+      a Hermitian positive semi-definite matrix.
+    rhs: Floating-point `Tensor` of shape `[..., N, K]`.
+    cholesky_matrix: (Optional) Floating-point `Tensor` of shape `[..., N, N]`
+      that represents a Cholesky factor of `matrix`.
+  Returns:
+    hpsd_solve: `Tensor` of shape `[..., N, K]`.
+  """
+  with tf.name_scope('hpsd_solve'):
+    dtype = dtype_util.common_dtype([matrix, rhs, cholesky_matrix], tf.float32)
+    matrix = tf.convert_to_tensor(matrix, dtype=dtype)
+    rhs = tf.convert_to_tensor(rhs, dtype=dtype)
+    if cholesky_matrix is None:
+      cholesky_matrix = tf.linalg.cholesky(matrix)
+    else:
+      cholesky_matrix = tf.convert_to_tensor(cholesky_matrix, dtype=dtype)
+    return _hpsd_solve_custom_gradient(matrix, rhs, cholesky_matrix)
+
+
+def hpsd_solvevec(matrix, rhs, cholesky_matrix=None):
+  """Computes `matrix^-1 rhs`, where `matrix` is HPSD.
+
+  Given `matrix` and `rhs`, computes `matrix^-1 rhs`, where
+  `matrix` is a Hermitian positive semi-definite matrix.
+
+  Args:
+    matrix: Floating-point `Tensor` of shape `[..., N, N]`. Represents
+      a Hermitian positive semi-definite matrix.
+    rhs: Floating-point `Tensor` of shape `[..., N]`.
+    cholesky_matrix: (Optional) Floating-point `Tensor` of shape `[..., N, N]`
+      that represents a Cholesky factor of `matrix`.
+  Returns:
+    hpsd_solvevec: `Tensor` of shape `[..., N]`.
+  """
+  with tf.name_scope('hpsd_solvevec'):
+    dtype = dtype_util.common_dtype([matrix, rhs, cholesky_matrix], tf.float32)
+    matrix = tf.convert_to_tensor(matrix, dtype=dtype)
+    rhs = tf.convert_to_tensor(rhs, dtype=dtype)
+    if cholesky_matrix is None:
+      cholesky_matrix = tf.linalg.cholesky(matrix)
+    else:
+      cholesky_matrix = tf.convert_to_tensor(cholesky_matrix, dtype=dtype)
+    return tf.squeeze(
+        _hpsd_solve_custom_gradient(
+            matrix, rhs[..., tf.newaxis], cholesky_matrix), axis=-1)
+
+
+def _hpsd_quadratic_form_solve_fwd(matrix, rhs, cholesky_matrix):
+  if cholesky_matrix is None:
+    cholesky_matrix = tf.linalg.cholesky(matrix)
+  chol_linop = tf.linalg.LinearOperatorLowerTriangular(cholesky_matrix)
+  solve_rhs = chol_linop.solve(rhs)
+  output = tf.linalg.matmul(solve_rhs, solve_rhs, transpose_a=True)
+  return output, (cholesky_matrix, rhs, solve_rhs)
+
+
+def _hpsd_quadratic_form_solve_bwd(cholesky_matrix, aux, g):
+  """Reverse mode impl for hpsd_quadratic_form_solve."""
+  del cholesky_matrix
+
+  cholesky_matrix, rhs, solve_rhs = aux
+  chol_linop = tf.linalg.LinearOperatorLowerTriangular(cholesky_matrix)
+  full_solve = chol_linop.solve(solve_rhs, adjoint=True)
+  matrix_grad = -tf.linalg.matmul(
+      full_solve, tf.linalg.matmul(g, full_solve, transpose_b=True))
+  rhs_grad = tf.linalg.matmul(2. * full_solve, g)
+
+  # Given that Matrix has shape [N, N] and RHS has shape [N, M], we
+  # need to add extra ones to make the shapes agree.
+
+  matrix_grad, rhs_grad = generic.fix_gradient_for_broadcasting(
+      [cholesky_matrix[..., tf.newaxis], rhs[..., tf.newaxis, :]],
+      [matrix_grad[..., tf.newaxis], rhs_grad[..., tf.newaxis, :]])
+  return tf.squeeze(matrix_grad, axis=-1), tf.squeeze(rhs_grad, axis=-2)
+
+
+def _hpsd_quadratic_form_solve_jvp(cholesky_matrix, primals, tangents):
+  """JVP for hpsd_quadratic_form_solve."""
+  matrix, rhs = primals
+  gmatrix, grhs = tangents
+  output, (cholesky_matrix, _, solve_rhs) = _hpsd_quadratic_form_solve_fwd(
+      matrix, rhs, cholesky_matrix)
+  chol_linop = tf.linalg.LinearOperatorLowerTriangular(cholesky_matrix)
+  full_solve = chol_linop.solve(solve_rhs, adjoint=True)
+  gmatrix_linop = tf.linalg.LinearOperatorFullMatrix(gmatrix)
+  jvp = tf.linalg.matmul(
+      full_solve,
+      2. * grhs - gmatrix_linop.matmul(full_solve),
+      transpose_a=True)
+  return output, jvp
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_hpsd_quadratic_form_solve_fwd,
+    vjp_bwd=_hpsd_quadratic_form_solve_bwd,
+    jvp_fn=_hpsd_quadratic_form_solve_jvp,
+    nondiff_argnums=(2,))
+def _hpsd_quadratic_form_solve_custom_gradient(
+    matrix, rhs, cholesky_matrix):
+  return _hpsd_quadratic_form_solve_fwd(matrix, rhs, cholesky_matrix)[0]
+
+
+def hpsd_quadratic_form_solve(matrix, rhs, cholesky_matrix=None):
+  """Computes `rhs^T matrix^-1 rhs`, where `matrix` is HPSD.
+
+  Given `matrix` and `rhs`, computes `rhs^T @ matrix^-1 rhs`, where
+  `matrix` is a Hermitian positive semi-definite matrix.
+
+  Args:
+    matrix: Floating-point `Tensor` of shape `[..., N, N]`. Represents
+      a Hermitian positive semi-definite matrix.
+    rhs: Floating-point `Tensor` of shape `[..., N, K]`.
+    cholesky_matrix: (Optional) Floating-point `Tensor` of shape `[..., N, N]`
+      that represents a Cholesky factor of `matrix`.
+  Returns:
+    hpsd_quadratic_form_solve: `Tensor` of shape `[..., K, K]`.
+  """
+  with tf.name_scope('hpsd_quadratic_form_solve'):
+    dtype = dtype_util.common_dtype([matrix, rhs, cholesky_matrix], tf.float32)
+    matrix = tf.convert_to_tensor(matrix, dtype=dtype)
+    rhs = tf.convert_to_tensor(rhs, dtype=dtype)
+    if cholesky_matrix is not None:
+      cholesky_matrix = tf.convert_to_tensor(cholesky_matrix, dtype=dtype)
+    return _hpsd_quadratic_form_solve_custom_gradient(
+        matrix, rhs, cholesky_matrix)
 
 
 def _hpsd_quadratic_form_solvevec_fwd(matrix, rhs, cholesky_matrix):
@@ -1166,7 +1358,6 @@ def _hpsd_quadratic_form_solvevec_bwd(cholesky_matrix, aux, g):
   """Reverse mode impl for hpsd_quadratic_form_solvevec."""
   del cholesky_matrix
 
-  # y^T A^-1 y
   cholesky_matrix, rhs, solve_rhs = aux
   chol_linop = tf.linalg.LinearOperatorLowerTriangular(cholesky_matrix)
   full_solve = chol_linop.solvevec(solve_rhs, adjoint=True)
@@ -1188,11 +1379,10 @@ def _hpsd_quadratic_form_solvevec_jvp(cholesky_matrix, primals, tangents):
       matrix, rhs, cholesky_matrix)
   chol_linop = tf.linalg.LinearOperatorLowerTriangular(cholesky_matrix)
   full_solve = chol_linop.solvevec(solve_rhs, adjoint=True)
-  rhs_grad = 2 * tf.math.reduce_sum(grhs * full_solve, axis=-1)
   gmatrix_linop = tf.linalg.LinearOperatorFullMatrix(gmatrix)
-  matrix_grad = -tf.math.reduce_sum(
-      full_solve * gmatrix_linop.matvec(full_solve), axis=-1)
-  return output, matrix_grad + rhs_grad
+  jvp = tf.math.reduce_sum(
+      full_solve * (2. * grhs - gmatrix_linop.matvec(full_solve)), axis=-1)
+  return output, jvp
 
 
 @tfp_custom_gradient.custom_gradient(
@@ -1206,19 +1396,19 @@ def _hpsd_quadratic_form_solvevec_custom_gradient(
 
 
 def hpsd_quadratic_form_solvevec(matrix, rhs, cholesky_matrix=None):
-  """Computes the `rhs^T matrix^-1 rhs`, where `matrix` is HPSD.
+  """Computes `rhs^T matrix^-1 rhs`, where `matrix` is HPSD.
 
-  Given `matrix` and `rhs` computes `rhs^T @ matrix^-1 rhs`, where
-  `matrix` is a Hermitian Positive semi-definite matrix.
+  Given `matrix` and `rhs`, computes `rhs^T @ matrix^-1 rhs`, where
+  `matrix` is a Hermitian positive semi-definite matrix.
 
   Args:
-    matrix: A Floating-point `Tensor` of shape `[..., N, N]`. Represents
-      a hermitian positive semi-definite matrix.
-    rhs: A Floating-point `Tensor` of shape `[..., N]`.
+    matrix: Floating-point `Tensor` of shape `[..., N, N]`. Represents
+      a Hermitian positive semi-definite matrix.
+    rhs: Floating-point `Tensor` of shape `[..., N]`.
     cholesky_matrix: (Optional) Floating-point `Tensor` of shape `[..., N, N]`
-      that represents a cholesky factor of `matrix`.
+      that represents a Cholesky factor of `matrix`.
   Returns:
-    hpsd_quadratic_form_solvevec: `Tensor` of shape `[..., N]`.
+    hpsd_quadratic_form_solvevec: Scalar `Tensor`.
   """
   with tf.name_scope('hpsd_quadratic_form_solvevec'):
     dtype = dtype_util.common_dtype([matrix, rhs, cholesky_matrix], tf.float32)

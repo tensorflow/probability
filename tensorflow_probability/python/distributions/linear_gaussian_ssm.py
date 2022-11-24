@@ -35,6 +35,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import linalg
 
 from tensorflow.python.ops import parallel_for  # pylint: disable=g-direct-tensorflow-import
 
@@ -1590,8 +1591,7 @@ def backward_smoothing_update(filtered_mean,
   if latent_size_is_static_and_scalar:
     gain_transpose = tmp_gain_cov / predicted_cov
   else:
-    gain_transpose = tf.linalg.cholesky_solve(
-        tf.linalg.cholesky(predicted_cov), tmp_gain_cov)
+    gain_transpose = linalg.hpsd_solve(predicted_cov, tmp_gain_cov)
 
   posterior_mean = (filtered_mean +
                     tf.linalg.matmul(gain_transpose,
@@ -1815,8 +1815,8 @@ def linear_gaussian_update(
     gain_transpose = tmp_obs_cov / predicted_obs_cov
   else:
     predicted_obs_cov_chol = tf.linalg.cholesky(predicted_obs_cov)
-    gain_transpose = tf.linalg.cholesky_solve(predicted_obs_cov_chol,
-                                              tmp_obs_cov)
+    gain_transpose = linalg.hpsd_solve(
+        predicted_obs_cov, tmp_obs_cov, cholesky_matrix=predicted_obs_cov_chol)
 
   # Compute the posterior mean, incorporating the observation.
   #  u* = u + K (x_observed - x_expected)
