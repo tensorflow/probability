@@ -316,24 +316,29 @@ def _kl_matrix_normal_matrix_normal(a, b, name=None):
     p = tf.cast(b.scale_column.domain_dimension_tensor(), b.dtype)
 
     kl_div = (
-        p * (b.scale_row.log_abs_determinant() - a.scale_row.log_abs_determinant())
-        + n
-        * (
-            b.scale_column.log_abs_determinant()
-            - a.scale_column.log_abs_determinant()
-        )
-        - 0.5 * n * p
-        + 0.5 * squared_frobenius_norm(k_inv_s_h) * squared_frobenius_norm(k_inv_s_x)
-        + 0.5
-        * tf.reduce_sum(
-            tf.linalg.cholesky_solve(
-                b.scale_column.to_dense(), transpose.forward(mt)
-            )
-            * transpose.forward(
-                tf.linalg.cholesky_solve(b.scale_row.to_dense(), mt)
-            ),
-            [-1, -2],
-        )
+      p * (
+        b.scale_row.log_abs_determinant()
+        - a.scale_row.log_abs_determinant()
+      )
+      + n * (
+        b.scale_column.log_abs_determinant()
+        - a.scale_column.log_abs_determinant()
+      )
+      - 0.5 * n * p
+      + 0.5 * (
+        squared_frobenius_norm(k_inv_s_h)
+        * squared_frobenius_norm(k_inv_s_x)
+      )
+      + 0.5
+      * tf.reduce_sum(
+          tf.linalg.cholesky_solve(
+              b.scale_column.to_dense(), transpose.forward(mt)
+          )
+          * transpose.forward(
+              tf.linalg.cholesky_solve(b.scale_row.to_dense(), mt)
+          ),
+          [-1, -2],
+      )
     )
     tensorshape_util.set_shape(
         kl_div, tf.broadcast_static_shape(a.batch_shape, b.batch_shape)
