@@ -128,6 +128,10 @@ def rejuvenation_criterion_fn(weighted_particles):
   return 0
 
 
+def rejuvenation_fn(state, step=-1):
+  return 1
+
+
 class SequentialMonteCarlo(kernel_base.TransitionKernel):
   """Sequential Monte Carlo transition kernel.
 
@@ -142,7 +146,7 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
                propose_and_update_log_weights_fn,
                resample_fn=weighted_resampling.resample_systematic,
                resample_criterion_fn=ess_below_threshold,
-               rejuvenation_fn=None,  #TODO: Add rejuvenation fn
+               rejuvenation_fn=rejuvenation_fn,
                rejuvenation_criterion_fn=rejuvenation_criterion_fn,
                unbiased_gradients=True,
                name=None):
@@ -190,6 +194,8 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
         correct for gradient bias introduced by the discrete resampling step.
         This will generally increase the variance of stochastic gradients.
         Default value: `True`.
+      rejuvenation_fn: optional Python `callable` with signature
+        'state' and 'step;. Return rejuvenated particles
       name: Python `str` name for ops created by this kernel.
 
     #### References
@@ -287,63 +293,47 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
                                                normalized_log_weights[0])
 
         do_resample = self.resample_criterion_fn(state)
+        # Some batch elements may require resampling and others not, so
+        # we first do the resampling for all elements, then select whether to
+        # use the resampled values for each batch element according to
+        # `do_resample`. If there were no batching, we might prefer to use
+        # `tf.cond` to avoid the resampling computation on steps where it's not
+        # needed---but we're ultimately interested in adaptive resampling
+        # for statistical (not computational) purposes, so this isn't a
+        # dealbreaker.
+        [
+            new_particles,
+            new_indices,
+            new_weights
+        ] = weighted_resampling.resample(
+            particles=state.particles,
+            # The `stop_gradient` here does not affect discrete resampling
+            # (which is nondifferentiable anyway), but avoids canceling out
+            # the gradient signal from the 'target' log weights, as described in
+            # Scibior, Masrani, and Wood (2021).
+            log_weights=tf.stop_gradient(state.log_weights),
+            resample_fn=self.resample_fn,
+            target_log_weights=(normalized_log_weights
+                                if self.unbiased_gradients else None),
+            seed=resample_seed)
+        (
+            new_particles,
+            new_indices,
+            log_weights
+        ) = tf.nest.map_structure(
+            lambda r, p: tf.where(do_resample, r, p),
+            (new_particles, new_indices, new_weights),
+            (state.particles, _dummy_indices_like(new_indices),
+            normalized_log_weights))
+
         do_rejuvenation = self._rejuvenation_criterion_fn(state)
-
-        if not do_rejuvenation:
-            # Some batch elements may require resampling and others not, so
-            # we first do the resampling for all elements, then select whether to
-            # use the resampled values for each batch element according to
-            # `do_resample`. If there were no batching, we might prefer to use
-            # `tf.cond` to avoid the resampling computation on steps where it's not
-            # needed---but we're ultimately interested in adaptive resampling
-            # for statistical (not computational) purposes, so this isn't a
-            # dealbreaker.
-            [
-                new_particles,
-                new_indices,
-                new_weights
-            ] = weighted_resampling.resample(
-                particles=state.particles,
-                # The `stop_gradient` here does not affect discrete resampling
-                # (which is nondifferentiable anyway), but avoids canceling out
-                # the gradient signal from the 'target' log weights, as described in
-                # Scibior, Masrani, and Wood (2021).
-                log_weights=tf.stop_gradient(state.log_weights),
-                resample_fn=self.resample_fn,
-                target_log_weights=(normalized_log_weights
-                                    if self.unbiased_gradients else None),
-                seed=resample_seed)
-            (new_particles,
-             new_indices,
-             log_weights) = tf.nest.map_structure(
-                 lambda r, p: tf.where(do_resample, r, p),
-                 (new_particles, new_indices, new_weights),
-                 (state.particles, _dummy_indices_like(new_indices),
-                  normalized_log_weights))
-
-        else:
-            [
-                new_particles,
-                new_indices,
-                new_weights
-            ] = weighted_resampling.resample(
-                particles=state.particles,
-                # The `stop_gradient` here does not affect discrete resampling
-                # (which is nondifferentiable anyway), but avoids canceling out
-                # the gradient signal from the 'target' log weights, as described in
-                # Scibior, Masrani, and Wood (2021).
-                log_weights=tf.stop_gradient(state.log_weights),
-                resample_fn=self.rejuvenate_fn,
-                target_log_weights=(normalized_log_weights
-                                    if self.unbiased_gradients else None),
-                seed=resample_seed)
-            (new_particles,
-             new_indices,
-             log_weights) = tf.nest.map_structure(
-                lambda r, p: tf.where(do_rejuvenation, r, p),
-                (new_particles, new_indices, new_weights),
-                (state.particles, _dummy_indices_like(new_indices),
-                 normalized_log_weights))
+        if do_rejuvenation:
+            # Apply rejuvenation to particles. This function could rejuvenate
+            # particles independently or all together
+            new_particles = self.rejuvenation_fn(
+                state,
+                kernel_results.steps
+            )
 
       return (WeightedParticles(particles=new_particles,
                                 log_weights=log_weights),
