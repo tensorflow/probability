@@ -31,6 +31,8 @@ from tensorflow_probability.python.distributions import poisson
 from tensorflow_probability.python.distributions import sample as sample_dist_lib
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
+from tensorflow_probability.python.distributions import categorical
+from tensorflow_probability.python.distributions import hidden_markov_model
 from tensorflow_probability.python.experimental.mcmc import particle_filter
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
@@ -256,6 +258,59 @@ class _ParticleFilterTest(test_util.TestCase):
         trajectories['susceptible'][1:, ...] -
         trajectories['susceptible'][:-1, ...],
         0.0)
+
+  def test_rejuvenation_fn(self):
+    # A simple HMM with 10 hidden states
+    d = hidden_markov_model.HiddenMarkovModel(
+          initial_distribution=categorical.Categorical(logits=tf.zeros(10)),
+          transition_distribution=categorical.Categorical(logits=tf.zeros((10, 10))),
+          observation_distribution=normal.Normal(loc=tf.range(10.), scale=0.3),
+          num_steps=50
+    )
+    # Fix
+    observation = categorical.Categorical(logits=[0] * 10, dtype=tf.float32).sample(50).numpy()
+
+    observations = tf.transpose(
+        tf.reshape(tf.tile(observation, [5]),
+                   [5, tf.shape(observation)[0]])
+    )
+
+    def rejuvenation_fn(state, step=-1):
+        posterior = d.posterior_marginals(observation).sample(len(state.particles))
+        rej_particles = tf.constant([post[step].numpy() for post in posterior])
+        return rej_particles
+
+    def rejuvenation_criterion_fn(state):
+        return 1
+
+    rej_particles, _, _, _ = self.evaluate(
+        particle_filter.particle_filter(
+            observations=observation,
+            initial_state_prior=d.initial_distribution,
+            transition_fn=lambda _, s: categorical.Categorical(logits=tf.zeros(s.shape + [10])),
+            observation_fn=lambda _, s: normal.Normal(loc=tf.cast(s, tf.float32), scale=0.3),
+            rejuvenation_criterion_fn=rejuvenation_criterion_fn,
+            rejuvenation_fn=rejuvenation_fn,
+            num_particles=5)
+    )
+
+    delta_rej = tf.math.abs(observations - tf.cast(rej_particles, tf.float32))
+
+    nonrej_particles, _, _, _ = self.evaluate(
+        particle_filter.particle_filter(
+            observations=observation,
+            initial_state_prior=d.initial_distribution,
+            transition_fn=lambda _, s: categorical.Categorical(logits=tf.zeros(s.shape + [10])),
+            observation_fn=lambda _, s: normal.Normal(loc=tf.cast(s, tf.float32), scale=0.3),
+            num_particles=5)
+    )
+
+    delta_nonrej = tf.math.abs(observations - tf.cast(nonrej_particles, tf.float32))
+
+    # Since likelihoods and weights have no meaning with rejuvenation, this test
+    # measures the distance of each particle with respect to ground truth,
+    # and we have better results if the rejuvenated particles are closer
+    self.assertLess(tf.reduce_sum(delta_rej), tf.reduce_sum(delta_nonrej))
 
   def test_data_driven_proposal(self):
 
