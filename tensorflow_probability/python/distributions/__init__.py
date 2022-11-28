@@ -130,6 +130,7 @@ from tensorflow_probability.python.distributions.triangular import Triangular
 from tensorflow_probability.python.distributions.truncated_cauchy import TruncatedCauchy
 from tensorflow_probability.python.distributions.truncated_normal import TruncatedNormal
 from tensorflow_probability.python.distributions.two_piece_normal import TwoPieceNormal
+from tensorflow_probability.python.distributions.two_piece_student_t import TwoPieceStudentT
 from tensorflow_probability.python.distributions.uniform import Uniform
 from tensorflow_probability.python.distributions.variational_gaussian_process import VariationalGaussianProcess
 from tensorflow_probability.python.distributions.von_mises import VonMises
@@ -286,6 +287,7 @@ __all__ = [
     'TruncatedCauchy',
     'TruncatedNormal',
     'TwoPieceNormal',
+    'TwoPieceStudentT',
     'Uniform',
     'VariationalGaussianProcess',
     'VectorDeterministic',
