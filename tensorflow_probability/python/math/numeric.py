@@ -57,7 +57,7 @@ def log1psquare(x, name=None):
     # Mask out small x's so the gradient correctly propagates.
     abs_large_x = tf.where(is_large, tf.abs(x), tf.ones([], x.dtype))
     return tf.where(is_large,
-                    2. * tf.math.log(abs_large_x),
+                    dtype(2.) * tf.math.log(abs_large_x),
                     tf.math.log1p(tf.square(x)))
 
 
