@@ -393,7 +393,6 @@ class TwoPieceStudentT(distribution.AutoCompositeTensorDistribution):
       """)
   def _variance(self):
     df = tf.convert_to_tensor(self.df)
-    loc = tf.convert_to_tensor(self.loc)
     scale = tf.convert_to_tensor(self.scale)
     skewness = tf.convert_to_tensor(self.skewness)
 
@@ -403,7 +402,7 @@ class TwoPieceStudentT(distribution.AutoCompositeTensorDistribution):
     two = numpy_dtype(2.)
 
     batch_shape = self._batch_shape_tensor(
-        df=df, loc=loc, scale=scale, skewness=skewness)
+        df=df, scale=scale, skewness=skewness)
     df = tf.broadcast_to(df, shape=batch_shape)
 
     small_df = (df <= two)
@@ -431,15 +430,8 @@ class TwoPieceStudentT(distribution.AutoCompositeTensorDistribution):
       ], result_where_defined)
 
   def _mode(self):
-    df = tf.convert_to_tensor(self.df)
     loc = tf.convert_to_tensor(self.loc)
-    scale = tf.convert_to_tensor(self.scale)
-    skewness = tf.convert_to_tensor(self.skewness)
-
-    batch_shape = self._batch_shape_tensor(
-        df=df, loc=loc, scale=scale, skewness=skewness)
-
-    return tf.broadcast_to(loc, shape=batch_shape)
+    return tf.broadcast_to(loc, shape=self._batch_shape_tensor(loc=loc))
 
   def _default_event_space_bijector(self):
     return identity_bijector.Identity(validate_args=self.validate_args)
