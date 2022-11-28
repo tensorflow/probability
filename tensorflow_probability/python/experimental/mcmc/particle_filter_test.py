@@ -267,7 +267,6 @@ class _ParticleFilterTest(test_util.TestCase):
           observation_distribution=normal.Normal(loc=tf.range(10.), scale=0.3),
           num_steps=50
     )
-    # Fix
     observation = categorical.Categorical(logits=[0] * 10, dtype=tf.float32).sample(50).numpy()
 
     observations = tf.transpose(
@@ -280,7 +279,7 @@ class _ParticleFilterTest(test_util.TestCase):
         rej_particles = tf.constant([post[step].numpy() for post in posterior])
         return rej_particles
 
-    def rejuvenation_criterion_fn(state):
+    def rejuvenation_criterion_fn(_):
         return 1
 
     rej_particles, _, _, _ = self.evaluate(
@@ -293,8 +292,7 @@ class _ParticleFilterTest(test_util.TestCase):
             rejuvenation_fn=rejuvenation_fn,
             num_particles=5)
     )
-
-    delta_rej = tf.math.abs(observations - tf.cast(rej_particles, tf.float32))
+    delta_rej = np.where(observations - tf.cast(rej_particles, tf.float32) != 0, 1, 0)
 
     nonrej_particles, _, _, _ = self.evaluate(
         particle_filter.particle_filter(
@@ -304,12 +302,8 @@ class _ParticleFilterTest(test_util.TestCase):
             observation_fn=lambda _, s: normal.Normal(loc=tf.cast(s, tf.float32), scale=0.3),
             num_particles=5)
     )
+    delta_nonrej = np.where(observations - tf.cast(nonrej_particles, tf.float32) != 0, 1, 0)
 
-    delta_nonrej = tf.math.abs(observations - tf.cast(nonrej_particles, tf.float32))
-
-    # Since likelihoods and weights have no meaning with rejuvenation, this test
-    # measures the distance of each particle with respect to ground truth,
-    # and we have better results if the rejuvenated particles are closer
     self.assertLess(tf.reduce_sum(delta_rej), tf.reduce_sum(delta_nonrej))
 
   def test_data_driven_proposal(self):
