@@ -109,21 +109,6 @@ class _TwoPieceStudentTTest(parameterized.TestCase):
     self.helper_param_static_shapes(
         tf.TensorShape(sample_shape), sample_shape)
 
-  def testSampleLikeArgsGetDistDType(self):
-    dist = self.make_two_piece_student_t()
-
-    self.assertEqual(self.dtype, dist.dtype)
-
-    seed = test_util.test_seed()
-    self.assertEqual(self.dtype, dist.sample(seed=seed).dtype)
-
-    for method in ('prob', 'cdf', 'survival_function', 'quantile',
-                   'log_prob', 'log_cdf', 'log_survival_function'):
-      self.assertEqual(self.dtype, getattr(dist, method)(1.).dtype, msg=method)
-
-    for method in ('mean', 'variance', 'mode'):
-      self.assertEqual(self.dtype, getattr(dist, method)().dtype, msg=method)
-
   def testShape(self):
     dists = (self.make_two_piece_student_t(), self.make_two_piece_student_ts())
 
@@ -140,8 +125,7 @@ class _TwoPieceStudentTTest(parameterized.TestCase):
       sample = dist.sample(n, seed=test_util.test_seed())
       results = [sample]
 
-      for method in ('prob', 'cdf', 'survival_function',
-                     'log_prob', 'log_cdf', 'log_survival_function'):
+      for method in ('log_prob', 'cdf', 'survival_function'):
         results.append(getattr(dist, method)(sample))
 
       probs = dist.cdf(sample)
@@ -189,6 +173,7 @@ class _TwoPieceStudentTTest(parameterized.TestCase):
       # The sample variance similarly is dependent on scale and n.
       # Thus, the tolerances below are very sensitive to number of samples
       # as well as the variances chosen.
+      self.assertDTypeEqual(sample, self.dtype)
       self.assertAllEqual(
           student_t_sample.shape, sample_shape + dist.batch_shape)
       self.assertAllClose(np.mean(student_t_sample), 0.0, atol=0.1)
@@ -392,9 +377,7 @@ class _TwoPieceStudentTTest(parameterized.TestCase):
     loc = tf.constant(0., self.dtype)
     scale = tf.constant(1., self.dtype)
 
-    # 'log_survival_function' currently fails at large in fp32 and fp64.
-    for attr in ('prob', 'cdf', 'survival_function',
-                 'log_prob', 'log_cdf'):
+    for attr in ('log_prob', 'cdf', 'survival_function'):
       value, grads = self.evaluate(
           gradient.value_and_gradient(
               make_fn(attr),

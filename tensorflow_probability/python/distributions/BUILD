@@ -4613,7 +4613,7 @@ multi_substrate_py_test(
     name = "two_piece_student_t_test",
     size = "medium",
     srcs = ["two_piece_student_t_test.py"],
-    shard_count = 6,
+    shard_count = 10,
     deps = [
         ":two_piece_student_t",
         # absl/testing:parameterized dep,
