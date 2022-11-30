@@ -983,6 +983,10 @@ class StudentT(distribution.AutoCompositeTensorDistribution):
     df = tf.convert_to_tensor(self.df)
     return cdf(value, df, self.loc, self.scale)
 
+  def _survival_function(self, value):
+    df = tf.convert_to_tensor(self.df)
+    return cdf(-value, df, -self.loc, self.scale)
+
   def _quantile(self, value):
     df = tf.convert_to_tensor(self.df)
     return quantile(value, df, self.loc, self.scale)
