@@ -25,6 +25,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_util
 
 
+NUMPY_MODE = False
 JAX_MODE = False
 
 
@@ -281,6 +282,14 @@ class FloatDTypeTest(test_util.TestCase):
     self.assertEqual(dtype_util.size(np.float32), 4)
     self.assertEqual(dtype_util.size(np.float64), 8)
 
+  @parameterized.named_parameters(
+      ('float32', tf.float32, True),
+      ('bfloat16', 'bfloat16', True),
+      ('not_int8', tf.int8, False))
+  def test_is_floating(self, dtype, expected):
+    if NUMPY_MODE and dtype == 'bfloat16':
+      self.skipTest('No bfloat16 in numpy')
+    self.assertEqual(dtype_util.is_floating(dtype), expected)
 
 if __name__ == '__main__':
   test_util.main()
