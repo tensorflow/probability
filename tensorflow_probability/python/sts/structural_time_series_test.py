@@ -641,9 +641,14 @@ class DynamicLinearRegressionTest(test_util.TestCase, _StsTestHarness):
               observed_time_series))
       dtype = dtype_util.as_numpy_dtype(observed_time_series_tensor.dtype)
 
+    drift_scale_prior = None
+    if observed_time_series is None:
+      drift_scale_prior = lognormal.LogNormal(-2.0, 2.0)
+
     return DynamicLinearRegression(
         design_matrix=np.random.randn(
             max_timesteps, num_features).astype(dtype),
+        drift_scale_prior=drift_scale_prior,
         observed_time_series=observed_time_series,
         **kwargs)
 
