@@ -20,12 +20,12 @@ import jax
 from jax import lax
 from jax import random
 from jax import tree_util
-from jax.example_libraries import stax
 import jax.numpy as jnp
 
 __all__ = [
     'assert_same_shallow_tree',
     'block_until_ready',
+    'diff',
     'flatten_tree',
     'get_shallow_tree',
     'inverse_fn',
@@ -38,6 +38,7 @@ __all__ = [
     'random_integer',
     'random_normal',
     'random_uniform',
+    'repeat',
     'split_seed',
     'trace',
     'value_and_grad',
@@ -143,7 +144,7 @@ def _searchsorted(a, v):
 
 def random_categorical(logits, num_samples, seed):
   """Returns a sample from a categorical distribution. `logits` must be 2D."""
-  probs = stax.softmax(logits)
+  probs = jax.nn.softmax(logits)
   cum_sum = jnp.cumsum(probs, axis=-1)
 
   eta = random.uniform(
@@ -211,6 +212,7 @@ def trace(state, fn, num_steps, unroll, **_):
       state, untraced, traced = fn(state)
       trace_arrays = map_tree(lambda a, e: a.at[i].set(e), trace_arrays, traced)
       return (state, untraced, trace_arrays)
+
     state, untraced, traced = lax.fori_loop(
         jnp.asarray(0, num_steps.dtype),
         num_steps,
@@ -250,7 +252,6 @@ def value_and_ldj(fn, args):
   assert y_extra == 3
   assert y_ldj == jnp.log(2)
   ```
-
   """
   value, (extra, ldj) = fn(args)
   return value, (extra, ldj), ldj
@@ -307,11 +308,13 @@ def block_until_ready(tensors):
   Returns:
     tensors: Tensors that are are guaranteed to be ready to materialize.
   """
+
   def _block_until_ready(tensor):
     if hasattr(tensor, 'block_until_ready'):
       return tensor.block_until_ready()
     else:
       return tensor
+
   return map_tree(_block_until_ready, tensors)
 
 
@@ -326,3 +329,13 @@ def named_call(f=None, name=None):
     return functools.partial(named_call, name=name)
 
   return jax.named_call(f, name=name)
+
+
+def diff(x, prepend=None):
+  """Like jnp.diff."""
+  return jnp.diff(x, prepend=prepend)
+
+
+def repeat(x, repeats, total_repeat_length=None):
+  """Like jnp.repeat."""
+  return jnp.repeat(x, repeats, total_repeat_length=total_repeat_length)

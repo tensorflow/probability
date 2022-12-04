@@ -51,6 +51,11 @@ __all__ = [
     'adam_step',
     'AdamExtra',
     'AdamState',
+    'annealed_importance_sampling_init',
+    'annealed_importance_sampling_resample',
+    'annealed_importance_sampling_step',
+    'AnnealedImportanceSamplingExtra',
+    'AnnealedImportanceSamplingState',
     'blanes_3_stage_step',
     'blanes_4_stage_step',
     'call_fn',
@@ -61,15 +66,17 @@ __all__ = [
     'call_transport_map_with_ldj',
     'choose',
     'clip_grads',
-    'gaussian_proposal',
     'gaussian_momentum_sample',
+    'gaussian_proposal',
+    'geometric_annealing_path',
+    'GeometricAnnealingPathExtra',
     'gradient_descent_init',
     'gradient_descent_step',
     'GradientDescentExtra',
     'GradientDescentState',
     'hamiltonian_integrator',
-    'hamiltonian_monte_carlo_step',
     'hamiltonian_monte_carlo_init',
+    'hamiltonian_monte_carlo_step',
     'HamiltonianMonteCarloExtra',
     'HamiltonianMonteCarloState',
     'IntegratorExtras',
@@ -121,6 +128,7 @@ __all__ = [
     'SimpleDualAveragesState',
     'splitting_integrator_step',
     'State',
+    'systematic_resample',
     'trace',
     'transform_log_prob_fn',
     'TransitionOperator',
@@ -145,6 +153,7 @@ IntNest = Union[IntTensor, Sequence[IntTensor], Mapping[Any, IntTensor]]
 StringNest = Union[Text, Sequence[Text], Mapping[Any, Text]]
 DTypeNest = Union['tf.DType', Sequence['tf.DType'], Mapping[Any, 'tf.DType']]
 State = TensorNest  # pylint: disable=invalid-name
+StateExtra = TensorNest  # pylint: disable=invalid-name
 TransitionOperator = Callable[..., Tuple[State, TensorNest]]
 TransportMap = Callable[..., Tuple[State, TensorNest]]
 PotentialFn = Union[Callable[[TensorNest], Tuple['tf.Tensor', TensorNest]],
@@ -222,7 +231,6 @@ def trace(
   assert(traces[0] == 4)
   assert(traces[1] == 6)
   ```
-
   """
 
   def split_trace(trace_element):
@@ -733,7 +741,7 @@ class IntegratorStepState(NamedTuple):
 class IntegratorStepExtras(NamedTuple):
   """Integrator step extras."""
   target_log_prob: 'FloatTensor'
-  state_extra: 'Any'
+  state_extra: 'StateExtra'
   kinetic_energy: 'FloatTensor'
   kinetic_energy_extra: 'Any'
   momentum_grads: 'State'
@@ -1275,7 +1283,7 @@ class HamiltonianMonteCarloState(NamedTuple):
   state: 'State'
   state_grads: 'State'
   target_log_prob: 'FloatTensor'
-  state_extra: 'Any'
+  state_extra: 'StateExtra'
 
 
 class HamiltonianMonteCarloExtra(NamedTuple):
@@ -1493,7 +1501,7 @@ def hamiltonian_monte_carlo_step(
 class IntegratorState(NamedTuple):
   """Integrator state."""
   state: 'State'
-  state_extra: Any
+  state_extra: 'StateExtra'
   state_grads: 'State'
   target_log_prob: 'FloatTensor'
   momentum: 'State'
@@ -1642,7 +1650,7 @@ def obabo_langevin_integrator(
                       'Tuple[FloatTensor, Any]]',
     integrator_trace_fn: 'Callable[[IntegratorState, IntegratorStepState, '
                          'IntegratorStepExtras], '
-                         'TensorNest]' = lambda *args: (),
+    'TensorNest]' = lambda *args: (),
     unroll: 'bool' = False,
     seed: Any = None,
 ) -> 'Tuple[IntegratorState, IntegratorExtras]':
@@ -2117,7 +2125,7 @@ class RandomWalkMetropolisState(NamedTuple):
   """Random Walk Metropolis state."""
   state: 'State'
   target_log_prob: 'FloatTensor'
-  state_extra: Any
+  state_extra: 'StateExtra'
 
 
 class RandomWalkMetropolisExtra(NamedTuple):
@@ -3036,3 +3044,317 @@ def clip_grads(x: 'FloatNest',
 
   return util.unflatten_tree(
       x, util.flatten_tree(grad_wrapper(*util.flatten_tree(x))))
+
+
+TransitionExtra = TensorNest
+LogWeightExtra = TensorNest
+ResampleExtra = TensorNest
+Stage = IntTensor
+
+
+class AnnealedImportanceSamplingState(NamedTuple):
+  """State of the annealed importance sampler.
+
+  Attributes:
+    state: The particles.
+    log_weight: Log weight of the particles.
+    stage: Current stage.
+  """
+  state: 'Any'
+  log_weight: 'FloatTensor'
+  stage: 'Stage'
+
+  def ess(self) -> FloatTensor:
+    """Estimates the effective sample size."""
+    norm_weights = tf.nn.softmax(self.log_weight)
+    return 1. / tf.reduce_sum(norm_weights**2)
+
+
+class AnnealedImportanceSamplingExtra(NamedTuple):
+  """Extra outputs from the annealed importance sampler.
+
+  Attributes:
+    stage_log_weight: Incremental log weight for this stage.
+    transition_extra: Extra outputs from the transition operator.
+    log_weight_extra: Extra outputs from log-weight computation.
+  """
+  stage_log_weight: 'FloatTensor'
+  transition_extra: 'TransitionExtra'
+  log_weight_extra: 'LogWeightExtra'
+
+
+@util.named_call
+def annealed_importance_sampling_init(
+    state: 'State',
+    initial_log_weight: 'FloatTensor',
+    initial_stage: 'Stage' = 0) -> 'AnnealedImportanceSamplingState':
+  """Initializes the annealed importance sampler.
+
+  Args:
+    state: Initial state.
+    initial_log_weight: Initial log weight.
+    initial_stage: Initial stage.
+
+  Returns:
+    `AnnealedImportanceSamplingState`.
+  """
+  state = util.map_tree(tf.convert_to_tensor, state)
+  return AnnealedImportanceSamplingState(
+      state=state,
+      log_weight=tf.convert_to_tensor(initial_log_weight),
+      stage=tf.convert_to_tensor(initial_stage, tf.int32),
+  )
+
+
+@util.named_call
+def annealed_importance_sampling_step(
+    ais_state: 'AnnealedImportanceSamplingState',
+    transition_operator:
+    'Callable[[State, Stage, Callable[[State], Tuple[FloatTensor, '
+    'StateExtra]]], Tuple[State, TransitionExtra]]',
+    make_tlp_fn:
+    'Callable[[Stage], PotentialFn]',
+    log_weight_fn: 'Optional[Callable[[State, State, Stage, TransitionExtra], '
+    'Tuple[FloatTensor, Any]]]' = None,
+) -> 'Tuple[AnnealedImportanceSamplingState, AnnealedImportanceSamplingExtra]':
+  """Takes a step of the annealed importance sampler (AIS).
+
+  AIS is a simple Sequential Monte Carlo (SMC) sampler that generates weighted
+  samples from a target distribution by annealing to it along a schedule of
+  simpler distributions. If self-normalized, the weights are biased. The mean of
+  the unnormalized weights, however, is an unbiased estimator of the ratio of
+  the normalizing constants of the target and the initial distributions.
+
+  In addition to classic AIS, this function also allows extending it to a more
+  general SMC sampler by overriding `log_weight_fn` (thus allowing custom
+  backward kernel) and also resampling (via the `resample` method on the state
+  object).
+
+  #### Example
+
+  In this example we estimate the normalizing constant ratio between `tlp_1`
+  and `tlp_2`.
+
+  ```python
+  def tlp_1(x):
+    return -x**2 / 2., ()
+
+  def tlp_2(x):
+    return -(x - 2)**2 / 2 / 16., ()
+
+  def kernel(ais_state, seed):
+
+    hmc_seed, resample_seed, seed = jax.random.split(seed, 3)
+
+    ais_state, _ = fun_mc.annealed_importance_sampling_resample(
+        ais_state,
+        seed=resample_seed)
+
+    def transition_operator(state, stage, tlp_fn):
+        f = stage / num_stages
+        hmc_state = fun_mc.hamiltonian_monte_carlo_init(state, tlp_fn)
+        hmc_state, hmc_extra = fun_mc.hamiltonian_monte_carlo_step(
+            hmc_state,
+            tlp_fn,
+            step_size=f * 4. + (1. - f) * 1.,
+            num_integrator_steps=1,
+            seed=hmc_seed)
+      return hmc_state.state, ()
+
+    ais_state, ais_extra = fun_mc.annealed_importance_sampling_step(
+        ais_state, transition_operator,
+        functools.partial(
+            fun_mc.geometric_annealing_path,
+            num_stages=num_stages,
+            initial_target_log_prob_fn=tlp_1,
+            final_target_log_prob_fn=tlp_2,
+        ))
+
+    return (ais_state, seed), ()
+
+
+  num_stages = 200
+  num_particles = 200
+  init_seed, seed = jax.random.split(jax.random.PRNGKey(0))
+  init_state = jax.random.normal(init_seed, [num_particles])
+
+  (ais_state, _), _ = fun_mc.trace(
+                      (fun_mc.annealed_importance_sampling_init(
+                          init_state, jnp.zeros([num_particles])), seed),
+                      kernel,
+                      num_stages,
+                  )
+
+  weights = jnp.exp(ais_state.log_weight)
+  # Should be close to 4.
+  print('estimated z2/z1', weights.mean())
+  # Should be close to 2.
+  print('estimated mean', (jax.nn.softmax(ais_state.log_weight)
+                           * ais_state.state).sum())
+  ```
+
+  Args:
+    ais_state: `AnnealedImportanceSamplingState`
+    transition_operator: The forward MCMC kernel. It has signature:
+      `(state, stage, tlp_fn) -> (state, extra)`.
+    make_tlp_fn: A function which, given the stage index, returns an annealed
+      density.
+    log_weight_fn: Optional function to compute the incremental log weight of a
+      stage. The default uses a naive implementation of the usual AIS
+      incremental weight computation.
+
+  Returns:
+    ais_state: `AnnealedImportanceSamplingState`
+    ais_extra: `AnnealedImportanceSamplingExtra`
+  """
+
+  if log_weight_fn is None:
+
+    def _default_log_weight_fn(old_state, new_state, stage, transition_extra):
+      del old_state, transition_extra
+      tlp_denom, denom_extra = call_potential_fn(make_tlp_fn(stage), new_state)
+      tlp_num, num_extra = call_potential_fn(make_tlp_fn(stage + 1), new_state)
+      stage_log_weight = tlp_num - tlp_denom
+      log_weight_extra = (num_extra, denom_extra)
+      return stage_log_weight, log_weight_extra
+
+    log_weight_fn = _default_log_weight_fn
+
+  new_state, transition_extra = transition_operator(
+      ais_state.state, ais_state.stage, make_tlp_fn(ais_state.stage))
+
+  stage_log_weight, log_weight_extra = log_weight_fn(ais_state.state, new_state,
+                                                     ais_state.stage,
+                                                     transition_extra)
+
+  ais_state = ais_state._replace(
+      state=new_state,
+      log_weight=ais_state.log_weight + stage_log_weight,
+      stage=ais_state.stage + 1,
+  )
+  extra = AnnealedImportanceSamplingExtra(
+      stage_log_weight=stage_log_weight,
+      transition_extra=transition_extra,
+      log_weight_extra=log_weight_extra,
+  )
+  return ais_state, extra
+
+
+@util.named_call
+def systematic_resample(
+    particles: 'State', log_weights: 'FloatTensor',
+    seed: 'Any') -> ('Tuple[Tuple[State, FloatTensor], IntTensor]'):
+  """Systematically resamples particles in proportion to their weights.
+
+  This uses the algorithm from [1].
+
+  Args:
+    particles: The particles.
+    log_weights: Un-normalized weights.
+    seed: PRNG seed.
+
+  Returns:
+    particles_and_weights: Tuple of resampled particles and weights.
+    ancestor_idx: Indices from which the returned particles were sampled from.
+
+  #### References
+
+  [1] Maskell, S., Alun-Jones, B., & Macleod, M. (2006). A Single Instruction
+      Multiple Data Particle Filter. 2006 IEEE Nonlinear Statistical Signal
+      Processing Workshop. https://doi.org/10.1109/NSSPW.2006.4378818
+  """
+  log_weights = tf.convert_to_tensor(log_weights)
+  log_weights = tf.where(
+      tf.math.is_nan(log_weights), tf.cast(-float('inf'), log_weights.dtype),
+      log_weights)
+  probs = tf.nn.softmax(log_weights)
+  num_particles = probs.shape[0]
+
+  shift = util.random_uniform([], log_weights.dtype, seed)
+  pie = tf.cumsum(probs) * num_particles + shift
+  repeats = tf.cast(util.diff(tf.floor(pie), prepend=0), tf.int32)
+  parent_idxs = util.repeat(
+      tf.range(num_particles), repeats, total_repeat_length=num_particles)
+  new_particles = util.map_tree(lambda x: tf.gather(x, parent_idxs), particles)
+  new_log_weights = tf.fill(log_weights.shape,
+                            tfp.math.reduce_logmeanexp(log_weights))
+  return (new_particles, new_log_weights), parent_idxs
+
+
+@util.named_call
+def annealed_importance_sampling_resample(
+    ais_state: 'AnnealedImportanceSamplingState',
+    resample_fn:
+    'Callable[[State, FloatTensor, Any], Tuple[Tuple[State, tf.Tensor], '
+    'ResampleExtra]]' = systematic_resample,
+    min_ess_threshold: 'FloatTensor' = 0.5,
+    seed: 'Any' = None,
+) -> 'Tuple[AnnealedImportanceSamplingState, ResampleExtra]':
+  """Resamples the particles in AnnealedImportanceSamplingState."""
+
+  (state, log_weight), extra = resample_fn(ais_state.state,
+                                           ais_state.log_weight, seed)
+  state, log_weight = choose(
+      ais_state.ess() <
+      tf.cast(log_weight.shape[0], log_weight.dtype) * min_ess_threshold,
+      (state, log_weight),
+      (ais_state.state, ais_state.log_weight),
+  )
+  return ais_state._replace(state=state, log_weight=log_weight), extra
+
+
+class GeometricAnnealingPathExtra(NamedTuple):
+  """Extra outputs of `geometric_annealing_path`.
+
+  Attributes:
+    initial_extra: Extra outputs from the `initial_target_log_prob_fn`.
+    final_extra: Extra outputs from the `final_target_log_prob_fn`.
+    fraction: Interpolation fraction.
+  """
+  initial_extra: StateExtra
+  final_extra: StateExtra
+  fraction: FloatTensor
+
+
+def geometric_annealing_path(
+    stage: 'Stage',
+    num_stages: 'Stage',
+    initial_target_log_prob_fn: 'PotentialFn',
+    final_target_log_prob_fn: 'PotentialFn',
+    fraction_fn: 'Optional[Callable[[FloatTensor], tf.Tensor]]' = None,
+) -> 'Callable[[Stage], PotentialFn]':
+  """Returns a geometrically interpolated target density function.
+
+  This interpolates between `initial_target_log_prob_fn` and
+  `final_target_log_prob_fn`.
+
+  Args:
+    stage: Interpolation stage, ranging in [0, num_stages].
+    num_stages: Number of interpolation stages.
+    initial_target_log_prob_fn: Initial target density function.
+    final_target_log_prob_fn: Final target density function.
+    fraction_fn: A function to transform a linear fraction into something else.
+      A logarithmic scaling is a common option.
+
+  Returns:
+    The interpolated target density function. It's extra output is of type
+    `GeometricAnnealingPathExtra`.
+  """
+
+  @util.named_call
+  def annealed_target_log_prob_fn(*args, **kwargs):
+    init_tlp, init_extra = initial_target_log_prob_fn(*args, **kwargs)
+    fin_tlp, fin_extra = final_target_log_prob_fn(*args, **kwargs)
+
+    dtype = init_tlp.dtype
+
+    fraction = tf.cast(stage, dtype) / tf.cast(num_stages, dtype)
+    if fraction_fn is not None:
+      fraction = fraction_fn(fraction)
+
+    extra = GeometricAnnealingPathExtra(
+        initial_extra=init_extra, final_extra=fin_extra, fraction=fraction)
+
+    return init_tlp * (1 - fraction) + fin_tlp * (fraction), extra
+
+  return annealed_target_log_prob_fn
