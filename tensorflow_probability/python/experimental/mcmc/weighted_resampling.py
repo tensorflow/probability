@@ -21,6 +21,7 @@ from tensorflow_probability.python.distributions import exponential
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.math.generic import log_cumsum_exp
 from tensorflow_probability.python.math.gradient import value_and_gradient
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
@@ -134,7 +135,7 @@ def _resample_using_log_points(log_probs, sample_shape, log_points, name=None):
          tf.zeros(points_shape, dtype=tf.int32)],
         axis=-1)
     log_marker_positions = tf.broadcast_to(
-        tf.math.cumulative_logsumexp(log_probs, axis=-1),
+        log_cumsum_exp(log_probs, axis=-1),
         markers_shape)
     log_markers_and_points = ps.concat(
         [log_marker_positions, log_points], axis=-1)
