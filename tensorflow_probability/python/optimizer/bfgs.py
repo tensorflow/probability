@@ -352,16 +352,26 @@ def _update_inv_hessian(prev_state, next_state):
   normalization_factor = tf.reduce_sum(gradient_delta * position_delta, axis=-1)
   should_update = should_update & ~tf.equal(normalization_factor, 0)
 
+  # Rescale the initial hessian at the first step, as suggested
+  # in Chapter 6 of Numerical Optimization, by Nocedal and Wright.
+  scale_factor = tf.where(
+      tf.math.equal(prev_state.num_iterations, 0),
+      normalization_factor / tf.reduce_sum(
+          tf.math.square(gradient_delta), axis=-1), 1.)
+
+  inverse_hessian_estimate = scale_factor[
+      ..., tf.newaxis, tf.newaxis] * prev_state.inverse_hessian_estimate
+
   def _do_update_inv_hessian():
     next_inv_hessian = _bfgs_inv_hessian_update(
         gradient_delta, position_delta, normalization_factor,
-        prev_state.inverse_hessian_estimate)
+        inverse_hessian_estimate)
     return bfgs_utils.update_fields(
         next_state,
         inverse_hessian_estimate=tf.where(
             should_update[..., tf.newaxis, tf.newaxis],
             next_inv_hessian,
-            prev_state.inverse_hessian_estimate))
+            inverse_hessian_estimate))
 
   return ps.cond(
       ps.reduce_any(should_update),

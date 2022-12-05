@@ -293,7 +293,12 @@ class BfgsTest(test_util.TestCase):
     self.assertLessEqual(final_gradient_norm, 1e-5)
     self.assertArrayNear(results.position, np.array([1.0, 1.0]), 1e-5)
 
-  def test_himmelblau(self):
+  @parameterized.parameters(
+      [(1, 1), (3, 2), 30],
+      [(-2, 2), (-2.805118, 3.131312), 17],
+      [(-1, -1), (-3.779310, -3.283186), 30],
+      [(1, -2), (3.584428, -1.848126), 26])
+  def test_himmelblau(self, start, expected_minima, expected_evals):
     """Tests minimization on the Himmelblau's function.
 
     Himmelblau's function is a standard optimization test case. The function is
@@ -305,30 +310,25 @@ class BfgsTest(test_util.TestCase):
     (-3.779310, -3.283186), (3.584428, -1.848126).
 
     All these minima may be reached from appropriate starting points.
+
+    Args:
+      start: Start position.
+      expected_minima: Location of minima that this optimization gets to.
+      expected_evals: Number of expected function evaluations.
     """
     @_make_val_and_grad_fn
     def himmelblau(coord):
       x, y = coord[0], coord[1]
       return (x * x + y - 11) ** 2 + (x + y * y - 7) ** 2
 
-    starts_and_targets = [
-        # Start Point, Target Minimum, Num evaluations expected.
-        [(1, 1), (3, 2), 30],
-        [(-2, 2), (-2.805118, 3.131312), 23],
-        [(-1, -1), (-3.779310, -3.283186), 29],
-        [(1, -2), (3.584428, -1.848126), 28]
-    ]
-    dtype = 'float64'
-    for start, expected_minima, expected_evals in starts_and_targets:
-      start = tf.constant(start, dtype=dtype)
-      results = self.evaluate(
-          bfgs.minimize(himmelblau, initial_position=start, tolerance=1e-8))
-      print(results)
-      self.assertTrue(results.converged)
-      self.assertArrayNear(results.position,
-                           np.array(expected_minima, dtype=dtype),
-                           1e-5)
-      self.assertEqual(results.num_objective_evaluations, expected_evals)
+    start = tf.constant(start, dtype=np.float64)
+    results = self.evaluate(
+        bfgs.minimize(himmelblau, initial_position=start, tolerance=1e-8))
+    self.assertTrue(results.converged)
+    self.assertArrayNear(results.position,
+                         np.array(expected_minima, dtype=np.float64),
+                         1e-5)
+    self.assertEqual(results.num_objective_evaluations, expected_evals)
 
   def test_himmelblau_batch_all(self):
     @_make_val_and_grad_fn
@@ -428,7 +428,7 @@ class BfgsTest(test_util.TestCase):
     for actual, expected in zip(batch_results.position[batch_results.converged],
                                 expected_minima[batch_results.converged]):
       self.assertArrayNear(actual, expected, 1e-5)
-    self.assertEqual(batch_results.num_objective_evaluations, 32)
+    self.assertEqual(batch_results.num_objective_evaluations, 31)
 
   def test_data_fitting(self):
     """Tests MLE estimation for a simple geometric GLM."""
@@ -464,7 +464,7 @@ class BfgsTest(test_util.TestCase):
             neg_log_likelihood, initial_position=start, tolerance=1e-6))
     expected_minima = np.array(
         [-0.020460034354, 0.171708568111, 0.021200423717], dtype='float64')
-    expected_evals = 19
+    expected_evals = 18
     self.assertArrayNear(results.position, expected_minima, 1e-6)
     self.assertEqual(results.num_objective_evaluations, expected_evals)
 
