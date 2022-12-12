@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2022 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,17 +17,10 @@
 set -v  # print commands as they are executed
 set -e  # fail and exit on any command erroring
 
-DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
-
-python -m pip install --upgrade 'pip>=19.2'
-python -m pip install --upgrade setuptools
-python -m pip install --quiet pylint
-
-# Run lints on added/changed python files.
-changed_py_files=$(${DIR}/get_github_changed_py_files.sh)
-if [[ -n "${changed_py_files}" ]]; then
-  echo "Running pylint on ${changed_py_files}"
-  pylint -j2 --rcfile=testing/pylintrc ${changed_py_files}
-else
-  echo "No files to lint."
+if [ $GITHUB_BASE_REF ]; then
+  git fetch origin ${GITHUB_BASE_REF} --depth=1
+  git diff \
+      --name-only \
+      --diff-filter=AM origin/${GITHUB_BASE_REF} \
+    | { grep '^tensorflow_probability.*\.py$' || true; }
 fi
