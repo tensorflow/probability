@@ -24,8 +24,8 @@ from tensorflow_probability.python.bijectors import softplus as softplus_bijecto
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import gamma
 from tensorflow_probability.python.distributions import student_t
+from tensorflow_probability.python.distributions import two_piece_normal
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
@@ -33,7 +33,6 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.math import gradient
 from tensorflow_probability.python.math import special
 from tensorflow_probability.python.math.numeric import log1psquare
 
@@ -286,8 +285,18 @@ class TwoPieceStudentT(distribution.AutoCompositeTensorDistribution):
         df=df, loc=loc, scale=scale, skewness=skewness)
     sample_shape = ps.concat([[n], batch_shape], axis=0)
 
-    samples = random_two_piece_student_t(
-        sample_shape, df=df, skewness=skewness, seed=seed)
+    numpy_dtype = dtype_util.as_numpy_dtype(self.dtype)
+    half = numpy_dtype(0.5)
+    broadcast_df = tf.broadcast_to(df, sample_shape)
+
+    two_piece_normal_seed, gamma_seed = samplers.split_seed(
+        seed, salt='two_piece_student_t_split')
+    two_piece_normal_samples = two_piece_normal.random_two_piece_normal(
+        sample_shape, skewness=skewness, seed=two_piece_normal_seed)
+    gamma_samples = gamma.random_gamma(
+        (), concentration=half * broadcast_df, rate=half, seed=gamma_seed)
+    samples = two_piece_normal_samples * tf.math.rsqrt(
+        gamma_samples / broadcast_df)
 
     return loc + scale * samples
 
@@ -621,227 +630,3 @@ def quantile(value, df, loc, scale, skewness):
   result = loc + adj_scale * t_quantile
 
   return tf.where(use_symmetry, -result, result)
-
-
-def _two_piece_student_t_sample_no_gradient(sample_shape, df, skewness, seed):
-  """Generate samples from Two-Piece Student's t-distribution.
-
-  The distribution is the Two-Piece Student's t-distribution with degree of
-  freedom `df`, location zero, scale one, and skewness `skewness`. To change
-  the location and scale, use:
-
-  ```none
-  loc + scale * samples
-  ```
-
-  Args:
-    sample_shape: 0D or 1D `int32` `Tensor`. Shape of the generated samples.
-    df: Floating-point tensor; the degree(s) of freedom of the
-      distribution(s). Must contain only positive values.
-    skewness: Floating-point tensor; the skewness(es) of the distribution(s).
-    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
-
-  Returns:
-    A tensor with shape `sample_shape`.
-  """
-  dtype = dtype_util.common_dtype([df, skewness], tf.float32)
-  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
-
-  half = numpy_dtype(0.5)
-  broadcast_df = tf.broadcast_to(df, sample_shape)
-
-  uniform_seed, normal_seed, gamma_seed = samplers.split_seed(
-      seed, n=3, salt='two_piece_student_t_split')
-  uniform_samples = samplers.uniform(
-      sample_shape,
-      maxval=numpy_dtype(1.),
-      dtype=skewness.dtype,
-      seed=uniform_seed)
-  normal_samples = samplers.normal(
-      sample_shape, dtype=skewness.dtype, seed=normal_seed)
-  gamma_samples = gamma.random_gamma(
-      (), concentration=half * broadcast_df, rate=half, seed=gamma_seed)
-  student_t_samples = normal_samples * tf.math.rsqrt(
-      gamma_samples / broadcast_df)
-
-  return tf.abs(student_t_samples) * tf.where(
-      uniform_samples < tf.math.reciprocal(1. + skewness**2),
-      -tf.math.reciprocal(skewness),
-      skewness)
-
-
-def _two_piece_student_t_sample_gradient(df, skewness, samples):
-  """Compute the gradients of Two-Piece Student's t-distribution samples.
-
-  This function computes the implicit reparameterization gradients [1] with
-  respect to `df` and `skewness`:
-
-  ```none
-  dz / ddf = -(
-      (dF(z; df, 0, 1, skewness) / ddf) / p(z; df, 0, 1, skewness))
-  dz / dskewness = -(
-      (dF(z; df, 0, 1, skewness) / dskewness) / p(z; df, 0, 1, skewness)
-  ```
-
-  where `F(z; df, 0, 1, skewness)` and `p(z; df, 0, 1, skewness)` are the cdf
-  and the pdf of the Two-Piece Student's t-distribution with degree of freedom
-  `df`, location zero, scale one, and skewness `skewness`.
-
-  Args:
-    df: Floating-point tensor; the degree(s) of freedom of the
-      distribution(s). Must contain only positive values.
-    skewness: Floating-point tensor; the skewness(es) of the distribution(s).
-    samples: Floating-point tensor; the samples of the distribution(s).
-
-  Returns:
-    A tensor with shape broadcast according to the arguments.
-
-  Reference:
-    [1]: Michael Figurnov, Shakir Mohamed, and Andriy Mnih.
-         Implicit Reparameterization Gradients. In _Advances in Neural
-         Information Processing Systems_, 31, 2018.
-         https://arxiv.org/abs/1805.08498
-  """
-  dtype = dtype_util.common_dtype([df, skewness], tf.float32)
-  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
-
-  zero = numpy_dtype(0.)
-  one = numpy_dtype(1.)
-
-  cdf_partial_df, cdf_partial_skewness = gradient.value_and_gradient(
-      lambda _df, _skewness: cdf(
-          samples, df=_df, loc=zero, scale=one, skewness=_skewness),
-      [df, skewness])[1]
-
-  pdf = tf.math.exp(
-      log_prob(samples, df=df, loc=zero, scale=one, skewness=skewness))
-
-  return -cdf_partial_df / pdf, -cdf_partial_skewness / pdf
-
-
-def _two_piece_student_t_sample_fwd(sample_shape, df, skewness, seed):
-  """Compute output, aux (collaborates with _two_piece_student_t_sample_bwd)."""
-  samples = _two_piece_student_t_sample_no_gradient(
-      sample_shape, df, skewness, seed)
-  return samples, (df, skewness, samples)
-
-
-def _two_piece_student_t_sample_bwd(_, aux, dy):
-  """The gradients of Two-Piece Student's t-distribution samples."""
-  df, skewness, samples = aux
-  broadcast_df = tf.broadcast_to(df, ps.shape(samples))
-  broadcast_skewness = tf.broadcast_to(skewness, ps.shape(samples))
-
-  partial_df, partial_skewness = _two_piece_student_t_sample_gradient(
-      broadcast_df, broadcast_skewness, samples)
-
-  # Sum over the sample dimensions. Assume that they are always the first
-  # ones.
-  df_sample_dims = (ps.rank(broadcast_df) - ps.rank(df))
-  skewness_sample_dims = (ps.rank(broadcast_skewness) - ps.rank(skewness))
-
-  # None gradients for seed
-  return (
-      tf.reduce_sum(dy * partial_df, axis=ps.range(df_sample_dims)),
-      tf.reduce_sum(dy * partial_skewness, axis=ps.range(skewness_sample_dims)),
-      None)
-
-
-def _two_piece_student_t_sample_jvp(sample_shape, primals, tangents):
-  """Compute primals and tangents using implicit derivative."""
-  df, skewness, seed = primals
-  ddf, dskewness, dseed = tangents
-  del dseed
-
-  broadcast_df = tf.broadcast_to(df, sample_shape)
-  broadcast_skewness = tf.broadcast_to(skewness, sample_shape)
-
-  broadcast_ddf = tf.broadcast_to(ddf, sample_shape)
-  broadcast_dskewness = tf.broadcast_to(dskewness, sample_shape)
-
-  samples = _two_piece_student_t_sample_no_gradient(
-      sample_shape, df, skewness, seed)
-  partial_df, partial_skewness = _two_piece_student_t_sample_gradient(
-      broadcast_df, broadcast_skewness, samples)
-
-  return (
-      samples,
-      broadcast_ddf * partial_df + broadcast_dskewness * partial_skewness)
-
-
-@tfp_custom_gradient.custom_gradient(
-    vjp_fwd=_two_piece_student_t_sample_fwd,
-    vjp_bwd=_two_piece_student_t_sample_bwd,
-    jvp_fn=_two_piece_student_t_sample_jvp,
-    nondiff_argnums=(0,))
-def _two_piece_student_t_sample_with_gradient(sample_shape, df, skewness, seed):
-  """Generate samples from Two-Piece Student's t-distribution.
-
-  The distribution is the Two-Piece Student's t-distribution with degree of
-  freedom `df`, location zero, scale one, and skewness `skewness`. To change
-  the location and scale, use:
-
-  ```none
-  loc + scale * samples
-  ```
-
-  The samples are pathwise differentiable using the approach of [1].
-
-  Args:
-    sample_shape: 0D or 1D `int32` `Tensor`. Shape of the generated samples.
-    df: Floating-point tensor; the degree(s) of freedom of the
-      distribution(s). Must contain only positive values.
-    skewness: Floating-point tensor; the skewness(es) of the distribution(s).
-    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
-
-  Returns:
-    A tensor with shape `sample_shape`.
-
-  References:
-    [1]: Michael Figurnov, Shakir Mohamed, and Andriy Mnih.
-         Implicit Reparameterization Gradients. In _Advances in Neural
-         Information Processing Systems_, 31, 2018.
-         https://arxiv.org/abs/1805.08498
-  """
-  return _two_piece_student_t_sample_no_gradient(
-      sample_shape, df, skewness, seed)
-
-
-def random_two_piece_student_t(sample_shape, df, skewness, seed=None):
-  """Generate samples from Two-Piece Student's t-distribution.
-
-  The distribution is the Two-Piece Student's t-distribution with degree of
-  freedom `df`, location zero, scale one, and skewness `skewness`. To change
-  the location and scale, use:
-
-  ```none
-  loc + scale * samples
-  ```
-
-  The samples are pathwise differentiable using the approach of [1].
-
-  Note that `skewness` can be negative.
-
-  Args:
-    sample_shape: 0D or 1D `int32` `Tensor`. Shape of the generated samples.
-    df: Floating-point tensor; the degree(s) of freedom of the
-      distribution(s). Must contain only positive values.
-    skewness: Floating-point tensor; the skewness(es) of the distribution(s).
-    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
-
-  Returns:
-    A tensor with shape `sample_shape`.
-
-  References:
-    [1]: Michael Figurnov, Shakir Mohamed, and Andriy Mnih.
-         Implicit Reparameterization Gradients. In _Advances in Neural
-         Information Processing Systems_, 31, 2018.
-         https://arxiv.org/abs/1805.08498
-  """
-  sample_shape = ps.convert_to_shape_tensor(sample_shape, dtype_hint=tf.int32)
-  df = tf.convert_to_tensor(df)
-  skewness = tf.convert_to_tensor(skewness)
-  seed = samplers.sanitize_seed(seed, salt='two_piece_student_t')
-
-  return _two_piece_student_t_sample_with_gradient(
-      sample_shape, df, tf.abs(skewness), seed)

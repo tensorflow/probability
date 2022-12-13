@@ -437,13 +437,13 @@ class _TwoPieceStudentTTest(parameterized.TestCase):
 
     err = self.compute_max_gradient_error(
         lambda _df: get_abs_sample_mean(_df, skewness), [df], delta=1e-4)
-    self.assertLess(err, 8e-3)
+    self.assertLess(err, 6e-3)
 
     err = self.compute_max_gradient_error(
         lambda _skewness: get_abs_sample_mean(df, _skewness),
         [skewness],
         delta=5e-2)
-    self.assertLess(err, 0.11)
+    self.assertLess(err, 0.09)
 
   def testNonPositiveDfScaleSkewnessFails(self):
     with self.assertRaisesOpError('Argument `df` must be positive.'):
