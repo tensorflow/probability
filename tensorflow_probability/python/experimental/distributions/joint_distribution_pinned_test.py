@@ -508,6 +508,26 @@ class JointDistributionPinnedTest(test_util.TestCase):
     self.assertAllCloseNested(
         normal.Normal(2., 2.).log_prob(0.), parts.pinned.y)
 
+  def test_unpin(self):
+    root = jdc.JointDistributionCoroutine.Root
+
+    @jdc.JointDistributionCoroutine
+    def model():
+      loc = yield root(normal.Normal(0., 1., name='loc'))
+      scl = yield root(gamma.Gamma(1., 1., name='scl'))
+      _ = yield normal.Normal(loc, scl, name='y')
+
+    p = model.experimental_pin(y=0.5)
+    self.assertIs(model, p.unpin('y'))
+
+    p = model.experimental_pin(scl=1., y=0.5)
+    self.assertEqual(['scl'], list(p.unpin('y').pins))
+    self.assertEqual(['y'], list(p.unpin('scl').pins))
+    self.assertIs(model, p.unpin('y', 'scl'))
+    with self.assertRaisesWithPredicateMatch(
+        ValueError, r"Unrecognized.*'foo'.*['scl', 'y']"):
+      p.unpin('foo', 'y')
+
 
 if __name__ == '__main__':
   test_util.main()
