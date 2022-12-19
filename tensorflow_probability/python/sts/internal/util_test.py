@@ -329,7 +329,7 @@ class _UtilityTests(test_util.TestCase):
     if is_missing is None:
       self.assertIsNone(expected_is_missing)
     elif expected_is_missing is None:
-      expected_is_missing = np.zeros(is_missing.shape, dtype=np.bool)
+      expected_is_missing = np.zeros(is_missing.shape, dtype=bool)
     self.assertAllEqual(expected_is_missing, is_missing)
 
   def test_series_with_no_fixed_frequency_raises_error(self):

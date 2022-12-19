@@ -195,7 +195,7 @@ class SpikeAndSlabTest(test_util.TestCase):
 
     rng = test_util.test_np_rng()
     initial_nonzeros = rng.randint(
-        low=0, high=2, size=[num_features]).astype(np.bool)
+        low=0, high=2, size=[num_features]).astype(bool)
     flip_idxs = rng.choice(
         num_features, size=num_flips, replace=False).astype(np.int32)
     should_flip = np.array([True] * num_flips)
