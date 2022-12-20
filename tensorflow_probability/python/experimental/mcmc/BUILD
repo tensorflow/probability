@@ -574,6 +574,8 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/distributions:sample",
         "//tensorflow_probability/python/distributions:transformed_distribution",
         "//tensorflow_probability/python/distributions:uniform",
+        "//tensorflow_probability/python/distributions:categorical",
+        "//tensorflow_probability/python/distributions:hidden_markov_model",
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math:gradient",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
@@ -652,6 +654,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/distributions:mvn_diag",
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/distributions:sample",
+        "//tensorflow_probability/python/experimental/mcmc:sequential_monte_carlo_kernel",
         "//tensorflow_probability/python/distributions:uniform",
         "//tensorflow_probability/python/distributions/internal:statistical_testing",
         "//tensorflow_probability/python/internal:test_util",
