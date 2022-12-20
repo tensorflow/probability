@@ -82,14 +82,162 @@ def _band_part(input, num_lower, num_upper, name=None):  # pylint: disable=redef
   return result
 
 
+def _create_solve_broadcastable_inputs(a, b):
+  """Internal method to handle broadcasting / reshaping for solves.
+
+  Args:
+    a: `Tensor` of shape `[B1, ..., Bk, N, N]`.
+    b: `Tensor` of shape `[C1, ..., Cl, N, M]`.
+
+  Returns:
+    a: Reshaped version of `a` suitable for solves.
+    b: Reshaped version of `b` suitable for solves.
+    b_batch_dims: List of dimensions of `b` that have been reshaped away in `b`.
+    result_permutation: Permutation of dimensions of the result of the solve,
+      that produces the same shape as naively computing
+      `solve(broadcast(a), broadcast(b))`.
+  """
+
+  # Returns reshaped inputs along with a list of batch dimensions and where
+  # they should be in the result.
+
+  # We mainly take advantage of the fact that we can compute a solve with a
+  # matrix `a` and batch of matrices `b` of shapes `[N, N]` and `[B, N, M]` via
+  # a solve with matrix `a` and a matrix `b'` of shapes `[N, N]` and `[N, M *
+  # B]`, where `b'` is related to `b` via a transpose in reshape.
+  # In general we can do this for arbitrary batch dimensions on both matrices by
+  # a combination of transposing and broadcasting.
+
+  a = ops.convert_to_tensor(a)
+  b = ops.convert_to_tensor(b)
+  import jax.numpy as jnp  # pylint: disable=g-import-not-at-top
+  import numpy as onp  # pylint: disable=g-import-not-at-top,reimported
+
+  # Special case batch dimensions are equal, only one tensor has batch
+  # dimensions, or batch dimensions are the same.
+
+  # If there are zero dimensions, just broadcast arguments and pass through.
+  if 0 in a.shape or 0 in b.shape:
+    a = a + np.zeros(b.shape[:-2] + (1, 1), dtype=a.dtype)
+    b = b + np.zeros(a.shape[:-2] + (1, 1), dtype=b.dtype)
+    return a, b, None, None
+
+  if a.shape[:-2] == b.shape[:-2]:
+    return a, b, None, None
+
+  # If a has batch dimensions and b doesn't, we need to explicitly broadcast.
+  if len(a.shape) > 2 and len(b.shape) == 2:
+    b = jnp.broadcast_to(b, a.shape[:-2] + b.shape[-2:])
+    return a, b, None, None
+
+  # If b has batch dimensions and a doesn't
+  if len(b.shape) > 2 and len(a.shape) == 2:
+    # Move all batch dimensions to the right.
+    transpose_dims = [len(b.shape) - 2, len(b.shape) - 1]
+    transpose_dims.extend(range(0, len(b.shape) - 2))
+    new_b = jnp.transpose(b, axes=transpose_dims)
+    new_b = new_b.reshape(new_b.shape[0], -1)
+
+    # Undo the transpose.
+    result_permutation = list(range(2, len(b.shape))) + [0, 1]
+    return a, new_b, b.shape[:-2], result_permutation
+
+  # Both inputs have batch dimensions that are unequal.
+  batch_a = a.shape[:-2]
+  batch_b = b.shape[:-2]
+
+  reversed_batch_a = list(reversed(batch_a))
+  reversed_batch_b = list(reversed(batch_b))
+
+  keep_a_dims = []
+  keep_b_dims = []
+  transpose_b_dims = []
+  result_permutation = []
+
+  b_batch_dims = []
+
+  # Iterate backwards over dimensions since the batch shapes might be of
+  # different sizes.
+  for i in range(min(len(batch_a), len(batch_b))):
+    if reversed_batch_a[i] == reversed_batch_b[i]:
+      keep_a_dims.append(i)
+      keep_b_dims.append(i)
+    else:
+      if reversed_batch_a[i] == 1 and reversed_batch_b[i] != 1:
+        transpose_b_dims.append(i)
+        b_batch_dims.append(reversed_batch_b[i])
+      else:
+        keep_a_dims.append(i)
+        keep_b_dims.append(i)
+
+  # Add extra dimensions of the larger list
+  if len(batch_a) > len(batch_b):
+    keep_a_dims.extend(range(len(batch_b), len(batch_a)))
+  elif len(batch_b) > len(batch_a):
+    transpose_b_dims.extend(range(len(batch_a), len(batch_b)))
+    b_batch_dims.extend(reversed_batch_b[len(batch_a):])
+
+  # We can compute the permutation of the broadcasted result that
+  # produces the result with the dimensions permuted as we do. We can then
+  # invert that permutation via an argsort.
+  result_batch_size = max(len(batch_a), len(batch_b))
+  result_permutation = [result_batch_size - 1 - x for x in reversed(
+      keep_a_dims)]
+  result_permutation.extend([result_batch_size + 1, result_batch_size + 2])
+  result_permutation.extend(
+      [result_batch_size - 1 - x for x in reversed(transpose_b_dims)])
+  result_permutation = onp.argsort(onp.array(result_permutation), axis=-1)
+
+  keep_a_dims = [len(batch_a) - 1 - x for x in reversed(keep_a_dims)]
+  keep_b_dims = [len(batch_b) - 1 - x for x in reversed(keep_b_dims)]
+  transpose_b_dims = [len(batch_b) - 1 - x for x in reversed(transpose_b_dims)]
+
+  b_batch_dims = list(reversed(b_batch_dims))
+
+  # Reshape away possible one dimensions.
+  new_a_shape = onp.take(
+      onp.array(a.shape[:-2]), onp.array(keep_a_dims, dtype=onp.int64))
+  new_a_shape = tuple(new_a_shape) + a.shape[-2:]
+  new_a = a.reshape(*new_a_shape)
+
+  new_b = jnp.transpose(
+      b, keep_b_dims + [len(b.shape) - 2, len(b.shape) - 1] + transpose_b_dims)
+  new_b_shape = onp.take(
+      onp.array(b.shape[:-2]), onp.array(keep_b_dims, dtype=onp.int64))
+  new_b_shape = tuple(new_b_shape) + (b.shape[-2], -1)
+  new_b = new_b.reshape(*new_b_shape)
+  if new_a.shape[:-2] != new_b.shape[:-2]:
+    new_b = jnp.broadcast_to(new_b, new_a.shape[:-2] + new_b.shape[-2:])
+
+  return new_a, new_b, b_batch_dims, result_permutation
+
+
+def _reshape_solve_result(result, b_batch_dims, result_permutation):
+  """Reshapes result of a solve to the original shapes."""
+  import jax.numpy as jnp  # pylint: disable=g-import-not-at-top
+  import numpy as onp  # pylint: disable=g-import-not-at-top,reimported
+
+  if b_batch_dims is None:
+    return result
+
+  new_shape = list(result.shape[:-1])
+  new_shape.append(result.shape[-1] // int(onp.prod(onp.array(b_batch_dims))))
+  new_shape.extend(b_batch_dims)
+  new_result = result.reshape(*new_shape)
+  return jnp.transpose(new_result, result_permutation)
+
+
 def _cholesky_solve(chol, rhs, name=None):  # pylint: disable=unused-argument
   """Scipy cho_solve does not broadcast, so we must do so explicitly."""
   chol = ops.convert_to_tensor(chol)
   rhs = ops.convert_to_tensor(rhs)
-  if JAX_MODE:  # But JAX uses XLA, which can do a batched solve.
-    chol = chol + np.zeros(rhs.shape[:-2] + (1, 1), dtype=chol.dtype)
-    rhs = rhs + np.zeros(chol.shape[:-2] + (1, 1), dtype=rhs.dtype)
-    return scipy_linalg.cho_solve((chol, True), rhs)
+  if JAX_MODE:
+    (chol_broadcast,
+     rhs_broadcast,
+     rhs_batch_dims,
+     result_permutation) = _create_solve_broadcastable_inputs(chol, rhs)
+    result = scipy_linalg.cho_solve((chol_broadcast, True), rhs_broadcast)
+    return _reshape_solve_result(result, rhs_batch_dims, result_permutation)
   try:
     bcast = np.broadcast(chol[..., :1], rhs)
   except ValueError as e:
@@ -286,10 +434,14 @@ def _solve(matrix, rhs, adjoint=False, name=None):  # pylint: disable=redefined-
   del name
   if adjoint:
     matrix = _matrix_transpose(matrix, conjugate=True)
-  if JAX_MODE:  # But JAX uses XLA, which can do a batched solve.
-    matrix = matrix + np.zeros(rhs.shape[:-2] + (1, 1), dtype=matrix.dtype)
-    rhs = rhs + np.zeros(matrix.shape[:-2] + (1, 1), dtype=rhs.dtype)
-    return np.linalg.solve(matrix, rhs)
+  if JAX_MODE:
+    (matrix_broadcast,
+     rhs_broadcast,
+     rhs_batch_dims,
+     result_permutation) = _create_solve_broadcastable_inputs(matrix, rhs)
+    result = np.linalg.solve(matrix_broadcast, rhs_broadcast)
+    return _reshape_solve_result(
+        result, rhs_batch_dims, result_permutation)
   try:
     bcast = np.broadcast(matrix[..., :1], rhs)
   except ValueError as e:
@@ -333,11 +485,15 @@ def _trace(x, name=None):
 def _triangular_solve(matrix, rhs, lower=True, adjoint=False, name=None):  # pylint: disable=redefined-outer-name
   """Scipy solve does not broadcast, so we must do so explicitly."""
   del name
-  if JAX_MODE:  # But JAX uses XLA, which can do a batched solve.
-    matrix = matrix + np.zeros(rhs.shape[:-2] + (1, 1), dtype=matrix.dtype)
-    rhs = rhs + np.zeros(matrix.shape[:-2] + (1, 1), dtype=rhs.dtype)
-    return scipy_linalg.solve_triangular(matrix, rhs, lower=lower,
-                                         trans='C' if adjoint else 'N')
+  if JAX_MODE:
+    (matrix_broadcast,
+     rhs_broadcast,
+     rhs_batch_dims,
+     result_permutation) = _create_solve_broadcastable_inputs(matrix, rhs)
+    result = scipy_linalg.solve_triangular(
+        matrix_broadcast, rhs_broadcast, lower=lower,
+        trans='C' if adjoint else 'N')
+    return _reshape_solve_result(result, rhs_batch_dims, result_permutation)
   try:
     bcast = np.broadcast(matrix[..., :1], rhs)
   except ValueError as e:
