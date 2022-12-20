@@ -25,7 +25,7 @@ REQUIRED_PACKAGES = [
     'decorator',
     'cloudpickle>=1.3',
     'gast>=0.3.2',  # For autobatching
-    'dm-tree',  # For NumPy/JAX backends (hence, also for prefer_static)
+    'dm-tree==0.1.7',  # For NumPy/JAX backends (hence, also for prefer_static)
 ]
 
 if __name__ == '__main__':
