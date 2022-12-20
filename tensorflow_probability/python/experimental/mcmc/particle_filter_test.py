@@ -283,7 +283,7 @@ class _ParticleFilterTest(test_util.TestCase):
       def rejuvenation_criterion_fn(_):
           return 1
 
-      rej_particles, _, _, _ = self.evaluate(
+      rej_particles, _, _, _ =\
           particle_filter.particle_filter(
               observations=observation,
               initial_state_prior=d.initial_distribution,
@@ -293,24 +293,23 @@ class _ParticleFilterTest(test_util.TestCase):
               rejuvenation_fn=rejuvenation_fn,
               num_particles=10,
               seed=stream())
-      )
-      delta_rej = tf.where(observations - rej_particles != 0, 1, 0)
 
-      nonrej_particles, _, _, _ = self.evaluate(
+      delta_rej = tf.where(observations - tf.cast(rej_particles, tf.float32) != 0, 1, 0)
+
+      nonrej_particles, _, _, _ = \
           particle_filter.particle_filter(
               observations=observation,
               initial_state_prior=d.initial_distribution,
               transition_fn=lambda _, s: categorical.Categorical(logits=tf.zeros(s.shape + tuple([10]))),
               observation_fn=lambda _, s: normal.Normal(loc=tf.cast(s, tf.float32), scale=0.3),
               num_particles=10,
-              seed=stream())
+              seed=stream()
       )
-      delta_nonrej = tf.where(observations - nonrej_particles != 0, 1, 0)
+      delta_nonrej = tf.where(observations - tf.cast(nonrej_particles, tf.float32) != 0, 1, 0)
 
       delta = tf.reduce_sum(delta_nonrej - delta_rej)
 
-      # Graph execution testing with self.valuate?
-      # self.assertEqual(self.evaluate(delta), 80)
+      self.assertAllGreaterEqual(self.evaluate(delta), 0)
 
   def test_data_driven_proposal(self):
 
