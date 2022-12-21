@@ -196,6 +196,22 @@ class _MaternTestCase(test_util.TestCase):
         [np.zeros(np.int32(grad.shape), np.float32) for grad in grads],
         self.evaluate(grads))
 
+  @test_util.numpy_disable_gradient_test
+  def testGradsofGradsAtIdenticalInputsNotNaN(self):
+    x = tf.constant(np.arange(2 * 5, dtype=np.float32).reshape(2, 5))
+    p = tf.convert_to_tensor([1., 0.1], dtype=tf.float32)
+
+    def f(p):
+      k = self._kernel_type(amplitude=p[0])
+      y = p[1] * x
+      return tf.reduce_mean(k.matrix(y, y))
+
+    def _grad_f(p):
+      return tf.math.reduce_mean(gradient.value_and_gradient(f, p)[1])
+
+    grad_of_grad = gradient.value_and_gradient(_grad_f, p)[1]
+    self.assertAllFinite(grad_of_grad)
+
 
 @test_util.test_all_tf_execution_regimes
 class GeneralizedMaternTest(_MaternTestCase):

@@ -205,7 +205,13 @@ class GeneralizedMatern(_AmplitudeLengthScaleMixin,
 
   def _apply_with_distance(
       self, x1, x2, pairwise_square_distance, example_ndims=0):
-    norm = tf.math.sqrt(pairwise_square_distance)
+    zero_distance = tf.equal(pairwise_square_distance, 0.)
+    pairwise_sq = tf.where(
+        zero_distance,
+        tf.zeros([], dtype=pairwise_square_distance.dtype),
+        pairwise_square_distance)
+    norm = tf.math.sqrt(pairwise_sq)
+    norm = tf.where(zero_distance, tf.zeros([], dtype=norm.dtype), norm)
     inverse_length_scale = self._inverse_length_scale_parameter()
     if inverse_length_scale is not None:
       inverse_length_scale = util.pad_shape_with_ones(
@@ -322,11 +328,13 @@ class MaternOneHalf(_AmplitudeLengthScaleMixin,
     # inputs should be 0 as well. Set square distances to be statically 0 to
     # ensure that gradients are 0 (and not infinity/NaN when the square root is
     # taken).
+    zero_distance = tf.equal(pairwise_square_distance, 0.)
     pairwise_sq = tf.where(
-        tf.equal(pairwise_square_distance, 0.),
+        zero_distance,
         tf.zeros([], dtype=pairwise_square_distance.dtype),
         pairwise_square_distance)
     norm = tf.math.sqrt(pairwise_sq)
+    norm = tf.where(zero_distance, tf.zeros([], dtype=norm.dtype), norm)
     inverse_length_scale = self._inverse_length_scale_parameter()
     if inverse_length_scale is not None:
       inverse_length_scale = util.pad_shape_with_ones(
@@ -403,11 +411,13 @@ class MaternThreeHalves(_AmplitudeLengthScaleMixin,
     # inputs should be 0 as well. Set square distances to be statically 0 to
     # ensure that gradients are 0 (and not infinity/NaN when the square root is
     # taken).
+    zero_distance = tf.equal(pairwise_square_distance, 0.)
     pairwise_sq = tf.where(
-        tf.equal(pairwise_square_distance, 0.),
+        zero_distance,
         tf.zeros([], dtype=pairwise_square_distance.dtype),
         pairwise_square_distance)
     norm = tf.math.sqrt(pairwise_sq)
+    norm = tf.where(zero_distance, tf.zeros([], dtype=norm.dtype), norm)
     np_dtype = dtype_util.as_numpy_dtype(norm.dtype)
     inverse_length_scale = self._inverse_length_scale_parameter()
     if inverse_length_scale is not None:
@@ -485,11 +495,13 @@ class MaternFiveHalves(_AmplitudeLengthScaleMixin,
     # inputs should be 0 as well. Set square distances to be statically 0 to
     # ensure that gradients are 0 (and not infinity/NaN when the square root is
     # taken).
+    zero_distance = tf.equal(pairwise_square_distance, 0.)
     pairwise_sq = tf.where(
-        tf.equal(pairwise_square_distance, 0.),
+        zero_distance,
         tf.zeros([], dtype=pairwise_square_distance.dtype),
         pairwise_square_distance)
     norm = tf.math.sqrt(pairwise_sq)
+    norm = tf.where(zero_distance, tf.zeros([], dtype=norm.dtype), norm)
     inverse_length_scale = self._inverse_length_scale_parameter()
     if inverse_length_scale is not None:
       inverse_length_scale = util.pad_shape_with_ones(
