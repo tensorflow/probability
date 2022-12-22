@@ -54,6 +54,10 @@ tensor_shape_pb2 = TensorShapePb2()
 def tf_export(*args, **kwargs):
   return lambda f: f
 
+
+class doc_controls:
+  do_not_doc_inheritable = lambda x: x
+
 # Copyright 2015 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -80,6 +84,7 @@ from typing import Optional, Sequence, Type
 # from tensorflow.python.platform import tf_logging as logging
 # from tensorflow.python.types import trace
 # from tensorflow.python.util.tf_export import tf_export
+# from tensorflow.tools.docs import doc_controls
 
 _TENSORSHAPE_V2_OVERRIDE = None
 
@@ -1329,6 +1334,11 @@ class TensorShape(trace.TraceType, trace_type.Serializable):
         for i, dim in enumerate(self._dims)
     ]
     return TensorShape(dims)
+
+  @doc_controls.do_not_doc_inheritable
+  def placeholder_value(self, placeholder_context=None):
+    raise NotImplementedError("A graph placeholder is not currently supported"
+                              "for an object of type: TensorShape.")
 
   @classmethod
   def experimental_type_proto(cls) -> Type[tensor_shape_pb2.TensorShapeProto]:

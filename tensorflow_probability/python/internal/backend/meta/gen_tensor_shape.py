@@ -33,6 +33,7 @@ COMMENT_OUT = [
      'import tf_logging as logging'),
     'from tensorflow.python.types import trace',
     'from tensorflow.python.util.tf_export import tf_export',
+    'from tensorflow.tools.docs import doc_controls',
 ]
 
 PREAMBLE = """
@@ -76,6 +77,10 @@ tensor_shape_pb2 = TensorShapePb2()
 
 def tf_export(*args, **kwargs):
   return lambda f: f
+
+
+class doc_controls:
+  do_not_doc_inheritable = lambda x: x
 """
 
 
