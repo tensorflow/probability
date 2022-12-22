@@ -36,8 +36,8 @@ from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math import generic
 from tensorflow_probability.python.math import gradient
+from tensorflow_probability.python.math import numeric
 from tensorflow_probability.python.math import special
-from tensorflow_probability.python.math.numeric import log1psquare
 
 
 __all__ = [
@@ -106,7 +106,8 @@ def log_prob(x, df, loc, scale):
 
   # Writing `y` this way reduces XLA mem copies.
   y = (x - loc) * (tf.math.rsqrt(df) / scale)
-  log_unnormalized_prob = -half * (df + numpy_dtype(1.)) * log1psquare(y)
+  log_unnormalized_prob = (-half * (df + numpy_dtype(1.)) *
+                           numeric.log1psquare(y))
   log_normalization = (
       tf.math.log(tf.abs(scale)) + half * tf.math.log(df) +
       special.lbeta(half, half * df))
@@ -200,7 +201,7 @@ def _stdtr_asymptotic_expansion(df, t, numpy_dtype):
       for coeffs in (coeffs1, coeffs2, coeffs3, coeffs4, coeffs5)]
 
   df_minus_half = df - numpy_dtype(0.5)
-  squared_z = df_minus_half * log1psquare(t * tf.math.rsqrt(df))
+  squared_z = df_minus_half * numeric.log1psquare(t * tf.math.rsqrt(df))
   z = tf.math.sqrt(squared_z)
   # To avoid overflow when df is huge, we manipulate b and the denominator of
   # each term of the expansion in the logarithmic space.
@@ -270,8 +271,9 @@ def _stdtr_computation(df, t):
   #   betainc(a, b, x) = 1 - betainc(b, a, 1 - x) .
 
   raw_ratio = t * tf.math.rsqrt(df)
-  ratio = tf.math.exp(-log1psquare(raw_ratio))
-  one_minus_ratio = tf.math.exp(-log1psquare(tf.math.reciprocal(raw_ratio)))
+  ratio = tf.math.exp(-numeric.log1psquare(raw_ratio))
+  one_minus_ratio = tf.math.exp(
+      -numeric.log1psquare(tf.math.reciprocal(raw_ratio)))
 
   # The maximum value for the ratio was set by experimentation.
   use_symmetry_relation = (ratio > 0.99)
@@ -364,8 +366,9 @@ def _stdtr_partials(df, t):
   abs_t_betainc = tf.where(t_is_small, min_abs_t_betainc, abs_t)
 
   raw_ratio = abs_t_betainc * tf.math.rsqrt(df)
-  ratio = tf.math.exp(-log1psquare(raw_ratio))
-  one_minus_ratio = tf.math.exp(-log1psquare(tf.math.reciprocal(raw_ratio)))
+  ratio = tf.math.exp(-numeric.log1psquare(raw_ratio))
+  one_minus_ratio = tf.math.exp(
+      -numeric.log1psquare(tf.math.reciprocal(raw_ratio)))
 
   # The maximum value for the ratio was set by experimentation.
   use_symmetry_relation = (ratio > 0.99)
@@ -982,6 +985,10 @@ class StudentT(distribution.AutoCompositeTensorDistribution):
   def _cdf(self, value):
     df = tf.convert_to_tensor(self.df)
     return cdf(value, df, self.loc, self.scale)
+
+  def _survival_function(self, value):
+    df = tf.convert_to_tensor(self.df)
+    return cdf(-value, df, -self.loc, self.scale)
 
   def _quantile(self, value):
     df = tf.convert_to_tensor(self.df)

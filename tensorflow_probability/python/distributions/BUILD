@@ -150,6 +150,7 @@ multi_substrate_py_library(
         ":truncated_cauchy",
         ":truncated_normal",
         ":two_piece_normal",
+        ":two_piece_student_t",
         ":uniform",
         ":variational_gaussian_process",
         ":von_mises",
@@ -2293,6 +2294,31 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:special_math",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math:numeric",
+        "//tensorflow_probability/python/math:special",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "two_piece_student_t",
+    srcs = ["two_piece_student_t.py"],
+    deps = [
+        ":distribution",
+        ":gamma",
+        ":student_t",
+        ":two_piece_normal",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/math:numeric",
         "//tensorflow_probability/python/math:special",
@@ -4574,6 +4600,21 @@ multi_substrate_py_test(
     shard_count = 4,
     deps = [
         ":two_piece_normal",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "two_piece_student_t_test",
+    size = "medium",
+    srcs = ["two_piece_student_t_test.py"],
+    shard_count = 10,
+    deps = [
+        ":two_piece_student_t",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,

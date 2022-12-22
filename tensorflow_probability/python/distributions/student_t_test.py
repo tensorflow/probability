@@ -109,6 +109,31 @@ class StudentTTest(test_util.TestCase):
     self.assertAllClose(expected_cdf, cdf_values, atol=0.)
     self.assertAllClose(np.exp(expected_log_cdf), cdf_values, atol=0.)
 
+  def testStudentSurvivalFunctionAndLogSurvivalFunction(self):
+    batch_size = 6
+    df = tf.constant([3.] * batch_size)
+    mu = tf.constant([7.] * batch_size)
+    sigma = tf.constant([-8.] * batch_size)
+    df_v = 3.
+    mu_v = 7.
+    sigma_v = 8.
+    t = np.array([-2.5, 2.5, 8., 0., -1., 2.], dtype=np.float32)
+    student = student_t.StudentT(df, loc=mu, scale=sigma, validate_args=True)
+
+    log_sf = student.log_survival_function(t)
+    self.assertAllEqual(log_sf.shape, (6,))
+    log_sf_values = self.evaluate(log_sf)
+    sf = student.survival_function(t)
+    self.assertAllEqual(sf.shape, (6,))
+    sf_values = self.evaluate(sf)
+
+    expected_log_sf = sp_stats.t.logsf(t, df_v, loc=mu_v, scale=sigma_v)
+    expected_sf = sp_stats.t.sf(t, df_v, loc=mu_v, scale=sigma_v)
+    self.assertAllClose(expected_log_sf, log_sf_values, atol=0.)
+    self.assertAllClose(np.log(expected_sf), log_sf_values, atol=0.)
+    self.assertAllClose(expected_sf, sf_values, atol=0.)
+    self.assertAllClose(np.exp(expected_log_sf), sf_values, atol=0.)
+
   def testStudentQuantile(self):
     # The SciPy implementation of quantile function is not very accurate. E.g.:
     #
