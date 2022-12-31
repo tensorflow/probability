@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for the unconstrained L-BFGS optimizer."""
 
-import functools
-
 from absl.testing import parameterized
 import numpy as np
 from scipy.stats import special_ortho_group
@@ -30,7 +28,6 @@ from tensorflow_probability.python.optimizer import lbfgs
 
 
 def _make_val_and_grad_fn(value_fn):
-  @functools.wraps(value_fn)
   def val_and_grad(x):
     return gradient.value_and_gradient(value_fn, x)
   return val_and_grad
