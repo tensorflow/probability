@@ -43,6 +43,10 @@ def _default_trace_fn(state, kernel_results):
           kernel_results.incremental_log_marginal_likelihood)
 
 
+def _default_extra_fn(_0, _1, _2, extra):
+  return extra
+
+
 particle_filter_arg_str = """\
 Each latent state is a `Tensor` or nested structure of `Tensor`s, as defined
 by the `initial_state_prior`.
@@ -289,7 +293,7 @@ def sequential_monte_carlo(loop_seed,
         unbiased_gradients,
         trace_fn,
         extra=None,
-        extra_fn=None,
+        extra_fn=_default_extra_fn,
         static_trace_allocation_size=None,
         never_trace=lambda *_: False,
         ):
@@ -343,8 +347,6 @@ def sequential_monte_carlo(loop_seed,
       """
     if extra == None:
         extra = tf.convert_to_tensor(np.nan)
-    if extra_fn == None:
-        extra_fn = lambda _0, _1, _2, extra: extra
 
     kernel = smc_kernel.SequentialMonteCarlo(
         propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
@@ -372,7 +374,7 @@ def sequential_monte_carlo(loop_seed,
                        extra),
         elems=tf.ones([num_timesteps]),
         trace_fn=lambda seed_state_results: trace_fn(*seed_state_results[1:]),
-        extra_fn=lambda step, extra_arrays, state, extra: extra_fn(step, extra_arrays, state, extra),
+        extra_fn=extra_fn,
         trace_criterion_fn=(
             lambda seed_state_results: trace_criterion_fn(  # pylint: disable=g-long-lambda
                 *seed_state_results[1:])),
@@ -394,7 +396,7 @@ def particle_filter(observations,
                     observation_fn,
                     num_particles,
                     extra=None,
-                    extra_fn=None,
+                    extra_fn=_default_extra_fn,
                     initial_state_proposal=None,
                     proposal_fn=None,
                     resample_fn=weighted_resampling.resample_systematic,
@@ -501,7 +503,7 @@ def particle_filter(observations,
         loop_seed=loop_seed,
         never_trace=never_trace,
         extra=extra,
-        extra_fn=extra_fn
+        extra_fn=extra_fn,
     )
 
     return traced_results

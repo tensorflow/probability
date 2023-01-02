@@ -236,7 +236,6 @@ def trace_scan(loop_fn,
                    num_steps_traced + 1, extra_one_step(num_steps_traced, extra_arrays, state, extra)),
           lambda: (trace_arrays, num_steps_traced, extra_arrays)
       )
-
       return i + 1, state, extra, num_steps_traced, trace_arrays, extra_arrays
 
     _, final_state, final_extra, _, trace_arrays, extra_arrays = tf.while_loop(
