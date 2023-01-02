@@ -241,7 +241,8 @@ def infer_trajectories(observations,
     (particles,
      log_weights,
      parent_indices,
-     incremental_log_marginal_likelihoods) = particle_filter(
+     incremental_log_marginal_likelihoods,
+     extra) = particle_filter(
          observations=observations,
          initial_state_prior=initial_state_prior,
          transition_fn=transition_fn,
@@ -288,7 +289,8 @@ def sequential_monte_carlo(loop_seed,
         unbiased_gradients,
         trace_fn,
         static_trace_allocation_size=None,
-        never_trace=lambda *_: False
+        never_trace=lambda *_: False,
+        extra=None
         ):
     """Samples a series of particles representing filtered latent states.
 
@@ -338,6 +340,9 @@ def sequential_monte_carlo(loop_seed,
           Filtering without Modifying the Forward Pass. _arXiv preprint
           arXiv:2106.10314_, 2021. https://arxiv.org/abs/2106.10314
       """
+    if extra == None:
+        extra = tf.convert_to_tensor(np.nan)
+
     kernel = smc_kernel.SequentialMonteCarlo(
         propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
         resample_fn=resample_fn,
@@ -349,20 +354,22 @@ def sequential_monte_carlo(loop_seed,
     # Use `trace_scan` rather than `sample_chain` directly because the latter
     # would force us to trace the state history (with or without thinning),
     # which is not always appropriate.
-    def seeded_one_step(seed_state_results, _):
+    def seeded_one_step(seed_state_results, extra, _):
         seed, state, results = seed_state_results
         one_step_seed, next_seed = samplers.split_seed(seed)
-        next_state, next_results = kernel.one_step(
-            state, results, seed=one_step_seed)
-        return next_seed, next_state, next_results
+        next_state, next_results, extra = kernel.one_step(
+            state, results, extra, seed=one_step_seed)
+        return (next_seed, next_state, next_results), extra
 
-    final_seed_state_result, traced_results = loop_util.trace_scan(
+    final_seed_state_result, final_extra, traced_results, traced_extra = loop_util.trace_scan(
         loop_fn=seeded_one_step,
         initial_state=(loop_seed,
                        initial_weighted_particles,
-                       kernel.bootstrap_results(initial_weighted_particles)),
+                       kernel.bootstrap_results(initial_weighted_particles),
+                       extra),
         elems=tf.ones([num_timesteps]),
         trace_fn=lambda seed_state_results: trace_fn(*seed_state_results[1:]),
+        extra_fn=lambda step, extra_arrays, state, extra: tf.cast(step, tf.float32),
         trace_criterion_fn=(
             lambda seed_state_results: trace_criterion_fn(  # pylint: disable=g-long-lambda
                 *seed_state_results[1:])),
@@ -373,7 +380,7 @@ def sequential_monte_carlo(loop_seed,
         # Return results from just the final step.
         traced_results = trace_fn(*final_seed_state_result[1:])
 
-    return traced_results
+    return (*traced_results, traced_extra['extra'])
 
 
 @docstring_util.expand_docstring(

@@ -110,6 +110,7 @@ def trace_scan(loop_fn,
                initial_state,
                elems,
                trace_fn,
+               extra_fn,
                trace_criterion_fn=None,
                static_trace_allocation_size=None,
                condition_fn=None,
@@ -163,14 +164,12 @@ def trace_scan(loop_fn,
       tf1.get_variable_scope()) as vs:
     if vs.caching_device is None and not tf.executing_eagerly():
       vs.set_caching_device(lambda op: op.device)
-
-    initial_state = tf.nest.map_structure(
+    initial_state = (tf.nest.map_structure(
         lambda x: tf.convert_to_tensor(x, name='initial_state'),
-        initial_state, expand_composites=True)
+        initial_state[:-1], expand_composites=True), initial_state[-1])
     elems = tf.convert_to_tensor(elems, name='elems')
 
     length = ps.size0(elems)
-
     # This is an TensorArray in part because of XLA, which had trouble with
     # non-statically known indices. I.e. elems[i] errored, but
     # elems_array.read(i) worked.
@@ -189,12 +188,25 @@ def trace_scan(loop_fn,
       dynamic_size, initial_size = False, length
     else:
       dynamic_size, initial_size = True, 0
+
     # Convert variables returned by trace_fn to tensors.
-    initial_trace = _convert_variables_to_tensors(trace_fn(initial_state))
+    initial_trace, extra = (_convert_variables_to_tensors(trace_fn(initial_state[0])), initial_state[1])
+
     flat_initial_trace = tf.nest.flatten(initial_trace, expand_composites=True)
+    flat_extra = tf.nest.flatten(extra, expand_composites=True)
+
     trace_arrays = []
     for trace_elt in flat_initial_trace:
       trace_arrays.append(
+          tf.TensorArray(
+              trace_elt.dtype,
+              size=initial_size,
+              dynamic_size=dynamic_size,
+              element_shape=trace_elt.shape))
+
+    extra_arrays = []
+    for trace_elt in flat_extra:
+      extra_arrays.append(
           tf.TensorArray(
               trace_elt.dtype,
               size=initial_size,
@@ -207,28 +219,39 @@ def trace_scan(loop_fn,
       return [ta.write(num_steps_traced, x) for ta, x in zip(
           trace_arrays, tf.nest.flatten(trace, expand_composites=True))]
 
-    def _body(i, state, num_steps_traced, trace_arrays):
-      elem = elems_array.read(i)
-      state = loop_fn(state, elem)
+    def extra_one_step(num_steps_traced, extra_arrays, state, extra):
+      extra = _convert_variables_to_tensors(
+          extra_fn(num_steps_traced, extra_arrays, state, extra)
+      )
+      return [ta.write(num_steps_traced, x) for ta, x in zip(
+          extra_arrays, tf.nest.flatten(extra, expand_composites=True))]
 
-      trace_arrays, num_steps_traced = ps.cond(
+    def _body(i, state, extra, num_steps_traced, trace_arrays, extra_arrays):
+      elem = elems_array.read(i)
+      (state, extra) = loop_fn(state, extra, elem)
+
+      trace_arrays, num_steps_traced, extra_arrays = ps.cond(
           trace_criterion_fn(state) if trace_criterion_fn else True,
           lambda: (trace_one_step(num_steps_traced, trace_arrays, state),  # pylint: disable=g-long-lambda
-                   num_steps_traced + 1),
-          lambda: (trace_arrays, num_steps_traced))
+                   num_steps_traced + 1, extra_one_step(num_steps_traced, extra_arrays, state, extra)),
+          lambda: (trace_arrays, num_steps_traced, extra_arrays)
+      )
 
-      return i + 1, state, num_steps_traced, trace_arrays
+      return i + 1, state, extra, num_steps_traced, trace_arrays, extra_arrays
 
-    _, final_state, _, trace_arrays = tf.while_loop(
+    _, final_state, final_extra, _, trace_arrays, extra_arrays = tf.while_loop(
         cond=condition_fn if condition_fn is not None else lambda *_: True,
         body=_body,
-        loop_vars=(0, initial_state, 0, trace_arrays),
+        loop_vars=(0, initial_state[0], extra, 0, trace_arrays, extra_arrays),
         maximum_iterations=length,
         parallel_iterations=parallel_iterations)
 
     # unflatten
     stacked_trace = tf.nest.pack_sequence_as(
         initial_trace, [ta.stack() for ta in trace_arrays],
+        expand_composites=True)
+    stacked_extra = tf.nest.pack_sequence_as(
+        extra, [ta.stack() for ta in extra_arrays],
         expand_composites=True)
 
     # Restore the static length if we know it.
@@ -240,4 +263,8 @@ def trace_scan(loop_fn,
 
     stacked_trace = tf.nest.map_structure(
         _merge_static_length, stacked_trace, expand_composites=True)
-    return final_state, stacked_trace
+    stacked_extra = tf.nest.map_structure(
+        _merge_static_length, stacked_extra, expand_composites=True)
+    stacked_extra = dict(extra=stacked_extra)
+
+    return final_state, final_extra, stacked_trace, stacked_extra
