@@ -43,7 +43,7 @@ def _default_trace_fn(state, kernel_results):
           kernel_results.incremental_log_marginal_likelihood)
 
 
-def _default_extra_fn(_0, _1, _2, extra):
+def _default_extra_fn(a, b, c, extra):
   return extra
 
 
@@ -346,7 +346,9 @@ def sequential_monte_carlo(loop_seed,
           arXiv:2106.10314_, 2021. https://arxiv.org/abs/2106.10314
       """
     if extra == None:
-        extra = tf.convert_to_tensor(np.nan)
+        extra = tf.convert_to_tensor([np.nan] * ps.size0(initial_weighted_particles.particles))
+    else:
+        extra = tf.repeat(extra, repeats=[ps.size0(initial_weighted_particles.particles)], axis=0)
 
     kernel = smc_kernel.SequentialMonteCarlo(
         propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
@@ -384,6 +386,8 @@ def sequential_monte_carlo(loop_seed,
     if trace_criterion_fn is never_trace:
         # Return results from just the final step.
         traced_results = trace_fn(*final_seed_state_result[1:])
+    if trace_fn == _default_extra_fn:
+        None
 
     return (*traced_results, traced_extra['extra'])
 

@@ -223,6 +223,10 @@ def trace_scan(loop_fn,
       extra = _convert_variables_to_tensors(
           extra_fn(num_steps_traced, extra_arrays, state, extra)
       )
+
+      if ps.size0(extra) == 0:
+          extra = tf.repeat(extra, repeats=ps.size0(state[1][0]), axis=0)
+
       return [ta.write(num_steps_traced, x) for ta, x in zip(
           extra_arrays, tf.nest.flatten(extra, expand_composites=True))]
 
@@ -265,5 +269,6 @@ def trace_scan(loop_fn,
     stacked_extra = tf.nest.map_structure(
         _merge_static_length, stacked_extra, expand_composites=True)
     stacked_extra = dict(extra=stacked_extra)
+
 
     return final_state, final_extra, stacked_trace, stacked_extra
