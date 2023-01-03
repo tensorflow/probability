@@ -359,9 +359,7 @@ class DynamicSpikeSlabSampler:
         previous_observation_noise_variance, dtype=self.dtype)
     feature_sweep_seed, resample_seed = samplers.split_seed(seed, n=2)
     initial_state = self._initialize_sampler_state(
-        targets=targets,
-        observation_noise_variance=previous_observation_noise_variance,
-        nonzeros=initial_nonzeros)
+        targets=targets, nonzeros=initial_nonzeros)
     # Loop over the features to update their sparsity indicators.
     final_state = self._resample_all_features(
         initial_state, seed=feature_sweep_seed)
@@ -369,8 +367,7 @@ class DynamicSpikeSlabSampler:
     return self._get_conditional_posterior(final_state).sample(
         seed=resample_seed)
 
-  def _initialize_sampler_state(self, targets, nonzeros,
-                                observation_noise_variance):
+  def _initialize_sampler_state(self, targets, nonzeros):
     """Precompute quantities needed to sample with given targets.
 
     This method computes a sampler state (including factorized precision
@@ -383,8 +380,6 @@ class DynamicSpikeSlabSampler:
     Args:
       targets: float Tensor regression outputs of shape `[num_outputs]`.
       nonzeros: boolean Tensor vectors of shape `[num_features]`.
-      observation_noise_variance: float Tensor of to scale the posterior
-        precision.
 
     Returns:
       sampler_state: instance of `DynamicSpikeSlabSamplerState` collecting
@@ -399,7 +394,8 @@ class DynamicSpikeSlabSampler:
       x_transpose_y = tf.linalg.matvec(
           self.design_matrix, targets, adjoint_a=True)
 
-      weights_posterior_precision = self.x_transpose_x + self.weights_prior_precision * observation_noise_variance
+      weights_posterior_precision = (
+          self.x_transpose_x + self.weights_prior_precision)
       y_transpose_y = tf.reduce_sum(targets**2, axis=-1)
       conditional_prior_precision_chol = tf.linalg.cholesky(
           tf.gather(
