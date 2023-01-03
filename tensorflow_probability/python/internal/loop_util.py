@@ -257,6 +257,7 @@ def trace_scan(loop_fn,
         extra, [ta.stack() for ta in extra_arrays],
         expand_composites=True)
 
+    # Stack trace and extra
     if isinstance(stacked_trace, tuple):
         if isinstance(stacked_trace, dict):
             stacked_trace[0]['extra'] = stacked_extra
@@ -274,6 +275,5 @@ def trace_scan(loop_fn,
 
     stacked_trace = tf.nest.map_structure(
         _merge_static_length, stacked_trace, expand_composites=True)
-
 
     return final_state, final_extra, stacked_trace
