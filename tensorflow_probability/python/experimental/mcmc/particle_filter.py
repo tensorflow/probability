@@ -475,6 +475,7 @@ def particle_filter(observations,
         initial_state_proposal=initial_state_proposal,
         num_particles=num_particles,
         seed=init_seed)
+
     propose_and_update_log_weights_fn = (
         _particle_filter_propose_and_update_log_weights_fn(
             observations=observations,

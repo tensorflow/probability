@@ -62,6 +62,7 @@ class _ParticleFilterTest(test_util.TestCase):
             transition_fn=lambda _, state: normal.Normal(state, 1.),
             observation_fn=lambda _, state: normal.Normal(state, 1.),
             num_particles=1024,
+            trace_fn=trace_fn,
             seed=test_util.test_seed()))
 
 
