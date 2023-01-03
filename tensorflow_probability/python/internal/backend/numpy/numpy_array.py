@@ -259,9 +259,9 @@ def _range(start, limit=None, delta=1, dtype=None, name='range'):  # pylint: dis
   delta = onp.array(delta, dtype=infer_dtype(delta))
   if dtype is None:
     dtype_hierarchy = [np.int32, np.int64, np.float32, np.float64]
-    inferred_dtype = max([arg.dtype for arg in [start, limit, delta]
-                          if arg is not None],
-                         key=dtype_hierarchy.index)
+    inferred_dtype = max(
+        (arg.dtype for arg in (start, limit, delta) if arg is not None),
+        key=dtype_hierarchy.index)
   else:
     inferred_dtype = dtype
   return np.arange(start, limit, delta).astype(inferred_dtype)

@@ -195,8 +195,8 @@ def sum_mvns(distributions):
         for mvn in distributions
     ]):
       return mvn_diag.MultivariateNormalDiag(
-          loc=sum([mvn.mean() for mvn in distributions]),
-          scale_diag=tf.sqrt(sum([mvn.scale.diag**2 for mvn in distributions])))
+          loc=sum(mvn.mean() for mvn in distributions),
+          scale_diag=tf.sqrt(sum(mvn.scale.diag**2 for mvn in distributions)))
     else:
       raise NotImplementedError(
           'Sums of distributions other than MultivariateNormalDiag are not '

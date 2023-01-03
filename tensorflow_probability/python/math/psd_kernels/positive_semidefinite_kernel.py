@@ -1337,15 +1337,15 @@ class _NonCompositeTensorSumKernel(PositiveSemidefiniteKernel):
     return self._kernels
 
   def _apply(self, x1, x2, example_ndims=0):
-    return sum([k.apply(x1, x2, example_ndims) for k in self.kernels])
+    return sum(k.apply(x1, x2, example_ndims) for k in self.kernels)
 
   def _matrix(self, x1, x2):
-    return sum([k.matrix(x1, x2) for k in self.kernels])
+    return sum(k.matrix(x1, x2) for k in self.kernels)
 
   def _tensor(self, x1, x2, x1_example_ndims, x2_example_ndims):
-    return sum([
+    return sum(
         k.tensor(
-            x1, x2, x1_example_ndims, x2_example_ndims) for k in self.kernels])
+            x1, x2, x1_example_ndims, x2_example_ndims) for k in self.kernels)
 
   def _batch_shape(self):
     return functools.reduce(tf.broadcast_static_shape,
