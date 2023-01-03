@@ -65,7 +65,6 @@ class _ParticleFilterTest(test_util.TestCase):
             trace_fn=trace_fn,
             seed=test_util.test_seed()))
 
-
     # # Verify that posterior means are increasing.
     # self.assertAllGreater(results['mean'][1:] - results['mean'][:-1], 0.)
     #
