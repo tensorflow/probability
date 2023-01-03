@@ -596,6 +596,43 @@ class _ParticleFilterTest(test_util.TestCase):
           run_filter(transition_fn=valid_transition_fn,
                      proposal_fn=transition_fn_no_batch_shape))
 
+  def test_extra(self):
+      num_particles = 3
+      observations = tf.convert_to_tensor([1., 3., 5., 7., 9.])
+      _, _, _, _, extra = self.evaluate(
+          particle_filter.particle_filter(
+              observations=observations,
+              initial_state_prior=normal.Normal(0., 1.),
+              transition_fn=lambda _, state: normal.Normal(state, 1.),
+              observation_fn=lambda _, state: normal.Normal(state, 1.),
+              num_particles=num_particles,
+              seed=test_util.test_seed())
+      )
+      self.assertEqual(len(extra), observations.shape)
+      self.assertEqual(len(extra[0]), num_particles)
+
+      def remember_step_count(step, _0, _1, _2):
+          return tf.cast(step, dtype=tf.float32)
+
+      _, _, _, _, extra = self.evaluate(
+          particle_filter.particle_filter(
+              observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
+              initial_state_prior=normal.Normal(0., 1.),
+              transition_fn=lambda _, state: normal.Normal(state, 1.),
+              observation_fn=lambda _, state: normal.Normal(state, 1.),
+              extra_fn=remember_step_count,
+              num_particles=num_particles,
+              seed=test_util.test_seed())
+      )
+      steps = tf.constant([0, 1, 2, 3, 4], dtype=tf.int32)
+      particles_steps = tf.transpose(
+          tf.reshape(tf.tile(steps, tf.constant([num_particles])),
+                     [tf.constant([num_particles])[0], tf.shape(steps)[0]])
+      )
+      self.assertAllEqual(self.evaluate(steps), self.evaluate(particles_steps[:, 0]))
+      self.assertAllEqual(self.evaluate(steps), self.evaluate(particles_steps[:, 1]))
+      self.assertAllEqual(self.evaluate(steps), self.evaluate(particles_steps[:, 2]))
+
   @test_util.jax_disable_test_missing_functionality('Gradient of while_loop.')
   def test_marginal_likelihood_gradients_are_defined(self):
 

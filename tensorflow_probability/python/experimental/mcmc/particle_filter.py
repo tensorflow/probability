@@ -292,7 +292,6 @@ def sequential_monte_carlo(loop_seed,
         rejuvenation_criterion_fn,
         unbiased_gradients,
         trace_fn,
-        extra=None,
         extra_fn=_default_extra_fn,
         static_trace_allocation_size=None,
         never_trace=lambda *_: False,
@@ -345,10 +344,7 @@ def sequential_monte_carlo(loop_seed,
           Filtering without Modifying the Forward Pass. _arXiv preprint
           arXiv:2106.10314_, 2021. https://arxiv.org/abs/2106.10314
       """
-    if extra == None:
-        extra = tf.convert_to_tensor([np.nan] * ps.size0(initial_weighted_particles.particles))
-    else:
-        extra = tf.repeat(extra, repeats=[ps.size0(initial_weighted_particles.particles)], axis=0)
+    initial_extra = tf.repeat(np.nan, repeats=[ps.size0(initial_weighted_particles.particles)], axis=0)
 
     kernel = smc_kernel.SequentialMonteCarlo(
         propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
@@ -373,7 +369,7 @@ def sequential_monte_carlo(loop_seed,
         initial_state=(loop_seed,
                        initial_weighted_particles,
                        kernel.bootstrap_results(initial_weighted_particles),
-                       extra),
+                       initial_extra),
         elems=tf.ones([num_timesteps]),
         trace_fn=lambda seed_state_results: trace_fn(*seed_state_results[1:]),
         extra_fn=extra_fn,
@@ -386,8 +382,6 @@ def sequential_monte_carlo(loop_seed,
     if trace_criterion_fn is never_trace:
         # Return results from just the final step.
         traced_results = trace_fn(*final_seed_state_result[1:])
-    if trace_fn == _default_extra_fn:
-        None
 
     return (*traced_results, traced_extra['extra'])
 
@@ -399,7 +393,6 @@ def particle_filter(observations,
                     transition_fn,
                     observation_fn,
                     num_particles,
-                    extra=None,
                     extra_fn=_default_extra_fn,
                     initial_state_proposal=None,
                     proposal_fn=None,
@@ -463,7 +456,6 @@ def particle_filter(observations,
       Filtering without Modifying the Forward Pass. _arXiv preprint
       arXiv:2106.10314_, 2021. https://arxiv.org/abs/2106.10314
   """
-
   init_seed, loop_seed = samplers.split_seed(seed, salt='particle_filter')
   with tf.name_scope(name or 'particle_filter'):
     num_observation_steps = ps.size0(tf.nest.flatten(observations)[0])
@@ -506,7 +498,6 @@ def particle_filter(observations,
         trace_fn=trace_fn,
         loop_seed=loop_seed,
         never_trace=never_trace,
-        extra=extra,
         extra_fn=extra_fn,
     )
 
