@@ -124,13 +124,9 @@ class WithReductionsTest(test_util.TestCase):
     new_sample, kernel_results = self.evaluate([
         new_sample, kernel_results])
 
-    self.assertEqual(
-        2, len(kernel_results.reduction_results[0]))
-    self.assertEqual(
-        1, len(kernel_results.reduction_results[1]))
-    self.assertEqual(
-        (2,),
-        np.array(kernel_results.reduction_results).shape)
+    self.assertLen(kernel_results.reduction_results, 2)
+    self.assertLen(kernel_results.reduction_results[0], 2)
+    self.assertLen(kernel_results.reduction_results[1], 1)
 
     self.assertAllEqual(
         [[1, 1], [1]],
@@ -154,15 +150,9 @@ class WithReductionsTest(test_util.TestCase):
     new_sample, kernel_results = self.evaluate([
         new_sample, kernel_results])
 
-    self.assertEqual(
-        2,
-        len(kernel_results.reduction_results[0]))
-    self.assertEqual(
-        1,
-        len(kernel_results.reduction_results[1]))
-    self.assertEqual(
-        (2,),
-        np.array(kernel_results.reduction_results).shape)
+    self.assertLen(kernel_results.reduction_results, 2)
+    self.assertLen(kernel_results.reduction_results[0], 2)
+    self.assertLen(kernel_results.reduction_results[1], 1)
 
     self.assertAllEqualNested(
         kernel_results.reduction_results,
@@ -422,9 +412,9 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         mean_reducer.finalize(
             kernel_results.reduction_results[0][0])
         ])
-    self.assertEqual(2, len(kernel_results.reduction_results))
-    self.assertEqual(2, len(kernel_results.reduction_results[0]))
-    self.assertEqual(1, len(kernel_results.reduction_results[1]))
+    self.assertLen(kernel_results.reduction_results, 2)
+    self.assertLen(kernel_results.reduction_results[0], 2)
+    self.assertLen(kernel_results.reduction_results[1], 1)
 
     self.assertEqual(3.5, final_mean)
     self.assertAllEqual(

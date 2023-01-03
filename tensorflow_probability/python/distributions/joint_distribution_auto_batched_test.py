@@ -98,8 +98,8 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
 
     # Properties `event_shape` and `batch_shape` should be defined
     # even before any sampling calls have occurred.
-    self.assertAllEqual(joint._model_flatten(joint.event_shape),
-                        [[], [], [20], [20]])
+    self.assertAllEqualNested(joint._model_flatten(joint.event_shape),
+                              [[], [], [20], [20]])
     self.assertAllEqual(joint.batch_shape, [])
 
     is_scalar = joint._model_flatten(joint.is_scalar_event())
@@ -178,8 +178,8 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
 
     joint = jd_class(models[jd_class], batch_ndims=1, validate_args=True)
 
-    self.assertAllEqual(joint._model_flatten(joint.event_shape),
-                        [[], [], [20], [20]])
+    self.assertAllEqualNested(joint._model_flatten(joint.event_shape),
+                              [[], [], [20], [20]])
     self.assertAllEqual(joint.batch_shape, [2])
 
     is_scalar = joint._model_flatten(joint.is_scalar_event())
@@ -301,7 +301,7 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     # performance wins when evaluating a shared value over multiple models.
     jda_broadcasting = jda_class(jd_auto_models[jda_class], batch_ndims=1)
 
-    self.assertAllEqual(
+    self.assertAllEqualNested(
         jda_broadcasting._model_flatten(jda_broadcasting.event_shape),
         [[], []])
     self.assertAllEqual(jda_broadcasting.batch_shape, [5])
