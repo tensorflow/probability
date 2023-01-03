@@ -257,6 +257,14 @@ def trace_scan(loop_fn,
         extra, [ta.stack() for ta in extra_arrays],
         expand_composites=True)
 
+    if isinstance(stacked_trace, tuple):
+        if isinstance(stacked_trace, dict):
+            stacked_trace[0]['extra'] = stacked_extra
+        else:
+            stacked_trace = (*stacked_trace, stacked_extra)
+    else:
+        stacked_trace['extra'] = stacked_extra
+
     # Restore the static length if we know it.
     static_length = tf.TensorShape(None if dynamic_size else initial_size)
 
@@ -266,8 +274,6 @@ def trace_scan(loop_fn,
 
     stacked_trace = tf.nest.map_structure(
         _merge_static_length, stacked_trace, expand_composites=True)
-    stacked_extra = tf.nest.map_structure(
-        _merge_static_length, stacked_extra, expand_composites=True)
-    stacked_extra = dict(extra=stacked_extra)
 
-    return final_state, final_extra, stacked_trace, stacked_extra
+
+    return final_state, final_extra, stacked_trace
