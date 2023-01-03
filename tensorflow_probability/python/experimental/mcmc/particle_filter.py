@@ -364,7 +364,7 @@ def sequential_monte_carlo(loop_seed,
             state, results, extra, seed=one_step_seed)
         return (next_seed, next_state, next_results), extra
 
-    final_seed_state_result, final_extra, traced_results = loop_util.trace_scan(
+    final_seed_state_result, traced_results = loop_util.trace_scan(
         loop_fn=seeded_one_step,
         initial_state=(loop_seed,
                        initial_weighted_particles,

@@ -242,7 +242,7 @@ def trace_scan(loop_fn,
       )
       return i + 1, state, extra, num_steps_traced, trace_arrays, extra_arrays
 
-    _, final_state, final_extra, _, trace_arrays, extra_arrays = tf.while_loop(
+    _, final_state, _, _, trace_arrays, extra_arrays = tf.while_loop(
         cond=condition_fn if condition_fn is not None else lambda *_: True,
         body=_body,
         loop_vars=(0, initial_state[0], extra, 0, trace_arrays, extra_arrays),
@@ -276,4 +276,4 @@ def trace_scan(loop_fn,
     stacked_trace = tf.nest.map_structure(
         _merge_static_length, stacked_trace, expand_composites=True)
 
-    return final_state, final_extra, stacked_trace
+    return final_state, stacked_trace
