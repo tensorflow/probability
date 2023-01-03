@@ -19,9 +19,6 @@
 # Pickle collected data for later comparisons.
 persistent=no
 
-# Set the cache size for astng objects.
-cache-size=500
-
 # Ignore Py3 files
 ignore=get_references_web.py,get_references_web_single_group.py
 
@@ -31,16 +28,8 @@ ignore=get_references_web.py,get_references_web_single_group.py
 # Set the output format.
 # output-format=sorted-text
 
-# Put messages in a separate file for each module / package specified on the
-# command line instead of printing them on stdout. Reports (if any) will be
-# written in a file name "pylint_global.[txt|html]".
-files-output=no
-
 # Tells whether to display a full report or only the messages.
 reports=no
-
-# Disable the report(s) with the given id(s).
-disable-report=R0001,R0002,R0003,R0004,R0101,R0102,R0201,R0202,R0220,R0401,R0402,R0701,R0801,R0901,R0902,R0903,R0904,R0911,R0912,R0913,R0914,R0915,R0921,R0922,R0923
 
 # Error message template (continued on second line)
 msg-template={msg_id}:{line:3} {obj}: {msg} [{symbol}]
@@ -51,12 +40,74 @@ msg-template={msg_id}:{line:3} {obj}: {msg} [{symbol}]
 enable=indexing-exception,old-raise-syntax
 
 # List of checkers and warnings to disable.
-disable=design,similarities,no-self-use,attribute-defined-outside-init,locally-disabled,star-args,pointless-except,bad-option-value,global-statement,fixme,suppressed-message,useless-suppression,locally-enabled,file-ignored,multiple-imports,c-extension-no-member,trailing-newlines,unsubscriptable-object,misplaced-comparison-constant,no-member,abstract-method,no-else-return,missing-docstring,wrong-import-order,protected-access,inconsistent-return-statements,invalid-unary-operand-type,import-error,no-name-in-module,arguments-differ,not-context-manager,unused-argument,redefined-argument-from-local,ungrouped-imports,deprecated-method,useless-object-inheritance,trailing-comma-tuple,consider-using-ternary,signature-differs,unnecessary-pass,consider-merging-isinstance,consider-using-dict-comprehension,bad-mcs-classmethod-argument,too-many-function-args,wrong-import-position,consider-using-set-comprehension,no-value-for-parameter,consider-using-enumerate,simplifiable-if-expression,len-as-condition,assignment-from-no-return,not-an-iterable,super-init-not-called,consider-using-in,raise-missing-from,super-with-arguments
+disable=design,
+        similarities,
+        no-self-use,
+        attribute-defined-outside-init,
+        locally-disabled,
+        star-args,
+        pointless-except,
+        bad-option-value,
+        global-statement,
+        fixme,
+        suppressed-message,
+        useless-suppression,
+        locally-enabled,
+        file-ignored,
+        multiple-imports,
+        c-extension-no-member,
+        trailing-newlines,
+        unsubscriptable-object,
+        misplaced-comparison-constant,
+        no-member,
+        abstract-method,
+        no-else-return,
+        missing-docstring,
+        wrong-import-order,
+        protected-access,
+        inconsistent-return-statements,
+        invalid-unary-operand-type,
+        import-error,
+        no-name-in-module,
+        arguments-differ,
+        not-context-manager,
+        unused-argument,
+        redefined-argument-from-local,
+        ungrouped-imports,
+        deprecated-method,
+        useless-object-inheritance,
+        trailing-comma-tuple,
+        consider-using-ternary,
+        signature-differs,
+        unnecessary-pass,
+        consider-merging-isinstance,
+        consider-using-dict-comprehension,
+        bad-mcs-classmethod-argument,
+        too-many-function-args,
+        wrong-import-position,
+        consider-using-set-comprehension,
+        no-value-for-parameter,
+        consider-using-enumerate,
+        simplifiable-if-expression,
+        len-as-condition,
+        assignment-from-no-return,
+        not-an-iterable,
+        super-init-not-called,
+        consider-using-in,
+        raise-missing-from,
+        super-with-arguments,
+        consider-using-f-string,
+        arguments-renamed,
+        unnecessary-lambda-assignment,
+        unbalanced-tuple-unpacking,
+        import-outside-toplevel,
+        cyclic-import,
+        no-else-raise,
+        use-a-generator,
+        consider-using-get,
+        use-dict-literal
 
 [BASIC]
-
-# Required attributes for module, separated by a comma
-required-attributes=
 
 # Regular expression which should only match the name
 # of functions or classes which do not require a docstring.
@@ -118,9 +169,6 @@ good-names=main,_
 
 # Bad variable names which should always be refused, separated by a comma
 bad-names=
-
-# List of builtins function names that should not be used, separated by a comma
-bad-functions=input,apply,reduce
 
 # List of decorators that define properties, such as abc.abstractproperty.
 property-classes=abc.abstractproperty
@@ -200,10 +248,6 @@ indent-string='  '
 #   if test: stmt
 single-line-if-stmt=y
 
-# Make sure : in dicts and trailing commas are checked for whitespace.
-no-space-check=
-
-
 [LOGGING]
 
 # Add logging modules.
@@ -214,20 +258,6 @@ logging-modules=logging,absl.logging
 
 # List of note tags to take in consideration, separated by a comma.
 notes=
-
-
-# Maximum line length for lambdas
-short-func-length=1
-
-# List of module members that should be marked as deprecated.
-# All of the string functions are listed in 4.1.4 Deprecated string functions
-# in the Python 2.4 docs.
-deprecated-members=string.atof,string.atoi,string.atol,string.capitalize,string.expandtabs,string.find,string.rfind,string.index,string.rindex,string.count,string.lower,string.split,string.rsplit,string.splitfields,string.join,string.joinfields,string.lstrip,string.rstrip,string.strip,string.swapcase,string.translate,string.upper,string.ljust,string.rjust,string.center,string.zfill,string.replace,sys.exitfunc,sys.maxint
-
-
-# List of exceptions that do not need to be mentioned in the Raises section of
-# a docstring.
-ignore-exceptions=AssertionError,NotImplementedError,StopIteration,TypeError
 
 
 # Number of spaces of indent required when the last token on the preceding line
