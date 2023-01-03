@@ -382,7 +382,7 @@ def sequential_monte_carlo(loop_seed,
     if trace_criterion_fn is never_trace:
         # Return results from just the final step.
         traced_results = trace_fn(*final_seed_state_result[1:])
-
+    print(traced_results)
     return (*traced_results, traced_extra['extra'])
 
 

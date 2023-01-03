@@ -270,5 +270,4 @@ def trace_scan(loop_fn,
         _merge_static_length, stacked_extra, expand_composites=True)
     stacked_extra = dict(extra=stacked_extra)
 
-
     return final_state, final_extra, stacked_trace, stacked_extra
