@@ -26,12 +26,17 @@ import hypothesis as hp
 import hypothesis.extra.numpy as hnp
 import hypothesis.strategies as hps
 import mock
-import numpy as np  # Rewritten by script to import jax.numpy
-import numpy as onp  # pylint: disable=reimported
-import scipy.special as scipy_special
 import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
+
+# NOTE: As of Jan 4, 2022, TensorFlow must be imported before JAX to avoid
+# TensorFlow crashing when imported (when using tf-nightly).
+#
+# pylint: disable=g-bad-import-order
+import numpy as np  # Rewritten by script to import jax.numpy
+import numpy as onp  # pylint: disable=reimported
+import scipy.special as scipy_special
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
