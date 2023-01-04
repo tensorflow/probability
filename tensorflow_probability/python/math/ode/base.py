@@ -544,7 +544,8 @@ class Results(
 class Diagnostics(object):
   """Diagnostics returned by a Solver."""
 
-  @abc.abstractproperty
+  @property
+  @abc.abstractmethod
   def num_ode_fn_evaluations(self):
     """Number of function evaluations.
 
@@ -554,7 +555,8 @@ class Diagnostics(object):
     """
     pass
 
-  @abc.abstractproperty
+  @property
+  @abc.abstractmethod
   def num_jacobian_evaluations(self):
     """Number of Jacobian evaluations.
 
@@ -564,7 +566,8 @@ class Diagnostics(object):
     """
     pass
 
-  @abc.abstractproperty
+  @property
+  @abc.abstractmethod
   def num_matrix_factorizations(self):
     """Number of matrix factorizations.
 
@@ -574,7 +577,8 @@ class Diagnostics(object):
     """
     pass
 
-  @abc.abstractproperty
+  @property
+  @abc.abstractmethod
   def status(self):
     """Completion status.
 
