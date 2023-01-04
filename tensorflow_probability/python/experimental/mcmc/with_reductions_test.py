@@ -128,7 +128,7 @@ class WithReductionsTest(test_util.TestCase):
     self.assertLen(kernel_results.reduction_results[0], 2)
     self.assertLen(kernel_results.reduction_results[1], 1)
 
-    self.assertAllEqual(
+    self.assertAllEqualNested(
         [[1, 1], [1]],
         kernel_results.reduction_results)
     self.assertEqual(1, new_sample)

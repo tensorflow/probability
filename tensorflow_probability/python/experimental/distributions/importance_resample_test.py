@@ -157,7 +157,8 @@ class ImportanceResampleTest(test_util.TestCase):
     resampled = importance_resample.ImportanceResample(
         proposal, target_log_prob_fn=target.log_prob, importance_sample_size=5)
     self.assertAllEqual(resampled.dtype, proposal.dtype)
-    self.assertAllEqual(resampled.event_shape, proposal.event_shape)
+    self.assertAllEqualNested(
+        list(resampled.event_shape), list(proposal.event_shape))
 
     seed = test_util.test_seed(sampler_type='stateless')
     x = self.evaluate(resampled.sample(2, seed=seed))

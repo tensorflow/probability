@@ -706,12 +706,12 @@ class JointDistributionSequentialTest(test_util.TestCase):
 
     # test event shapes
     event_shapes = [[2, None], [2], [4]]
-    self.assertAllEqual(
+    self.assertAllEqualNested(
         [shape.as_list()
          for shape in joint_bijector.forward_event_shape(event_shapes)],
         [bijectors[i].forward_event_shape(event_shapes[i]).as_list()
          for i in range(3)])
-    self.assertAllEqual(
+    self.assertAllEqualNested(
         [shape.as_list()
          for shape in joint_bijector.inverse_event_shape(event_shapes)],
         [bijectors[i].inverse_event_shape(event_shapes[i]).as_list()
