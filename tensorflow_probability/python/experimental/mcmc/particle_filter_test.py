@@ -261,9 +261,15 @@ class _ParticleFilterTest(test_util.TestCase):
             num_particles=1024,
             seed=test_util.test_seed())
     )
-    self.assertLen(extra, 1024)
+    self.assertLen(extra, 5)
+    self.assertLen(extra[0], 1024)
     self.assertLen(extra[1], 1024)
     self.assertLen(extra[2], 1024)
+    self.assertLen(extra[3], 1024)
+    self.assertAllEqual(extra[0, :], tf.repeat(tf.constant(0), 1024))
+    self.assertAllEqual(extra[1, :], tf.repeat(tf.constant(1), 1024))
+    self.assertAllEqual(extra[2, :], tf.repeat(tf.constant(2), 1024))
+    self.assertAllEqual(extra[3, :], tf.repeat(tf.constant(3), 1024))
 
   def test_epidemiological_model(self):
     # A toy, discrete version of an SIR (Susceptible, Infected, Recovered)
