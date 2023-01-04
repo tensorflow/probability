@@ -344,8 +344,6 @@ def sequential_monte_carlo(loop_seed,
           Filtering without Modifying the Forward Pass. _arXiv preprint
           arXiv:2106.10314_, 2021. https://arxiv.org/abs/2106.10314
       """
-    initial_extra = tf.repeat(np.nan, repeats=[ps.size0(initial_weighted_particles.particles)], axis=0)
-
     kernel = smc_kernel.SequentialMonteCarlo(
         propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
         resample_fn=resample_fn,
@@ -364,12 +362,11 @@ def sequential_monte_carlo(loop_seed,
             state, results, extra, seed=one_step_seed)
         return (next_seed, next_state, next_results), extra
 
-    final_seed_state_result, traced_results = loop_util.trace_scan(
+    final_seed_state_result, final_extra, traced_results = loop_util.trace_scan(
         loop_fn=seeded_one_step,
         initial_state=(loop_seed,
                        initial_weighted_particles,
-                       kernel.bootstrap_results(initial_weighted_particles),
-                       initial_extra),
+                       kernel.bootstrap_results(initial_weighted_particles)),
         elems=tf.ones([num_timesteps]),
         trace_fn=lambda seed_state_results: trace_fn(*seed_state_results[1:]),
         extra_fn=extra_fn,
@@ -381,7 +378,8 @@ def sequential_monte_carlo(loop_seed,
 
     if trace_criterion_fn is never_trace:
         # Return results from just the final step.
-        traced_results = trace_fn(*final_seed_state_result[1:])
+        traced_results = (*trace_fn(*final_seed_state_result[1:]),
+                          extra_fn(0, 0, 0, final_extra))
 
     return traced_results
 

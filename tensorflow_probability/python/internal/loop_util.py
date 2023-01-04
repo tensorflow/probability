@@ -164,9 +164,16 @@ def trace_scan(loop_fn,
       tf1.get_variable_scope()) as vs:
     if vs.caching_device is None and not tf.executing_eagerly():
       vs.set_caching_device(lambda op: op.device)
+
+    if isinstance(initial_state[1].particles, dict):
+        key = list(initial_state[1].particles.keys())[0]
+        initial_extra = tf.constant(np.nan, shape=initial_state[1].particles[key].shape)
+    else:
+        initial_extra = tf.constant(np.nan, shape=initial_state[1].particles.shape)
+
     initial_state = (tf.nest.map_structure(
         lambda x: tf.convert_to_tensor(x, name='initial_state'),
-        initial_state[:-1], expand_composites=True), initial_state[-1])
+        initial_state, expand_composites=True), initial_extra)
     elems = tf.convert_to_tensor(elems, name='elems')
 
     length = ps.size0(elems)
@@ -242,7 +249,7 @@ def trace_scan(loop_fn,
       )
       return i + 1, state, extra, num_steps_traced, trace_arrays, extra_arrays
 
-    _, final_state, _, _, trace_arrays, extra_arrays = tf.while_loop(
+    _, final_state, final_extra, _, trace_arrays, extra_arrays = tf.while_loop(
         cond=condition_fn if condition_fn is not None else lambda *_: True,
         body=_body,
         loop_vars=(0, initial_state[0], extra, 0, trace_arrays, extra_arrays),
@@ -276,4 +283,4 @@ def trace_scan(loop_fn,
     stacked_trace = tf.nest.map_structure(
         _merge_static_length, stacked_trace, expand_composites=True)
 
-    return final_state, stacked_trace
+    return final_state, final_extra, stacked_trace
