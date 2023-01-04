@@ -195,7 +195,6 @@ def trace_scan(loop_fn,
       dynamic_size, initial_size = False, length
     else:
       dynamic_size, initial_size = True, 0
-
     # Convert variables returned by trace_fn to tensors.
     initial_trace, extra = (_convert_variables_to_tensors(trace_fn(initial_state[0])), initial_state[1])
 
@@ -282,5 +281,4 @@ def trace_scan(loop_fn,
 
     stacked_trace = tf.nest.map_structure(
         _merge_static_length, stacked_trace, expand_composites=True)
-
     return final_state, final_extra, stacked_trace

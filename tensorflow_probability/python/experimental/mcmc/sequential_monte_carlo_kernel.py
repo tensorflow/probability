@@ -337,11 +337,9 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
             target_log_weights=(normalized_log_weights
                                 if self.unbiased_gradients else None),
             seed=resample_seed)
-        (
-            new_particles,
-            new_indices,
-            log_weights
-        ) = tf.nest.map_structure(
+        (new_particles,
+         new_indices,
+         log_weights) = tf.nest.map_structure(
             lambda r, p: tf.where(do_resample, r, p),
             (new_particles, new_indices, new_weights),
             (state.particles, _dummy_indices_like(new_indices),
