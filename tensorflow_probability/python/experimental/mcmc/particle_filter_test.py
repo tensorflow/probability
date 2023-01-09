@@ -101,7 +101,7 @@ class _ParticleFilterTest(test_util.TestCase):
     observations = tf.reshape(tf.tile(observation, [10]),
                               [10, tf.shape(observation)[0]])
 
-    def rejuvenation_fn(state, step=-1):
+    def rejuvenation_fn(*_):
       posterior = d.posterior_marginals(observation).sample(seed=stream())
       return posterior
 

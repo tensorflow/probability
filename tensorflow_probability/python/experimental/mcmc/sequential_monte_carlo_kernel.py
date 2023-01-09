@@ -129,7 +129,7 @@ def rejuvenation_criterion_fn(weighted_particles):
   return 0
 
 
-def rejuvenation_fn(state, step=-1):
+def rejuvenation_fn(*_):
   return 1
 
 
@@ -351,7 +351,11 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
             # particles independently or all together
             new_particles = self.rejuvenation_fn(
                 state,
-                kernel_results.steps
+                new_particles,
+                new_indices,
+                log_weights,
+                extra,
+                ps.maximum(0, kernel_results.steps - 1)
             )
 
         proposed_extra = self.propose_extra(
