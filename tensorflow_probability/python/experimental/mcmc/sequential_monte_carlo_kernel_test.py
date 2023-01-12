@@ -59,11 +59,11 @@ class _SequentialMonteCarloTest(test_util.TestCase):
         propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
         resample_fn=weighted_resampling.resample_systematic,
         resample_criterion_fn=sequential_monte_carlo_kernel.ess_below_threshold)
-    state, results = kernel.one_step(
+    state, results, extra = kernel.one_step(
         state=initial_state,
         kernel_results=kernel.bootstrap_results(initial_state),
         seed=seeds[0])
-    state, results = kernel.one_step(state=state, kernel_results=results,
+    state, results, extra = kernel.one_step(state=state, kernel_results=results,
                                      seed=seeds[1])
     state, results = self.evaluate(
         (tf.nest.map_structure(tf.convert_to_tensor, state),
@@ -74,11 +74,11 @@ class _SequentialMonteCarloTest(test_util.TestCase):
         propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
         resample_fn=weighted_resampling.resample_systematic,
         resample_criterion_fn=sequential_monte_carlo_kernel.ess_below_threshold)
-    state2, results2 = kernel2.one_step(
+    state2, results2, extra2 = kernel2.one_step(
         state=initial_state,
         kernel_results=kernel2.bootstrap_results(initial_state),
         seed=seeds[0])
-    state2, results2 = kernel2.one_step(state=state2, kernel_results=results2,
+    state2, results2, extra2 = kernel2.one_step(state=state2, kernel_results=results2,
                                         seed=seeds[1])
     state2, results2 = self.evaluate(
         (tf.nest.map_structure(tf.convert_to_tensor, state2),
@@ -124,11 +124,11 @@ class _SequentialMonteCarloTest(test_util.TestCase):
           propose_and_update_log_weights_fn=functools.partial(
               propose_and_update_log_weights_fn,
               transition_scale=transition_scale))
-      state, results = kernel.one_step(
+      state, results, extra = kernel.one_step(
           state=initial_state,
           kernel_results=kernel.bootstrap_results(initial_state),
           seed=seeds[1])
-      state, results = kernel.one_step(state=state, kernel_results=results,
+      state, results, extra = kernel.one_step(state=state, kernel_results=results,
                                        seed=seeds[2])
       return results.accumulated_log_marginal_likelihood
 
