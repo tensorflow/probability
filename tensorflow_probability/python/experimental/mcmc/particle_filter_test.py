@@ -101,12 +101,15 @@ class _ParticleFilterTest(test_util.TestCase):
     observations = tf.reshape(tf.tile(observation, [10]),
                               [10, tf.shape(observation)[0]])
 
-    def rejuvenation_fn(*_):
-      posterior = d.posterior_marginals(observation).sample(seed=stream())
-      return posterior
-
-    def rejuvenation_criterion_fn(_):
-      return 1
+    def rejuvenation_fn(state,
+                        particles,
+                        indices,
+                        log_weights,
+                        extra,
+                        step
+                        ):
+      posterior = tf.cast(d.posterior_marginals(observation).sample(seed=stream()), tf.int32)
+      return (posterior, indices, log_weights)
 
     rej_particles, _, _, _, _ =\
         particle_filter.particle_filter(
@@ -114,7 +117,7 @@ class _ParticleFilterTest(test_util.TestCase):
             initial_state_prior=d.initial_distribution,
             transition_fn=lambda _, s: categorical.Categorical(logits=tf.zeros(s.shape + tuple([10]))),
             observation_fn=lambda _, s: normal.Normal(loc=tf.cast(s, tf.float32), scale=0.3),
-            rejuvenation_criterion_fn=rejuvenation_criterion_fn,
+            rejuvenation_criterion_fn=lambda _: True,
             rejuvenation_fn=rejuvenation_fn,
             num_particles=10,
             seed=stream()

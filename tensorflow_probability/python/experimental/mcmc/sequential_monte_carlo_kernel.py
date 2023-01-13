@@ -126,11 +126,16 @@ def ess_below_threshold(weighted_particles, threshold=0.5):
 
 
 def rejuvenation_criterion_fn(weighted_particles):
-  return 0
+  return False
 
 
-def rejuvenation_fn(*_):
-  return 1
+def rejuvenation_fn(state,
+                    particles,
+                    indices,
+                    log_weights,
+                    extra,
+                    step):
+  return (particles, indices, log_weights)
 
 
 def propose_extra(step,
@@ -142,6 +147,10 @@ def propose_extra(step,
                   seed
                   ):
   return extra
+
+
+def identity(state, new_particles, new_indices, log_weights, extra, step):
+    return new_particles, new_indices, log_weights
 
 
 class SequentialMonteCarlo(kernel_base.TransitionKernel):
@@ -346,17 +355,25 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
             normalized_log_weights))
 
         do_rejuvenation = self._rejuvenation_criterion_fn(state)
-        if do_rejuvenation:
-            # Apply rejuvenation to particles. This function could rejuvenate
-            # particles independently or all together
-            new_particles = self.rejuvenation_fn(
-                state,
-                new_particles,
-                new_indices,
-                log_weights,
-                extra,
-                ps.maximum(0, kernel_results.steps - 1)
-            )
+        (new_particles,
+         new_indices,
+         log_weights) = tf.cond(
+            tf.constant(do_rejuvenation),
+            lambda: self._rejuvenation_fn(state,
+                                          new_particles,
+                                          new_indices,
+                                          log_weights,
+                                          extra,
+                                          ps.maximum(0, kernel_results.steps - 1)
+                                          ),
+            lambda: identity(state,
+                             new_particles,
+                             new_indices,
+                             log_weights,
+                             extra,
+                             ps.maximum(0, kernel_results.steps - 1)
+                             )
+        )
 
         proposed_extra = self.propose_extra(
             ps.maximum(0, kernel_results.steps - 1),

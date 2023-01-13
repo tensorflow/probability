@@ -47,6 +47,15 @@ def _default_extra_fn(a, b, c, extra):
   return extra
 
 
+def _no_rejuvenation(state,
+                    particles,
+                    indices,
+                    log_weights,
+                    extra,
+                    step):
+  return (particles, indices, log_weights)
+
+
 particle_filter_arg_str = """\
 Each latent state is a `Tensor` or nested structure of `Tensor`s, as defined
 by the `initial_state_prior`.
@@ -131,8 +140,8 @@ def infer_trajectories(observations,
                        resample_fn=weighted_resampling.resample_systematic,
                        resample_criterion_fn=smc_kernel.ess_below_threshold,
                        unbiased_gradients=True,
-                       rejuvenation_fn=None,
-                       rejuvenation_criterion_fn=lambda _: 0,
+                       rejuvenation_fn=_no_rejuvenation,
+                       rejuvenation_criterion_fn=lambda *_: False,
                        num_transitions_per_observation=1,
                        seed=None,
                        name=None):  # pylint: disable=g-doc-args
@@ -397,8 +406,8 @@ def particle_filter(observations,
                     resample_fn=weighted_resampling.resample_systematic,
                     resample_criterion_fn=smc_kernel.ess_below_threshold,
                     unbiased_gradients=True,
-                    rejuvenation_fn=None,
-                    rejuvenation_criterion_fn=lambda _: 0,  # TODO(davmre): not yet supported. pylint: disable=unused-argument
+                    rejuvenation_fn=_no_rejuvenation,
+                    rejuvenation_criterion_fn=lambda *_: False,
                     num_transitions_per_observation=1,
                     trace_fn=_default_trace_fn,
                     trace_criterion_fn=_always_trace,
