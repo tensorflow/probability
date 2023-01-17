@@ -56,6 +56,22 @@ def _no_rejuvenation(state,
   return (particles, indices, log_weights)
 
 
+def swap_dim(
+        state,
+        particles_dim):
+  particles_dim_shape = state.shape[particles_dim]
+  ordered_indices = [state.shape[index] if index is not particles_dim else state.shape[0] for index in
+                     range(0, len(state.shape))]
+  ordered_indices[0] = particles_dim_shape
+
+  state = tf.cond(
+      tf.math.greater(particles_dim, 0),
+      lambda: tf.reshape(state, ordered_indices),
+      lambda: state
+  )
+  return state
+
+
 particle_filter_arg_str = """\
 Each latent state is a `Tensor` or nested structure of `Tensor`s, as defined
 by the `initial_state_prior`.
@@ -302,6 +318,7 @@ def sequential_monte_carlo(loop_seed,
         unbiased_gradients,
         trace_fn,
         extra_fn=_default_extra_fn,
+        particles_dim=0,
         static_trace_allocation_size=None,
         never_trace=lambda *_: False,
         ):
@@ -359,6 +376,7 @@ def sequential_monte_carlo(loop_seed,
         resample_criterion_fn=resample_criterion_fn,
         rejuvenation_fn=rejuvenation_fn,
         rejuvenation_criterion_fn=rejuvenation_criterion_fn,
+        particles_dim=particles_dim,
         unbiased_gradients=unbiased_gradients)
 
     # Use `trace_scan` rather than `sample_chain` directly because the latter
@@ -401,6 +419,7 @@ def particle_filter(observations,
                     observation_fn,
                     num_particles,
                     extra_fn=_default_extra_fn,
+                    particles_dim=0,
                     initial_state_proposal=None,
                     proposal_fn=None,
                     resample_fn=weighted_resampling.resample_systematic,
@@ -481,6 +500,7 @@ def particle_filter(observations,
         initial_state_prior=initial_state_prior,
         initial_state_proposal=initial_state_proposal,
         num_particles=num_particles,
+        particles_dim=particles_dim,
         seed=init_seed)
     propose_and_update_log_weights_fn = (
         _particle_filter_propose_and_update_log_weights_fn(
@@ -502,6 +522,7 @@ def particle_filter(observations,
         parallel_iterations=parallel_iterations,
         unbiased_gradients=unbiased_gradients,
         num_timesteps=num_timesteps,
+        particles_dim=particles_dim,
         trace_fn=trace_fn,
         loop_seed=loop_seed,
         never_trace=never_trace,
@@ -516,6 +537,7 @@ def _particle_filter_initial_weighted_particles(observations,
                                                 initial_state_prior,
                                                 initial_state_proposal,
                                                 num_particles,
+                                                particles_dim=0,
                                                 seed=None):
   """Initialize a set of weighted particles including the first observation."""
   # Propose an initial state.
@@ -530,6 +552,8 @@ def _particle_filter_initial_weighted_particles(observations,
   # Normalize the initial weights. If we used a proposal, the weights are
   # normalized in expectation, but actually normalizing them reduces variance.
   initial_log_weights = tf.nn.log_softmax(initial_log_weights, axis=0)
+  if particles_dim is not 0:
+    initial_state = swap_dim(initial_state, particles_dim)
 
   # Return particles weighted by the initial observation.
   return smc_kernel.WeightedParticles(
