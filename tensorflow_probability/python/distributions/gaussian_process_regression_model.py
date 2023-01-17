@@ -632,11 +632,6 @@ class GaussianProcessRegressionModel(
         self._parameters = parameters
 
   @staticmethod
-  @deprecation.deprecated_args(
-      '2022-06-23',
-      ('The `observations_mask` flag is deprecated; instead use '
-       '`observations_is_missing` (with the opposite sense).'),
-      'observations_mask')
   @deprecation.deprecated_arg_values(
       '2023-02-15',
       _ALWAYS_YIELD_MVN_DEPRECATION_WARNING,
@@ -645,7 +640,6 @@ class GaussianProcessRegressionModel(
       kernel,
       observation_index_points,
       observations,
-      observations_mask=None,
       observations_is_missing=None,
       index_points=None,
       observation_noise_variance=0.,
@@ -706,11 +700,6 @@ class GaussianProcessRegressionModel(
         `None`, which corresponds to the empty set of observations, and simply
         results in the prior predictive model (a GP with noise of variance
         `predictive_noise_variance`).
-      observations_mask:  Deprecated. Prefer `observations_is_missing`.
-        `bool` `Tensor` of shape `[..., e]`, representing
-        a batch of boolean masks.  When `observation_masks` is not `None`,
-        the returned distribution is conditioned only on the observations for
-        which the corresponding elements of `observations_masks` are `True`.
       observations_is_missing:  `bool` `Tensor` of shape `[..., e]`,
         representing a batch of boolean masks.  When `observations_is_missing`
         is not `None`, the returned distribution is conditioned only on the
@@ -800,13 +789,6 @@ class GaussianProcessRegressionModel(
           observation_noise_variance, dtype=dtype)
       observations = tf.convert_to_tensor(observations, dtype=dtype)
 
-      if ((observations_is_missing is not None) and
-          (observations_mask is not None)):
-        raise ValueError('Expect only one of `observations_is_missing` and '
-                         '`observations_mask` to be set')
-
-      if observations_mask is not None:
-        observations_is_missing = ~tf.convert_to_tensor(observations_mask)
       if observations_is_missing is not None:
         observations_is_missing = tf.convert_to_tensor(observations_is_missing)
 

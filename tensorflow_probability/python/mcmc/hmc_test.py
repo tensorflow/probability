@@ -973,7 +973,7 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
   def make_weights_prior(self, dims, sigma):
     return mvn_diag.MultivariateNormalDiag(
         loc=tf.zeros([dims], dtype=sigma.dtype),
-        scale_identity_multiplier=sigma)
+        scale_diag=sigma * tf.ones([dims], dtype=sigma.dtype))
 
   def make_response_likelihood(self, w, x):
     if tensorshape_util.rank(w.shape) == 1:
@@ -1013,9 +1013,9 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
         tf.TensorSpec(shape=[], dtype=tf.float32),
     ])
     def mcem_iter(weights_chain_start, step_size):
-      prior = self.make_weights_prior(dims, sigma)
 
       def unnormalized_posterior_log_prob(w):
+        prior = self.make_weights_prior(dims, sigma)
         likelihood = self.make_response_likelihood(w, x)
         return (prior.log_prob(w) +
                 tf.reduce_sum(likelihood.log_prob(y), axis=-1))  # [m]

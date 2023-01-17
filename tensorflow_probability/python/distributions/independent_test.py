@@ -72,10 +72,10 @@ class IndependentDistributionTest(test_util.TestCase):
 
   def testSampleAndLogProbMultivariate(self):
     loc = np.float32([[-1., 1], [1, -1]])
-    scale = np.float32([1., 0.5])
+    scale = np.float32([[1., 1.], [0.5, 0.5]])
     ind = independent.Independent(
         distribution=mvn_diag.MultivariateNormalDiag(
-            loc=loc, scale_identity_multiplier=scale),
+            loc=loc, scale_diag=scale),
         reinterpreted_batch_ndims=1,
         validate_args=True)
 
@@ -89,7 +89,7 @@ class IndependentDistributionTest(test_util.TestCase):
     self.assertEqual([4, 5], log_prob_x.shape)
 
     expected_log_prob_x = sp_stats.norm(
-        loc, scale[:, None]).logpdf(x_).sum(-1).sum(-1)
+        loc, scale[:, [0]]).logpdf(x_).sum(-1).sum(-1)
     self.assertAllClose(
         expected_log_prob_x, actual_log_prob_x, rtol=1e-6, atol=0.)
 
@@ -110,11 +110,11 @@ class IndependentDistributionTest(test_util.TestCase):
 
   def testSampleConsistentStats(self):
     loc = np.float32([[-1., 1], [1, -1]])
-    scale = np.float32([1., 0.5])
+    scale = np.float32([[1., 1.], [0.5, 0.5]])
     n_samp = 1e4
     ind = independent.Independent(
         distribution=mvn_diag.MultivariateNormalDiag(
-            loc=loc, scale_identity_multiplier=scale),
+            loc=loc, scale_diag=scale),
         reinterpreted_batch_ndims=1,
         validate_args=True)
 

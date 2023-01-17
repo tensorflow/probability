@@ -104,7 +104,7 @@ MUTEX_PARAMS = (
     set(['rate1', 'log_rate1']),
     set(['rate2', 'log_rate2']),
     set(['scale', 'log_scale']),
-    set(['scale', 'scale_tril', 'scale_diag', 'scale_identity_multiplier']),
+    set(['scale', 'scale_tril', 'scale_diag']),
 )
 
 
@@ -307,8 +307,6 @@ CONSTRAINTS = {
     'Wishart.scale':
         tfp_hps.positive_definite,
     'scale_diag':
-        tfp_hps.softplus_plus_eps(),
-    'scale_identity_multiplier':
         tfp_hps.softplus_plus_eps(),
     'scale_tril':
         tfp_hps.lower_tril_positive_definite,

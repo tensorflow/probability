@@ -431,7 +431,8 @@ class MultiTaskGaussianProcessRegressionModelTest(
         kernel.base_kernel[..., tf.newaxis],
         observation_index_points=index_points[:, tf.newaxis],
         observations=tf.linalg.matrix_transpose(observations),
-        observations_mask=~tf.linalg.matrix_transpose(observations_is_missing),
+        observations_is_missing=tf.linalg.matrix_transpose(
+            observations_is_missing),
         index_points=test_points[:, tf.newaxis],
         predictive_noise_variance=0.05,
         mean_fn=lambda x: tf.linalg.matrix_transpose(mean_fn(x[:, 0])),

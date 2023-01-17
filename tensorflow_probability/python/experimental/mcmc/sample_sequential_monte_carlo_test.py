@@ -112,7 +112,8 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
     likelihood_dist = mixture_same_family.MixtureSameFamily(
         mixture_distribution=categorical.Categorical(probs=mixture_weight),
         components_distribution=mvn_diag.MultivariateNormalDiag(
-            loc=component_loc, scale_identity_multiplier=[.1, .2]))
+            loc=component_loc,
+            scale_diag=[[.1], [.2]] * tf.ones_like(component_loc)))
 
     # Uniform prior
     init_log_prob = tf.zeros_like(proposal.log_prob(init_state))
@@ -147,7 +148,9 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
     likelihood_dist = mixture_same_family.MixtureSameFamily(
         mixture_distribution=categorical.Categorical(probs=mixture_weight),
         components_distribution=mvn_diag.MultivariateNormalDiag(
-            loc=component_loc, scale_identity_multiplier=[.1, .2]))
+            loc=component_loc,
+            scale_diag=tf.constant([[.1], [.2]], tf.float64) *
+            tf.ones_like(component_loc)))
 
     proposal = sample.Sample(
         normal.Normal(tf.constant(0., tf.float64), 10.), sample_shape=nd)

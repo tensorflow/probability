@@ -121,7 +121,9 @@ class MultivariateNormalDiagPlusLowRankTest(test_util.TestCase):
     mvn_identity = mvn_diag.MultivariateNormalDiag(
         loc=np.array([1., 2, 0.25], dtype=np.float32), validate_args=True)
     mvn_scaled = mvn_diag.MultivariateNormalDiag(
-        loc=mvn_identity.loc, scale_identity_multiplier=2.2, validate_args=True)
+        loc=mvn_identity.loc,
+        scale_diag=2.2 * tf.ones_like(mvn_identity.loc),
+        validate_args=True)
     mvd = mvn_diag.MultivariateNormalDiag(
         loc=mvn_identity.loc,
         scale_diag=np.array([0.5, 1.5, 1.], dtype=np.float32),

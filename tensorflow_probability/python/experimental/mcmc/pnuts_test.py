@@ -67,7 +67,7 @@ def run_nuts_chain(event_size, batch_size, num_steps, initial_state=None,
   def target_log_prob_fn(event):
     with tf.name_scope('nuts_test_target_log_prob'):
       return mvn_diag.MultivariateNormalDiag(
-          tf.zeros(event_size), scale_identity_multiplier=1.).log_prob(event)
+          tf.zeros(event_size)).log_prob(event)
 
   if initial_state is None:
     initial_state = tf.zeros([batch_size, event_size])

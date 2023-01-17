@@ -200,7 +200,6 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
     length_scale = np.array([.1, .2, .3], np.float64).reshape([1, 3])
     observation_noise_variance = np.array([1e-9], np.float64)
 
-    jitter = np.float64(1e-6)
     observation_index_points = (
         np.random.uniform(-1., 1., (1, 1, 7, 2)).astype(np.float64))
     observations = np.random.uniform(-1., 1., (1, 1, 7)).astype(np.float64)
@@ -215,7 +214,6 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         observation_index_points=observation_index_points,
         observations=observations,
         observation_noise_variance=observation_noise_variance,
-        jitter=jitter,
         validate_args=True)
 
     precomputed_dist = gprm.GaussianProcessRegressionModel.precompute_regression_model(
@@ -224,7 +222,6 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         observation_index_points=observation_index_points,
         observations=observations,
         observation_noise_variance=observation_noise_variance,
-        jitter=jitter,
         validate_args=True)
 
     self.assertAllClose(
@@ -304,7 +301,6 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
     length_scale = np.array([.1, .2, .3], np.float64).reshape([1, 3])
     observation_noise_variance = np.array([1e-9], np.float64)
 
-    jitter = np.float64(1e-6)
     observation_index_points = (
         np.random.uniform(-1., 1., (1, 1, 7, 2)).astype(np.float64))
     observations = np.random.uniform(-1., 1., (1, 1, 7)).astype(np.float64)
@@ -320,7 +316,6 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         observation_index_points=observation_index_points,
         observations=observations,
         observation_noise_variance=observation_noise_variance,
-        jitter=jitter,
         validate_args=True)
 
     flat = tf.nest.flatten(precomputed_dist, expand_composites=True)
@@ -351,7 +346,6 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
   def testEmptyDataMatchesGPPrior(self):
     amp = np.float64(.5)
     len_scale = np.float64(.2)
-    jitter = np.float64(1e-4)
     index_points = np.random.uniform(-1., 1., (10, 1)).astype(np.float64)
 
     # k_xx - k_xn @ (k_nn + sigma^2) @ k_nx + sigma^2
@@ -362,14 +356,12 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         kernel,
         index_points,
         mean_fn=mean_fn,
-        jitter=jitter,
         validate_args=True)
 
     dist_nones = gprm.GaussianProcessRegressionModel(
         kernel,
         index_points,
         mean_fn=mean_fn,
-        jitter=jitter,
         validate_args=True)
 
     dist_zero_shapes = gprm.GaussianProcessRegressionModel(
@@ -378,7 +370,6 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         observation_index_points=tf.ones([0, 1], tf.float64),
         observations=tf.ones([0], tf.float64),
         mean_fn=mean_fn,
-        jitter=jitter,
         validate_args=True)
 
     for dist in [dist_nones, dist_zero_shapes]:
@@ -469,7 +460,6 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         observation_index_points=observation_index_points_1,
         observations=observations_1,
         mean_fn=mean_fn,
-        jitter=1e-5,
         validate_args=True)
     dist2 = dist1.copy(
         kernel=kernel_2,
@@ -484,7 +474,6 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
             observation_index_points=observation_index_points_1,
             observations=observations_1,
             mean_fn=mean_fn,
-            jitter=1e-5,
             validate_args=True))
     precomputed_dist2 = precomputed_dist1.copy(index_points=index_points_2)
     self.assertIs(precomputed_dist1.mean_fn, precomputed_dist2.mean_fn)
@@ -504,8 +493,6 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
       self.assertAllEqual(dist2.event_shape, event_shape_2)
       self.assertAllEqual(dist1.index_points, index_points_1)
       self.assertAllEqual(dist2.index_points, index_points_2)
-      self.assertAllEqual(
-          tf.get_static_value(dist1.jitter), tf.get_static_value(dist2.jitter))
     else:
       self.assertAllEqual(
           self.evaluate(dist1.batch_shape_tensor()),
@@ -514,7 +501,6 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
           self.evaluate(dist1.event_shape_tensor()), event_shape_1)
       self.assertAllEqual(
           self.evaluate(dist2.event_shape_tensor()), event_shape_2)
-      self.assertEqual(self.evaluate(dist1.jitter), self.evaluate(dist2.jitter))
       self.assertAllEqual(self.evaluate(dist1.index_points), index_points_1)
       self.assertAllEqual(self.evaluate(dist2.index_points), index_points_2)
 
