@@ -22,7 +22,6 @@ from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.math.psd_kernels.internal import util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -177,15 +176,9 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
   """
   # pylint:disable=invalid-name
 
-  @deprecation.deprecated_args(
-      '2022-06-23',
-      ('The `fixed_inputs_mask` flag is deprecated; instead use '
-       '`fixed_inputs_is_missing` (with the opposite sense).'),
-      'fixed_inputs_mask')
   def __init__(self,
                base_kernel,
                fixed_inputs,
-               fixed_inputs_mask=None,
                fixed_inputs_is_missing=None,
                diag_shift=None,
                cholesky_fn=None,
@@ -216,10 +209,6 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
         computing the Cholesky decomposition of the k(Z, Z) matrix. The batch
         shape elements of `fixed_inputs` must be broadcast compatible with
         `base_kernel.batch_shape`.
-      fixed_inputs_mask: Deprecated. A boolean Tensor of shape `[..., N]`. When
-        `mask` is not None and an element of `mask` is `False`, this kernel
-        will return values computed as if the divisor matrix did not contain the
-        corresponding row or column.
       fixed_inputs_is_missing: A boolean Tensor of shape `[..., N]`.
         When `is_missing` is not None and an element of `mask` is `True`,
         this kernel will return values computed as if the divisor matrix did
@@ -268,12 +257,6 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
       self._fixed_inputs = nest_util.convert_to_nested_tensor(
           fixed_inputs, dtype=dtype, name='fixed_inputs', convert_ref=False,
           allow_packing=True)
-      if ((fixed_inputs_mask is not None) and
-          (fixed_inputs_is_missing is not None)):
-        raise ValueError('Expected at most one of `fixed_inputs_mask` or '
-                         '`fixed_inputs_is_missing`')
-      self._fixed_inputs_mask = tensor_util.convert_nonref_to_tensor(
-          fixed_inputs_mask, dtype=tf.bool, name='fixed_inputs_mask')
       self._fixed_inputs_is_missing = tensor_util.convert_nonref_to_tensor(
           fixed_inputs_is_missing,
           dtype=tf.bool, name='fixed_inputs_is_missing')
@@ -297,15 +280,9 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
           parameters=parameters)
 
   @staticmethod
-  @deprecation.deprecated_args(
-      '2022-06-23',
-      ('The `fixed_inputs_mask` flag is deprecated; instead use '
-       '`fixed_inputs_is_missing` (with the opposite sense).'),
-      'fixed_inputs_mask')
   def with_precomputed_divisor(
       base_kernel,
       fixed_inputs,
-      fixed_inputs_mask=None,
       fixed_inputs_is_missing=None,
       diag_shift=None,
       cholesky_fn=None,
@@ -345,10 +322,6 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
         computing the Cholesky decomposition of the k(Z, Z) matrix. The batch
         shape elements of `fixed_inputs` must be broadcast compatible with
         `base_kernel.batch_shape`.
-      fixed_inputs_mask: Deprecated. A boolean Tensor of shape `[..., N]`. When
-        `mask` is not None and an element of `mask` is `False`, the returned
-        kernel will return values computed as if the divisor matrix did not
-        contain the corresponding row or column.
       fixed_inputs_is_missing: A boolean Tensor of shape `[..., N]`.  When
         `is_missing` is not None and an element of `is_missing` is `True`, the
         returned kernel will return values computed as if the divisor matrix
@@ -381,13 +354,6 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
       float_dtype = dtype
     fixed_inputs = nest_util.convert_to_nested_tensor(
         fixed_inputs, dtype=dtype, allow_packing=True)
-    if ((fixed_inputs_mask is not None) and
-        (fixed_inputs_is_missing is not None)):
-      raise ValueError('Expected at most one of `fixed_inputs_mask` or '
-                       '`fixed_inputs_is_missing`')
-    if fixed_inputs_mask is not None:
-      fixed_inputs_is_missing = ~tf.convert_to_tensor(
-          fixed_inputs_mask, tf.bool)
     if fixed_inputs_is_missing is not None:
       fixed_inputs_is_missing = tf.convert_to_tensor(
           fixed_inputs_is_missing, tf.bool)
@@ -434,8 +400,6 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
     fixed_inputs_is_missing = self._fixed_inputs_is_missing
     if fixed_inputs_is_missing is not None:
       fixed_inputs_is_missing = tf.convert_to_tensor(fixed_inputs_is_missing)
-    if self._fixed_inputs_mask is not None:
-      fixed_inputs_is_missing = ~tf.convert_to_tensor(self._fixed_inputs_mask)
     return fixed_inputs_is_missing
 
   def _apply(self, x1, x2, example_ndims):
@@ -561,8 +525,6 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
         fixed_inputs=parameter_properties.ParameterProperties(
             event_ndims=lambda self: tf.nest.map_structure(  # pylint: disable=g-long-lambda
                 lambda nd: nd + 1, self.base_kernel.feature_ndims)),
-        fixed_inputs_mask=parameter_properties.ParameterProperties(
-            event_ndims=1),
         fixed_inputs_is_missing=parameter_properties.ParameterProperties(
             event_ndims=1),
         diag_shift=parameter_properties.ParameterProperties(
@@ -601,14 +563,7 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
   def divisor_matrix_cholesky(
       self,
       fixed_inputs=None,
-      fixed_inputs_mask=None,
       fixed_inputs_is_missing=None):
     if self._precomputed_divisor_matrix_cholesky is not None:
       return self._precomputed_divisor_matrix_cholesky
-    if ((fixed_inputs_mask is not None) and
-        (fixed_inputs_is_missing is not None)):
-      raise ValueError('Expected only one of `fixed_inputs_mask` or '
-                       '`fixed_inputs_is_missing` to be set.')
-    if fixed_inputs_mask is not None:
-      fixed_inputs_is_missing = ~tf.convert_to_tensor(fixed_inputs_mask)
     return self._divisor_matrix_cholesky(fixed_inputs, fixed_inputs_is_missing)

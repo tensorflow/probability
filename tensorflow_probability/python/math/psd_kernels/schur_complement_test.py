@@ -134,7 +134,7 @@ class SchurComplementTest(test_util.TestCase):
                                 [3, 5, 4], seed=seed1, minval=-1.0, maxval=1.0),
                             np.nan)
     k = schur_complement.SchurComplement(
-        base_kernel, fixed_inputs, fixed_inputs_mask=mask)
+        base_kernel, fixed_inputs, fixed_inputs_is_missing=~mask)
 
     x = tf.random.stateless_uniform([6, 4], seed=seed2, minval=-1.0, maxval=1.0)
     y = tf.random.stateless_uniform(
@@ -400,9 +400,10 @@ class SchurComplementTest(test_util.TestCase):
     # Test input masking.
     mask = np.random.randint(2, size=(10,), dtype=bool)
     masked_schur = schur_complement.SchurComplement(
-        base_kernel, fixed_inputs, fixed_inputs_mask=mask)
+        base_kernel, fixed_inputs, fixed_inputs_is_missing=~mask)
     masked_structured_schur = schur_complement.SchurComplement(
-        structured_kernel, structured_fixed_inputs, fixed_inputs_mask=mask)
+        structured_kernel, structured_fixed_inputs,
+        fixed_inputs_is_missing=~mask)
     self.assertAllClose(masked_schur.apply(x, y),
                         masked_structured_schur.apply(struct_x, struct_y))
 

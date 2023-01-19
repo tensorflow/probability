@@ -849,8 +849,7 @@ class REMCTest(test_util.TestCase):
             [1., 0.5, 0.],  # loc of second batch
         ],
         dtype=np.float32)
-    scale_diag = np.array([[0.5], [0.8]], dtype=np.float32) * np.ones(
-        (2, 3), dtype=np.float32)
+    scale_diag = np.array([[0.5, 0.5, 0.5], [0.8, 0.8, 0.8]], dtype=np.float32)
     target = mvn_diag.MultivariateNormalDiag(
         loc=loc, scale_diag=scale_diag)
 

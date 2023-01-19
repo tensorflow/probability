@@ -277,8 +277,8 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
     kernel_args = (
         dict(length_scale=tf.random.uniform([], .5, 1.5, dtype=tf.float64),
              amplitude=tf.random.uniform([], 1.5, 2.5, dtype=tf.float64)),
-        dict(bias_variance=tf.random.uniform([feature_dim], .5, 1.5,
-                                             dtype=tf.float64),
+        dict(bias_amplitude=tf.random.uniform([feature_dim], .5, 1.5,
+                                              dtype=tf.float64),
              shift=tf.random.normal([feature_dim], dtype=tf.float64)))
 
     x1 = tf.random.normal([5, feature_dim], dtype=tf.float64)

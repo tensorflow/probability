@@ -285,7 +285,8 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   def make_weights_prior(dims, log_sigma):
     return tfd.MultivariateNormalDiag(
         loc=tf.zeros([dims], dtype=log_sigma.dtype),
-        scale_identity_multiplier=tf.math.exp(log_sigma))
+        scale_diag=tf.math.exp(log_sigma) *
+                   tf.ones([dims], dtype=log_sigma.dtype))
 
   def make_response_likelihood(w, x):
     if w.shape.ndims == 1:
@@ -398,15 +399,11 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
        (1999), no. 1, 94--128. https://projecteuclid.org/euclid.aos/1018031103
   """
 
-  @deprecation.deprecated_args(
-      '2019-05-22', 'The `step_size_update_fn` argument is deprecated. Use '
-      '`tfp.mcmc.SimpleStepSizeAdaptation` instead.', 'step_size_update_fn')
   def __init__(self,
                target_log_prob_fn,
                step_size,
                num_leapfrog_steps,
                state_gradients_are_stopped=False,
-               step_size_update_fn=None,
                store_parameters_in_results=False,
                experimental_shard_axis_names=None,
                name=None):
@@ -429,25 +426,16 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
         new state be run through `tf.stop_gradient`. This is particularly useful
         when combining optimization over samples from the HMC chain.
         Default value: `False` (i.e., do not apply `stop_gradient`).
-      step_size_update_fn: Python `callable` taking current `step_size`
-        (typically a `tf.Variable`) and `kernel_results` (typically
-        `collections.namedtuple`) and returns updated step_size (`Tensor`s).
-        Default value: `None` (i.e., do not update `step_size` automatically).
       store_parameters_in_results: If `True`, then `step_size` and
         `num_leapfrog_steps` are written to and read from eponymous fields in
         the kernel results objects returned from `one_step` and
         `bootstrap_results`. This allows wrapper kernels to adjust those
-        parameters on the fly. This is incompatible with `step_size_update_fn`,
-        which must be set to `None`.
+        parameters on the fly.
       experimental_shard_axis_names: A structure of string names indicating how
         members of the state are sharded.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'hmc_kernel').
     """
-    if step_size_update_fn and store_parameters_in_results:
-      raise ValueError('It is invalid to simultaneously specify '
-                       '`step_size_update_fn` and set '
-                       '`store_parameters_in_results` to `True`.')
     self._impl = metropolis_hastings.MetropolisHastings(
         inner_kernel=UncalibratedHamiltonianMonteCarlo(
             target_log_prob_fn=target_log_prob_fn,
@@ -458,7 +446,6 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
             store_parameters_in_results=store_parameters_in_results,
         )).experimental_with_shard_axes(experimental_shard_axis_names)
     self._parameters = self._impl.inner_kernel.parameters.copy()
-    self._parameters['step_size_update_fn'] = step_size_update_fn
 
   @property
   def target_log_prob_fn(self):
@@ -499,10 +486,6 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
     return self._impl.inner_kernel.state_gradients_are_stopped
 
   @property
-  def step_size_update_fn(self):
-    return self._parameters['step_size_update_fn']
-
-  @property
   def name(self):
     return self._impl.inner_kernel.name
 
@@ -538,33 +521,16 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
       ValueError: if there isn't one `step_size` or a list with same length as
         `current_state`.
     """
-    previous_step_size_assign = (
-        [] if self.step_size_update_fn is None  # pylint: disable=g-long-ternary
-        else (previous_kernel_results.extra.step_size_assign  # pylint: disable=g-long-ternary
-              if mcmc_util.is_list_like(
-                  previous_kernel_results.extra.step_size_assign)
-              else [previous_kernel_results.extra.step_size_assign]))
+    previous_step_size_assign = []
 
     with tf.control_dependencies(previous_step_size_assign):
       next_state, kernel_results = self._impl.one_step(
           current_state, previous_kernel_results, seed=seed)
-      if self.step_size_update_fn is not None:
-        step_size_assign = self.step_size_update_fn(  # pylint: disable=not-callable
-            self.step_size, kernel_results)
-        kernel_results = kernel_results._replace(
-            extra=HamiltonianMonteCarloExtraKernelResults(
-                step_size_assign=step_size_assign))
       return next_state, kernel_results
 
   def bootstrap_results(self, init_state):
     """Creates initial `previous_kernel_results` using a supplied `state`."""
-    kernel_results = self._impl.bootstrap_results(init_state)
-    if self.step_size_update_fn is not None:
-      step_size_assign = self.step_size_update_fn(self.step_size, None)  # pylint: disable=not-callable
-      kernel_results = kernel_results._replace(
-          extra=HamiltonianMonteCarloExtraKernelResults(
-              step_size_assign=step_size_assign))
-    return kernel_results
+    return self._impl.bootstrap_results(init_state)
 
   @property
   def experimental_shard_axis_names(self):

@@ -197,7 +197,7 @@ def lower_bound_barber_agakov(logu, entropy, name=None):
 
   # Conditional distribution of p(x|y)
   conditional_dist = tfd.MultivariateNormalDiag(
-      mean, scale_identity_multiplier=conditional_stddev)
+      mean, scale_diag=conditional_stddev * tf.ones((batch_size, dim)))
 
   # Scores/unnormalized likelihood of pairs of joint samples `x[i], y[i]`
   joint_scores = conditional_dist.log_prob(x)
@@ -270,7 +270,7 @@ def lower_bound_info_nce(logu, joint_sample_mask=None,
 
   # Conditional distribution of p(x|y)
   conditional_dist = tfd.MultivariateNormalDiag(
-      mean, scale_identity_multiplier=conditional_stddev)
+      mean, scale_diag=conditional_stddev * tf.ones((batch_size, dim)))
 
   # Scores/unnormalized likelihood of pairs of samples `x[i], y[j]`
   # (The scores has its shape [x_batch_size, distibution_batch_size]
@@ -384,7 +384,7 @@ def lower_bound_jensen_shannon(logu, joint_sample_mask=None,
   # (For JS lower bound, the optimal critic is of the form `f(x, y) = 1 +
   # log(p(x | y) / p(x))` [(Poole et al., 2018)][3].)
   conditional_dist = tfd.MultivariateNormalDiag(
-      mean, scale_identity_multiplier=conditional_stddev)
+      mean, scale_diag=conditional_stddev * tf.ones((batch_size, dim)))
   conditional_scores = conditional_dist.log_prob(y[:, tf.newaxis, :])
   marginal_dist = tfd.MultivariateNormalDiag(tf.zeros(dim), tf.ones(dim))
   marginal_scores = marginal_dist.log_prob(y)[:, tf.newaxis]
@@ -495,7 +495,7 @@ def lower_bound_nguyen_wainwright_jordan(logu, joint_sample_mask=None,
   # (For NWJ lower bound, the optimal critic is of the form `f(x, y) = 1 +
   # log(p(x | y) / p(x))` [(Poole et al., 2018)][4]. )
   conditional_dist = tfd.MultivariateNormalDiag(
-      mean, scale_identity_multiplier=conditional_stddev)
+      mean, scale_diag=conditional_stddev * tf.ones((batch_size, dim)))
   conditional_scores = conditional_dist.log_prob(y[:, tf.newaxis, :])
   marginal_dist = tfd.MultivariateNormalDiag(tf.zeros(dim), tf.ones(dim))
   marginal_scores = marginal_dist.log_prob(y)[:, tf.newaxis]
