@@ -17,7 +17,6 @@
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import identity as identity_bijector
-from tensorflow_probability.python.bijectors import transpose as transpose_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import mvn_linear_operator
@@ -286,13 +285,9 @@ def _kl_matrix_normal_matrix_normal(a, b, name=None):
   """
   def squared_frobenius_norm(x):
     """Helper to make KL calculation slightly more readable."""
-    # http://mathworld.wolfram.com/FrobeniusNorm.html
-    # The gradient of KL[p,q] is not defined when p==q. The culprit is
-    # tf.norm, i.e., we cannot use the commented out code.
-    # return tf.square(tf.norm(x, ord="fro", axis=[-2, -1]))
     return tf.reduce_sum(tf.square(x), axis=[-2, -1])
 
-  with tf.name_scope(name or "kl_mn"):
+  with tf.name_scope(name or "kl_matrix_normal_matrix_normal"):
     # Calculation is based on:
     # http://stats.stackexchange.com/questions/60680/kl-divergence-between-two-multivariate-gaussians
     # and,
@@ -310,7 +305,6 @@ def _kl_matrix_normal_matrix_normal(a, b, name=None):
     k_inv_s_x = b.scale_column.solve(a.scale_column.to_dense())
 
     mt = b.mean() - a.mean()
-    transpose = transpose_bijector.Transpose(rightmost_transposed_ndims=2)
 
     n = tf.cast(b.scale_row.domain_dimension_tensor(), b.dtype)
     p = tf.cast(b.scale_column.domain_dimension_tensor(), b.dtype)
@@ -332,9 +326,9 @@ def _kl_matrix_normal_matrix_normal(a, b, name=None):
       + 0.5
       * tf.reduce_sum(
           tf.linalg.cholesky_solve(
-              b.scale_column.to_dense(), transpose.forward(mt)
+              b.scale_column.to_dense(), tf.linalg.matrix_transpose(mt)
           )
-          * transpose.forward(
+          * tf.linalg.matrix_transpose(
               tf.linalg.cholesky_solve(b.scale_row.to_dense(), mt)
           ),
           [-1, -2],
