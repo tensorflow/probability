@@ -34,7 +34,7 @@ __all__ = [
 ]
 
 
-def resample(particles, log_weights, resample_fn, target_log_weights=None,
+def resample(particles, log_weights, resample_fn, target_log_weights=None, particles_dim=0,
              seed=None):
   """Resamples the current particles according to provided weights.
 
@@ -74,11 +74,11 @@ def resample(particles, log_weights, resample_fn, target_log_weights=None,
     log_num_particles = tf.math.log(tf.cast(num_particles, log_weights.dtype))
 
     # Normalize the weights and sample the ancestral indices.
-    log_probs = tf.math.log_softmax(log_weights, axis=0)
+    log_probs = tf.math.log_softmax(log_weights, axis=particles_dim)
     resampled_indices = resample_fn(log_probs, num_particles, (), seed=seed)
 
     gather_ancestors = lambda x: (  # pylint: disable=g-long-lambda
-        mcmc_util.index_remapping_gather(x, resampled_indices, axis=0))
+        mcmc_util.index_remapping_gather(x, resampled_indices, axis=particles_dim))
     resampled_particles = tf.nest.map_structure(gather_ancestors, particles)
     if target_log_weights is None:
       log_weights_after_resampling = tf.fill(ps.shape(log_weights),

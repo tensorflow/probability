@@ -56,22 +56,6 @@ def _no_rejuvenation(state,
   return (particles, indices, log_weights)
 
 
-def swap_dim(
-        state,
-        particles_dim):
-  particles_dim_shape = state.shape[particles_dim]
-  ordered_indices = [state.shape[index] if index is not particles_dim else state.shape[0] for index in
-                     range(0, len(state.shape))]
-  ordered_indices[0] = particles_dim_shape
-
-  state = tf.cond(
-      tf.math.greater(particles_dim, 0),
-      lambda: tf.reshape(state, ordered_indices),
-      lambda: state
-  )
-  return state
-
-
 particle_filter_arg_str = """\
 Each latent state is a `Tensor` or nested structure of `Tensor`s, as defined
 by the `initial_state_prior`.
@@ -508,6 +492,7 @@ def particle_filter(observations,
             transition_fn=transition_fn,
             proposal_fn=proposal_fn,
             observation_fn=observation_fn,
+            particles_dim=particles_dim,
             num_transitions_per_observation=num_transitions_per_observation))
 
     traced_results = sequential_monte_carlo(
@@ -551,9 +536,7 @@ def _particle_filter_initial_weighted_particles(observations,
                            initial_state_proposal.log_prob(initial_state))
   # Normalize the initial weights. If we used a proposal, the weights are
   # normalized in expectation, but actually normalizing them reduces variance.
-  initial_log_weights = tf.nn.log_softmax(initial_log_weights, axis=0)
-  if particles_dim is not 0:
-    initial_state = swap_dim(initial_state, particles_dim)
+  initial_log_weights = tf.nn.log_softmax(initial_log_weights, axis=particles_dim)
 
   # Return particles weighted by the initial observation.
   return smc_kernel.WeightedParticles(
@@ -570,7 +553,8 @@ def _particle_filter_propose_and_update_log_weights_fn(
     transition_fn,
     proposal_fn,
     observation_fn,
-    num_transitions_per_observation=1):
+    num_transitions_per_observation=1,
+    particles_dim=0):
   """Build a function specifying a particle filter update step."""
   def propose_and_update_log_weights_fn(step, state, seed=None):
     particles, log_weights = state.particles, state.log_weights
@@ -595,7 +579,7 @@ def _particle_filter_propose_and_update_log_weights_fn(
       # likelihood of a model with no observations is constant
       # (equal to 1.), so the transition and proposal distributions shouldn't
       # affect it.
-      log_weights = tf.nn.log_softmax(log_weights, axis=0)
+      log_weights = tf.nn.log_softmax(log_weights, axis=particles_dim)
     else:
       proposed_particles = transition_dist.sample(seed=seed)
 

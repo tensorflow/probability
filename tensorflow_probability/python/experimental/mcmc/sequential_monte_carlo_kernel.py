@@ -170,6 +170,7 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
                rejuvenation_fn=rejuvenation_fn,
                rejuvenation_criterion_fn=rejuvenation_criterion_fn,
                propose_extra=propose_extra,
+               particles_dim=0,
                unbiased_gradients=True,
                name=None):
     """Initializes a sequential Monte Carlo transition kernel.
@@ -232,6 +233,7 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
     self._rejuvenation_fn = rejuvenation_fn
     self._rejuvenation_criterion_fn = rejuvenation_criterion_fn
     self._propose_extra = propose_extra
+    self._particles_dim = particles_dim
     self._unbiased_gradients = unbiased_gradients
     self._name = name or 'SequentialMonteCarlo'
 
@@ -315,7 +317,7 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
         state = tf.nest.map_structure(
             lambda a, b: tf.where(is_initial_step, a, b), state, proposed_state)
 
-        normalized_log_weights = tf.nn.log_softmax(state.log_weights, axis=0)
+        normalized_log_weights = tf.nn.log_softmax(state.log_weights, axis=self._particles_dim)
         # Every entry of `log_weights` differs from `normalized_log_weights`
         # by the same normalizing constant. We extract that constant by
         # examining an arbitrary entry.
@@ -345,6 +347,7 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
             resample_fn=self.resample_fn,
             target_log_weights=(normalized_log_weights
                                 if self.unbiased_gradients else None),
+            particles_dim=self._particles_dim,
             seed=resample_seed)
         (new_particles,
          new_indices,
