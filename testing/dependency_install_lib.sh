@@ -75,7 +75,9 @@ install_tensorflow() {
 install_jax() {
   # For the JAX backend.
   PIP_FLAGS=${1-}
-  python -m pip install $PIP_FLAGS jax jaxlib
+  python -m pip install $PIP_FLAGS \
+    jax==0.4.1 \
+    jaxlib==0.4.1
 }
 
 install_common_packages() {
@@ -88,7 +90,18 @@ install_common_packages() {
 install_test_only_packages() {
   # The following unofficial dependencies are used only by tests.
   PIP_FLAGS=${1-}
-  python -m pip install $PIP_FLAGS hypothesis matplotlib mock mpmath scipy pandas optax holidays wrapt
+  python -m pip install $PIP_FLAGS \
+    hypothesis==6.64.0 \
+    jax==0.4.1 \
+    jaxlib==0.4.1 \
+    optax \
+    matplotlib \
+    mock \
+    mpmath \
+    scipy \
+    pandas \
+    holidays \
+    wrapt
 }
 
 dump_versions() {

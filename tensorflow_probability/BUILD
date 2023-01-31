@@ -17,14 +17,16 @@
 #   methods, including modeling and Bayesian inference. APIs here are
 #   meant to evolve over time.
 
-load("//tools/build_defs/license:license.bzl", "license")
-
-package(default_applicable_licenses = ["//tensorflow_probability:license"])
-
-license(
-    name = "license",
-    package_name = "tensorflow_probability",
-)
+# copybara:uncomment_begin
+# load("//tools/build_defs/license:license.bzl", "license")
+# 
+# package(default_applicable_licenses = [":license"])
+# 
+# license(
+#     name = "license",
+#     package_name = "tensorflow_probability",
+# )
+# copybara:uncomment_end
 
 licenses(["notice"])
 
