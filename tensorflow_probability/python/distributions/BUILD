@@ -1394,6 +1394,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )
@@ -3736,6 +3737,7 @@ multi_substrate_py_test(
     shard_count = 2,
     deps = [
         ":matrix_normal_linear_operator",
+        # absl/testing:parameterized dep,
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
