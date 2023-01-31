@@ -258,6 +258,7 @@ def reduce_logmeanexp(input_tensor,
     log_mean_exp: The reduced tensor.
   """
   with tf.name_scope(name or 'reduce_logmeanexp'):
+    input_tensor = tf.convert_to_tensor(input_tensor)
     named_axes = distribute_lib.canonicalize_named_axis(experimental_named_axis)
     lse = distribute_lib.reduce_logsumexp(
         input_tensor,
