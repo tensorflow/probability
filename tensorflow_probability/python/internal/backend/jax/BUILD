@@ -63,6 +63,7 @@ FILENAMES = [
     "test_lib",
     "tf_inspect",
     "type_spec",
+    "type_spec_registry",
     "variable_utils",
     "variables",
     "v1",

@@ -45,6 +45,7 @@ from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shap
 from tensorflow_probability.python.internal.backend.numpy import tensor_spec
 from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.internal.backend.numpy import type_spec
+from tensorflow_probability.python.internal.backend.numpy import type_spec_registry
 from tensorflow_probability.python.internal.backend.numpy import ops as module
 from tensorflow_probability.python.internal.backend.numpy import numpy_array as array_ops
 from tensorflow_probability.python.internal.backend.numpy import debugging as check_ops
@@ -1358,7 +1359,7 @@ def make_composite_tensor(cls, module_name="tf.linalg"):
 
   spec_name = "{}Spec".format(cls.__name__)
   spec_type = type(spec_name, (_LinearOperatorSpec,), {"value_type": cls})
-  type_spec.register("{}.{}".format(module_name, spec_name))(spec_type)
+  type_spec_registry.register("{}.{}".format(module_name, spec_name))(spec_type)
   cls._type_spec = property(spec_type.from_operator)  # pylint: disable=protected-access
   return cls
 

@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.framework import composite_tensor
 from tensorflow.python.framework import type_spec
+from tensorflow.python.framework import type_spec_registry
 from tensorflow.python.ops import resource_variable_ops
 from tensorflow.python.util import tf_inspect
 from tensorflow.python.util import variable_utils
@@ -490,7 +491,7 @@ class AutoCompositeTensor(composite_tensor.CompositeTensor):
 def type_spec_register(name, allow_overwrite=True):
   """Decorator used to register a unique name for a TypeSpec subclass.
 
-  Unlike TensorFlow's `type_spec.register`, this function allows a new
+  Unlike TensorFlow's `type_spec_registry.register`, this function allows a new
   `TypeSpec` to be registered with a `name` that already appears in the
   registry (overwriting the `TypeSpec` already registered with that name). This
   allows for re-definition of `AutoCompositeTensor` subclasses in test
@@ -507,10 +508,10 @@ def type_spec_register(name, allow_overwrite=True):
     A class decorator that registers the decorated class with the given name.
   """
   # pylint: disable=protected-access
-  if allow_overwrite and name in type_spec._NAME_TO_TYPE_SPEC:
-    type_spec._TYPE_SPEC_TO_NAME.pop(
-        type_spec._NAME_TO_TYPE_SPEC.pop(name))
-  return type_spec.register(name)
+  if allow_overwrite and name in type_spec_registry._NAME_TO_TYPE_SPEC:
+    type_spec_registry._TYPE_SPEC_TO_NAME.pop(
+        type_spec_registry._NAME_TO_TYPE_SPEC.pop(name))
+  return type_spec_registry.register(name)
 
 
 def auto_composite_tensor(

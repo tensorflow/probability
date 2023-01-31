@@ -62,6 +62,7 @@ py_library(
         ":test_lib",
         ":tf_inspect",
         ":type_spec",
+        ":type_spec_registry",
         ":variable_utils",
         ":variables",
     ],
@@ -402,6 +403,11 @@ py_library(
 py_library(
     name = "type_spec",
     srcs = ["type_spec.py"],
+)
+
+py_library(
+    name = "type_spec_registry",
+    srcs = ["type_spec_registry.py"],
 )
 
 py_library(

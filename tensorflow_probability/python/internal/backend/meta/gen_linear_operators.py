@@ -132,6 +132,11 @@ def gen_module(module_name):
       'from tensorflow_probability.python.internal.backend.numpy '
       'import type_spec')
   code = code.replace(
+      'from tensorflow.python.framework '
+      'import type_spec_registry',
+      'from tensorflow_probability.python.internal.backend.numpy '
+      'import type_spec_registry')
+  code = code.replace(
       'from tensorflow.python.ops import variables',
       'from tensorflow_probability.python.internal.backend.numpy '
       'import variables')
@@ -147,8 +152,8 @@ def gen_module(module_name):
       'import data_structures')
   code = re.sub(
       r'from tensorflow\.python\.linalg import (\w+)',
-      'from tensorflow_probability.python.internal.backend.numpy.gen import \\1 '
-      'as \\1', code)
+      'from tensorflow_probability.python.internal.backend.numpy.gen '
+      'import \\1 as \\1', code)
   code = code.replace(
       'from tensorflow.python.ops.linalg import ',
       '# from tensorflow.python.ops.linalg import ')
