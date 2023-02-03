@@ -283,7 +283,8 @@ class SGAHMCTest(tfp_test_util.TestCase):
 
       sga_hmc_state, sga_hmc_extra = sga_hmc.stochastic_gradient_ascent_hmc_step(
           sga_hmc_state,
-          scalar_step_size=0.1,
+          scalar_step_size=self._constant(0.1),
+          step_size_scale=self._constant(1.),
           target_log_prob_fn=target_log_prob_fn,
           criterion_fn=sga_hmc.chees_criterion,
           adapt=adapt,

@@ -100,9 +100,15 @@ def hamiltonian_monte_carlo_with_state_grads_step(
        for Setting Trajectory Lengths in Hamiltonian Monte Carlo.
        http://proceedings.mlr.press/v130/hoffman21a.html
   """
+  consts = scalar_step_size, hmc_state, step_size_scale
+  flat_consts = util.flatten_tree(consts)
 
   @tf.custom_gradient
-  def hmc(trajectory_length):
+  def hmc(*traj_and_flat_consts):
+    trajectory_length = traj_and_flat_consts[0]
+    scalar_step_size, hmc_state, step_size_scale = (
+        util.unflatten_tree(consts, traj_and_flat_consts[1:])
+    )
     trajectory_length = tf.convert_to_tensor(trajectory_length)
     num_integrator_steps = tf.cast(
         tf.math.ceil(trajectory_length / scalar_step_size), tf.int32)
@@ -153,14 +159,15 @@ def hamiltonian_monte_carlo_with_state_grads_step(
       else:
         named_axis_bc = named_axis
 
-      return sum(
+      traj_grad = sum(
           util.flatten_tree(
               util.map_tree_up_to(state_grads, do_sum, state_grads,
                                   named_axis_bc)))
+      return (traj_grad,) + (None,) * len(flat_consts)
 
     return res, grad
 
-  return hmc(trajectory_length)
+  return hmc(trajectory_length, *flat_consts)
 
 
 @util.named_call

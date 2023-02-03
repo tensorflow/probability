@@ -157,16 +157,20 @@ def _retrying_cholesky_fwd(matrix, jitter, max_iters):
       loop_vars=[tf.convert_to_tensor(0), shift, triangular_factor],
       maximum_iterations=max_iters)
   shift = tf.stop_gradient(shift)
-  return (triangular_factor, shift[..., 0]), (triangular_factor, matrix, shift)
+  return (triangular_factor, shift[..., 0]), (
+      triangular_factor,
+      matrix,
+      jitter,
+      shift,
+  )
 
 # Gradient implementation comes from https://arxiv.org/pdf/1602.07527.pdf
 
 
-def _retrying_cholesky_bwd(jitter, max_iters, aux, g):
+def _retrying_cholesky_bwd(max_iters, aux, g):
   """Reverse mode impl for retrying_cholesky."""
-  del jitter
   del max_iters
-  _, matrix, shift = aux
+  _, matrix, _, shift = aux
 
   # Recompute triangular factor so we can take gradients of gradients.
   triangular_factor = tf.linalg.cholesky(
@@ -187,13 +191,13 @@ def _retrying_cholesky_bwd(jitter, max_iters, aux, g):
       tf.linalg.matmul(t_inverse, middle, adjoint_a=True), t_inverse)
   grad = grad + tf.linalg.adjoint(grad)
   # Shift has no gradients.
-  return 0.5 * grad
+  return 0.5 * grad, None
 
 
-def _retrying_cholesky_jvp(jitter, max_iters, primals, tangents):
+def _retrying_cholesky_jvp(max_iters, primals, tangents):
   """JVP for retrying_cholesky."""
-  matrix, = primals
-  gmatrix, = tangents
+  matrix, jitter = primals
+  gmatrix, _ = tangents
   gmatrix = 0.5 * (gmatrix + tf.linalg.adjoint(gmatrix))
   output, shift = _retrying_cholesky_custom_gradient(matrix, jitter, max_iters)
   triangular_linop = tf.linalg.LinearOperatorLowerTriangular(output)
@@ -209,7 +213,7 @@ def _retrying_cholesky_jvp(jitter, max_iters, primals, tangents):
     vjp_fwd=_retrying_cholesky_fwd,
     vjp_bwd=_retrying_cholesky_bwd,
     jvp_fn=_retrying_cholesky_jvp,
-    nondiff_argnums=(1, 2))
+    nondiff_argnums=(2,))
 def _retrying_cholesky_custom_gradient(matrix, jitter, max_iters):
   return _retrying_cholesky_fwd(matrix, jitter, max_iters)[0]
 

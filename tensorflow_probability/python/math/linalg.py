@@ -1101,9 +1101,8 @@ def _hpsd_logdet_fwd(matrix, cholesky_matrix):
   return output, (cholesky_matrix,)
 
 
-def _hpsd_logdet_bwd(cholesky_matrix, aux, g):
+def _hpsd_logdet_bwd(aux, g):
   """Reverse mode impl for hpsd_logdet."""
-  del cholesky_matrix
   cholesky_matrix, = aux
   dmatrix = g
   chol_linop = tf.linalg.LinearOperatorLowerTriangular(cholesky_matrix)
@@ -1113,12 +1112,12 @@ def _hpsd_logdet_bwd(cholesky_matrix, aux, g):
   inverse_matrix = tf.linalg.matmul(
       chol_inverse, chol_inverse, transpose_a=True)
 
-  return (dmatrix[..., tf.newaxis, tf.newaxis] * inverse_matrix,)
+  return dmatrix[..., tf.newaxis, tf.newaxis] * inverse_matrix, None
 
 
-def _hpsd_logdet_jvp(cholesky_matrix, primals, tangents):
-  matrix, = primals
-  gmatrix, = tangents
+def _hpsd_logdet_jvp(primals, tangents):
+  matrix, cholesky_matrix = primals
+  gmatrix, _ = tangents
   output, (cholesky_matrix,) = _hpsd_logdet_fwd(matrix, cholesky_matrix)
   chol_linop = tf.linalg.LinearOperatorLowerTriangular(cholesky_matrix)
   matrix_jvp = chol_linop.solve(chol_linop.solve(gmatrix), adjoint=True)
@@ -1128,8 +1127,7 @@ def _hpsd_logdet_jvp(cholesky_matrix, primals, tangents):
 @tfp_custom_gradient.custom_gradient(
     vjp_fwd=_hpsd_logdet_fwd,
     vjp_bwd=_hpsd_logdet_bwd,
-    jvp_fn=_hpsd_logdet_jvp,
-    nondiff_argnums=(1,))
+    jvp_fn=_hpsd_logdet_jvp)
 def _hpsd_logdet_custom_gradient(matrix, cholesky_matrix):
   return _hpsd_logdet_fwd(matrix, cholesky_matrix)[0]
 
@@ -1354,10 +1352,8 @@ def _hpsd_quadratic_form_solvevec_fwd(matrix, rhs, cholesky_matrix):
   return output, (cholesky_matrix, rhs, solve_rhs)
 
 
-def _hpsd_quadratic_form_solvevec_bwd(cholesky_matrix, aux, g):
+def _hpsd_quadratic_form_solvevec_bwd(aux, g):
   """Reverse mode impl for hpsd_quadratic_form_solvevec."""
-  del cholesky_matrix
-
   cholesky_matrix, rhs, solve_rhs = aux
   chol_linop = tf.linalg.LinearOperatorLowerTriangular(cholesky_matrix)
   full_solve = chol_linop.solvevec(solve_rhs, adjoint=True)
@@ -1368,13 +1364,13 @@ def _hpsd_quadratic_form_solvevec_bwd(cholesky_matrix, aux, g):
       [cholesky_matrix, rhs[..., tf.newaxis]],
       [matrix_grad * g[..., tf.newaxis, tf.newaxis],
        (rhs_grad * g[..., tf.newaxis])[..., tf.newaxis]])
-  return matrix_grad, tf.squeeze(rhs_grad, axis=-1)
+  return matrix_grad, tf.squeeze(rhs_grad, axis=-1), None
 
 
-def _hpsd_quadratic_form_solvevec_jvp(cholesky_matrix, primals, tangents):
+def _hpsd_quadratic_form_solvevec_jvp(primals, tangents):
   """JVP for hpsd_quadratic_form_solvevec."""
-  matrix, rhs = primals
-  gmatrix, grhs = tangents
+  matrix, rhs, cholesky_matrix = primals
+  gmatrix, grhs, _ = tangents
   output, (cholesky_matrix, _, solve_rhs) = _hpsd_quadratic_form_solvevec_fwd(
       matrix, rhs, cholesky_matrix)
   chol_linop = tf.linalg.LinearOperatorLowerTriangular(cholesky_matrix)
@@ -1388,8 +1384,7 @@ def _hpsd_quadratic_form_solvevec_jvp(cholesky_matrix, primals, tangents):
 @tfp_custom_gradient.custom_gradient(
     vjp_fwd=_hpsd_quadratic_form_solvevec_fwd,
     vjp_bwd=_hpsd_quadratic_form_solvevec_bwd,
-    jvp_fn=_hpsd_quadratic_form_solvevec_jvp,
-    nondiff_argnums=(2,))
+    jvp_fn=_hpsd_quadratic_form_solvevec_jvp)
 def _hpsd_quadratic_form_solvevec_custom_gradient(
     matrix, rhs, cholesky_matrix):
   return _hpsd_quadratic_form_solvevec_fwd(matrix, rhs, cholesky_matrix)[0]
