@@ -91,7 +91,7 @@ install_test_only_packages() {
   # The following unofficial dependencies are used only by tests.
   PIP_FLAGS=${1-}
   python -m pip install $PIP_FLAGS \
-    hypothesis==6.64.0 \
+    hypothesis \
     jax==0.4.1 \
     jaxlib==0.4.1 \
     optax \
