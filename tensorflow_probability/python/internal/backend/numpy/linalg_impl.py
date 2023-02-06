@@ -239,14 +239,14 @@ def _cholesky_solve(chol, rhs, name=None):  # pylint: disable=unused-argument
     result = scipy_linalg.cho_solve((chol_broadcast, True), rhs_broadcast)
     return _reshape_solve_result(result, rhs_batch_dims, result_permutation)
   try:
-    bcast = np.broadcast(chol[..., :1], rhs)
+    bcast_shp = np.broadcast_shapes(chol.shape[:-2], rhs.shape[:-2])
   except ValueError as e:
-    raise ValueError('Error with inputs shaped `chol`={}, rhs={}:\n{}'.format(
-        chol.shape, rhs.shape, str(e)))
+    raise ValueError(
+        f'Error with inputs shaped `chol`={chol.shape}, rhs={rhs.shape}') from e
   dim = chol.shape[-1]
-  chol = np.broadcast_to(chol, bcast.shape[:-1] + (dim,))
-  rhs = np.broadcast_to(rhs, bcast.shape)
-  nbatch = int(np.prod(chol.shape[:-2]))
+  chol = np.broadcast_to(chol, bcast_shp + (dim, dim))
+  rhs = np.broadcast_to(rhs, bcast_shp + (dim, rhs.shape[-1],))
+  nbatch = int(np.prod(bcast_shp))
   flat_chol = chol.reshape(nbatch, dim, dim)
   flat_rhs = rhs.reshape(nbatch, dim, rhs.shape[-1])
   result = np.empty_like(flat_rhs)
@@ -443,14 +443,15 @@ def _solve(matrix, rhs, adjoint=False, name=None):  # pylint: disable=redefined-
     return _reshape_solve_result(
         result, rhs_batch_dims, result_permutation)
   try:
-    bcast = np.broadcast(matrix[..., :1], rhs)
+    bcast_shp = np.broadcast_shapes(matrix.shape[:-2], rhs.shape[:-2])
   except ValueError as e:
-    raise ValueError('Error with inputs shaped `matrix`={}, rhs={}:\n{}'.format(
-        matrix.shape, rhs.shape, str(e)))
+    raise ValueError(
+        f'Error with inputs shaped `matrix`={matrix.shape}, rhs={rhs.shape}'
+        ) from e
   dim = matrix.shape[-1]
-  matrix = np.broadcast_to(matrix, bcast.shape[:-1] + (dim,))
-  rhs = np.broadcast_to(rhs, bcast.shape)
-  nbatch = int(np.prod(matrix.shape[:-2]))
+  matrix = np.broadcast_to(matrix, bcast_shp + (dim, dim))
+  rhs = np.broadcast_to(rhs, bcast_shp + (dim, rhs.shape[-1]))
+  nbatch = int(np.prod(bcast_shp))
   flat_mat = matrix.reshape(nbatch, dim, dim)
   flat_rhs = rhs.reshape(nbatch, dim, rhs.shape[-1])
   result = np.empty(flat_rhs.shape)
@@ -495,14 +496,15 @@ def _triangular_solve(matrix, rhs, lower=True, adjoint=False, name=None):  # pyl
         trans='C' if adjoint else 'N')
     return _reshape_solve_result(result, rhs_batch_dims, result_permutation)
   try:
-    bcast = np.broadcast(matrix[..., :1], rhs)
+    bcast_shp = np.broadcast_shapes(matrix.shape[:-2], rhs.shape[:-2])
   except ValueError as e:
-    raise ValueError('Error with inputs shaped `matrix`={}, rhs={}:\n{}'.format(
-        matrix.shape, rhs.shape, str(e)))
+    raise ValueError(
+        f'Error with inputs shaped `matrix`={matrix.shape}, rhs={rhs.shape}'
+        ) from e
   dim = matrix.shape[-1]
-  matrix = np.broadcast_to(matrix, bcast.shape[:-1] + (dim,))
-  rhs = np.broadcast_to(rhs, bcast.shape)
-  nbatch = int(np.prod(matrix.shape[:-2]))
+  matrix = np.broadcast_to(matrix, bcast_shp + (dim, dim))
+  rhs = np.broadcast_to(rhs, bcast_shp + (dim, rhs.shape[-1]))
+  nbatch = int(np.prod(bcast_shp))
   flat_mat = matrix.reshape(nbatch, dim, dim)
   flat_rhs = rhs.reshape(nbatch, dim, rhs.shape[-1])
   result = np.empty(flat_rhs.shape)

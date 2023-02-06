@@ -302,7 +302,8 @@ def matmul_compatible_pairs(draw,
                             elements=None):
   elements = elements or floats(dtype=dtype)
   x_strategy = x_strategy or single_arrays(
-      shape=shapes(min_dims=2, max_dims=5), dtype=dtype, elements=elements)
+      shape=shapes(min_dims=2, max_dims=5, min_side=0),
+      dtype=dtype, elements=elements)
   x = draw(x_strategy)
   x_shape = tuple(map(int, x.shape))
   y_shape = x_shape[:-2] + x_shape[-1:] + (draw(hps.integers(1, 10)),)
@@ -314,7 +315,7 @@ def matmul_compatible_pairs(draw,
 def pd_matrices(draw, eps=1.):
   x = draw(
       single_arrays(
-          shape=shapes(min_dims=2),
+          shape=shapes(min_dims=2, min_side=0),
           elements=floats(min_value=-1e3, max_value=1e3)))
   y = np.swapaxes(x, -1, -2)
   if x.shape[-1] < x.shape[-2]:  # Ensure resultant matrix not rank-deficient.
@@ -1180,6 +1181,12 @@ NUMPY_TEST_CASES = [
     TestCase('linalg.triangular_solve', [
         matmul_compatible_pairs(
             x_strategy=pd_matrices().map(np.linalg.cholesky))
+    ]),
+
+    # ArgSpec(args=['matrix', 'rhs', 'adjoint', 'name'], varargs=None,
+    # keywords=None, defaults=(True, False, None))
+    TestCase('linalg.solve', [
+        matmul_compatible_pairs(x_strategy=pd_matrices())
     ]),
 
     # ArgSpec(args=['shape_x', 'shape_y'], varargs=None, keywords=None,
