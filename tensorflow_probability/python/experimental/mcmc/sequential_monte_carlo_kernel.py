@@ -33,7 +33,7 @@ __all__ = [
 
 # SequentialMonteCarlo `state` structure.
 class WeightedParticles(collections.namedtuple(
-    'WeightedParticles', ['particles', 'log_weights'])):
+    'WeightedParticles', ['particles', 'log_weights', 'extra'])):
   """Particles with corresponding log weights.
 
   This structure serves as the `state` for the `SequentialMonteCarlo` transition
@@ -49,6 +49,9 @@ class WeightedParticles(collections.namedtuple(
       `exp(reduce_logsumexp(log_weights, axis=0)) == 1.`. These must be used in
       conjunction with `particles` to compute expectations under the target
       distribution.
+    extra: a (structure of) Tensor(s) each of shape
+      `concat([[num_particles, b1, ..., bN], event_shape])`, where `event_shape`
+      may differ across component `Tensor`s.
 
   In some contexts, particles may be stacked across multiple inference steps,
   in which case all `Tensor` shapes will be prefixed by an additional dimension
@@ -135,7 +138,7 @@ def rejuvenation_fn(state,
                     log_weights,
                     extra,
                     step):
-  return (particles, indices, log_weights)
+  return (particles, indices, log_weights, extra)
 
 
 def propose_extra(step,
@@ -150,7 +153,7 @@ def propose_extra(step,
 
 
 def identity(state, new_particles, new_indices, log_weights, extra, step):
-    return new_particles, new_indices, log_weights
+    return new_particles, new_indices, log_weights, extra
 
 
 class SequentialMonteCarlo(kernel_base.TransitionKernel):
@@ -273,7 +276,7 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
   def resample_fn(self):
     return self._resample_fn
 
-  def one_step(self, state, kernel_results, extra=None, seed=None):
+  def one_step(self, state, kernel_results, seed=None):
     """Takes one Sequential Monte Carlo inference step.
 
     Args:
@@ -286,7 +289,6 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
       kernel_results: instance of
         `tfp.experimental.mcmc.SequentialMonteCarloResults` representing results
         from a previous step.
-      extra: extra information to keep track of
       seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
     Returns:
@@ -301,8 +303,6 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
         proposal_seed, resample_seed = samplers.split_seed(seed)
 
         state = WeightedParticles(*state)  # Canonicalize.
-        if extra == None:
-            extra = tf.convert_to_tensor([np.nan] * ps.size0(state.particles))
 
         # Propose new particles and update weights for this step, unless it's
         # the initial step, in which case, use the user-provided initial
@@ -360,20 +360,21 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
         do_rejuvenation = self._rejuvenation_criterion_fn(state)
         (new_particles,
          new_indices,
-         log_weights) = tf.cond(
+         log_weights,
+         extra) = tf.cond(
             tf.constant(do_rejuvenation),
             lambda: self._rejuvenation_fn(state,
                                           new_particles,
                                           new_indices,
                                           log_weights,
-                                          extra,
+                                          state.extra,
                                           ps.maximum(0, kernel_results.steps - 1)
                                           ),
             lambda: identity(state,
                              new_particles,
                              new_indices,
                              log_weights,
-                             extra,
+                             state.extra,
                              ps.maximum(0, kernel_results.steps - 1)
                              )
         )
@@ -389,7 +390,8 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
         )
 
       return (WeightedParticles(particles=new_particles,
-                                log_weights=log_weights),
+                                log_weights=log_weights,
+                                extra=proposed_extra),
               SequentialMonteCarloResults(
                   steps=kernel_results.steps + 1,
                   parent_indices=new_indices,
@@ -398,8 +400,7 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
                   accumulated_log_marginal_likelihood=(
                       kernel_results.accumulated_log_marginal_likelihood +
                       incremental_log_marginal_likelihood),
-                  seed=seed),
-              proposed_extra)
+                  seed=seed))
 
   def bootstrap_results(self, init_state):
     with tf.name_scope(self.name):

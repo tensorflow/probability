@@ -84,61 +84,6 @@ class _ParticleFilterTest(test_util.TestCase):
     self.assertAllClose(tf.reduce_mean(position[-1]), 6., atol=0.1)
     self.assertAllClose(tf.math.reduce_variance(position[-1]), 1.5, atol=0.1)
 
-  def test_rejuvenation_fn(self):
-    # A simple HMM with 10 hidden states
-    stream = test_util.test_seed_stream()
-    d = hidden_markov_model.HiddenMarkovModel(
-        initial_distribution=categorical.Categorical(logits=tf.zeros(10)),
-        transition_distribution=categorical.Categorical(logits=tf.zeros((10, 10))),
-        observation_distribution=normal.Normal(loc=tf.range(10.), scale=0.3),
-        num_steps=10
-    )
-    observation = categorical.Categorical(
-        logits=[0] * 10,
-        dtype=tf.float32).sample(10, seed=stream())
-
-    # A dimension for each particle of the particles filters
-    observations = tf.reshape(tf.tile(observation, [10]),
-                              [10, tf.shape(observation)[0]])
-
-    def rejuvenation_fn(state,
-                        particles,
-                        indices,
-                        log_weights,
-                        extra,
-                        step
-                        ):
-      posterior = tf.cast(d.posterior_marginals(observation).sample(seed=stream()), tf.int32)
-      return (posterior, indices, log_weights)
-
-    rej_particles, _, _, _, _ =\
-        particle_filter.particle_filter(
-            observations=observation,
-            initial_state_prior=d.initial_distribution,
-            transition_fn=lambda _, s: categorical.Categorical(logits=tf.zeros(s.shape + tuple([10]))),
-            observation_fn=lambda _, s: normal.Normal(loc=tf.cast(s, tf.float32), scale=0.3),
-            rejuvenation_criterion_fn=lambda _: True,
-            rejuvenation_fn=rejuvenation_fn,
-            num_particles=10,
-            seed=stream()
-        )
-    delta_rej = tf.where(observations - tf.cast(rej_particles, tf.float32) != 0, 1, 0)
-
-    nonrej_particles, _, _, _, _ =\
-        particle_filter.particle_filter(
-            observations=observation,
-            initial_state_prior=d.initial_distribution,
-            transition_fn=lambda _, s: categorical.Categorical(logits=tf.zeros(s.shape + tuple([10]))),
-            observation_fn=lambda _, s: normal.Normal(loc=tf.cast(s, tf.float32), scale=0.3),
-            num_particles=10,
-            seed=stream()
-        )
-    delta_nonrej = tf.where(observations - tf.cast(nonrej_particles, tf.float32) != 0, 1, 0)
-
-    delta = tf.reduce_sum(delta_nonrej - delta_rej)
-
-    self.assertAllGreaterEqual(self.evaluate(delta), 0)
-
   def test_batch_of_filters(self):
 
     batch_shape = [3, 2]
@@ -175,7 +120,7 @@ class _ParticleFilterTest(test_util.TestCase):
         true_initial_positions)
 
     (particles, log_weights, parent_indices,
-     incremental_log_marginal_likelihoods, extra) = self.evaluate(
+     incremental_log_marginal_likelihoods) = self.evaluate(
          particle_filter.particle_filter(
              observations=observed_positions,
              initial_state_prior=initial_state_prior,
@@ -192,8 +137,6 @@ class _ParticleFilterTest(test_util.TestCase):
                         [num_timesteps, num_particles] + batch_shape)
     self.assertAllEqual(incremental_log_marginal_likelihoods.shape,
                         [num_timesteps] + batch_shape)
-    self.assertAllEqual(extra.shape,
-                        [num_timesteps, num_particles] + batch_shape)
 
     self.assertAllClose(
         self.evaluate(
@@ -247,32 +190,6 @@ class _ParticleFilterTest(test_util.TestCase):
         particle_filter.reconstruct_trajectories(particles, parent_indices))
     self.assertAllEqual(
         np.array([[1, 2, 2], [4, 6, 6], [7, 8, 9]]), trajectories)
-
-  def test_extra(self):
-    def extra_fn(step, _1, _2, _3):
-      return tf.cast(step, dtype=tf.float32)
-
-    observations = tf.convert_to_tensor([1., 3., 5., 7., 9.])
-
-    _, _, _, _, extra = self.evaluate(
-        particle_filter.particle_filter(
-            observations=observations,
-            initial_state_prior=normal.Normal(0., 1.),
-            transition_fn=lambda _, state: normal.Normal(state, 1.),
-            observation_fn=lambda _, state: normal.Normal(state, 1.),
-            extra_fn=extra_fn,
-            num_particles=1024,
-            seed=test_util.test_seed())
-    )
-    self.assertLen(extra, 5)
-    self.assertLen(extra[0], 1024)
-    self.assertLen(extra[1], 1024)
-    self.assertLen(extra[2], 1024)
-    self.assertLen(extra[3], 1024)
-    self.assertAllEqual(extra[0, :], tf.repeat(tf.constant(0), 1024))
-    self.assertAllEqual(extra[1, :], tf.repeat(tf.constant(1), 1024))
-    self.assertAllEqual(extra[2, :], tf.repeat(tf.constant(2), 1024))
-    self.assertAllEqual(extra[3, :], tf.repeat(tf.constant(3), 1024))
 
   def test_epidemiological_model(self):
     # A toy, discrete version of an SIR (Susceptible, Infected, Recovered)
@@ -402,7 +319,7 @@ class _ParticleFilterTest(test_util.TestCase):
     # the particle filter.
     # pylint: disable=g-long-lambda
     (particles, log_weights, _,
-     estimated_incremental_log_marginal_likelihoods, extra) = self.evaluate(
+     estimated_incremental_log_marginal_likelihoods) = self.evaluate(
          particle_filter.particle_filter(
              observations=observations,
              initial_state_prior=initial_state_prior,
@@ -478,7 +395,7 @@ class _ParticleFilterTest(test_util.TestCase):
     def observe_position(_, state):
       return normal.Normal(loc=state['position'], scale=0.01)
 
-    particles, _, _, lps, _ = self.evaluate(
+    particles, _, _, lps = self.evaluate(
         particle_filter.particle_filter(
             # 'Observing' the values we'd expect from a proper integrator should
             # give high likelihood if our discrete approximation is good.
@@ -543,7 +460,7 @@ class _ParticleFilterTest(test_util.TestCase):
   def test_step_indices_to_trace(self):
     num_particles = 1024
     (particles_1_3, log_weights_1_3, parent_indices_1_3,
-     incremental_log_marginal_likelihood_1_3, extra) = self.evaluate(
+     incremental_log_marginal_likelihood_1_3) = self.evaluate(
          particle_filter.particle_filter(
              observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
              initial_state_prior=normal.Normal(0., 1.),
@@ -557,12 +474,11 @@ class _ParticleFilterTest(test_util.TestCase):
     self.assertLen(particles_1_3, 2)
     self.assertLen(log_weights_1_3, 2)
     self.assertLen(parent_indices_1_3, 2)
-    self.assertLen(extra, 2)
     self.assertLen(incremental_log_marginal_likelihood_1_3, 2)
     means = np.sum(np.exp(log_weights_1_3) * particles_1_3, axis=1)
     self.assertAllClose(means, [3., 7.], atol=1.)
 
-    (final_particles, final_log_weights, final_cumulative_lp, extra) = self.evaluate(
+    (final_particles, final_log_weights, final_cumulative_lp) = self.evaluate(
         particle_filter.particle_filter(
             observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
             initial_state_prior=normal.Normal(0., 1.),
@@ -577,7 +493,6 @@ class _ParticleFilterTest(test_util.TestCase):
             seed=test_util.test_seed()))
     self.assertLen(final_particles, num_particles)
     self.assertLen(final_log_weights, num_particles)
-    self.assertLen(extra, num_particles)
     self.assertEqual(final_cumulative_lp.shape, ())
     means = np.sum(np.exp(final_log_weights) * final_particles)
     self.assertAllClose(means, 9., atol=1.5)
@@ -686,7 +601,7 @@ class _ParticleFilterTest(test_util.TestCase):
   def test_marginal_likelihood_gradients_are_defined(self):
 
     def marginal_log_likelihood(level_scale, noise_scale):
-      _, _, _, lps, _ = particle_filter.particle_filter(
+      _, _, _, lps = particle_filter.particle_filter(
           observations=tf.convert_to_tensor([1., 2., 3., 4., 5.]),
           initial_state_prior=normal.Normal(loc=0, scale=1.),
           transition_fn=lambda _, x: normal.Normal(loc=x, scale=level_scale),

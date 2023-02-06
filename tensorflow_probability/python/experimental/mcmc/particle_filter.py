@@ -43,17 +43,13 @@ def _default_trace_fn(state, kernel_results):
           kernel_results.incremental_log_marginal_likelihood)
 
 
-def _default_extra_fn(a, b, c, extra):
-  return extra
-
-
 def _no_rejuvenation(state,
                     particles,
                     indices,
                     log_weights,
                     extra,
                     step):
-  return (particles, indices, log_weights)
+  return (particles, indices, log_weights, extra)
 
 
 particle_filter_arg_str = """\
@@ -140,7 +136,7 @@ def infer_trajectories(observations,
                        resample_fn=weighted_resampling.resample_systematic,
                        resample_criterion_fn=smc_kernel.ess_below_threshold,
                        unbiased_gradients=True,
-                       rejuvenation_fn=_no_rejuvenation,
+                       rejuvenation_fn=None,
                        rejuvenation_criterion_fn=lambda *_: False,
                        num_transitions_per_observation=1,
                        seed=None,
@@ -254,8 +250,7 @@ def infer_trajectories(observations,
     (particles,
      log_weights,
      parent_indices,
-     incremental_log_marginal_likelihoods,
-     extra) = particle_filter(
+     incremental_log_marginal_likelihoods) = particle_filter(
          observations=observations,
          initial_state_prior=initial_state_prior,
          transition_fn=transition_fn,
@@ -301,7 +296,6 @@ def sequential_monte_carlo(loop_seed,
         rejuvenation_criterion_fn,
         unbiased_gradients,
         trace_fn,
-        extra_fn=_default_extra_fn,
         particles_dim=0,
         static_trace_allocation_size=None,
         never_trace=lambda *_: False,
@@ -366,21 +360,20 @@ def sequential_monte_carlo(loop_seed,
     # Use `trace_scan` rather than `sample_chain` directly because the latter
     # would force us to trace the state history (with or without thinning),
     # which is not always appropriate.
-    def seeded_one_step(seed_state_results, extra, _):
+    def seeded_one_step(seed_state_results, _):
         seed, state, results = seed_state_results
         one_step_seed, next_seed = samplers.split_seed(seed)
-        next_state, next_results, extra = kernel.one_step(
-            state, results, extra, seed=one_step_seed)
-        return (next_seed, next_state, next_results), extra
+        next_state, next_results = kernel.one_step(
+            state, results, seed=one_step_seed)
+        return next_seed, next_state, next_results
 
-    final_seed_state_result, final_extra, traced_results = loop_util.trace_scan(
+    final_seed_state_result, traced_results = loop_util.trace_scan(
         loop_fn=seeded_one_step,
         initial_state=(loop_seed,
                        initial_weighted_particles,
                        kernel.bootstrap_results(initial_weighted_particles)),
         elems=tf.ones([num_timesteps]),
         trace_fn=lambda seed_state_results: trace_fn(*seed_state_results[1:]),
-        extra_fn=extra_fn,
         trace_criterion_fn=(
             lambda seed_state_results: trace_criterion_fn(  # pylint: disable=g-long-lambda
                 *seed_state_results[1:])),
@@ -388,9 +381,8 @@ def sequential_monte_carlo(loop_seed,
         parallel_iterations=parallel_iterations)
 
     if trace_criterion_fn is never_trace:
-        # Return results from just the final step.
-        traced_results = (*trace_fn(*final_seed_state_result[1:]),
-                          extra_fn(0, 0, 0, final_extra))
+      # Return results from just the final step.
+      traced_results = trace_fn(*final_seed_state_result[1:])
 
     return traced_results
 
@@ -402,7 +394,6 @@ def particle_filter(observations,
                     transition_fn,
                     observation_fn,
                     num_particles,
-                    extra_fn=_default_extra_fn,
                     particles_dim=0,
                     initial_state_proposal=None,
                     proposal_fn=None,
@@ -511,7 +502,6 @@ def particle_filter(observations,
         trace_fn=trace_fn,
         loop_seed=loop_seed,
         never_trace=never_trace,
-        extra_fn=extra_fn,
     )
 
     return traced_results
@@ -522,6 +512,7 @@ def _particle_filter_initial_weighted_particles(observations,
                                                 initial_state_prior,
                                                 initial_state_proposal,
                                                 num_particles,
+                                                extra=np.nan,
                                                 particles_dim=0,
                                                 seed=None):
   """Initialize a set of weighted particles including the first observation."""
@@ -545,7 +536,8 @@ def _particle_filter_initial_weighted_particles(observations,
           step=0,
           particles=initial_state,
           observations=observations,
-          observation_fn=observation_fn))
+          observation_fn=observation_fn),
+      extra=extra)
 
 
 def _particle_filter_propose_and_update_log_weights_fn(
@@ -588,7 +580,8 @@ def _particle_filter_propose_and_update_log_weights_fn(
           particles=proposed_particles,
           log_weights=log_weights + _compute_observation_log_weights(
               step + 1, proposed_particles, observations, observation_fn,
-              num_transitions_per_observation=num_transitions_per_observation))
+              num_transitions_per_observation=num_transitions_per_observation),
+          extra=state.extra)
   return propose_and_update_log_weights_fn
 
 
