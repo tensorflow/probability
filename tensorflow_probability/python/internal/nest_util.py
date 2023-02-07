@@ -37,6 +37,27 @@ _is_namedtuple = nest._is_namedtuple  # pylint: disable=protected-access
 
 UNSPECIFIED = object()
 
+_STRUCTURES_HAVE_MISMATCHING_TYPES = (
+    "The two structures don't have the same sequence type. Input structure has "
+    'type {input_type}, while shallow structure has type {shallow_type}.'
+)
+
+_STRUCTURES_HAVE_MISMATCHING_LENGTHS = (
+    "The two structures don't have the same sequence length. Input "
+    'structure has length {input_length}, while shallow structure has length '
+    '{shallow_length}.'
+)
+
+_SHALLOW_TREE_HAS_INVALID_KEYS = (
+    "The shallow_tree's keys are not a subset of the input_tree's keys. The "
+    'shallow_tree has the following keys that are not in the input_tree: {}.'
+)
+
+_IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ = (
+    'If shallow structure is a sequence, input must also be a sequence. '
+    'Input has type: {}.'
+)
+
 
 def broadcast_structure(to_structure, from_structure):
   """Broadcasts `from_structure` to `to_structure`.
@@ -558,14 +579,16 @@ def _coerce_structure(shallow_tree, input_tree):
     return input_tree
 
   if not nest.is_nested(input_tree):
-    raise TypeError(nest._IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ.format(
-        type(input_tree)))
+    raise TypeError(
+        _IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ.format(type(input_tree))
+    )
 
   if len(input_tree) != len(shallow_tree):
     raise ValueError(
-        nest._STRUCTURES_HAVE_MISMATCHING_LENGTHS.format(
-            input_length=len(input_tree),
-            shallow_length=len(shallow_tree)))
+        _STRUCTURES_HAVE_MISMATCHING_LENGTHS.format(
+            input_length=len(input_tree), shallow_length=len(shallow_tree)
+        )
+    )
 
   # Determine whether shallow_tree should be treated as a Mapping or a Sequence.
   # Namedtuples can be interpreted either way (but keys take precedence).
@@ -588,12 +611,16 @@ def _coerce_structure(shallow_tree, input_tree):
     input_iter = nest._yield_value(input_tree)
     lookup_branch = lambda _: next(input_iter)
   else:
-    raise TypeError(nest._STRUCTURES_HAVE_MISMATCHING_TYPES.format(
-        input_type=type(input_tree),
-        shallow_type=(
-            type(shallow_tree.__wrapped__)
-            if hasattr(shallow_tree, '__wrapped__') else
-            type(shallow_tree))))
+    raise TypeError(
+        _STRUCTURES_HAVE_MISMATCHING_TYPES.format(
+            input_type=type(input_tree),
+            shallow_type=(
+                type(shallow_tree.__wrapped__)
+                if hasattr(shallow_tree, '__wrapped__')
+                else type(shallow_tree)
+            ),
+        )
+    )
 
   flat_coerced = []
   needs_wrapping = type(shallow_tree) is not type(input_tree)
@@ -601,8 +628,8 @@ def _coerce_structure(shallow_tree, input_tree):
     try:
       input_branch = lookup_branch(shallow_key)
     except (KeyError, AttributeError):
-      raise ValueError(
-          nest._SHALLOW_TREE_HAS_INVALID_KEYS.format([shallow_key]))
+      # pylint: disable=raise-missing-from
+      raise ValueError(_SHALLOW_TREE_HAS_INVALID_KEYS.format([shallow_key]))
     flat_coerced.append(_coerce_structure(shallow_branch, input_branch))
     # Keep track of whether nested elements have changed.
     needs_wrapping |= input_branch is not flat_coerced[-1]
