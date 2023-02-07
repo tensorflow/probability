@@ -471,7 +471,9 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
       cholesky_fn=None,
       validate_args=False,
       allow_nan_stats=False,
-      name='PrecomputedStudentTProcessRegressionModel'):
+      name='PrecomputedStudentTProcessRegressionModel',
+      _precomputed_divisor_matrix_cholesky=None,
+      _precomputed_solve_on_observation=None):
     """Returns a StudentTProcessRegressionModel with precomputed quantities.
 
     This differs from the constructor by precomputing quantities associated with
@@ -564,6 +566,8 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
         Default value: `False`.
       name: Python `str` name prefixed to Ops created by this class.
         Default value: 'PrecomputedStudentTProcessRegressionModel'.
+      _precomputed_divisor_matrix_cholesky: Internal parameter -- do not use.
+      _precomputed_solve_on_observation: Internal parameter -- do not use.
     Returns
       An instance of `StudentTProcessRegressionModel` with precomputed
       quantities associated with observations.
@@ -584,33 +588,17 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
           observation_noise_variance, dtype=dtype)
       observations = tf.convert_to_tensor(observations, dtype=dtype)
 
-      observation_cholesky = kernel.matrix(
-          observation_index_points, observation_index_points)
-
-      broadcast_shape = distribution_util.get_broadcast_shape(
-          observation_cholesky,
-          observation_noise_variance[..., tf.newaxis, tf.newaxis])
-
-      observation_cholesky = tf.broadcast_to(
-          observation_cholesky, broadcast_shape)
-
-      observation_cholesky = tf.linalg.set_diag(
-          observation_cholesky,
-          tf.linalg.diag_part(observation_cholesky) +
-          observation_noise_variance[..., tf.newaxis])
       if cholesky_fn is None:
         cholesky_fn = cholesky_util.make_cholesky_with_jitter_fn()
 
-      observation_cholesky = cholesky_fn(observation_cholesky)
-      observation_cholesky_operator = tf.linalg.LinearOperatorLowerTriangular(
-          observation_cholesky)
-
       conditional_kernel = DampedSchurComplement(
           df=df,
-          schur_complement=schur_complement_lib.SchurComplement(
+          schur_complement=schur_complement_lib.SchurComplement.with_precomputed_divisor(
               base_kernel=kernel,
               fixed_inputs=observation_index_points,
-              diag_shift=observation_noise_variance),
+              diag_shift=observation_noise_variance,
+              _precomputed_divisor_matrix_cholesky=(
+                  _precomputed_divisor_matrix_cholesky)),
           fixed_inputs_observations=observations,
           validate_args=validate_args)
 
@@ -620,9 +608,29 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
         if not callable(mean_fn):
           raise ValueError('`mean_fn` must be a Python callable')
 
-      diff = observations - mean_fn(observation_index_points)
-      solve_on_observation = observation_cholesky_operator.solvevec(
-          observation_cholesky_operator.solvevec(diff), adjoint=True)
+      solve_on_observation = _precomputed_solve_on_observation
+      if solve_on_observation is None:
+        observation_cholesky = kernel.matrix(
+            observation_index_points, observation_index_points)
+
+        broadcast_shape = distribution_util.get_broadcast_shape(
+            observation_cholesky,
+            observation_noise_variance[..., tf.newaxis, tf.newaxis])
+
+        observation_cholesky = tf.broadcast_to(
+            observation_cholesky, broadcast_shape)
+
+        observation_cholesky = tf.linalg.set_diag(
+            observation_cholesky,
+            tf.linalg.diag_part(observation_cholesky) +
+            observation_noise_variance[..., tf.newaxis])
+        observation_cholesky = cholesky_fn(observation_cholesky)
+        observation_cholesky_operator = tf.linalg.LinearOperatorLowerTriangular(
+            observation_cholesky)
+
+        diff = observations - mean_fn(observation_index_points)
+        solve_on_observation = observation_cholesky_operator.solvevec(
+            observation_cholesky_operator.solvevec(diff), adjoint=True)
 
       def conditional_mean_fn(x):
         k_x_obs = kernel.matrix(x, observation_index_points)
@@ -642,6 +650,13 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           name=name)
+
+      # pylint: disable=protected-access
+      stprm._precomputed_divisor_matrix_cholesky = (
+          conditional_kernel.schur_complement
+          ._precomputed_divisor_matrix_cholesky)
+      stprm._precomputed_solve_on_observation = solve_on_observation
+      # pylint: enable=protected-access
 
     return stprm
 

@@ -17,6 +17,7 @@
 
 import functools
 import itertools
+from unittest import mock
 
 from absl.testing import parameterized
 import numpy as np
@@ -406,6 +407,27 @@ class SchurComplementTest(test_util.TestCase):
         fixed_inputs_is_missing=~mask)
     self.assertAllClose(masked_schur.apply(x, y),
                         masked_structured_schur.apply(struct_x, struct_y))
+
+  def testPrivateArgPreventsCholeskyRecomputation(self):
+    x = np.random.uniform(-1, 1, (4, 7)).astype(np.float32)
+    chol = np.eye(4).astype(np.float32)
+    mock_cholesky_fn = mock.Mock(return_value=chol)
+    base_kernel = exponentiated_quadratic.ExponentiatedQuadratic()
+    k = schur_complement.SchurComplement.with_precomputed_divisor(
+        base_kernel, x, cholesky_fn=mock_cholesky_fn)
+    mock_cholesky_fn.assert_called_once()
+
+    # Assert that the Cholesky is not recomputed when the kernel is rebuilt and
+    # its methods are called.
+    mock_cholesky_fn.reset_mock()
+    k2 = schur_complement.SchurComplement.with_precomputed_divisor(
+        base_kernel, x, cholesky_fn=mock_cholesky_fn,
+        _precomputed_divisor_matrix_cholesky=(
+            k._precomputed_divisor_matrix_cholesky))
+    y = np.random.uniform(-1, 1, size=(3, 7))
+    z = np.random.uniform(-1, 1, size=(2, 7))
+    self.assertAllClose(k.matrix(y, z), k2.matrix(y, z))
+    mock_cholesky_fn.assert_not_called()
 
 
 if __name__ == '__main__':

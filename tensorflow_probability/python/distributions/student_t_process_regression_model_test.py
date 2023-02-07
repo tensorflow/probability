@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+from unittest import mock
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
@@ -382,6 +383,41 @@ class StudentTProcessRegressionModelTest(test_util.TestCase):
     #   return d.log_prob(x)
     # self.assertAllClose(actual, call_log_prob(dist))
     # self.assertAllClose(actual, call_log_prob(unflat))
+
+  def testPrivateArgPreventsCholeskyRecomputation(self):
+    df = np.float32(5.)
+    x = np.random.uniform(-1, 1, (4, 7)).astype(np.float32)
+    x_obs = np.random.uniform(-1, 1, (4, 7)).astype(np.float32)
+    y_obs = np.random.uniform(-1, 1, (4,)).astype(np.float32)
+    chol = np.eye(4).astype(np.float32)
+    mock_cholesky_fn = mock.Mock(return_value=chol)
+    base_kernel = psd_kernels.ExponentiatedQuadratic()
+    d = stprm.StudentTProcessRegressionModel.precompute_regression_model(
+        df,
+        base_kernel,
+        index_points=x,
+        observation_index_points=x_obs,
+        observations=y_obs,
+        cholesky_fn=mock_cholesky_fn)
+    mock_cholesky_fn.assert_called_once()
+
+    mock_cholesky_fn.reset_mock()
+    d2 = stprm.StudentTProcessRegressionModel.precompute_regression_model(
+        df,
+        base_kernel,
+        index_points=x,
+        observation_index_points=x_obs,
+        observations=y_obs,
+        cholesky_fn=mock_cholesky_fn,
+        _precomputed_divisor_matrix_cholesky=(
+            d._precomputed_divisor_matrix_cholesky),
+        _precomputed_solve_on_observation=d._precomputed_solve_on_observation)
+    mock_cholesky_fn.assert_not_called()
+
+    # The Cholesky is computed just once in each call to log_prob (on the
+    # index points kernel matrix).
+    self.assertAllClose(d.log_prob(y_obs), d2.log_prob(y_obs))
+    self.assertEqual(mock_cholesky_fn.call_count, 2)
 
 
 if __name__ == '__main__':

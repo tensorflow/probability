@@ -46,7 +46,7 @@ def _compute_divisor_matrix(
     base_kernel,
     diag_shift,
     fixed_inputs):
-  """Compute the the modified kernel with respect to the fixed inputs."""
+  """Compute the modified kernel with respect to the fixed inputs."""
   divisor_matrix = base_kernel.matrix(fixed_inputs, fixed_inputs)
   if diag_shift is not None:
     diag_shift = tf.convert_to_tensor(diag_shift)
@@ -287,7 +287,8 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
       diag_shift=None,
       cholesky_fn=None,
       validate_args=False,
-      name='PrecomputedSchurComplement'):
+      name='PrecomputedSchurComplement',
+      _precomputed_divisor_matrix_cholesky=None):
     """Returns a `SchurComplement` with a precomputed divisor matrix.
 
     This method is the same as creating a `SchurComplement` kernel, but assumes
@@ -337,6 +338,7 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
         Default value: `False`
       name: Python `str` name prefixed to Ops created by this class.
         Default value: `"PrecomputedSchurComplement"`
+      _precomputed_divisor_matrix_cholesky: Internal arg -- do not use.
     """
     if tf.nest.is_nested(base_kernel.feature_ndims):
       dtype = dtype_util.common_dtype(
@@ -364,13 +366,15 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
       from tensorflow_probability.python.distributions import cholesky_util  # pylint:disable=g-import-not-at-top
       cholesky_fn = cholesky_util.make_cholesky_with_jitter_fn()
 
-    # TODO(b/196219597): Add a check to ensure that we have a `base_kernel`
-    # that is explicitly concretized.
-    divisor_matrix_cholesky = cholesky_fn(util.mask_matrix(
-        _compute_divisor_matrix(base_kernel,
-                                diag_shift=diag_shift,
-                                fixed_inputs=fixed_inputs),
-        is_missing=fixed_inputs_is_missing))
+    divisor_matrix_cholesky = _precomputed_divisor_matrix_cholesky
+    if divisor_matrix_cholesky is None:
+      # TODO(b/196219597): Add a check to ensure that we have a `base_kernel`
+      # that is explicitly concretized.
+      divisor_matrix_cholesky = cholesky_fn(util.mask_matrix(
+          _compute_divisor_matrix(base_kernel,
+                                  diag_shift=diag_shift,
+                                  fixed_inputs=fixed_inputs),
+          is_missing=fixed_inputs_is_missing))
 
     schur_complement = SchurComplement(
         base_kernel=base_kernel,

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+from unittest import mock
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
@@ -655,6 +656,38 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
     self.assertAllEqual(base_gprm.batch_shape_tensor(),
                         gprm_with_lists.batch_shape_tensor())
     self.assertAllClose(base_gprm.log_prob(s), gprm_with_lists.log_prob(s))
+
+  def testPrivateArgPreventsCholeskyRecomputation(self):
+    x = np.random.uniform(-1, 1, (4, 7)).astype(np.float32)
+    x_obs = np.random.uniform(-1, 1, (4, 7)).astype(np.float32)
+    y_obs = np.random.uniform(-1, 1, (4,)).astype(np.float32)
+    chol = np.eye(4).astype(np.float32)
+    mock_cholesky_fn = mock.Mock(return_value=chol)
+    base_kernel = exponentiated_quadratic.ExponentiatedQuadratic()
+    d = gprm.GaussianProcessRegressionModel.precompute_regression_model(
+        base_kernel,
+        index_points=x,
+        observation_index_points=x_obs,
+        observations=y_obs,
+        cholesky_fn=mock_cholesky_fn)
+    mock_cholesky_fn.assert_called_once()
+
+    mock_cholesky_fn.reset_mock()
+    d2 = gprm.GaussianProcessRegressionModel.precompute_regression_model(
+        base_kernel,
+        index_points=x,
+        observation_index_points=x_obs,
+        observations=y_obs,
+        cholesky_fn=mock_cholesky_fn,
+        _precomputed_divisor_matrix_cholesky=(
+            d._precomputed_divisor_matrix_cholesky),
+        _precomputed_solve_on_observation=d._precomputed_solve_on_observation)
+    mock_cholesky_fn.assert_not_called()
+
+    # The Cholesky is computed just once in each call to log_prob (on the
+    # index points kernel matrix).
+    self.assertAllClose(d.log_prob(y_obs), d2.log_prob(y_obs))
+    self.assertEqual(mock_cholesky_fn.call_count, 2)
 
 
 class GaussianProcessRegressionModelStaticTest(

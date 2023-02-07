@@ -650,7 +650,9 @@ class GaussianProcessRegressionModel(
       always_yield_multivariate_normal=False,
       validate_args=False,
       allow_nan_stats=False,
-      name='PrecomputedGaussianProcessRegressionModel'):
+      name='PrecomputedGaussianProcessRegressionModel',
+      _precomputed_divisor_matrix_cholesky=None,
+      _precomputed_solve_on_observation=None):
     """Returns a GaussianProcessRegressionModel with precomputed quantities.
 
     This differs from the constructor by precomputing quantities associated with
@@ -756,6 +758,8 @@ class GaussianProcessRegressionModel(
         Default value: `False`.
       name: Python `str` name prefixed to Ops created by this class.
         Default value: 'PrecomputedGaussianProcessRegressionModel'.
+      _precomputed_divisor_matrix_cholesky: Internal parameter -- do not use.
+      _precomputed_solve_on_observation: Internal parameter -- do not use.
     Returns
       An instance of `GaussianProcessRegressionModel` with precomputed
       quantities associated with observations.
@@ -800,10 +804,9 @@ class GaussianProcessRegressionModel(
           fixed_inputs=observation_index_points,
           fixed_inputs_is_missing=observations_is_missing,
           cholesky_fn=cholesky_fn,
-          diag_shift=observation_noise_variance)
-
-      observation_cholesky_operator = tf.linalg.LinearOperatorLowerTriangular(
-          conditional_kernel.divisor_matrix_cholesky())
+          diag_shift=observation_noise_variance,
+          _precomputed_divisor_matrix_cholesky=(
+              _precomputed_divisor_matrix_cholesky))
 
       if mean_fn is None:
         mean_fn = lambda x: tf.zeros([1], dtype=dtype)
@@ -811,12 +814,16 @@ class GaussianProcessRegressionModel(
         if not callable(mean_fn):
           raise ValueError('`mean_fn` must be a Python callable')
 
-      diff = observations - mean_fn(observation_index_points)
-      if observations_is_missing is not None:
-        diff = tf.where(
-            observations_is_missing, tf.zeros([], dtype=diff.dtype), diff)
-      solve_on_observation = observation_cholesky_operator.solvevec(
-          observation_cholesky_operator.solvevec(diff), adjoint=True)
+      solve_on_observation = _precomputed_solve_on_observation
+      if solve_on_observation is None:
+        observation_cholesky_operator = tf.linalg.LinearOperatorLowerTriangular(
+            conditional_kernel.divisor_matrix_cholesky())
+        diff = observations - mean_fn(observation_index_points)
+        if observations_is_missing is not None:
+          diff = tf.where(
+              observations_is_missing, tf.zeros([], dtype=diff.dtype), diff)
+        solve_on_observation = observation_cholesky_operator.solvevec(
+            observation_cholesky_operator.solvevec(diff), adjoint=True)
 
       def conditional_mean_fn(x):
         k_x_obs = kernel.matrix(x, observation_index_points)
@@ -841,6 +848,11 @@ class GaussianProcessRegressionModel(
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           name=name)
+      # pylint: disable=protected-access
+      gprm._precomputed_divisor_matrix_cholesky = (
+          conditional_kernel._precomputed_divisor_matrix_cholesky)
+      gprm._precomputed_solve_on_observation = solve_on_observation
+      # pylint: enable=protected-access
 
     return gprm
 
