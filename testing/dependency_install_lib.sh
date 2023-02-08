@@ -76,8 +76,8 @@ install_jax() {
   # For the JAX backend.
   PIP_FLAGS=${1-}
   python -m pip install $PIP_FLAGS \
-    jax==0.4.1 \
-    jaxlib==0.4.1
+    jax \
+    jaxlib
 }
 
 install_common_packages() {
@@ -92,8 +92,8 @@ install_test_only_packages() {
   PIP_FLAGS=${1-}
   python -m pip install $PIP_FLAGS \
     hypothesis \
-    jax==0.4.1 \
-    jaxlib==0.4.1 \
+    jax \
+    jaxlib \
     optax \
     matplotlib \
     mock \
