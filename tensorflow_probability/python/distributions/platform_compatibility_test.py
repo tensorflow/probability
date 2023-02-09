@@ -173,6 +173,7 @@ XLA_LOGPROB_ATOL.update({
     'Kumaraswamy': 4e-5,
     'Logistic': 3e-6,
     'Multinomial': 2e-4,
+    'NoncentralChi2': 1e-4,
     'OneHotCategorical': 1e-5,
     'PERT': 1e-5,
     'PowerSpherical': 2e-5,
