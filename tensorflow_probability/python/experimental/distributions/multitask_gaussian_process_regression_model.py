@@ -14,10 +14,6 @@
 # ============================================================================
 """The MultiTaskGaussianProcessRegressionModel distribution class."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 # Dependency imports
 
 import tensorflow.compat.v2 as tf
@@ -26,6 +22,7 @@ from tensorflow_probability.python.distributions import cholesky_util
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.experimental.distributions import multitask_gaussian_process as mtgp
+from tensorflow_probability.python.experimental.linalg import linear_operator_unitary
 from tensorflow_probability.python.experimental.psd_kernels import multitask_kernel
 from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import distribution_util
@@ -131,6 +128,52 @@ def _compute_observation_scale(
         observation_noise_variance=observation_noise_variance)
 
   return observation_scale
+
+
+def _scale_from_precomputed(precomputed_cholesky, kernel):
+  """Rebuilds `observation_scale` from precomputed values."""
+  params, = tuple(precomputed_cholesky.values())
+  if 'tril' in precomputed_cholesky:
+    return tf.linalg.LinearOperatorLowerTriangular(
+        params['chol_tril'], is_non_singular=True)
+  if 'multitask' in precomputed_cholesky:
+    return tf.linalg.LinearOperatorKronecker(
+        [tf.linalg.LinearOperatorLowerTriangular(
+            params['chol_tril'], is_non_singular=True),
+         tf.linalg.LinearOperatorIdentity(
+             kernel.num_tasks, dtype=kernel.dtype)],
+        is_square=True,
+        is_non_singular=True)
+  if 'separable' in precomputed_cholesky:
+    diag_op = tf.linalg.LinearOperatorDiag(
+        params['diag'],
+        is_square=True,
+        is_non_singular=True,
+        is_positive_definite=True)
+    orthogonal_op = tf.linalg.LinearOperatorKronecker(
+        [linear_operator_unitary.LinearOperatorUnitary(orth)
+         for orth in params['kronecker_orths']],
+        is_square=True, is_non_singular=True)
+    return orthogonal_op.matmul(diag_op)
+  # This should not happen.
+  raise ValueError(
+      f'Unexpected value for `precompute_cholesky`: {precomputed_cholesky}.')
+
+
+def _precomputed_from_scale(observation_scale, kernel):
+  """Extracts expensive precomputed values."""
+  if isinstance(observation_scale, tf.linalg.LinearOperatorLowerTriangular):
+    return {'tril': {'chol_tril': observation_scale.tril}}
+  if isinstance(kernel, multitask_kernel.Independent):
+    base_kernel_chol_op = observation_scale.operators[0]
+    return {'multitask': {'chol_tril': base_kernel_chol_op.tril}}
+  if isinstance(kernel, multitask_kernel.Separable):
+    kronecker_op, diag_op = observation_scale.operators
+    kronecker_orths = [k.matrix for k in kronecker_op.operators]
+    return {'separable': {'kronecker_orths': kronecker_orths,
+                          'diag': diag_op.diag}}
+  # This should not happen.
+  raise ValueError('Unexpected values for kernel and observation_scale.')
 
 
 class MultiTaskGaussianProcessRegressionModel(
@@ -366,7 +409,9 @@ class MultiTaskGaussianProcessRegressionModel(
       cholesky_fn=None,
       validate_args=False,
       allow_nan_stats=False,
-      name='PrecomputedMultiTaskGaussianProcessRegressionModel'):
+      name='PrecomputedMultiTaskGaussianProcessRegressionModel',
+      _precomputed_divisor_matrix_cholesky=None,
+      _precomputed_solve_on_observation=None):
     """Returns a MTGaussianProcessRegressionModel with precomputed quantities.
 
     This differs from the constructor by precomputing quantities associated with
@@ -462,6 +507,8 @@ class MultiTaskGaussianProcessRegressionModel(
         Default value: `False`.
       name: Python `str` name prefixed to Ops created by this class.
         Default value: 'PrecomputedGaussianProcessRegressionModel'.
+      _precomputed_divisor_matrix_cholesky: Internal parameter -- do not use.
+      _precomputed_solve_on_observation: Internal parameter -- do not use.
     Returns
       An instance of `MultiTaskGaussianProcessRegressionModel` with precomputed
       quantities associated with observations.
@@ -497,7 +544,10 @@ class MultiTaskGaussianProcessRegressionModel(
         if not callable(mean_fn):
           raise ValueError('`mean_fn` must be a Python callable')
 
-      if observations_is_missing is not None:
+      if _precomputed_divisor_matrix_cholesky is not None:
+        observation_scale = _scale_from_precomputed(
+            _precomputed_divisor_matrix_cholesky, kernel)
+      elif observations_is_missing is not None:
         # If observations are missing, there's nothing we can do to preserve the
         # operator structure, so densify.
 
@@ -537,8 +587,10 @@ class MultiTaskGaussianProcessRegressionModel(
         vec_diff = tf.where(vec_observations_is_missing,
                             tf.zeros([], dtype=vec_diff.dtype),
                             vec_diff)
-      solve_on_observations = observation_scale.solvevec(
-          observation_scale.solvevec(vec_diff), adjoint=True)
+      solve_on_observations = _precomputed_solve_on_observation
+      if solve_on_observations is None:
+        solve_on_observations = observation_scale.solvevec(
+            observation_scale.solvevec(vec_diff), adjoint=True)
 
       def flattened_conditional_mean_fn(x):
 
@@ -565,6 +617,12 @@ class MultiTaskGaussianProcessRegressionModel(
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           name=name)
+
+      # pylint: disable=protected-access
+      mtgprm._precomputed_divisor_matrix_cholesky = (
+          _precomputed_from_scale(observation_scale, kernel))
+      mtgprm._precomputed_solve_on_observation = solve_on_observations
+      # pylint: enable=protected-access
 
     return mtgprm
 

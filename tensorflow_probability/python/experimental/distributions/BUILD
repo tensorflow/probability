@@ -220,6 +220,7 @@ multi_substrate_py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:cholesky_util",
+        "//tensorflow_probability/python/experimental/linalg:linear_operator_unitary",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",

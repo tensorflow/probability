@@ -14,10 +14,7 @@
 # ============================================================================
 """Tests for MultiTaskGaussianProcessRegressionModel."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
+from unittest import mock
 # Dependency imports
 
 from absl.testing import parameterized
@@ -510,9 +507,28 @@ class MultiTaskGaussianProcessRegressionModelTest(
         observation_noise_variance=observation_noise_variance,
         validate_args=True)
 
+    mock_cholesky_fn = mock.Mock(return_value=None)
+    rebuilt_precomputed_mtgprm = mtgprm_lib.MultiTaskGaussianProcessRegressionModel.precompute_regression_model(
+        kernel=multi_task_kernel,
+        index_points=index_points,
+        observation_index_points=observation_index_points,
+        observations=observations,
+        observation_noise_variance=observation_noise_variance,
+        _precomputed_divisor_matrix_cholesky=precomputed_mtgprm._precomputed_divisor_matrix_cholesky,
+        _precomputed_solve_on_observation=precomputed_mtgprm._precomputed_solve_on_observation,
+        cholesky_fn=mock_cholesky_fn,
+        validate_args=True)
+    mock_cholesky_fn.assert_not_called()
+
+    rebuilt_precomputed_mtgprm = rebuilt_precomputed_mtgprm.copy(
+        cholesky_fn=None)
     self.assertAllClose(self.evaluate(precomputed_mtgprm.variance()),
                         self.evaluate(mtgprm.variance()))
     self.assertAllClose(self.evaluate(precomputed_mtgprm.mean()),
+                        self.evaluate(mtgprm.mean()))
+    self.assertAllClose(self.evaluate(rebuilt_precomputed_mtgprm.variance()),
+                        self.evaluate(mtgprm.variance()))
+    self.assertAllClose(self.evaluate(rebuilt_precomputed_mtgprm.mean()),
                         self.evaluate(mtgprm.mean()))
 
   def testPrecomputedWithMasking(self):
@@ -540,8 +556,15 @@ class MultiTaskGaussianProcessRegressionModelTest(
 
     kernel = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude, length_scale)
-    multi_task_kernel = multitask_kernel.Independent(
-        num_tasks=num_tasks, base_kernel=kernel)
+    task_kernel_matrix = np.array([[6., 2.],
+                                   [2., 7.]],
+                                  dtype=np.float64)
+    task_kernel_matrix_linop = tf.linalg.LinearOperatorFullMatrix(
+        task_kernel_matrix)
+    multi_task_kernel = multitask_kernel.Separable(
+        num_tasks=num_tasks,
+        task_kernel_matrix_linop=task_kernel_matrix_linop,
+        base_kernel=kernel)
     mtgprm = mtgprm_lib.MultiTaskGaussianProcessRegressionModel.precompute_regression_model(
         kernel=multi_task_kernel,
         index_points=index_points,
@@ -551,12 +574,30 @@ class MultiTaskGaussianProcessRegressionModelTest(
         observation_noise_variance=observation_noise_variance,
         validate_args=True)
 
+    mock_cholesky_fn = mock.Mock(return_value=None)
+    rebuilt_mtgprm = mtgprm_lib.MultiTaskGaussianProcessRegressionModel.precompute_regression_model(
+        kernel=multi_task_kernel,
+        index_points=index_points,
+        observation_index_points=observation_index_points,
+        observations=observations,
+        observation_noise_variance=observation_noise_variance,
+        _precomputed_divisor_matrix_cholesky=mtgprm._precomputed_divisor_matrix_cholesky,
+        _precomputed_solve_on_observation=mtgprm._precomputed_solve_on_observation,
+        cholesky_fn=mock_cholesky_fn,
+        validate_args=True)
+    mock_cholesky_fn.assert_not_called()
+
+    rebuilt_mtgprm = rebuilt_mtgprm.copy(cholesky_fn=None)
     self.assertAllNotNan(mtgprm.mean())
     self.assertAllNotNan(mtgprm.variance())
+    self.assertAllClose(self.evaluate(mtgprm.variance()),
+                        self.evaluate(rebuilt_mtgprm.variance()))
+    self.assertAllClose(self.evaluate(mtgprm.mean()),
+                        self.evaluate(rebuilt_mtgprm.mean()))
 
   @test_util.disable_test_for_backend(
-      disable_numpy=True, disable_jax=True,
-      reason='Numpy and JAX have no notion of CompositeTensor/saved_model')
+      disable_numpy=True,
+      reason='Numpy has no notion of CompositeTensor/Pytree/saved_model')
   def testPrecomputedCompositeTensor(self):
     num_tasks = 3
     amplitude = np.array([1., 2.], np.float64).reshape([2, 1])
