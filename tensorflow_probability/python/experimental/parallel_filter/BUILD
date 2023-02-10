@@ -21,7 +21,10 @@ load(
     "multi_substrate_py_test",
 )
 
-package(default_visibility = ["//visibility:public"])
+package(
+    default_applicable_licenses = ["//tensorflow_probability:license"],
+    default_visibility = ["//visibility:public"],
+)
 
 licenses(["notice"])
 
