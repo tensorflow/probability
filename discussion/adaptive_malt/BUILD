@@ -17,7 +17,7 @@
 # [internal] load pytype.bzl (pytype_strict_binary, pytype_strict_library)
 
 package(
-    default_applicable_licenses = ["//tensorflow_probability:license"],
+    # copybara:uncomment default_applicable_licenses = ["//tensorflow_probability:license"],
     default_visibility = ["//visibility:public"],
 )
 

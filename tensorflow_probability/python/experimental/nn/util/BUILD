@@ -16,7 +16,7 @@
 licenses(["notice"])
 
 package(
-    default_applicable_licenses = ["//tensorflow_probability:license"],
+    # copybara:uncomment default_applicable_licenses = ["//tensorflow_probability:license"],
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
