@@ -108,15 +108,9 @@ class JointDistributionSequentialTest(test_util.TestCase):
         ],
         validate_args=True)
 
-    self.assertEqual(
-        (
-            ('e', ()),
-            ('scale', ('e',)),
-            ('loc', ()),
-            ('m', ('loc', 'scale')),
-            ('x', ('m',)),
-        ),
-        d.resolve_graph())
+    keys = ('e', 'scale', 'loc', 'm', 'x')
+    deps = ((), ('e',), (), ('loc', 'scale'), ('m',))
+    self.assertEqual(tuple(zip(keys, deps)), d.resolve_graph())
 
     xs = d.sample(seed=test_util.test_seed())
     self.assertLen(xs, 5)
@@ -149,9 +143,15 @@ class JointDistributionSequentialTest(test_util.TestCase):
       self.assertAllEqual(expected, actual_tensorshape)
       self.assertAllEqual(expected, actual_shapetensor)
 
-    expected_jlp = sum(d_.log_prob(x) for d_, x in zip(ds, xs))
+    expected_lp_parts = [d_.log_prob(x) for d_, x in zip(ds, xs)]
+    expected_jlp = sum(expected_lp_parts)
     actual_jlp = d.log_prob(xs)
     self.assertAllEqual(*self.evaluate([expected_jlp, actual_jlp]))
+    # Verify different log_prob_parts calling conventions.
+    self.assertAllCloseNested(expected_lp_parts, d.log_prob_parts(xs))
+    self.assertAllCloseNested(expected_lp_parts, d.log_prob_parts(*xs))
+    self.assertAllCloseNested(expected_lp_parts,
+                              d.log_prob_parts(**dict(zip(keys, xs))))
 
   def test_kl_divergence(self):
     d0 = jds.JointDistributionSequential([
