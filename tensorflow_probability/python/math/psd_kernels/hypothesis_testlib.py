@@ -1054,6 +1054,7 @@ CONSTRAINTS = {
     'constant': constrain_to_range(0.1, 0.5),
     'concentration0': constrain_to_range(1., 2.),
     'concentration1': constrain_to_range(1., 2.),
+    'power': constrain_to_range(0.01, 1.),
     'df': constrain_to_range(2., 5.),
     'scales': constrain_to_range(1., 2.),
     'slope_amplitude': constrain_to_range(0.1, 0.5),

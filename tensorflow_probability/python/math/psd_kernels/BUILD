@@ -40,6 +40,7 @@ multi_substrate_py_library(
         ":exponentiated_quadratic",
         ":feature_scaled",
         ":feature_transformed",
+        ":gamma_exponential",
         ":kumaraswamy_transformed",
         ":matern",
         ":parabolic",
@@ -162,6 +163,33 @@ multi_substrate_py_test(
     srcs = ["exp_sin_squared_test.py"],
     deps = [
         ":exp_sin_squared",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "gamma_exponential",
+    srcs = ["gamma_exponential.py"],
+    deps = [
+        ":positive_semidefinite_kernel",
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:sigmoid",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/math/psd_kernels/internal:util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "gamma_exponential_test",
+    size = "small",
+    srcs = ["gamma_exponential_test.py"],
+    deps = [
+        ":gamma_exponential",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
