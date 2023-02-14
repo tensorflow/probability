@@ -1963,15 +1963,16 @@ variance = tfd.Distribution.variance
 
 
 def _serialize(convert_to_tensor_fn):
-  return tf.keras.utils.serialize_keras_object(convert_to_tensor_fn)
+  return tf.keras.utils.legacy.serialize_keras_object(convert_to_tensor_fn)
 
 
 def _deserialize(name, custom_objects=None):
-  return tf.keras.utils.deserialize_keras_object(
+  return tf.keras.utils.legacy.deserialize_keras_object(
       name,
       module_objects=globals(),
       custom_objects=custom_objects,
-      printable_module_name='convert-to-tensor function')
+      printable_module_name='convert-to-tensor function',
+  )
 
 
 def _get_convert_to_tensor_fn(identifier):

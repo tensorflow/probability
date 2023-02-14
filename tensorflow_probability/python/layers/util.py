@@ -252,7 +252,7 @@ def deserialize_function(serial, function_type):
   """
   if function_type == 'function':
     # Simple lookup in custom objects
-    function = tf.keras.utils.deserialize_keras_object(serial)
+    function = tf.keras.utils.legacy.deserialize_keras_object(serial)
   elif function_type == 'lambda':
     # Unsafe deserialization from bytecode
     function = generic_utils.func_load(serial)
