@@ -25,6 +25,7 @@ load(
 )
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
