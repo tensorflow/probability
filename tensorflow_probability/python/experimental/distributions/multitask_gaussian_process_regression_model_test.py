@@ -29,6 +29,7 @@ from tensorflow_probability.python.experimental.psd_kernels import multitask_ker
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic
+from tensorflow_probability.python.math.psd_kernels.internal import test_util as psd_kernel_test_util
 
 
 @test_util.test_all_tf_execution_regimes
@@ -636,6 +637,61 @@ class MultiTaskGaussianProcessRegressionModelTest(
     self.assertIs(precomputed_mtgprm._observation_scale.operators[0]._tril,  # pylint:disable=protected-access
                   unflat._observation_scale.operators[0]._tril)  # pylint:disable=protected-access
 
+  def testStructuredIndexPoints(self):
+    num_tasks = 3
+    observation_index_points = np.random.uniform(
+        -1, 1, (12, 8)).astype(np.float32)
+    observations = np.random.uniform(-1, 1, (12, num_tasks)).astype(np.float32)
+    index_points = np.random.uniform(-1, 1, (6, 8)).astype(np.float32)
+    base_kernel = exponentiated_quadratic.ExponentiatedQuadratic()
+    base_mtk = multitask_kernel.Independent(
+        num_tasks=num_tasks, base_kernel=base_kernel)
+    base_mtgp = mtgprm_lib.MultiTaskGaussianProcessRegressionModel(
+        base_mtk,
+        index_points=index_points,
+        observation_index_points=observation_index_points,
+        observations=observations)
+
+    structured_kernel = psd_kernel_test_util.MultipartTestKernel(base_kernel)
+    structured_mtk = multitask_kernel.Independent(
+        num_tasks=num_tasks, base_kernel=structured_kernel)
+    structured_obs_index_points = dict(
+        zip(('foo', 'bar'),
+            tf.split(observation_index_points, [5, 3], axis=-1)))
+    structured_index_points = dict(
+        zip(('foo', 'bar'), tf.split(index_points, [5, 3], axis=-1)))
+    structured_mtgp = mtgprm_lib.MultiTaskGaussianProcessRegressionModel(
+        structured_mtk,
+        index_points=structured_index_points,
+        observation_index_points=structured_obs_index_points,
+        observations=observations)
+
+    s = structured_mtgp.sample(3, seed=test_util.test_seed())
+    self.assertAllClose(base_mtgp.log_prob(s), structured_mtgp.log_prob(s))
+    self.assertAllClose(base_mtgp.mean(), structured_mtgp.mean())
+    self.assertAllClose(base_mtgp.variance(), structured_mtgp.variance())
+    self.assertAllEqual(base_mtgp.event_shape, structured_mtgp.event_shape)
+    self.assertAllEqual(base_mtgp.event_shape_tensor(),
+                        structured_mtgp.event_shape_tensor())
+    self.assertAllEqual(base_mtgp.batch_shape, structured_mtgp.batch_shape)
+    self.assertAllEqual(base_mtgp.batch_shape_tensor(),
+                        structured_mtgp.batch_shape_tensor())
+
+    # Iterable index points should be interpreted as single Tensors if the
+    # kernel is not structured.
+    index_points_list = tf.unstack(index_points)
+    obs_index_points_nested_list = tf.nest.map_structure(
+        tf.unstack, tf.unstack(observation_index_points))
+    mtgp_with_lists = mtgprm_lib.MultiTaskGaussianProcessRegressionModel(
+        base_mtk,
+        index_points=index_points_list,
+        observation_index_points=obs_index_points_nested_list,
+        observations=observations)
+    self.assertAllEqual(base_mtgp.event_shape_tensor(),
+                        mtgp_with_lists.event_shape_tensor())
+    self.assertAllEqual(base_mtgp.batch_shape_tensor(),
+                        mtgp_with_lists.batch_shape_tensor())
+    self.assertAllClose(base_mtgp.log_prob(s), mtgp_with_lists.log_prob(s))
 
 if __name__ == '__main__':
   test_util.main()

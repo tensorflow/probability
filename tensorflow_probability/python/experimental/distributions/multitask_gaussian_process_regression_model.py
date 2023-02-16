@@ -14,6 +14,8 @@
 # ============================================================================
 """The MultiTaskGaussianProcessRegressionModel distribution class."""
 
+import functools
+
 # Dependency imports
 
 import tensorflow.compat.v2 as tf
@@ -27,12 +29,14 @@ from tensorflow_probability.python.experimental.psd_kernels import multitask_ker
 from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.psd_kernels.internal import util as psd_kernels_util
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
 def _vec(x):
@@ -63,8 +67,9 @@ def _flattened_conditional_mean_fn_helper(
     solve_on_observations=None):
   """Flattened Conditional mean helper."""
   observations = tf.convert_to_tensor(observations)
-  observation_index_points = tf.convert_to_tensor(
-      observation_index_points)
+  if observation_index_points is not None:
+    observation_index_points = nest_util.convert_to_nested_tensor(
+        observation_index_points, dtype=kernel.dtype, allow_packing=True)
 
   k_x_obs_linop = kernel.matrix_over_all_tasks(x, observation_index_points)
   if solve_on_observations is None:
@@ -141,7 +146,7 @@ def _scale_from_precomputed(precomputed_cholesky, kernel):
         [tf.linalg.LinearOperatorLowerTriangular(
             params['chol_tril'], is_non_singular=True),
          tf.linalg.LinearOperatorIdentity(
-             kernel.num_tasks, dtype=kernel.dtype)],
+             kernel.num_tasks, dtype=params['chol_tril'].dtype)],
         is_square=True,
         is_non_singular=True)
   if 'separable' in precomputed_cholesky:
@@ -202,14 +207,15 @@ class MultiTaskGaussianProcessRegressionModel(
     Args:
       kernel: `MultiTaskKernel`-like instance representing the GP's covariance
         function.
-      observation_index_points: `float` `Tensor` representing finite collection,
-        or batch of collections, of points in the index set for which some data
-        has been observed. Shape has the form `[b1, ..., bB, e, f1, ..., fF]`
-        where `F` is the number of feature dimensions and must equal
-        `kernel.feature_ndims`, and `e` is the number (size) of index points in
-        each batch. `[b1, ..., bB, e]` must be broadcastable with the shape of
-        `observations`, and `[b1, ..., bB]` must be broadcastable with the
-        shapes of all other batched parameters (`kernel.batch_shape`,
+      observation_index_points: (Nested) `float` `Tensor` representing finite
+        collection, or batch of collections, of points in the index set for
+        which some data has been observed. Shape (of each nested component) has
+        the form `[b1, ..., bB, e, f1, ..., fF]` where `F` is the number of
+        feature dimensions and must equal `kernel.feature_ndims` (or its
+        corresponding nested component), and `e` is the number (size) of index
+        points in each batch. `[b1, ..., bB, e]` must be broadcastable with the
+        shape of `observations`, and `[b1, ..., bB]` must be broadcastable with
+        the shapes of all other batched parameters (`kernel.batch_shape`,
         `index_points`, etc).
       observations: `float` `Tensor` representing collection, or batch of
         collections, of observations corresponding to
@@ -223,18 +229,20 @@ class MultiTaskGaussianProcessRegressionModel(
         `observations_is_missing` is not `None`, this distribution is
         conditioned only on the observations for which the
         corresponding elements of `observations_is_missing` are `False`.
-      index_points: `float` `Tensor` representing finite collection, or batch of
-        collections, of points in the index set over which the GP is defined.
-        Shape has the form `[b1, ..., bB, e, f1, ..., fF]` where `F` is the
-        number of feature dimensions and must equal `kernel.feature_ndims` and
-        `e` is the number (size) of index points in each batch. Ultimately this
-        distribution corresponds to an `e`-dimensional multivariate normal. The
-        batch shape must be broadcastable with `kernel.batch_shape`.
+      index_points: (Nested) `float` `Tensor` representing finite collection, or
+        batch of collections, of points in the index set over which the GP is
+        defined.  Shape (or shape of each nested component) has the form
+        `[b1, ..., bB, e, f1, ..., fF]` where `F` is the number of feature
+        dimensions and must equal `kernel.feature_ndims` (or its corresponding
+        nested component) and `e` is the number (size) of index points in each
+        batch. Ultimately this distribution corresponds to an `e`-dimensional
+        multivariate normal. The batch shape must be broadcastable with
+        `kernel.batch_shape`.
       mean_fn: Python `callable` that acts on `index_points` to produce a (batch
-        of) collection of mean values at `index_points`. Takes a `Tensor` of
-        shape `[b1, ..., bB, e, f1, ..., fF]` and returns a `Tensor` whose shape
-        is broadcastable with `[b1, ..., bB, e, t]`, where `t` is the number of
-        tasks.
+        of) collection of mean values at `index_points`. Takes a (nested)
+        `Tensor` of shape `[b1, ..., bB, e, f1, ..., fF]` and returns a `Tensor`
+        whose shape is broadcastable with `[b1, ..., bB, e, t]`, where `t` is
+        the number of tasks.
       observation_noise_variance: `float` `Tensor` representing the variance of
         the noise in the Normal likelihood distribution of the model. May be
         batched, in which case the batch shape must be broadcastable with the
@@ -272,16 +280,31 @@ class MultiTaskGaussianProcessRegressionModel(
       if not isinstance(kernel, multitask_kernel.MultiTaskKernel):
         raise ValueError('`kernel` must be a `MultiTaskKernel`.')
 
-      dtype = dtype_util.common_dtype([
-          index_points, observation_index_points, observations,
-          observation_noise_variance, predictive_noise_variance
-      ], tf.float32)
-      index_points = tensor_util.convert_nonref_to_tensor(
-          index_points, dtype=dtype, name='index_points')
-      observation_index_points = tensor_util.convert_nonref_to_tensor(
-          observation_index_points,
-          dtype=dtype,
-          name='observation_index_points')
+      if tf.nest.is_nested(kernel.feature_ndims):
+        input_dtype = dtype_util.common_dtype(
+            [kernel, index_points, observation_index_points],
+            dtype_hint=nest_util.broadcast_structure(
+                kernel.feature_ndims, tf.float32))
+        dtype = dtype_util.common_dtype(
+            [observations, observation_noise_variance,
+             predictive_noise_variance], tf.float32)
+      else:
+        # If the index points are not nested, we assume they are of the same
+        # dtype as the kernel.
+        dtype = dtype_util.common_dtype([
+            kernel, index_points, observation_index_points, observations,
+            observation_noise_variance, predictive_noise_variance
+        ], tf.float32)
+        input_dtype = dtype
+
+      if index_points is not None:
+        index_points = nest_util.convert_to_nested_tensor(
+            index_points, dtype=input_dtype, convert_ref=False,
+            name='index_points', allow_packing=True)
+      if observation_index_points is not None:
+        observation_index_points = nest_util.convert_to_nested_tensor(
+            observation_index_points, dtype=input_dtype, convert_ref=False,
+            name='observation_index_points', allow_packing=True)
       observations = tensor_util.convert_nonref_to_tensor(
           observations, dtype=dtype, name='observations')
       if observations_is_missing is not None:
@@ -313,10 +336,13 @@ class MultiTaskGaussianProcessRegressionModel(
         def _mean_fn(x):
           # Shape B1 + [E, N], where E is the number of index points, and N is
           # the number of tasks.
+          flat_shapes = tf.nest.flatten(
+              tf.nest.map_structure(lambda z, d: ps.shape(z)[:-d],
+                                    x, self.kernel.feature_ndims))
+          bcast_shape = functools.reduce(ps.broadcast_shape, flat_shapes, [])
           return tf.zeros(
               ps.concat([
-                  ps.shape(x)[:-self.kernel.feature_ndims],
-                  [self.kernel.num_tasks]], axis=0), dtype=self.dtype)
+                  bcast_shape, [self.kernel.num_tasks]], axis=0), dtype=dtype)
         mean_fn = _mean_fn
       else:
         if not callable(mean_fn):
@@ -385,8 +411,17 @@ class MultiTaskGaussianProcessRegressionModel(
     if observation_rank >= 2:
       num_index_points = tf.compat.dimension_value(observations.shape[-2])
 
-      expected_num_index_points = self.observation_index_points.shape[
-          -(self.kernel.feature_ndims + 1)]
+      flat_shapes = tf.nest.flatten(
+          tf.nest.map_structure(lambda t, nd: t.shape[-(nd + 1):-nd],
+                                self.observation_index_points,
+                                self.kernel.feature_ndims))
+      if None in flat_shapes:
+        expected_num_index_points = None
+      else:
+        dim = functools.reduce(
+            tf.broadcast_static_shape, flat_shapes, tf.TensorShape([]))
+        expected_num_index_points = tf.compat.dimension_value(dim[0])
+
       if (num_index_points is not None and
           expected_num_index_points is not None and
           num_index_points != 1 and
@@ -439,18 +474,19 @@ class MultiTaskGaussianProcessRegressionModel(
     Args:
       kernel: `PositiveSemidefiniteKernel`-like instance representing the
         GP's covariance function.
-      observation_index_points: `float` `Tensor` representing finite collection,
-        or batch of collections, of points in the index set for which some data
-        has been observed. Shape has the form `[b1, ..., bB, e, f1, ..., fF]`
-        where `F` is the number of feature dimensions and must equal
-        `kernel.feature_ndims`, and `e` is the number (size) of index points in
-        each batch. `[b1, ..., bB, e]` must be broadcastable with the shape of
-        `observations`, and `[b1, ..., bB]` must be broadcastable with the
-        shapes of all other batched parameters (`kernel.batch_shape`,
-        `index_points`, etc). The default value is `None`, which corresponds to
-        the empty set of observations, and simply results in the prior
-        predictive model (a GP with noise of variance
-        `predictive_noise_variance`).
+      observation_index_points: (Nested) `float` `Tensor` representing finite
+        collection, or batch of collections, of points in the index set for
+        which some data has been observed. Shape (or shape of each nested
+        component) has the form `[b1, ..., bB, e, f1, ..., fF]` where `F` is
+        the number of feature dimensions and must equal
+        `kernel.feature_ndims` (or its corresponding nested component), and
+        `e` is the number (size) of index points in each batch. `[b1, ...,
+        bB, e]` must be broadcastable with the shape of `observations`, and
+        `[b1, ..., bB]` must be broadcastable with the shapes of all other
+        batched parameters (`kernel.batch_shape`, `index_points`, etc). The
+        default value is `None`, which corresponds to the empty set of
+        observations, and simply results in the prior predictive model (a GP
+        with noise of variance `predictive_noise_variance`).
       observations: `float` `Tensor` representing collection, or batch of
         collections, of observations corresponding to
         `observation_index_points`. Shape has the form `[b1, ..., bB, e, t]`
@@ -465,14 +501,15 @@ class MultiTaskGaussianProcessRegressionModel(
         is not `None`, the returned distribution is conditioned only on the
         observations for which the corresponding elements of
         `observations_is_missing` are `True`.
-      index_points: `float` `Tensor` representing finite collection, or batch of
-        collections, of points in the index set over which the GP is defined.
-        Shape has the form `[b1, ..., bB, e, f1, ..., fF]` where `F` is the
-        number of feature dimensions and must equal `kernel.feature_ndims` and
-        `e` is the number (size) of index points in each batch. Ultimately this
-        distribution corresponds to an `e`-dimensional multivariate normal. The
-        batch shape must be broadcastable with `kernel.batch_shape` and any
-        batch dims yielded by `mean_fn`.
+      index_points: (Nested) `float` `Tensor` representing finite collection, or
+        batch of collections, of points in the index set over which the GP is
+        defined.  Shape (or shape of each nested component) has the form
+        `[b1, ..., bB, e, f1, ..., fF]` where `F` is the number of feature
+        dimensions and must equal `kernel.feature_ndims` (or its corresponding
+        nested component) and `e` is the number (size) of index points in each
+        batch. Ultimately this distribution corresponds to an `e`-dimensional
+        multivariate normal. The batch shape must be broadcastable with
+        `kernel.batch_shape` and any batch dims yielded by `mean_fn`.
       observation_noise_variance: `float` `Tensor` representing the variance
         of the noise in the Normal likelihood distribution of the model. May be
         batched, in which case the batch shape must be broadcastable with the
@@ -488,8 +525,8 @@ class MultiTaskGaussianProcessRegressionModel(
         observations.
       mean_fn: Python `callable` that acts on `index_points` to produce a
         collection, or batch of collections, of mean values at `index_points`.
-        Takes a `Tensor` of shape `[b1, ..., bB, f1, ..., fF]` and returns a
-        `Tensor` whose shape is broadcastable with `[b1, ..., bB, t]`.
+        Takes a (nested) `Tensor` of shape `[b1, ..., bB, f1, ..., fF]` and
+        returns a `Tensor` whose shape is broadcastable with `[b1, ..., bB, t]`.
         Default value: `None` implies the constant zero function.
       cholesky_fn: Callable which takes a single (batch) matrix argument and
         returns a Cholesky-like lower triangular factor.  Default value: `None`,
@@ -515,15 +552,27 @@ class MultiTaskGaussianProcessRegressionModel(
     """
 
     with tf.name_scope(name) as name:
-      dtype = dtype_util.common_dtype([
-          index_points, observation_index_points, observations,
-          observation_noise_variance, predictive_noise_variance,
-      ], tf.float32)
+      if tf.nest.is_nested(kernel.feature_ndims):
+        input_dtype = dtype_util.common_dtype(
+            [kernel, index_points, observation_index_points],
+            dtype_hint=nest_util.broadcast_structure(
+                kernel.feature_ndims, tf.float32))
+        dtype = dtype_util.common_dtype(
+            [observations, observation_noise_variance,
+             predictive_noise_variance], tf.float32)
+      else:
+        # If the index points are not nested, we assume they are of the same
+        # dtype as the kernel.
+        dtype = dtype_util.common_dtype([
+            kernel, index_points, observation_index_points, observations,
+            observation_noise_variance, predictive_noise_variance
+        ], tf.float32)
+        input_dtype = dtype
 
       # Convert-to-tensor arguments that are expected to not be Variables / not
       # going to change.
-      observation_index_points = tf.convert_to_tensor(
-          observation_index_points, dtype=dtype)
+      observation_index_points = nest_util.convert_to_nested_tensor(
+          observation_index_points, dtype=input_dtype, allow_packing=True)
       if observation_noise_variance is not None:
         observation_noise_variance = tf.convert_to_tensor(
             observation_noise_variance, dtype=dtype)
@@ -668,16 +717,18 @@ class MultiTaskGaussianProcessRegressionModel(
 
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):
+    def _event_ndims_fn(self):
+      return tf.nest.map_structure(lambda nd: nd + 1, self.kernel.feature_ndims)
     return dict(
         index_points=parameter_properties.ParameterProperties(
-            event_ndims=lambda self: self.kernel.feature_ndims + 1,
+            event_ndims=_event_ndims_fn,
             shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
         ),
         observations=parameter_properties.ParameterProperties(
             event_ndims=2,
             shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED),
         observation_index_points=parameter_properties.ParameterProperties(
-            event_ndims=lambda self: self.kernel.feature_ndims + 1,
+            event_ndims=_event_ndims_fn,
             shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
         ),
         observations_is_missing=parameter_properties.ParameterProperties(
@@ -703,22 +754,25 @@ class MultiTaskGaussianProcessRegressionModel(
 
     if index_points is None:
       return tf.TensorShape([None, self.kernel.num_tasks])
-    examples_index = -(self.kernel.feature_ndims + 1)
-    shape = tensorshape_util.concatenate(
-        index_points.shape[examples_index:examples_index + 1],
-        (self.kernel.num_tasks,))
-    if tensorshape_util.rank(shape) is None:
-      return tensorshape_util.concatenate(
-          [index_points.shape[examples_index:examples_index + 1]],
-          [self.kernel.num_tasks])
-    return shape
+    example_shape = tf.nest.map_structure(
+        lambda t, nd: tf.TensorShape(t.shape[-(nd + 1):-nd]),
+        index_points, self.kernel.feature_ndims)
+    flat_shapes = nest.flatten_up_to(self.kernel.feature_ndims, example_shape)
+    if None in [tensorshape_util.rank(s) for s in flat_shapes]:
+      return tf.TensorShape([None, self.kernel.num_tasks])
+    bcast_shape = functools.reduce(
+        tf.broadcast_static_shape, flat_shapes, tf.TensorShape([]))
+    return tensorshape_util.concatenate(
+        bcast_shape, [self.kernel.num_tasks])
 
   def _event_shape_tensor(self, index_points=None):
     index_points = self._get_index_points(index_points)
-    return ps.concat(
-        [[ps.shape(index_points)[-(self.kernel.feature_ndims + 1)]],
-         [self.kernel.num_tasks]],
-        axis=0)
+    example_shape = tf.nest.map_structure(
+        lambda t, nd: ps.shape(t)[-(nd + 1):-nd],
+        index_points, self.kernel.feature_ndims)
+    shape = functools.reduce(ps.broadcast_shape,
+                             tf.nest.flatten(example_shape), [])
+    return ps.concat([shape, [self.kernel.num_tasks]], axis=0)
 
   def _batch_shape(self, index_points=None):
     kwargs = {}
@@ -877,5 +931,6 @@ class MultiTaskGaussianProcessRegressionModel(
           'an argument and returns a `Normal` or '
           '`MultivariateNormalLinearOperator` instance, whose KL can be '
           'computed.')
-    return tf.convert_to_tensor(
-        index_points if index_points is not None else self._index_points)
+    return nest_util.convert_to_nested_tensor(
+        index_points if index_points is not None else self._index_points,
+        dtype_hint=self.kernel.dtype, allow_packing=True)

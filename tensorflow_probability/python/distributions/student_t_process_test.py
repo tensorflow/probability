@@ -13,6 +13,7 @@
 # limitations under the License.
 # ============================================================================
 # Dependency imports
+from absl.testing import parameterized
 import numpy as np
 
 import tensorflow.compat.v1 as tf1
@@ -24,9 +25,10 @@ from tensorflow_probability.python.distributions import student_t_process
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import psd_kernels
+from tensorflow_probability.python.math.psd_kernels.internal import test_util as psd_kernel_test_util
 
 
-class _StudentTProcessTest(object):
+class _StudentTProcessTest(test_util.TestCase):
 
   def testShapes(self):
     # 5x5 grid of index points in R^2 and flatten to 25x2
@@ -250,15 +252,104 @@ class _StudentTProcessTest(object):
             index_points=np.ones([10, 1], dtype=np.float32)),
         mvst.MultivariateStudentTLinearOperator)
 
+  @parameterized.parameters(
+      {"foo_feature_shape": [5], "bar_feature_shape": [3]},
+      {"foo_feature_shape": [3, 2], "bar_feature_shape": [5]},
+      {"foo_feature_shape": [3, 2], "bar_feature_shape": [4, 3]},
+  )
+  def testStructuredIndexPoints(self, foo_feature_shape, bar_feature_shape):
+    base_kernel = psd_kernels.ExponentiatedQuadratic()
+    structured_kernel = psd_kernel_test_util.MultipartTestKernel(
+        base_kernel,
+        feature_ndims={"foo": len(foo_feature_shape),
+                       "bar": len(bar_feature_shape)})
+
+    foo_num_features = np.prod(foo_feature_shape)
+    bar_num_features = np.prod(bar_feature_shape)
+    batch_and_example_shape = [3, 2, 10]
+    index_points = np.random.uniform(
+        -1, 1, batch_and_example_shape + [foo_num_features + bar_num_features]
+        ).astype(np.float32)
+    split_index_points = tf.split(
+        index_points, [foo_num_features, bar_num_features], axis=-1)
+    structured_index_points = {
+        "foo": tf.reshape(split_index_points[0],
+                          batch_and_example_shape + foo_feature_shape),
+        "bar": tf.reshape(split_index_points[1],
+                          batch_and_example_shape + bar_feature_shape)}
+    df = np.float32(3.)
+    base_stp = student_t_process.StudentTProcess(
+        df, kernel=base_kernel, index_points=index_points)
+    structured_stp = student_t_process.StudentTProcess(
+        df, kernel=structured_kernel, index_points=structured_index_points)
+
+    self.assertAllEqual(base_stp.event_shape, structured_stp.event_shape)
+    self.assertAllEqual(base_stp.event_shape_tensor(),
+                        structured_stp.event_shape_tensor())
+    self.assertAllEqual(base_stp.batch_shape, structured_stp.batch_shape)
+    self.assertAllEqual(base_stp.batch_shape_tensor(),
+                        structured_stp.batch_shape_tensor())
+
+    s = structured_stp.sample(3, seed=test_util.test_seed())
+    self.assertAllClose(base_stp.log_prob(s), structured_stp.log_prob(s))
+    self.assertAllClose(base_stp.mean(), structured_stp.mean())
+    self.assertAllClose(base_stp.variance(), structured_stp.variance())
+
+    # Check that batch shapes and number of index points broadcast across
+    # different parts of index_points.
+    bcast_structured_index_points = {
+        "foo": np.random.uniform(
+            -1, 1, [2, 1] + foo_feature_shape).astype(np.float32),
+        "bar": np.random.uniform(
+            -1, 1, [3, 1, 10] + bar_feature_shape).astype(np.float32),
+    }
+    bcast_structured_stp = student_t_process.StudentTProcess(
+        df, kernel=structured_kernel,
+        index_points=bcast_structured_index_points)
+    self.assertAllEqual(base_stp.event_shape, bcast_structured_stp.event_shape)
+    self.assertAllEqual(base_stp.event_shape_tensor(),
+                        bcast_structured_stp.event_shape_tensor())
+    self.assertAllEqual(base_stp.batch_shape, bcast_structured_stp.batch_shape)
+    self.assertAllEqual(base_stp.batch_shape_tensor(),
+                        bcast_structured_stp.batch_shape_tensor())
+
+    index_points_bad_num_examples = {
+        "foo": np.random.uniform(
+            -1, 1, [5] + foo_feature_shape).astype(np.float32),
+        "bar": np.random.uniform(
+            -1, 1, [2] + bar_feature_shape).astype(np.float32),
+    }
+
+    # Non-broadcasting numbers of index points should raise.
+    structured_stp_bad_num_examples = student_t_process.StudentTProcess(
+        df, kernel=structured_kernel,
+        index_points=index_points_bad_num_examples)
+    with self.assertRaisesRegex(ValueError, "the same or broadcastable"):
+      _ = structured_stp_bad_num_examples.event_shape
+
+    # Iterable index points should be interpreted as single Tensors if the
+    # kernel is not structured.
+    index_points_list = tf.unstack(index_points)
+    stp_with_list = student_t_process.StudentTProcess(
+        df, kernel=base_kernel, index_points=index_points_list)
+    self.assertAllEqual(base_stp.event_shape_tensor(),
+                        stp_with_list.event_shape_tensor())
+    self.assertAllEqual(base_stp.batch_shape_tensor(),
+                        stp_with_list.batch_shape_tensor())
+    self.assertAllClose(base_stp.log_prob(s), stp_with_list.log_prob(s))
+
 
 @test_util.test_all_tf_execution_regimes
-class StudentTProcessStaticTest(_StudentTProcessTest, test_util.TestCase):
+class StudentTProcessStaticTest(_StudentTProcessTest):
   is_static = True
 
 
 @test_util.test_all_tf_execution_regimes
-class StudentTProcessDynamicTest(_StudentTProcessTest, test_util.TestCase):
+class StudentTProcessDynamicTest(_StudentTProcessTest):
   is_static = False
+
+
+del _StudentTProcessTest
 
 
 if __name__ == "__main__":

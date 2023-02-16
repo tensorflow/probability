@@ -24,6 +24,7 @@ from tensorflow_probability.python.distributions import student_t_process
 from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
@@ -44,10 +45,11 @@ def _is_empty_observation_data(
   Emptiness means either
     1. Both `observation_index_points` and `observations` are `None`, or
     2. the "number of observations" shape is 0. The shape of
-    `observation_index_points` is `[..., N, f1, ..., fF]`, where `N` is the
-    number of observations and the `f`s are feature dims. Thus, we look at the
-    shape element just to the left of the leftmost feature dim. If that shape is
-    zero, we consider the data empty.
+    `observation_index_points` (or each of its components, if nested) is
+    `[..., N, f1, ..., fF]`, where `N` is the number of observations and the
+    `f`s are feature dims. Thus, we look at the shape element just to the
+    left of the leftmost feature dim. If that shape is zero, we consider the
+    data empty.
 
   We don't check the shape of observations; validations are checked elsewhere in
   the calling code, to ensure these shapes are consistent.
@@ -64,9 +66,10 @@ def _is_empty_observation_data(
   # "empty" observation data.
   if observation_index_points is None and observations is None:
     return True
-  num_obs = tf.compat.dimension_value(
-      observation_index_points.shape[-(feature_ndims + 1)])
-  if num_obs is not None and num_obs == 0:
+  num_obs = tf.nest.map_structure(
+      lambda t, nd: tf.compat.dimension_value(t.shape[-(nd + 1)]),
+      observation_index_points, feature_ndims)
+  if all(n is not None and n == 0 for n in tf.nest.flatten(num_obs)):
     return True
   return False
 
@@ -88,19 +91,22 @@ def _validate_observation_data(
   """
   # Check that observation index points and observation counts broadcast.
   ndims = kernel.feature_ndims
-  if (tensorshape_util.is_fully_defined(
-      observation_index_points.shape[:-ndims]) and
-      tensorshape_util.is_fully_defined(observations.shape)):
-    index_point_count = observation_index_points.shape[:-ndims]
-    observation_count = observations.shape
-    try:
-      tf.broadcast_static_shape(index_point_count, observation_count)
-    except ValueError:
-      # Re-raise with our own more contextual error message.
-      raise ValueError(
-          'Observation index point and observation counts are not '
-          'broadcastable: {} and {}, respectively.'.format(
-              index_point_count, observation_count))
+
+  def _validate(t, nd):
+    if (tensorshape_util.is_fully_defined(t.shape[:-nd])
+        and tensorshape_util.is_fully_defined(observations.shape)):
+      index_point_count = t.shape[:-nd]
+      observation_count = observations.shape
+      try:
+        tf.broadcast_static_shape(index_point_count, observation_count)
+      except ValueError:
+        # Re-raise with our own more contextual error message.
+        raise ValueError(
+            'Observation index point and observation counts are not '
+            'broadcastable: {} and {}, respectively.'.format(
+                index_point_count, observation_count))
+
+  tf.nest.map_structure(_validate, observation_index_points, ndims)
 
 
 class DampedSchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
@@ -124,10 +130,16 @@ class DampedSchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
                name='DampedSchurComplement'):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      dtype = dtype_util.common_dtype([
-          df,
-          schur_complement,
-          fixed_inputs_observations], tf.float32)
+      if tf.nest.is_nested(schur_complement.feature_ndims):
+        dtype = dtype_util.common_dtype(
+            [df, fixed_inputs_observations], tf.float32)
+        kernel_dtype = schur_complement.dtype
+      else:
+        # If the index points are not nested, we assume they are of the same
+        # dtype as the STPRM.
+        dtype = dtype_util.common_dtype([
+            schur_complement, fixed_inputs_observations, df], tf.float32)
+        kernel_dtype = dtype
       self._schur_complement = schur_complement
       self._df = tensor_util.convert_nonref_to_tensor(
           df, name='df', dtype=dtype)
@@ -137,7 +149,7 @@ class DampedSchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
 
     super(DampedSchurComplement, self).__init__(
         feature_ndims=schur_complement.feature_ndims,
-        dtype=dtype,
+        dtype=kernel_dtype,
         name=name,
         parameters=parameters)
 
@@ -179,7 +191,7 @@ class DampedSchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
               self.fixed_inputs_observations)
       b = tf.reduce_sum(b**2, axis=-1)
       numerator = numerator + b
-      n = tf.cast(ps.shape(self.fixed_inputs_observations)[-1], self.dtype)
+      n = tf.cast(ps.shape(self.fixed_inputs_observations)[-1], b.dtype)
       denominator = denominator + n
 
     scaling_factor = numerator / denominator
@@ -200,7 +212,7 @@ class DampedSchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
               self.fixed_inputs_observations)
       b = tf.reduce_sum(b**2, axis=-1)
       numerator = numerator + b
-      n = tf.cast(ps.shape(self.fixed_inputs_observations)[-1], self.dtype)
+      n = tf.cast(ps.shape(self.fixed_inputs_observations)[-1], b.dtype)
       denominator = denominator + n
     return (numerator / denominator)[..., tf.newaxis, tf.newaxis] * undamped
 
@@ -286,22 +298,28 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
         Must be greather than 2.
       kernel: `PositiveSemidefiniteKernel`-like instance representing the
         StP's covariance function.
-      index_points: `float` `Tensor` representing finite collection, or batch of
-        collections, of points in the index set over which the STP is defined.
-        Shape has the form `[b1, ..., bB, e, f1, ..., fF]` where `F` is the
-        number of feature dimensions and must equal `kernel.feature_ndims` and
-        `e` is the number (size) of index points in each batch. Ultimately this
-        distribution corresponds to an `e`-dimensional multivariate normal. The
-        batch shape must be broadcastable with `kernel.batch_shape`.
-      observation_index_points: `float` `Tensor` representing finite collection,
-        or batch of collections, of points in the index set for which some data
-        has been observed. Shape has the form `[b1, ..., bB, e, f1, ..., fF]`
-        where `F` is the number of feature dimensions and must equal
-        `kernel.feature_ndims`, and `e` is the number (size) of index points in
-        each batch. `[b1, ..., bB, e]` must be broadcastable with the shape of
-        `observations`, and `[b1, ..., bB]` must be broadcastable with the
-        shapes of all other batched parameters (`kernel.batch_shape`,
-        `index_points`, etc).
+      index_points: (Nested) `Tensor` representing finite collection, or batch
+        of collections, of points in the index set over which the STP is
+        defined. Shape (of each nested component) has the form `[b1, ..., bB,
+        e, f1, ..., fF]` where `F` is the number of feature dimensions and
+        must equal `kernel.feature_ndims` (or its corresponding nested
+        component) and `e` is the number (size) of index points in each
+        batch. Ultimately this distribution corresponds to an `e`-dimensional
+        multivariate normal. The batch shape must be broadcastable with
+        `kernel.batch_shape` and any batch dims yielded by `mean_fn`.
+      observation_index_points: (Nested) `Tensor` representing finite
+        collection, or batch of collections, of points in the index set for
+        which some data has been observed. Shape (of each nested component)
+        has the form `[b1, ..., bB, e, f1, ..., fF]` where `F` is the number
+        of feature dimensions and must equal `kernel.feature_ndims` (or its
+        corresponding nested component), and `e` is the number (size) of
+        index points in each batch. `[b1, ..., bB, e]` must be broadcastable
+        with the shape of `observations`, and `[b1, ..., bB]` must be
+        broadcastable with the shapes of all other batched parameters
+        (`kernel.batch_shape`, `index_points`, etc). The default value is
+        `None`, which corresponds to the empty set of observations, and
+        simply results in the prior predictive model (a STP with noise of
+        variance `predictive_noise_variance`).
       observations: `float` `Tensor` representing collection, or batch of
         collections, of observations corresponding to
         `observation_index_points`. Shape has the form `[b1, ..., bB, e]`, which
@@ -324,8 +342,8 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
         observations.
       mean_fn: Python `callable` that acts on `index_points` to produce a
         collection, or batch of collections, of mean values at `index_points`.
-        Takes a `Tensor` of shape `[b1, ..., bB, f1, ..., fF]` and returns a
-        `Tensor` whose shape is broadcastable with `[b1, ..., bB]`.
+        Takes a (nested) `Tensor` of shape `[b1, ..., bB, f1, ..., fF]` and
+        returns a `Tensor` whose shape is broadcastable with `[b1, ..., bB]`.
         Default value: `None` implies the constant zero function.
       cholesky_fn: Callable which takes a single (batch) matrix argument and
         returns a Cholesky-like lower triangular factor.  Default value: `None`,
@@ -352,17 +370,33 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      dtype = dtype_util.common_dtype(
-          [df, kernel, index_points, observation_noise_variance, observations],
-          tf.float32)
+      if tf.nest.is_nested(kernel.feature_ndims):
+        input_dtype = dtype_util.common_dtype(
+            [kernel, index_points, observation_index_points],
+            dtype_hint=nest_util.broadcast_structure(
+                kernel.feature_ndims, tf.float32))
+        dtype = dtype_util.common_dtype(
+            [observations, observation_noise_variance,
+             predictive_noise_variance, df], tf.float32)
+      else:
+        # If the index points are not nested, we assume they are of the same
+        # dtype as the STPRM.
+        dtype = dtype_util.common_dtype([
+            kernel, index_points, observation_index_points, observations,
+            observation_noise_variance, predictive_noise_variance, df
+        ], tf.float32)
+        input_dtype = dtype
+
+      if index_points is not None:
+        index_points = nest_util.convert_to_nested_tensor(
+            index_points, dtype=input_dtype, convert_ref=False,
+            name='index_points', allow_packing=True)
+      if observation_index_points is not None:
+        observation_index_points = nest_util.convert_to_nested_tensor(
+            observation_index_points, dtype=input_dtype, convert_ref=False,
+            name='observation_index_points', allow_packing=True)
       df = tensor_util.convert_nonref_to_tensor(
           df, dtype=dtype, name='df')
-      index_points = tensor_util.convert_nonref_to_tensor(
-          index_points, dtype=dtype, name='index_points')
-      observation_index_points = tensor_util.convert_nonref_to_tensor(
-          observation_index_points,
-          dtype=dtype,
-          name='observation_index_points')
       observations = tensor_util.convert_nonref_to_tensor(
           observations, dtype=dtype, name='observations')
       observation_noise_variance = tensor_util.convert_nonref_to_tensor(
@@ -431,8 +465,9 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
             def conditional_mean_fn(x):
               """Conditional mean."""
               observations = tf.convert_to_tensor(self._observations)
-              observation_index_points = tf.convert_to_tensor(
-                  self._observation_index_points)
+              observation_index_points = nest_util.convert_to_nested_tensor(
+                  self._observation_index_points, dtype_hint=self.kernel.dtype,
+                  allow_packing=True)
               k_x_obs_linop = tf.linalg.LinearOperatorFullMatrix(
                   kernel.matrix(x, observation_index_points))
               chol_linop = tf.linalg.LinearOperatorLowerTriangular(
@@ -502,18 +537,19 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
         Must be greather than 2.
       kernel: `PositiveSemidefiniteKernel`-like instance representing the
         StP's covariance function.
-      observation_index_points: `float` `Tensor` representing finite collection,
-        or batch of collections, of points in the index set for which some data
-        has been observed. Shape has the form `[b1, ..., bB, e, f1, ..., fF]`
-        where `F` is the number of feature dimensions and must equal
-        `kernel.feature_ndims`, and `e` is the number (size) of index points in
-        each batch. `[b1, ..., bB, e]` must be broadcastable with the shape of
-        `observations`, and `[b1, ..., bB]` must be broadcastable with the
-        shapes of all other batched parameters (`kernel.batch_shape`,
-        `index_points`, etc). The default value is `None`, which corresponds to
-        the empty set of observations, and simply results in the prior
-        predictive model (a StP with noise of variance
-        `predictive_noise_variance`).
+      observation_index_points: (Nested) `float` `Tensor` representing finite
+        collection, or batch of collections, of points in the index set for
+        which some data has been observed. Shape (or shape of each nested
+        component) has the form `[b1, ..., bB, e, f1, ..., fF]` where `F` is
+        the number of feature dimensions and must equal
+        `kernel.feature_ndims` (or its corresponding nested component), and
+        `e` is the number (size) of index points in each batch. `[b1, ...,
+        bB, e]` must be broadcastable with the shape of `observations`, and
+        `[b1, ..., bB]` must be broadcastable with the shapes of all other
+        batched parameters (`kernel.batch_shape`, `index_points`, etc). The
+        default value is `None`, which corresponds to the empty set of
+        observations, and simply results in the prior predictive model (a StP
+        with noise of variance `predictive_noise_variance`).
       observations: `float` `Tensor` representing collection, or batch of
         collections, of observations corresponding to
         `observation_index_points`. Shape has the form `[b1, ..., bB, e]`, which
@@ -524,14 +560,15 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
         `None`, which corresponds to the empty set of observations, and simply
         results in the prior predictive model (a StP with noise of variance
         `predictive_noise_variance`).
-      index_points: `float` `Tensor` representing finite collection, or batch of
-        collections, of points in the index set over which the StP is defined.
-        Shape has the form `[b1, ..., bB, e, f1, ..., fF]` where `F` is the
-        number of feature dimensions and must equal `kernel.feature_ndims` and
-        `e` is the number (size) of index points in each batch. Ultimately this
-        distribution corresponds to an `e`-dimensional multivariate normal. The
-        batch shape must be broadcastable with `kernel.batch_shape` and any
-        batch dims yielded by `mean_fn`.
+      index_points: (Nested) `float` `Tensor` representing finite collection, or
+        batch of collections, of points in the index set over which the StP is
+        defined.  Shape (or shape of each nested component) has the form
+        `[b1, ..., bB, e, f1, ..., fF]` where `F` is the number of feature
+        dimensions and must equal `kernel.feature_ndims` (or its corresponding
+        nested component) and `e` is the number (size) of index points in each
+        batch. Ultimately this distribution corresponds to an `e`-dimensional
+        multivariate normal. The batch shape must be broadcastable with
+        `kernel.batch_shape` and any batch dims yielded by `mean_fn`.
       observation_noise_variance: `float` `Tensor` representing the variance
         of the noise in the Normal likelihood distribution of the model. May be
         batched, in which case the batch shape must be broadcastable with the
@@ -547,8 +584,8 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
         observations.
       mean_fn: Python `callable` that acts on `index_points` to produce a
         collection, or batch of collections, of mean values at `index_points`.
-        Takes a `Tensor` of shape `[b1, ..., bB, f1, ..., fF]` and returns a
-        `Tensor` whose shape is broadcastable with `[b1, ..., bB]`.
+        Takes a (nested) `Tensor` of shape `[b1, ..., bB, f1, ..., fF]` and
+        returns a `Tensor` whose shape is broadcastable with `[b1, ..., bB]`.
         Default value: `None` implies the constant zero function.
       cholesky_fn: Callable which takes a single (batch) matrix argument and
         returns a Cholesky-like lower triangular factor.  Default value: `None`,
@@ -574,16 +611,28 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
     """
 
     with tf.name_scope(name) as name:
-      dtype = dtype_util.common_dtype([
-          df, index_points, observation_index_points, observations,
-          observation_noise_variance, predictive_noise_variance,
-      ], tf.float32)
+      if tf.nest.is_nested(kernel.feature_ndims):
+        input_dtype = dtype_util.common_dtype(
+            [kernel, index_points, observation_index_points],
+            dtype_hint=nest_util.broadcast_structure(
+                kernel.feature_ndims, tf.float32))
+        dtype = dtype_util.common_dtype(
+            [observations, observation_noise_variance,
+             predictive_noise_variance, df], tf.float32)
+      else:
+        # If the index points are not nested, we assume they are of the same
+        # dtype as the STPRM.
+        dtype = dtype_util.common_dtype([
+            index_points, observation_index_points, observations,
+            observation_noise_variance, predictive_noise_variance, df
+        ], tf.float32)
+        input_dtype = dtype
 
       # Convert to tensor arguments that are expected to not be Variables / not
       # going to change.
       df = tf.convert_to_tensor(df, dtype=dtype)
-      observation_index_points = tf.convert_to_tensor(
-          observation_index_points, dtype=dtype)
+      observation_index_points = nest_util.convert_to_nested_tensor(
+          observation_index_points, dtype=input_dtype, allow_packing=True)
       observation_noise_variance = tf.convert_to_tensor(
           observation_noise_variance, dtype=dtype)
       observations = tf.convert_to_tensor(observations, dtype=dtype)
@@ -662,20 +711,22 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
 
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):
+    def _event_ndims_fn(self):
+      return tf.nest.map_structure(lambda nd: nd + 1, self.kernel.feature_ndims)
     return dict(
         df=parameter_properties.ParameterProperties(
             default_constraining_bijector_fn=(
                 lambda: softplus_bijector.Softplus(  # pylint:disable=g-long-lambda
                     low=dtype_util.as_numpy_dtype(dtype)(2.)))),
         index_points=parameter_properties.ParameterProperties(
-            event_ndims=lambda self: self.kernel.feature_ndims + 1,
+            event_ndims=_event_ndims_fn,
             shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
         ),
         observations=parameter_properties.ParameterProperties(
             event_ndims=1,
             shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED),
         observation_index_points=parameter_properties.ParameterProperties(
-            event_ndims=lambda self: self.kernel.feature_ndims + 1,
+            event_ndims=_event_ndims_fn,
             shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
         ),
         kernel=parameter_properties.BatchedComponentProperties(),

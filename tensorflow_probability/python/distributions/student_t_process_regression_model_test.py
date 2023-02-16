@@ -21,6 +21,7 @@ from tensorflow_probability.python.distributions import student_t_process
 from tensorflow_probability.python.distributions import student_t_process_regression_model as stprm
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import psd_kernels
+from tensorflow_probability.python.math.psd_kernels.internal import test_util as psd_kernel_test_util
 
 
 @test_util.test_all_tf_execution_regimes
@@ -418,6 +419,61 @@ class StudentTProcessRegressionModelTest(test_util.TestCase):
     # index points kernel matrix).
     self.assertAllClose(d.log_prob(y_obs), d2.log_prob(y_obs))
     self.assertEqual(mock_cholesky_fn.call_count, 2)
+
+  def testStructuredIndexPoints(self):
+    df = np.float32(4.)
+    base_kernel = psd_kernels.ExponentiatedQuadratic()
+    observation_index_points = np.random.uniform(
+        -1, 1, (12, 8)).astype(np.float32)
+    observations = np.sum(observation_index_points, axis=-1)
+    index_points = np.random.uniform(-1, 1, (6, 8)).astype(np.float32)
+    base_stprm = stprm.StudentTProcessRegressionModel(
+        df,
+        kernel=base_kernel,
+        index_points=index_points,
+        observation_index_points=observation_index_points,
+        observations=observations)
+
+    structured_kernel = psd_kernel_test_util.MultipartTestKernel(base_kernel)
+    structured_obs_index_points = dict(
+        zip(('foo', 'bar'),
+            tf.split(observation_index_points, [5, 3], axis=-1)))
+    structured_index_points = dict(
+        zip(('foo', 'bar'), tf.split(index_points, [5, 3], axis=-1)))
+    structured_stprm = stprm.StudentTProcessRegressionModel(
+        df,
+        kernel=structured_kernel,
+        index_points=structured_index_points,
+        observation_index_points=structured_obs_index_points,
+        observations=observations)
+
+    s = structured_stprm.sample(3, seed=test_util.test_seed())
+    self.assertAllClose(base_stprm.log_prob(s), structured_stprm.log_prob(s))
+    self.assertAllClose(base_stprm.mean(), structured_stprm.mean())
+    self.assertAllClose(base_stprm.variance(), structured_stprm.variance())
+    self.assertAllEqual(base_stprm.event_shape, structured_stprm.event_shape)
+    self.assertAllEqual(base_stprm.event_shape_tensor(),
+                        structured_stprm.event_shape_tensor())
+    self.assertAllEqual(base_stprm.batch_shape, structured_stprm.batch_shape)
+    self.assertAllEqual(base_stprm.batch_shape_tensor(),
+                        structured_stprm.batch_shape_tensor())
+
+    # Iterable index points should be interpreted as single Tensors if the
+    # kernel is not structured.
+    index_points_list = tf.unstack(index_points)
+    obs_index_points_nested_list = tf.nest.map_structure(
+        tf.unstack, tf.unstack(observation_index_points))
+    stprm_with_lists = stprm.StudentTProcessRegressionModel(
+        df,
+        kernel=base_kernel,
+        index_points=index_points_list,
+        observation_index_points=obs_index_points_nested_list,
+        observations=observations)
+    self.assertAllEqual(base_stprm.event_shape_tensor(),
+                        stprm_with_lists.event_shape_tensor())
+    self.assertAllEqual(base_stprm.batch_shape_tensor(),
+                        stprm_with_lists.batch_shape_tensor())
+    self.assertAllClose(base_stprm.log_prob(s), stprm_with_lists.log_prob(s))
 
 
 if __name__ == '__main__':
