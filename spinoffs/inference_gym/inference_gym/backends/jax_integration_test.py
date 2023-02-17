@@ -14,8 +14,8 @@
 # ============================================================================
 """Integration test for the JAX backend."""
 
-from absl.testing import absltest
 from inference_gym import using_jax as gym
+from absl.testing import absltest
 
 
 class JaxIntegrationTest(absltest.TestCase):

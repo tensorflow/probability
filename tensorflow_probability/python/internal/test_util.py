@@ -25,7 +25,6 @@ import unittest
 
 from absl import flags
 from absl import logging
-from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
 
@@ -42,6 +41,7 @@ from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 from tensorflow_probability.python.util.deferred_tensor import TransformedVariable
 from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
+from absl.testing import absltest
 
 
 __all__ = [

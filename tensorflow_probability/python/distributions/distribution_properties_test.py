@@ -702,4 +702,4 @@ if __name__ == '__main__':
   # by seeing all the digits of every floating point number, instead of the
   # usual default of truncating the printed representation to 8 digits.
   np.set_printoptions(floatmode='unique', precision=None)
-  tf.test.main()
+  test_util.main()
