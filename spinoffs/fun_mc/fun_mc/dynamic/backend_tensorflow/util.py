@@ -26,6 +26,7 @@ tnp = tf.experimental.numpy
 __all__ = [
     'assert_same_shallow_tree',
     'block_until_ready',
+    'convert_to_tensor',
     'diff',
     'flatten_tree',
     'get_shallow_tree',
@@ -35,14 +36,17 @@ __all__ = [
     'map_tree_up_to',
     'move_axis',
     'named_call',
+    'new_dynamic_array',
     'random_categorical',
     'random_integer',
     'random_normal',
     'random_uniform',
     'repeat',
     'split_seed',
+    'stack_dynamic_array',
     'trace',
     'value_and_ldj',
+    'write_to_dynamic_array',
 ]
 
 
@@ -370,3 +374,34 @@ def repeat(x, repeats, total_repeat_length=None):
   if total_repeat_length is not None:
     res.set_shape([total_repeat_length] + [None] * (len(res.shape) - 1))
   return res
+
+
+def new_dynamic_array(shape, dtype, size):
+  """Creates a new dynamic array."""
+  return tf.TensorArray(dtype, size=size, element_shape=shape)
+
+
+def write_to_dynamic_array(array, index, element):
+  """Writes to the dynamic array."""
+  return array.write(index, element)
+
+
+def stack_dynamic_array(array):
+  """Stacks the dynamic array."""
+  return array.stack()
+
+
+def eval_shape(fn, *args):
+  """Evaluates the shape/dtypes of fn statically."""
+  args = tf.nest.map_structure(tf.TensorSpec.from_tensor, args)
+  _, shape = _eval_shape(lambda args: fn(*args), args)
+  return shape
+
+
+def convert_to_tensor(x):
+  """A looser convert_to_tensor."""
+  if x is None:
+    return x
+  if isinstance(x, tf.TensorArray):
+    return x
+  return tf.convert_to_tensor(x)

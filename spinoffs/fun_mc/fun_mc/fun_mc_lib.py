@@ -32,9 +32,10 @@ while not_done:
 """
 
 import collections
+import dataclasses
 import functools
 import typing
-from typing import Any, Callable, List, Mapping, NamedTuple, Optional, Sequence, Text, Tuple, Union  # pylint: disable=unused-import
+from typing import Any, Callable, Dict, List, Mapping, NamedTuple, Optional, Sequence, Text, Tuple, Union  # pylint: disable=unused-import
 
 import numpy as np
 
@@ -83,6 +84,9 @@ __all__ = [
     'IntegratorState',
     'IntegratorStep',
     'IntegratorStepState',
+    'InterruptibleTraceState',
+    'interruptible_trace_init',
+    'interruptible_trace_step',
     'leapfrog_step',
     'make_gaussian_kinetic_energy_fn',
     'make_surrogate_loss_fn',
@@ -167,6 +171,36 @@ def _trace_extra(state: 'State', extra: 'TensorNest') -> 'TensorNest':
   return extra
 
 
+def _split_trace(trace_element: Any, trace_mask: Any) -> Tuple[Any, Any]:
+  # The two return values of this function share the same shallow structure as
+  # `trace_mask`, with the first return value being a version meant for
+  # tracing, and the second return value meant for mere propagation.
+  return (
+      util.map_tree_up_to(
+          trace_mask,
+          lambda m, s: () if m else s,
+          trace_mask,
+          trace_element,
+      ),
+      util.map_tree_up_to(
+          trace_mask,
+          lambda m, s: s if m else (),
+          trace_mask,
+          trace_element,
+      ),
+  )
+
+
+def _combine_trace(untraced: Any, traced: Any, trace_mask: Any) -> Any:
+  # Reconstitute the structure returned by `trace_fn`, with leaves replaced
+  # with traced and untraced elements according to the trace_mask. This is the
+  # inverse operation of `split_trace`.
+  def _select(trace_mask, traced, untraced):
+    return traced if trace_mask else untraced
+
+  return util.map_tree_up_to(trace_mask, _select, trace_mask, traced, untraced)
+
+
 @util.named_call
 def trace(
     state: 'State',
@@ -233,44 +267,16 @@ def trace(
   ```
   """
 
-  def split_trace(trace_element):
-    # The two return values of this function share the same shallow structure as
-    # `trace_mask`, with the first return value being a version meant for
-    # tracing, and the second return value meant for mere propagation.
-    return (
-        util.map_tree_up_to(
-            trace_mask,
-            lambda m, s: () if m else s,
-            trace_mask,
-            trace_element,
-        ),
-        util.map_tree_up_to(
-            trace_mask,
-            lambda m, s: s if m else (),
-            trace_mask,
-            trace_element,
-        ),
-    )
-
-  def combine_trace(untraced, traced):
-    # Reconstitute the structure returned by `trace_fn`, with leaves replaced
-    # with traced and untraced elements according to the trace_mask. This is the
-    # inverse operation of `split_trace`.
-    def _select(trace_mask, traced, untraced):
-      return traced if trace_mask else untraced
-
-    return util.map_tree_up_to(trace_mask, _select, trace_mask, traced,
-                               untraced)
-
   def wrapper(state):
-    state, extra = util.map_tree(tf.convert_to_tensor,
+    state, extra = util.map_tree(util.convert_to_tensor,
                                  call_transition_operator(fn, state))
-    trace_element = util.map_tree(tf.convert_to_tensor, trace_fn(state, extra))
-    untraced, traced = split_trace(trace_element)
+    trace_element = util.map_tree(
+        util.convert_to_tensor, trace_fn(state, extra)
+    )
+    untraced, traced = _split_trace(trace_element, trace_mask)
     return state, untraced, traced
 
-  state = util.map_tree(lambda t: (t if t is None else tf.convert_to_tensor(t)),
-                        state)
+  state = util.map_tree(util.convert_to_tensor, state)
 
   state, untraced, traced = util.trace(
       state=state,
@@ -280,7 +286,170 @@ def trace(
       parallel_iterations=parallel_iterations,
   )
 
-  return state, combine_trace(untraced, traced)
+  return state, _combine_trace(untraced, traced, trace_mask)
+
+
+@dataclasses.dataclass
+class _TraceMaskHolder:
+  """Helper to store mutable trace masks in an immutable context."""
+
+  trace_mask: Any
+
+  def __eq__(self, other):
+    return True
+
+  def __hash__(self):
+    return 0
+
+
+class InterruptibleTraceState(NamedTuple):
+  """State of the interruptible trace transition operator."""
+
+  state: 'State'
+  traced: Optional[tuple[Any]]
+  untraced: Optional[Any]
+  step: Any
+  # We need to store the static trace mask in the state. The most convenient,
+  # backend agnostic method to do this is to place it into the key of a dict. We
+  # use a helper type to fake immutability, if necessary.
+  trace_mask_holder: Dict[_TraceMaskHolder, Tuple[()]]
+
+  @property
+  def trace_mask(self) -> 'BooleanNest':
+    return next(iter(self.trace_mask_holder.keys())).trace_mask
+
+  @util.named_call
+  def trace(self, only_valid=True) -> 'TensorNest':
+    """Returns the stacked and unstacked values.
+
+    Args:
+      only_valid: Slice away the invalid tail of the trace arrays.
+
+    Returns:
+      The stacked and unstacked values. This has the same structure as the
+      second return value of `fn`.
+    """
+
+    traced = util.map_tree(util.stack_dynamic_array, self.traced)
+    if only_valid:
+      traced = util.map_tree(lambda x: x[: self.step], traced)
+    return _combine_trace(self.untraced, traced, self.trace_mask)
+
+
+@util.named_call
+def interruptible_trace_init(
+    state: 'State',
+    fn: 'TransitionOperator',
+    num_steps: int,
+    trace_mask: 'BooleanNest' = True,
+) -> 'InterruptibleTraceState':
+  """Initializes the state interruptible trace operator.
+
+  Args:
+    state: State of `fn`.
+    fn: A `TransitionOperator`.
+    num_steps: Number of steps that this trace will run for. It is valid to call
+      this for fewer than `num_steps`, but invalid to call it for more than
+      that.
+    trace_mask: A potentially shallow nest with boolean leaves applied to the
+      second return value of `fn`. This controls whether or not to actually
+      trace the arrays in that value. For subtrees  where the mask leaf is
+      `True`, those subtrees are traced (i.e. the corresponding subtrees in
+      `trace()` will contain an extra leading dimension less than or equal to
+      `num_steps`). For subtrees of the return value  where the mask leaf is
+      `False`, those subtrees are merely propagated, and their corresponding
+      subtrees in `trace()` correspond to their final value.
+
+  Returns:
+    state: `InterruptibleTraceState`
+  """
+  state = util.map_tree(util.convert_to_tensor, state)
+  _, trace_element = util.eval_shape(
+      lambda s: call_transition_operator(fn, s),
+      state
+  )
+  untraced, traced = _split_trace(trace_element, trace_mask)
+
+  traced = util.map_tree(
+      lambda x: util.new_dynamic_array(x.shape, x.dtype, num_steps), traced
+  )
+  untraced = util.map_tree(lambda x: tf.zeros(x.shape, x.dtype), untraced)
+
+  return InterruptibleTraceState(
+      state=state,
+      traced=traced,
+      untraced=untraced,
+      step=tf.zeros([], tf.int32),
+      trace_mask_holder={_TraceMaskHolder(trace_mask): ()},
+  )
+
+
+@util.named_call
+def interruptible_trace_step(
+    state: 'InterruptibleTraceState', fn: 'TransitionOperator'
+) -> 'Tuple[InterruptibleTraceState, Tuple[()]]':
+  """Runs a step of the interruptible trace operator.
+
+  Interruptible trace is like the regular `fun_mc.trace`, but can be
+  interrupted. This is accomplished by requiring the user to call this step
+  function for `num_steps` manually. It is valid to call this for fewer than
+  `num_steps`, but invalid to call it for more than that. You can extract the
+  traced and untraced values via the `trace()` method of the state of this
+  operator.
+
+  Args:
+    state: `InterruptibleTraceState`.
+    fn: A `TransitionOperator`.
+
+  Returns:
+    state: New `InterruptibleTraceState`.
+    extra: Empty tuple.
+
+  #### Example
+
+  ```python
+  def fun(x, y):
+    x = x + 1.0
+    y = y + 2.0
+    return (x, y), (x, y)
+
+  state, _ = fun_mc.trace(
+      state=fun_mc.interruptible_trace_init((0.0, 0.0), fn=fun, num_steps=5),
+      fn=functools.partial(fun_mc.interruptible_trace_step, fn=fun),
+      num_steps=4,
+  )
+
+  x_trace, y_trace = state.trace()
+
+  assert([1.0, 2.0, 3.0, 4.0] == x_trace)
+  assert([2.0, 4.0, 6.0, 8.0] == y_trace)
+  ```
+
+  """
+
+  inner_state, trace_element = call_transition_operator(
+      fn, state.state
+  )
+
+  untraced, traced = util.map_tree(
+      util.convert_to_tensor, _split_trace(trace_element, state.trace_mask)
+  )
+
+  traced = util.map_tree(
+      lambda ta, x: util.write_to_dynamic_array(ta, state.step, x),
+      state.traced,
+      traced,
+  )
+
+  return (
+      state._replace(
+          state=inner_state,
+          traced=traced,
+          untraced=untraced,
+          step=state.step + 1,
+      ),
+      (),
+  )
 
 
 def _tree_repr(tree: 'Any') -> 'Text':
