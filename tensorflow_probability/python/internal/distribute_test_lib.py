@@ -39,8 +39,13 @@ class DistributedTest(test_util.TestCase):
     elif NUMPY_MODE:
       pass
     else:
-      self.strategy = tf.distribute.MirroredStrategy(
-          devices=tf.config.list_logical_devices())
+      # Each test case needs a separate key base to not have the collective
+      # clash.
+      tf.distribute.MirroredStrategy._collective_key_base += 1
+      # We need to defer creating the strategy, because some ops don't get
+      # registered if we create it in setUp (which is ran eagerly) and then
+      # used in TF1 graph mode.
+      self._strategy = None
       self.key = [0, 0]
     self.axis_name = 'i'
 
@@ -66,6 +71,16 @@ class DistributedTest(test_util.TestCase):
                                     reshaped,
                                     expand_composites=True)
 
+  def strategy(self):
+    if not JAX_MODE and not NUMPY_MODE:
+      if self._strategy is None:
+        self._strategy = tf.distribute.MirroredStrategy(
+            devices=tf.config.list_logical_devices()
+        )
+      return self._strategy
+    else:
+      return None
+
   def strategy_run(self, f, args=(), in_axes=0, axis_name=None):
     if JAX_MODE:
       axis_name = axis_name or self.axis_name
@@ -75,7 +90,7 @@ class DistributedTest(test_util.TestCase):
             in_axes=(0, None),
             axis_name=axis_name)(tf.ones(NUM_DEVICES), args)
       return jax.pmap(f, axis_name=axis_name, in_axes=in_axes)(*args)
-    return self.strategy.run(tf.function(f, autograph=False), args)
+    return self.strategy().run(tf.function(f, autograph=False), args)
 
   def shard_values(self, values, axis=0):
     self.assertEqual(values.shape[axis], NUM_DEVICES)
@@ -88,7 +103,9 @@ class DistributedTest(test_util.TestCase):
     def value_fn(ctx):
       return values[ctx.replica_id_in_sync_group]
 
-    return self.strategy.experimental_distribute_values_from_function(value_fn)
+    return self.strategy().experimental_distribute_values_from_function(
+        value_fn
+    )
 
 
 def distributed_set_up():
