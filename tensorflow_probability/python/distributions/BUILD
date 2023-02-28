@@ -4051,6 +4051,7 @@ multi_substrate_py_test(
     name = "normal_test",
     srcs = ["normal_test.py"],
     numpy_tags = ["notap"],
+    tags = ["colab-smoke"],
     deps = [
         ":kullback_leibler",
         ":normal",
@@ -4511,6 +4512,7 @@ multi_substrate_py_test(
     name = "transformed_distribution_test",
     size = "medium",
     srcs = ["transformed_distribution_test.py"],
+    tags = ["colab-smoke"],
     deps = [
         ":beta",
         ":exponential",
