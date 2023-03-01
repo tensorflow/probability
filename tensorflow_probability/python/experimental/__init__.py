@@ -28,6 +28,7 @@ You are welcome to try any of this out (and tell us how well it works for you!).
 """
 
 from tensorflow_probability.python.experimental import auto_batching
+from tensorflow_probability.python.experimental import bayesopt
 from tensorflow_probability.python.experimental import bijectors
 from tensorflow_probability.python.experimental import distribute
 from tensorflow_probability.python.experimental import distributions
@@ -57,6 +58,7 @@ _allowed_symbols = [
     'as_composite',
     'auto_composite_tensor',
     'AutoCompositeTensor',
+    'bayesopt',
     'bijectors',
     'distribute',
     'distributions',

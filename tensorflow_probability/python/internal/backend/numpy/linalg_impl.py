@@ -507,7 +507,7 @@ def _triangular_solve(matrix, rhs, lower=True, adjoint=False, name=None):  # pyl
   nbatch = int(np.prod(bcast_shp))
   flat_mat = matrix.reshape(nbatch, dim, dim)
   flat_rhs = rhs.reshape(nbatch, dim, rhs.shape[-1])
-  result = np.empty(flat_rhs.shape)
+  result = np.empty(flat_rhs.shape, dtype=flat_rhs.dtype)
   if np.size(result):
     # ValueError: On entry to STRTRS parameter number 7 had an illegal value.
     for i, (mat, rh) in enumerate(zip(flat_mat, flat_rhs)):
