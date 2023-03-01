@@ -27,7 +27,7 @@ from tensorflow_probability.python.internal.backend import numpy as nptf
 
 from tensorflow.python.framework import ops  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.framework import tensor_util  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.ops import control_flow_ops  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.ops import control_flow_case  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 JAX_MODE = False
@@ -286,8 +286,13 @@ def case(pred_fn_pairs, default=None, exclusive=False, name='smart_case'):
         return pred
       return p
     pred_fn_pairs = [(maybe_static(pred), fn) for pred, fn in pred_fn_pairs]
-  return control_flow_ops._case_helper(  # pylint: disable=protected-access
-      cond, pred_fn_pairs, default, exclusive, name, allow_python_preds=True)
+  return control_flow_case._case_helper(  # pylint: disable=protected-access
+      cond,
+      pred_fn_pairs,
+      default,
+      exclusive,
+      name,
+      allow_python_preds=True)
 
 
 def size0(x, name=None):
