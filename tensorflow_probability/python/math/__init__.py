@@ -55,6 +55,7 @@ from tensorflow_probability.python.math.linalg import hpsd_quadratic_form_solve
 from tensorflow_probability.python.math.linalg import hpsd_quadratic_form_solvevec
 from tensorflow_probability.python.math.linalg import hpsd_solve
 from tensorflow_probability.python.math.linalg import hpsd_solvevec
+from tensorflow_probability.python.math.linalg import low_rank_cholesky
 from tensorflow_probability.python.math.linalg import lu_matrix_inverse
 from tensorflow_probability.python.math.linalg import lu_reconstruct
 from tensorflow_probability.python.math.linalg import lu_solve
@@ -141,6 +142,7 @@ _allowed_symbols = [
     'log_gamma_correction',
     'log_gamma_difference',
     'log_sub_exp',
+    'low_rank_cholesky',
     'lu_matrix_inverse',
     'lu_reconstruct',
     'lu_solve',
