@@ -408,6 +408,192 @@ if not JAX_MODE:
 del _PivotedCholesky
 
 
+class _LowRankCholesky(test_util.TestCase):
+
+  def _random_batch_psd(self, dim):
+    rng = test_util.test_np_rng()
+    matrix = rng.random_sample([2, dim, dim])
+    matrix = np.matmul(matrix, np.swapaxes(matrix, -2, -1))
+    matrix = (matrix + np.diag(np.arange(dim) * .1)).astype(self.dtype)
+    masked_shape = (
+        matrix.shape if self.use_static_shape else [None] * len(matrix.shape))
+    matrix = tf1.placeholder_with_default(matrix, shape=masked_shape)
+    return matrix
+
+  def testLowRankCholesky(self):
+    if not tf.executing_eagerly() and not self.use_static_shape:
+      return
+
+    # TODO(thomaswc): Jit this.
+    dim = 11
+    matrix = self._random_batch_psd(dim)
+    true_diag = tf.linalg.diag_part(matrix)
+
+    pchol, r = linalg.low_rank_cholesky(matrix, max_rank=1)
+    self.assertEqual(1, self.evaluate(r))
+    mat = tf.matmul(pchol, pchol, transpose_b=True)
+    diag_diff_prev = self.evaluate(tf.abs(tf.linalg.diag_part(mat) - true_diag))
+    diff_norm_prev = self.evaluate(
+        tf.linalg.norm(mat - matrix, ord='fro', axis=[-1, -2]))
+    for rank in range(2, dim + 1):
+      # Specifying trace_rtol forces the full max_rank decomposition.
+      pchol, r = linalg.low_rank_cholesky(matrix, max_rank=rank, trace_rtol=-1)
+      self.assertEqual(rank, self.evaluate(r))
+      # Compared to pivot_cholesky, low_rank_cholesky will sometimes have
+      # approximate zeros like 7e-17 or -2.6e-7 where it "should" have a
+      # real zero.
+      zeros_per_col = tf.math.count_nonzero(
+          tf.math.less(tf.math.abs(pchol), 1e-6),
+          axis=-2)
+      mat = tf.matmul(pchol, pchol, transpose_b=True)
+      pchol_shp, diag_diff, diff_norm, zeros_per_col = self.evaluate([
+          tf.shape(pchol),
+          tf.abs(tf.linalg.diag_part(mat) - true_diag),
+          tf.linalg.norm(mat - matrix, ord='fro', axis=[-1, -2]), zeros_per_col
+      ])
+      self.assertAllEqual([2, dim, rank], pchol_shp)
+      self.assertAllEqual(
+          np.ones([2, rank], dtype=np.bool_), zeros_per_col >= np.arange(rank),
+          msg=f'For matrix {matrix}, low rank cholesky {pchol} with max_rank '
+              f'{rank} has zeros per column of {zeros_per_col}'
+      )
+      self.assertAllLessEqual(diag_diff - diag_diff_prev,
+                              np.finfo(self.dtype).resolution)
+      self.assertAllLessEqual(diff_norm - diff_norm_prev,
+                              np.finfo(self.dtype).resolution)
+      diag_diff_prev, diff_norm_prev = diag_diff, diff_norm
+
+  @test_util.numpy_disable_gradient_test
+  def testGradient(self):
+    if not tf.executing_eagerly():
+      return
+
+    dim = 11
+
+    def fn(matrix):
+      chol, _ = linalg.low_rank_cholesky(matrix, max_rank=dim // 3)
+      return chol
+    def grad(matrix):
+      _, dmatrix = gradient.value_and_gradient(fn, matrix)
+      return dmatrix
+    if self.jit:
+      self.skip_if_no_xla()
+      grad = tf.function(grad, jit_compile=True)
+
+    matrix = self._random_batch_psd(dim)
+    _, dmatrix = grad(matrix)
+    self.assertIsNotNone(dmatrix)
+    self.assertAllGreater(tf.linalg.norm(dmatrix, ord='fro', axis=[-1, -2]), 0.)
+
+  @test_util.tf_tape_safety_test
+  def testGradientTapeCFv2(self):
+    if not tf1.control_flow_v2_enabled():
+      self.skipTest('Requires v2 control flow')
+    dim = 11
+
+    def grad(matrix):
+      with tf.GradientTape() as tape:
+        tape.watch(matrix)
+        pchol, _ = linalg.low_rank_cholesky(matrix, max_rank=dim // 3)
+      dmatrix = tape.gradient(
+          pchol, matrix, output_gradients=tf.ones_like(pchol) * .01)
+      return dmatrix
+    if self.jit:
+      self.skip_if_no_xla()
+      grad = tf.function(grad, jit_compile=True)
+
+    matrix = self._random_batch_psd(dim)
+    dmatrix = grad(matrix)
+    self.assertIsNotNone(dmatrix)
+    self.assertAllGreater(tf.linalg.norm(dmatrix, ord='fro', axis=[-1, -2]), 0.)
+
+  # pyformat: disable
+  @parameterized.parameters(
+      # Inputs are randomly shuffled arange->tril; outputs from gpytorch.
+      (
+          np.array([
+              [7., 0, 0, 0, 0, 0],
+              [9, 13, 0, 0, 0, 0],
+              [4, 10, 6, 0, 0, 0],
+              [18, 1, 2, 14, 0, 0],
+              [5, 11, 20, 3, 17, 0],
+              [19, 12, 16, 15, 8, 21]
+          ]),
+          np.array([
+              [3.4444, -1.3545, 4.084, 1.7674, -1.1789, 3.7562],
+              [8.4685, 1.2821, 3.1179, 12.9197, 0.0000, 0.0000],
+              [7.5621, 4.8603, 0.0634, 7.3942, 4.0637, 0.0000],
+              [15.435, -4.8864, 16.2137, 0.0000, 0.0000, 0.0000],
+              [18.8535, 22.103, 0.0000, 0.0000, 0.0000, 0.0000],
+              [38.6135, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000]
+          ])),
+      (
+          np.array([
+              [1, 0, 0],
+              [2, 3, 0],
+              [4, 5, 6.]
+          ]),
+          np.array([
+              [0.4558, 0.3252, 0.8285],
+              [2.6211, 2.4759, 0.0000],
+              [8.7750, 0.0000, 0.0000]
+          ])),
+      (
+          np.array([
+              [6, 0, 0],
+              [3, 2, 0],
+              [4, 1, 5.]
+          ]),
+          np.array([
+              [3.7033, 4.7208, 0.0000],
+              [2.1602, 2.1183, 1.9612],
+              [6.4807, 0.0000, 0.0000]
+          ])))
+  # pyformat: enable
+  def testOracleExamples(self, mat, oracle_pchol):
+    max_rank = mat.shape[-1] + 1
+    fns = [functools.partial(
+        linalg.low_rank_cholesky, max_rank=rank, trace_rtol=-1)
+           for rank in range(max_rank)]
+    if self.jit:
+      self.skip_if_no_xla()
+      fns = [tf.function(fn, jit_compile=True) for fn in fns]
+
+    mat = np.matmul(mat, mat.T)
+    for rank in range(1, max_rank):
+      lr_chol, r = fns[rank](mat)
+      self.assertEqual(self.evaluate(r), rank)
+      self.assertAllClose(
+          oracle_pchol[..., :rank], lr_chol[..., :rank], atol=1e-4)
+
+  # No testLinopKernel, because low_rank_cholesky doesn't support
+  # tf.linalg.LinearOperators as input matrices yet.
+
+
+@test_util.test_all_tf_execution_regimes
+class LowRankCholesky32Static(_LowRankCholesky):
+  dtype = np.float32
+  use_static_shape = True
+  jit = False
+
+
+@test_util.test_all_tf_execution_regimes
+class LowRankCholesky64Dynamic(_LowRankCholesky):
+  dtype = np.float64
+  use_static_shape = False
+  jit = False
+
+
+@test_util.test_all_tf_execution_regimes
+class LowRankCholeskyJit(_LowRankCholesky):
+  dtype = np.float32
+  use_static_shape = True
+  jit = True
+
+
+del _LowRankCholesky
+
+
 def make_tensor_hiding_attributes(value, hide_shape, hide_value=True):
   if not hide_value:
     return tf.convert_to_tensor(value)

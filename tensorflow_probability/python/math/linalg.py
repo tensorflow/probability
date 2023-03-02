@@ -45,6 +45,7 @@ __all__ = [
     'lu_reconstruct',
     'lu_reconstruct_assertions',  # Internally visible for MatvecLU.
     'lu_solve',
+    'low_rank_cholesky',
     'pivoted_cholesky',
     'sparse_or_dense_matmul',
     'sparse_or_dense_matvecmul',
@@ -405,6 +406,97 @@ def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
     tensorshape_util.set_shape(
         pchol, tensorshape_util.concatenate(matrix_diag.shape, [None]))
     return pchol
+
+
+def low_rank_cholesky(matrix, max_rank, trace_atol=0, trace_rtol=0, name=None):
+  """Computes a low-rank approximation to the Cholesky decomposition.
+
+  This routine is similar to pivoted_cholesky, but works under JAX, at
+  the cost of being slightly less numerically stable and not supporting inputs
+  that are LinearOperators rather than true matrices.
+
+  Args:
+    matrix: Floating point `Tensor` batch of symmetric, positive definite
+      matrices.
+    max_rank: Scalar `int` `Tensor`, the rank at which to truncate the
+      approximation.
+    trace_atol: Scalar floating point `Tensor` (same dtype as `matrix`). If
+      trace_atol > 0 and trace(matrix - LR * LR^t) < trace_atol, the output
+      LR matrix is allowed to be of rank less than max_rank.
+    trace_rtol: Scalar floating point `Tensor` (same dtype as `matrix`). If
+      trace_rtol > 0 and trace(matrix - LR * LR^t) < trace_rtol * trace(matrix),
+      the output LR matrix is allowed to be of rank less than max_rank.
+    name: Optional name for the op.
+
+  Returns:
+    A pair (LR, r) of a matrix LR such that the rank of LR is r <= max_rank
+    and if r is < max_rank, trace(matrix - LR * LR^t) < trace_atol.
+    If matrix is of shape (b1, ..., bn, m, m), then LR will be of shape
+    (b1, ..., bn, m, r) where r <= max_rank.
+  """
+  with tf.name_scope(name or 'low_rank_cholesky'):
+    dtype = dtype_util.common_dtype([matrix, trace_atol, trace_rtol],
+                                    dtype_hint=tf.float32)
+    if not isinstance(matrix, tf.linalg.LinearOperator):
+      matrix = tf.convert_to_tensor(matrix, name='matrix', dtype=dtype)
+
+    mtrace = tf.linalg.trace(matrix)
+    mrank = tensorshape_util.rank(matrix.shape)
+    batch_dims = mrank - 2
+
+    def lr_cholesky_cond(i, _, residual):
+      """Condition for `tf.while_loop` continuation."""
+      residual_trace = tf.linalg.trace(residual)
+      atol_terminate = (trace_atol > 0) & tf.reduce_all(
+          residual_trace < trace_atol)
+      rtol_terminate = (trace_rtol > 0) & tf.reduce_all(
+          residual_trace < trace_rtol * mtrace)
+      terminate = atol_terminate | rtol_terminate
+      # TODO(thomaswc): Return false even if i == 0 when mtrace == 0.0 to
+      # avoid division by zero errors.
+      return (i == 0) | ~terminate
+
+    def lr_cholesky_body(i, lr, residual):
+      # 1. Find the maximum diagonal entry of the residual.
+      residual_diag = tf.linalg.diag_part(residual)
+      max_j = tf.argmax(
+          residual_diag, axis=-1, output_type=tf.int64)[..., tf.newaxis]
+
+      # 2. Construct vector v that kills that diagonal entry and its row & col.
+      maxval = tf.gather(
+          residual_diag, max_j, axis=-1, batch_dims=batch_dims)[..., 0]
+      normalizer = tf.sqrt(maxval)
+      vgather = tf.gather(
+          residual, max_j, axis=-1, batch_dims=batch_dims)[..., 0]
+      v = vgather / normalizer[..., tf.newaxis]
+
+      # 3. Add v to lr.
+      # Conceptually the same as
+      #   new_lr = lr
+      #   new_lr[..., i] = v
+      # v[..., tf.newaxis] is of shape (batch1, ..., batchn, m, 1) and
+      # the one_hot term is of shape (1, max_rank) so their broadcasted product
+      # will be of shape (batch1, ..., batchn, m, max_rank), the same as lr.
+      new_lr = lr + v[..., tf.newaxis] * tf.one_hot(
+          indices=i, depth=max_rank, dtype=matrix.dtype)[tf.newaxis, :]
+
+      # 4. Compute new_residual = old_residual - v * v^t
+      outer_product = tf.linalg.matmul(
+          v[..., tf.newaxis], v[..., tf.newaxis], transpose_b=True)
+      new_residual = residual - outer_product
+
+      return i + 1, new_lr, new_residual
+
+    lr = tf.zeros(matrix.shape, dtype=matrix.dtype)[..., :max_rank]
+
+    i, lr, _ = tf.while_loop(
+        cond=lr_cholesky_cond,
+        body=lr_cholesky_body,
+        loop_vars=(0, lr, matrix),
+        maximum_iterations=max_rank
+    )
+
+    return lr, i
 
 
 def lu_solve(lower_upper, perm, rhs,
