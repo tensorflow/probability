@@ -566,8 +566,22 @@ class _LowRankCholesky(test_util.TestCase):
       self.assertAllClose(
           oracle_pchol[..., :rank], lr_chol[..., :rank], atol=1e-4)
 
-  # No testLinopKernel, because low_rank_cholesky doesn't support
-  # tf.linalg.LinearOperators as input matrices yet.
+  @test_util.disable_test_for_backend(
+      disable_jax=True,
+      disable_numpy=True,
+      reason='LinearOperatorPSDKernel not available in jax or numpy backends.')
+  def testLinopKernel(self):
+    if not tf.executing_eagerly() and not self.use_static_shape:
+      return
+    x = tf.random.uniform([10, 2], dtype=self.dtype, seed=test_util.test_seed())
+    masked_shape = x.shape if self.use_static_shape else [None] * len(x.shape)
+    x = tf1.placeholder_with_default(x, shape=masked_shape)
+    k = matern.MaternThreeHalves()
+    expected = linalg.low_rank_cholesky(k.matrix(x, x), max_rank=3)
+    actual = linalg.low_rank_cholesky(
+        experimental_linalg.LinearOperatorPSDKernel(k, x), max_rank=3)
+    expected, actual = self.evaluate([expected, actual])
+    self.assertAllClose(expected, actual)
 
 
 @test_util.test_all_tf_execution_regimes

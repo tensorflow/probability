@@ -412,12 +412,11 @@ def low_rank_cholesky(matrix, max_rank, trace_atol=0, trace_rtol=0, name=None):
   """Computes a low-rank approximation to the Cholesky decomposition.
 
   This routine is similar to pivoted_cholesky, but works under JAX, at
-  the cost of being slightly less numerically stable and not supporting inputs
-  that are LinearOperators rather than true matrices.
+  the cost of being slightly less numerically stable.
 
   Args:
     matrix: Floating point `Tensor` batch of symmetric, positive definite
-      matrices.
+      matrices, or a tf.linalg.LinearOperator.
     max_rank: Scalar `int` `Tensor`, the rank at which to truncate the
       approximation.
     trace_atol: Scalar floating point `Tensor` (same dtype as `matrix`). If
@@ -467,7 +466,7 @@ def low_rank_cholesky(matrix, max_rank, trace_atol=0, trace_rtol=0, name=None):
           residual_diag, max_j, axis=-1, batch_dims=batch_dims)[..., 0]
       normalizer = tf.sqrt(maxval)
       if callable(getattr(matrix, 'row', None)):
-        matrix_row = matrix.row(max_j)
+        matrix_row = tf.squeeze(matrix.row(max_j), axis=-2)
       else:
         matrix_row = tf.gather(
             matrix, max_j, axis=-1, batch_dims=batch_dims)[..., 0]
