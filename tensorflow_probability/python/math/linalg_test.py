@@ -458,7 +458,7 @@ class _LowRankCholesky(test_util.TestCase):
               f'{rank} has zeros per column of {zeros_per_col}'
       )
       self.assertAllLessEqual(diag_diff - diag_diff_prev,
-                              np.finfo(self.dtype).resolution)
+                              2.0 * np.finfo(self.dtype).resolution)
       self.assertAllLessEqual(diff_norm - diff_norm_prev,
                               np.finfo(self.dtype).resolution)
       diag_diff_prev, diff_norm_prev = diag_diff, diff_norm

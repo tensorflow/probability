@@ -444,9 +444,9 @@ def low_rank_cholesky(matrix, max_rank, trace_atol=0, trace_rtol=0, name=None):
     mrank = tensorshape_util.rank(matrix.shape)
     batch_dims = mrank - 2
 
-    def lr_cholesky_cond(i, _, residual):
+    def lr_cholesky_cond(i, _, residual_diag):
       """Condition for `tf.while_loop` continuation."""
-      residual_trace = tf.linalg.trace(residual)
+      residual_trace = tf.math.reduce_sum(residual_diag, axis=-1)
       atol_terminate = (trace_atol > 0) & tf.reduce_all(
           residual_trace < trace_atol)
       rtol_terminate = (trace_rtol > 0) & tf.reduce_all(
@@ -456,43 +456,53 @@ def low_rank_cholesky(matrix, max_rank, trace_atol=0, trace_rtol=0, name=None):
       # avoid division by zero errors.
       return (i == 0) | ~terminate
 
-    def lr_cholesky_body(i, lr, residual):
-      # 1. Find the maximum diagonal entry of the residual.
-      residual_diag = tf.linalg.diag_part(residual)
+    def lr_cholesky_body(i, lr, residual_diag):
+      # 1. Find the maximum entry of the residual diagonal.
       max_j = tf.argmax(
           residual_diag, axis=-1, output_type=tf.int64)[..., tf.newaxis]
 
       # 2. Construct vector v that kills that diagonal entry and its row & col.
+      # v = residual_matrix[max_j, :] / sqrt(residual_matrix[max_j, maxj])
       maxval = tf.gather(
           residual_diag, max_j, axis=-1, batch_dims=batch_dims)[..., 0]
       normalizer = tf.sqrt(maxval)
-      vgather = tf.gather(
-          residual, max_j, axis=-1, batch_dims=batch_dims)[..., 0]
-      v = vgather / normalizer[..., tf.newaxis]
+      if callable(getattr(matrix, 'row', None)):
+        matrix_row = matrix.row(max_j)
+      else:
+        matrix_row = tf.gather(
+            matrix, max_j, axis=-1, batch_dims=batch_dims)[..., 0]
+      # residual_matrix[max_j, :] = matrix_row[max_j, :] - (lr * lr^t)[max_j, :]
+      # And (lr * lr^t)[max_j, :] = lr[max_j, :] * lr^t
+      lr_row_maxj = tf.gather(lr, max_j, axis=-2, batch_dims=batch_dims)
+      lr_lrt_row = tf.matmul(lr_row_maxj, lr, transpose_b=True)
+      lr_lrt_row = tf.squeeze(lr_lrt_row, axis=-2)
+      unnormalized_v = matrix_row - lr_lrt_row
+      v = unnormalized_v / normalizer[..., tf.newaxis]
 
       # 3. Add v to lr.
       # Conceptually the same as
       #   new_lr = lr
       #   new_lr[..., i] = v
+      # but without using assignment or dynamic slices, both of which don't
+      # work under JAX.
       # v[..., tf.newaxis] is of shape (batch1, ..., batchn, m, 1) and
       # the one_hot term is of shape (1, max_rank) so their broadcasted product
       # will be of shape (batch1, ..., batchn, m, max_rank), the same as lr.
       new_lr = lr + v[..., tf.newaxis] * tf.one_hot(
           indices=i, depth=max_rank, dtype=matrix.dtype)[tf.newaxis, :]
 
-      # 4. Compute new_residual = old_residual - v * v^t
-      outer_product = tf.linalg.matmul(
-          v[..., tf.newaxis], v[..., tf.newaxis], transpose_b=True)
-      new_residual = residual - outer_product
+      # 4. Compute the new residual_diag = old_residual_diag - v * v
+      new_residual_diag = residual_diag - v * v
 
-      return i + 1, new_lr, new_residual
+      return i + 1, new_lr, new_residual_diag
 
     lr = tf.zeros(matrix.shape, dtype=matrix.dtype)[..., :max_rank]
 
+    mdiag = tf.linalg.diag_part(matrix)
     i, lr, _ = tf.while_loop(
         cond=lr_cholesky_cond,
         body=lr_cholesky_body,
-        loop_vars=(0, lr, matrix),
+        loop_vars=(0, lr, mdiag),
         maximum_iterations=max_rank
     )
 
