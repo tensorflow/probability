@@ -115,10 +115,10 @@ class _EllipticalSliceSamplerTest(test_util.TestCase):
 
     self.assertAllClose(samples0_[::2], samples1_, atol=1e-5, rtol=1e-5)
 
+  @test_util.numpy_disable_gradient_test('too slow')
   def testNormalNormalSampleMultipleDatapoints(self):
     if not tf.executing_eagerly():
       self.skipTest('This test runs only in eager mode to reduce test weight.')
-    tf.compat.v1.enable_control_flow_v2()
 
     # Two independent chains, of states of shape [3].
     prior_stddev = self.dtype(np.exp(np.random.rand(2, 3)))
