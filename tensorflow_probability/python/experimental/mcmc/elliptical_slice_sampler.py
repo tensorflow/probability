@@ -35,8 +35,8 @@ __all__ = [
 
 def _rotate_on_ellipse(state_parts, vectors, angle):
   new_state_parts = []
-  padded_angle = _right_pad_with_ones(angle, ps.rank(state_parts[0]))
   for state, vector in zip(state_parts, vectors):
+    padded_angle = _right_pad_with_ones(angle, ps.rank(state))
     new_state_parts.append(
         state * tf.cos(padded_angle) + vector * tf.sin(padded_angle))
   return new_state_parts
@@ -319,9 +319,9 @@ class EllipticalSliceSampler(kernel_base.TransitionKernel):
             init_state_parts, normal_samples, angle)
 
         new_state_parts = []
-        broadcasted_chain_not_done = _right_pad_with_ones(
-            chain_not_done, ps.rank(next_state_parts[0]))
         for n_state, c_state in zip(next_state_parts, current_state_parts):
+          broadcasted_chain_not_done = _right_pad_with_ones(
+              chain_not_done, ps.rank(n_state))
           new_state_part = tf.where(
               broadcasted_chain_not_done, n_state, c_state)
           new_state_parts.append(new_state_part)

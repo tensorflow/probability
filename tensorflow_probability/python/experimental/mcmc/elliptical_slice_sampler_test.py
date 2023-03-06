@@ -163,6 +163,31 @@ class _EllipticalSliceSamplerTest(test_util.TestCase):
     self.assertAllClose(posterior_mean, mean, rtol=2e-2, atol=6e-2)
     self.assertAllClose(posterior_variance, variance, rtol=5e-1)
 
+  def testTupleShapes(self):
+
+    def normal_sampler(seed):
+      return tuple(
+          normal.Normal(0, 1).sample(shp, seed=seed)
+          for shp in [(8, 31, 3), (8,)])
+    params = normal_sampler(test_util.test_seed())
+
+    def normal_log_likelihood(p0, p1):
+      return (tf.reduce_sum(normal.Normal(0, 1).log_prob(p0), axis=(-1, -2)) +
+              normal.Normal(0, 1).log_prob(p1))
+
+    kernel = elliptical_slice_sampler.EllipticalSliceSampler(
+        normal_sampler_fn=normal_sampler,
+        log_likelihood_fn=normal_log_likelihood,
+    )
+    samples = tf.function(sample.sample_chain)(
+        num_results=3,
+        current_state=params,
+        kernel=kernel,
+        num_burnin_steps=int(4),
+        seed=test_util.test_seed(),
+        trace_fn=None)
+    self.evaluate(samples)
+
 
 class EllipticalSliceSamplerTestFloat32(_EllipticalSliceSamplerTest):
   dtype = np.float32
