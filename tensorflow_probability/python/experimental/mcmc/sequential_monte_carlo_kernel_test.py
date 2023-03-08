@@ -42,7 +42,9 @@ class _SequentialMonteCarloTest(test_util.TestCase):
       return WeightedParticles(
           particles=proposed_particles,
           log_weights=weighted_particles.log_weights +
-          normal.Normal(loc=-2.6, scale=0.1).log_prob(proposed_particles))
+          normal.Normal(loc=-2.6, scale=0.1).log_prob(proposed_particles),
+          extra=tf.constant(np.nan)
+      )
 
     num_particles = 16
     initial_state = self.evaluate(
@@ -50,7 +52,9 @@ class _SequentialMonteCarloTest(test_util.TestCase):
             particles=tf.random.normal([num_particles],
                                        seed=test_util.test_seed()),
             log_weights=tf.fill([num_particles],
-                                -tf.math.log(float(num_particles)))))
+                                -tf.math.log(float(num_particles))),
+            extra=tf.constant(np.nan)
+    ))
 
     # Run a couple of steps.
     seeds = samplers.split_seed(
@@ -59,11 +63,11 @@ class _SequentialMonteCarloTest(test_util.TestCase):
         propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
         resample_fn=weighted_resampling.resample_systematic,
         resample_criterion_fn=sequential_monte_carlo_kernel.ess_below_threshold)
-    state, results, extra = kernel.one_step(
+    state, results = kernel.one_step(
         state=initial_state,
         kernel_results=kernel.bootstrap_results(initial_state),
         seed=seeds[0])
-    state, results, extra = kernel.one_step(state=state, kernel_results=results,
+    state, results = kernel.one_step(state=state, kernel_results=results,
                                      seed=seeds[1])
     state, results = self.evaluate(
         (tf.nest.map_structure(tf.convert_to_tensor, state),
@@ -74,11 +78,11 @@ class _SequentialMonteCarloTest(test_util.TestCase):
         propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
         resample_fn=weighted_resampling.resample_systematic,
         resample_criterion_fn=sequential_monte_carlo_kernel.ess_below_threshold)
-    state2, results2, extra2 = kernel2.one_step(
+    state2, results2 = kernel2.one_step(
         state=initial_state,
         kernel_results=kernel2.bootstrap_results(initial_state),
         seed=seeds[0])
-    state2, results2, extra2 = kernel2.one_step(state=state2, kernel_results=results2,
+    state2, results2 = kernel2.one_step(state=state2, kernel_results=results2,
                                         seed=seeds[1])
     state2, results2 = self.evaluate(
         (tf.nest.map_structure(tf.convert_to_tensor, state2),
@@ -103,7 +107,9 @@ class _SequentialMonteCarloTest(test_util.TestCase):
         WeightedParticles(
             particles=samplers.normal([num_particles], seed=seeds[0]),
             log_weights=tf.fill([num_particles],
-                                -tf.math.log(float(num_particles)))))
+                                -tf.math.log(float(num_particles))),
+            extra=tf.constant(np.nan)
+        ))
 
     def propose_and_update_log_weights_fn(_,
                                           weighted_particles,
@@ -117,18 +123,20 @@ class _SequentialMonteCarloTest(test_util.TestCase):
           particles=proposed_particles,
           log_weights=(weighted_particles.log_weights +
                        transition_dist.log_prob(proposed_particles) -
-                       proposal_dist.log_prob(proposed_particles)))
+                       proposal_dist.log_prob(proposed_particles)),
+          extra=tf.constant(np.nan)
+      )
 
     def marginal_logprob(transition_scale):
       kernel = SequentialMonteCarlo(
           propose_and_update_log_weights_fn=functools.partial(
               propose_and_update_log_weights_fn,
               transition_scale=transition_scale))
-      state, results, extra = kernel.one_step(
+      state, results = kernel.one_step(
           state=initial_state,
           kernel_results=kernel.bootstrap_results(initial_state),
           seed=seeds[1])
-      state, results, extra = kernel.one_step(state=state, kernel_results=results,
+      state, results = kernel.one_step(state=state, kernel_results=results,
                                        seed=seeds[2])
       return results.accumulated_log_marginal_likelihood
 

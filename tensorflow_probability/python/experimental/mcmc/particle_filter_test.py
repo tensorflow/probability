@@ -497,6 +497,59 @@ class _ParticleFilterTest(test_util.TestCase):
     means = np.sum(np.exp(final_log_weights) * final_particles)
     self.assertAllClose(means, 9., atol=1.5)
 
+
+  def test_rejuvenation_fn(self):
+    # A simple HMM with 10 hidden states
+    stream = test_util.test_seed_stream()
+    d = hidden_markov_model.HiddenMarkovModel(
+        initial_distribution=categorical.Categorical(logits=tf.zeros(10)),
+        transition_distribution=categorical.Categorical(logits=tf.zeros((10, 10))),
+        observation_distribution=normal.Normal(loc=tf.range(10.), scale=0.3),
+        num_steps=10
+    )
+    observation = categorical.Categorical(
+        logits=[0] * 10,
+        dtype=tf.float32).sample(10, seed=stream())
+
+    # A dimension for each particle of the particles filters
+    observations = tf.reshape(tf.tile(observation, [10]),
+                              [10, tf.shape(observation)[0]])
+
+    def rejuvenation_fn(state, particles, indices, log_weights, extra, step):
+      posterior = d.posterior_marginals(observation).sample(seed=stream())
+      return (posterior, indices, log_weights, extra)
+
+    def rejuvenation_criterion_fn(_):
+      return True
+
+    rej_particles, _, _, _ =\
+        particle_filter.particle_filter(
+            observations=observation,
+            initial_state_prior=d.initial_distribution,
+            transition_fn=lambda _, s: categorical.Categorical(logits=tf.zeros(s.shape + tuple([10]))),
+            observation_fn=lambda _, s: normal.Normal(loc=tf.cast(s, tf.float32), scale=0.3),
+            rejuvenation_criterion_fn=rejuvenation_criterion_fn,
+            rejuvenation_fn=rejuvenation_fn,
+            num_particles=10,
+            seed=stream()
+        )
+    delta_rej = tf.where(observations - tf.cast(rej_particles, tf.float32) != 0, 1, 0)
+
+    nonrej_particles, _, _, _ =\
+        particle_filter.particle_filter(
+            observations=observation,
+            initial_state_prior=d.initial_distribution,
+            transition_fn=lambda _, s: categorical.Categorical(logits=tf.zeros(s.shape + tuple([10]))),
+            observation_fn=lambda _, s: normal.Normal(loc=tf.cast(s, tf.float32), scale=0.3),
+            num_particles=10,
+            seed=stream()
+        )
+    delta_nonrej = tf.where(observations - tf.cast(nonrej_particles, tf.float32) != 0, 1, 0)
+
+    delta = tf.reduce_sum(delta_nonrej - delta_rej)
+
+    self.assertAllGreaterEqual(self.evaluate(delta), 0)
+
   def test_warns_if_transition_distribution_has_unexpected_shape(self):
 
     initial_state_prior = jdab.JointDistributionNamedAutoBatched({

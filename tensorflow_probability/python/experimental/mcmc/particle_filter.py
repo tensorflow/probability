@@ -136,7 +136,7 @@ def infer_trajectories(observations,
                        resample_fn=weighted_resampling.resample_systematic,
                        resample_criterion_fn=smc_kernel.ess_below_threshold,
                        unbiased_gradients=True,
-                       rejuvenation_fn=None,
+                       rejuvenation_fn=_no_rejuvenation,
                        rejuvenation_criterion_fn=lambda *_: False,
                        num_transitions_per_observation=1,
                        seed=None,
@@ -385,6 +385,95 @@ def sequential_monte_carlo(loop_seed,
       traced_results = trace_fn(*final_seed_state_result[1:])
 
     return traced_results
+
+
+def smc_squared(
+        inner_observations,
+        initial_parameter_prior,
+        parameter_proposal_kernel,
+        num_particles,
+        observation_fn,
+        initial_parameter_proposal,
+        rejuvenation_criterion_fn,
+        unbiased_gradients,
+        trace_fn,
+        trace_criterion_fn,
+        state_trace_allocation_size,
+        parallel_iterations,
+        particles_dim,
+        seed,
+        inner_initial_state_prior,
+        inner_transition_fn,
+        inner_observation_fn,
+        num_inner_particles,
+        inner_initial_state_proposal,
+        inner_proposal_fn,
+        inner_resample_fn,
+        inner_resample_criterion_fn,
+        inner_rejuvenation_fn,
+        inner_rejuvenation_criterion_fn,
+        num_inner_transitions_per_observation,
+        inner_trace_fn,
+        inner_trace_criterion_fn,
+        num_transitions_per_observation=1
+):
+    if initial_parameter_proposal is None:
+        initial_state = initial_parameter_prior.sample(num_particles, seed=seed)
+        initial_log_weights = ps.zeros_like(
+            initial_parameter_prior.log_prob(initial_state))
+    else:
+        initial_state = initial_parameter_proposal.sample(num_particles, seed=seed)
+        initial_log_weights = (initial_parameter_prior.log_prob(initial_state) -
+                               initial_parameter_proposal.log_prob(initial_state))
+    # Normalize the initial weights. If we used a proposal, the weights are
+    # normalized in expectation, but actually normalizing them reduces variance.
+    initial_log_weights = tf.nn.log_softmax(initial_log_weights, axis=0)   # Particle dim 0 outside, 1 inside
+
+    # Particles weighted by the initial observation.
+    initial_weighted_parameters = smc_kernel.WeightedParticles(
+        particles=initial_state,
+        log_weights=initial_log_weights,
+        extra=np.nan)
+
+    inner_weighted_particles = _particle_filter_initial_weighted_particles(
+        observations=inner_observations,
+        observation_fn=inner_observation_fn,
+        initial_state_prior=inner_initial_state_prior,
+        initial_state_proposal=inner_initial_state_proposal,
+        num_particles=num_inner_particles,
+        particles_dim=particles_dim,
+        seed=seed)
+
+    propose_and_update_log_weights_fn = (
+        _particle_filter_propose_and_update_log_weights_fn(
+            observations=inner_observations,
+            transition_fn=inner_transition_fn,
+            proposal_fn=inner_proposal_fn,
+            observation_fn=observation_fn,
+            particles_dim=particles_dim,
+            num_transitions_per_observation=num_transitions_per_observation))
+
+    kernel = smc_kernel.SequentialMonteCarlo(
+        propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
+        resample_fn=inner_resample_fn,
+        resample_criterion_fn=inner_resample_criterion_fn,
+        rejuvenation_fn=inner_rejuvenation_fn,
+        rejuvenation_criterion_fn=inner_rejuvenation_criterion_fn,
+        particles_dim=particles_dim,
+        unbiased_gradients=unbiased_gradients)
+
+    initial_filter_results = kernel.bootstrap_results(inner_weighted_particles)
+
+    pmcmc_extra = parameter_proposal_kernel.bootstrap_results(initial_weighted_parameters)
+
+    initial_state = smc_kernel.WeightedParticles(
+        particles=(initial_weighted_parameters.particles,
+                   inner_weighted_particles,
+                   initial_filter_results),
+        log_weights=initial_weighted_parameters.log_weights,
+        extra=pmcmc_extra)
+
+    return None
 
 
 @docstring_util.expand_docstring(
