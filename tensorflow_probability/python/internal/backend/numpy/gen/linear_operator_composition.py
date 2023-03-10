@@ -38,6 +38,7 @@ from tensorflow_probability.python.internal.backend.numpy import dtype as dtypes
 from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shape
 from tensorflow_probability.python.internal.backend.numpy import numpy_array as array_ops
+from tensorflow_probability.python.internal.backend.numpy import numpy_array as array_ops_stack
 from tensorflow_probability.python.internal.backend.numpy import debugging as check_ops
 from tensorflow_probability.python.internal.backend.numpy import control_flow as control_flow_ops
 from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator
@@ -263,7 +264,7 @@ class LinearOperatorComposition(linear_operator.LinearOperator):
     # Don't check the matrix dimensions.  That would add unnecessary Asserts to
     # the graph.  Things will fail at runtime naturally if shapes are
     # incompatible.
-    matrix_shape = array_ops.stack([
+    matrix_shape = array_ops_stack.stack([
         self.operators[0].range_dimension_tensor(),
         self.operators[-1].domain_dimension_tensor()
     ])

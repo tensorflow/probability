@@ -38,6 +38,7 @@ from tensorflow_probability.python.internal.backend.numpy import dtype as dtypes
 from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shape
 from tensorflow_probability.python.internal.backend.numpy import numpy_array as array_ops
+from tensorflow_probability.python.internal.backend.numpy import numpy_array as array_ops_stack
 from tensorflow_probability.python.internal.backend.numpy import debugging as check_ops
 from tensorflow_probability.python.internal.backend.numpy import control_flow as control_flow_ops
 from tensorflow_probability.python.internal.backend.numpy import numpy_math as math_ops
@@ -405,7 +406,7 @@ class LinearOperatorBlockLowerTriangular(linear_operator.LinearOperator):
 
     domain_dimension = sum(self._block_domain_dimension_tensors())
     range_dimension = sum(self._block_range_dimension_tensors())
-    matrix_shape = array_ops.stack([domain_dimension, range_dimension])
+    matrix_shape = array_ops_stack.stack([domain_dimension, range_dimension])
 
     batch_shape = self.operators[0][0].batch_shape_tensor()
     for row in self.operators[1:]:
