@@ -1270,7 +1270,9 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
              rtol=5e-5),
     TestCase('math.erf', [single_arrays()]),
     TestCase('math.erfc', [single_arrays()]),
-    TestCase('math.erfinv', [single_arrays(elements=floats(-1., 1.))]),
+    # TODO(b/272793360): Set `erfinv` bounds to [-1, 1].
+    TestCase('math.erfinv',
+             [single_arrays(elements=floats(-1. + 1e-5, 1. - 1e-5))]),
     TestCase(
         'math.exp',  # TODO(b/147394924): max_value=1e3
         [single_arrays(elements=floats(min_value=-1e3, max_value=85))]),
