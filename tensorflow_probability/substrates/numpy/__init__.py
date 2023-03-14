@@ -35,3 +35,7 @@ from tensorflow_probability.substrates.numpy import util
 from tensorflow_probability.substrates.numpy import vi
 
 from tensorflow_probability.python.internal.backend import numpy as tf2numpy
+
+# from tensorflow_probability.substrates.numpy.google import tfp_google  # DisableOnExport  # pylint:disable=line-too-long
+# tfp_google.bind(globals())  # DisableOnExport
+# del tfp_google  # DisableOnExport

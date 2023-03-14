@@ -53,3 +53,7 @@ from tensorflow_probability.substrates.jax import util
 from tensorflow_probability.substrates.jax import vi
 
 from tensorflow_probability.python.internal.backend import jax as tf2jax
+
+# from tensorflow_probability.substrates.jax.google import tfp_google  # DisableOnExport  # pylint:disable=line-too-long
+# tfp_google.bind(globals())  # DisableOnExport
+# del tfp_google  # DisableOnExport

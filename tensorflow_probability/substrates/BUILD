@@ -46,6 +46,7 @@ py_library(
     deps = [
 #         "//tensorflow_probability/google:google.jax",  # DisableOnExport
 #         "//tensorflow_probability/google/staging:staging.jax",  # DisableOnExport
+#         "//tensorflow_probability/google/tfp_google:tfp_google.jax",  # DisableOnExport
         "//tensorflow_probability/python:version",
         "//tensorflow_probability/python/bijectors:bijectors.jax",
         "//tensorflow_probability/python/distributions:distributions.jax",
@@ -70,6 +71,7 @@ py_library(
     deps = [
 #         "//tensorflow_probability/google:google.numpy",  # DisableOnExport
 #         "//tensorflow_probability/google/staging:staging.numpy",  # DisableOnExport
+#         "//tensorflow_probability/google/tfp_google:tfp_google.numpy",  # DisableOnExport
         "//tensorflow_probability/python:version",
         "//tensorflow_probability/python/bijectors:bijectors.numpy",
         "//tensorflow_probability/python/distributions:distributions.numpy",
