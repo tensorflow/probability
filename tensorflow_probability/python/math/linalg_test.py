@@ -1236,6 +1236,23 @@ class _HPSDSolveTest(test_util.TestCase):
     self.assertAllClose(actual_mat_gradient, expected_mat_gradient)
     self.assertAllClose(actual_rhs_gradient, expected_rhs_gradient)
 
+  def test_no_jax_tracer_leaks(self):
+    if not JAX_MODE:
+      return
+    import jax  # pylint:disable=g-import-not-at-top
+    import jax.numpy as jnp  # pylint:disable=g-import-not-at-top
+    def f(carry, x):
+      return (carry / 2 + linalg.hpsd_solve(jnp.eye(3), x,
+                                            cholesky_matrix=jnp.eye(3)),
+              ())
+
+    def g(t):
+      carry, _ = jax.lax.scan(f, jnp.zeros([3, 3]), xs=jnp.zeros([7, 3, 3]) + t)
+      return carry.sum()
+
+    with jax.checking_leaks():
+      jax.grad(g)(jnp.eye(3))
+
 
 @test_util.test_all_tf_execution_regimes
 class HPSDSolve32Test(_HPSDSolveTest):

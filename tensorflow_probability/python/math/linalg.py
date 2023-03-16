@@ -1262,10 +1262,8 @@ def _hpsd_solve_fwd(matrix, rhs, cholesky_matrix):
   return solve_rhs, (cholesky_matrix, rhs, solve_rhs)
 
 
-def _hpsd_solve_bwd(cholesky_matrix, aux, g):
+def _hpsd_solve_bwd(aux, g):
   """Reverse mode impl for hpsd_solve."""
-  del cholesky_matrix
-
   cholesky_matrix, rhs, solve_rhs = aux
   chol_linop = tf.linalg.LinearOperatorLowerTriangular(cholesky_matrix)
 
@@ -1281,13 +1279,16 @@ def _hpsd_solve_bwd(cholesky_matrix, aux, g):
   matrix_grad, rhs_grad = generic.fix_gradient_for_broadcasting(
       [cholesky_matrix[..., tf.newaxis], rhs[..., tf.newaxis, :]],
       [matrix_grad[..., tf.newaxis], rhs_grad[..., tf.newaxis, :]])
-  return tf.squeeze(matrix_grad, axis=-1), tf.squeeze(rhs_grad, axis=-2)
+  return (tf.squeeze(matrix_grad, axis=-1),
+          tf.squeeze(rhs_grad, axis=-2),
+          None)
 
 
-def _hpsd_solve_jvp(cholesky_matrix, primals, tangents):
+def _hpsd_solve_jvp(primals, tangents):
   """JVP for hpsd_solve."""
-  matrix, rhs = primals
-  gmatrix, grhs = tangents
+  matrix, rhs, cholesky_matrix = primals
+  gmatrix, grhs, gcholesky_matrix = tangents
+  del gcholesky_matrix
   output, (cholesky_matrix, _, solve_rhs) = _hpsd_solve_fwd(
       matrix, rhs, cholesky_matrix)
   chol_linop = tf.linalg.LinearOperatorLowerTriangular(cholesky_matrix)
@@ -1304,8 +1305,7 @@ def _hpsd_solve_jvp(cholesky_matrix, primals, tangents):
 @tfp_custom_gradient.custom_gradient(
     vjp_fwd=_hpsd_solve_fwd,
     vjp_bwd=_hpsd_solve_bwd,
-    jvp_fn=_hpsd_solve_jvp,
-    nondiff_argnums=(2,))
+    jvp_fn=_hpsd_solve_jvp)
 def _hpsd_solve_custom_gradient(matrix, rhs, cholesky_matrix):
   return _hpsd_solve_fwd(matrix, rhs, cholesky_matrix)[0]
 
