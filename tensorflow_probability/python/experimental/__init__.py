@@ -81,3 +81,7 @@ _allowed_symbols = [
 ]
 
 all_util.remove_undocumented(__name__, _allowed_symbols)
+
+# from tensorflow_probability.google import tfp_google  # DisableOnExport  # pylint:disable=line-too-long,g-bad-import-order,g-import-not-at-top
+# tfp_google.bind(globals())  # DisableOnExport
+# del tfp_google  # DisableOnExport

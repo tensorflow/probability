@@ -95,7 +95,7 @@ DISABLED_BY_PKG = {
 }
 LIBS = ('bijectors', 'distributions', 'experimental', 'math', 'mcmc',
         'monte_carlo', 'optimizer', 'random', 'staging', 'stats', 'sts',
-        'util', 'vi')
+        'tfp_google', 'util', 'vi')
 INTERNALS = ('assert_util', 'auto_composite_tensor',
              'batched_rejection_sampler',
              'batch_shape_lib', 'broadcast_util', 'cache_util',

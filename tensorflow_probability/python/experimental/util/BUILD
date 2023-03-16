@@ -157,6 +157,7 @@ py_library(
     srcs = ["composite_tensor.py"],
     deps = [
         # tensorflow dep,
+#         "//tensorflow_probability/google/tfp_google",  # DisableOnExport
     ],
 )
 

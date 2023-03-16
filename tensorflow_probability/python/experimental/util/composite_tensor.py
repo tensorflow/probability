@@ -334,3 +334,8 @@ def register_composite(cls):
     raise TypeError('Expected cls to have property "_composite_tensor_params".')
   _make_convertible(cls)
   return cls
+
+
+# from tensorflow_probability.google import tfp_google  # DisableOnExport  # pylint:disable=line-too-long,g-bad-import-order,g-import-not-at-top
+# tfp_google.bind(globals())  # DisableOnExport
+# del tfp_google  # DisableOnExport
