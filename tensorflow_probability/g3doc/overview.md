@@ -7,7 +7,7 @@ gradient-based inference using automatic differentiation, and scalability to
 large datasets and models with hardware acceleration (GPUs) and distributed
 computation.
 
-To get started with TensorFlow Probability, see the [install guide](./install)
+To get started with TensorFlow Probability, see the [install guide](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/g3doc/install.md)
 and view the
 [Python notebook tutorials](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/examples/jupyter_notebooks/){:.external}.
 
