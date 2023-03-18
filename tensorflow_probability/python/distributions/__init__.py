@@ -244,6 +244,7 @@ __all__ = [
     'Multinomial',
     'MultivariateNormalDiag',
     'MultivariateNormalDiagPlusLowRank',
+    'MultivariateNormalDiagPlusLowRankCovariance',
     'MultivariateNormalFullCovariance',
     'MultivariateNormalLinearOperator',
     'MultivariateNormalTriL',
