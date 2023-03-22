@@ -53,7 +53,6 @@ JIT_LOGPROB_BLOCKLIST = (
     'Independent',  # http://b/164415821
     'MixtureSameFamily',  # http://b/164415821
     'NegativeBinomial',  # http://b/170871051
-    'QuantizedDistribution',  # http://b/273257949
     'ZeroInflatedNegativeBinomial',  # http://b/170871051
 )
 
