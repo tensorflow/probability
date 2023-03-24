@@ -37,6 +37,7 @@ import numpy as np
 
 from tensorflow_probability.python.internal.backend.numpy import dtype as dtypes
 from tensorflow_probability.python.internal.backend.numpy import ops
+# from tensorflow.python.framework import tensor_conversion
 from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shape
 from tensorflow_probability.python.internal.backend.numpy import numpy_array as array_ops
 from tensorflow_probability.python.internal.backend.numpy import debugging as check_ops
@@ -143,15 +144,18 @@ def exponential_power_convolution_kernel(
   nd = len(grid_shape)
 
   length_scale = ops.convert_to_tensor(
-      length_scale, name="length_scale")
+      length_scale, name="length_scale"
+  )
   dtype = length_scale.dtype
 
   power = 2. if power is None else power
   power = ops.convert_to_tensor(
-      power, name="power", dtype=dtype)
+      power, name="power", dtype=dtype
+  )
   divisor = power if divisor is None else divisor
   divisor = ops.convert_to_tensor(
-      divisor, name="divisor", dtype=dtype)
+      divisor, name="divisor", dtype=dtype
+  )
 
   # With K = grid_shape[i], we implicitly assume the grid vertices along the
   # ith dimension are at:
@@ -174,7 +178,8 @@ def exponential_power_convolution_kernel(
   if zero_inflation:
     # tensor_shape.TensorShape(delta.shape) = grid_shape, delta[0, 0, 0] = 1., all other entries are 0.
     zero_inflation = ops.convert_to_tensor(
-        zero_inflation, name="zero_inflation", dtype=dtype)
+        zero_inflation, name="zero_inflation", dtype=dtype
+    )
     delta = array_ops.pad(
         array_ops.reshape(one, [1] * nd), [[0, dim - 1] for dim in grid_shape])
     kernel = (1. - zero_inflation) * kernel + zero_inflation * delta
@@ -534,7 +539,9 @@ class _BaseLinearOperatorCirculant(linear_operator.LinearOperator):
 
   def _broadcast_batch_dims(self, x, spectrum):
     """Broadcast batch dims of batch matrix `x` and spectrum."""
-    spectrum = ops.convert_to_tensor(spectrum, name="spectrum")
+    spectrum = ops.convert_to_tensor(
+        spectrum, name="spectrum"
+    )
     # tensor_shape.TensorShape(spectrum.shape) = batch_shape + block_shape
     # First make spectrum a batch matrix with
     #   tensor_shape.TensorShape(spectrum.shape) = batch_shape + [prod(block_shape), 1]
@@ -570,7 +577,8 @@ class _BaseLinearOperatorCirculant(linear_operator.LinearOperator):
 
   def _eigvals(self):
     return ops.convert_to_tensor(
-        self._unblockify(self.spectrum))
+        self._unblockify(self.spectrum)
+    )
 
   def _matmul(self, x, adjoint=False, adjoint_arg=False):
     x = linalg.adjoint(x) if adjoint_arg else x

@@ -53,6 +53,8 @@ MODULE_MAPPINGS = {
 COMMENT_OUT = [
     'from tensorflow.python.util import dispatch',
     'from tensorflow.python.util.tf_export',
+    'from tensorflow.python.framework import ' +
+    'tensor_conversion',
     'from tensorflow.python.framework import tensor_util',
     '@tf_export',
     '@dispatch',
@@ -209,7 +211,7 @@ def gen_module(module_name):
   code = code.replace('math_ops.cast', '_ops.cast')
   code = code.replace('math_ops.matmul', '_linalg.matmul')
   code = code.replace('math_ops.range', 'array_ops.range')
-  code = code.replace('ops.convert_to_tensor_v2_with_dispatch(',
+  code = code.replace('tensor_conversion.convert_to_tensor_v2_with_dispatch(',
                       'ops.convert_to_tensor(')
   code = code.replace('ops.convert_to_tensor(dim_value)',
                       'np.array(dim_value, np.int32)')

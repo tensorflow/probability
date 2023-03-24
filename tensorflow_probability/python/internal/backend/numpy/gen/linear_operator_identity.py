@@ -37,6 +37,7 @@ import numpy as np
 
 from tensorflow_probability.python.internal.backend.numpy import dtype as dtypes
 from tensorflow_probability.python.internal.backend.numpy import ops
+# from tensorflow.python.framework import tensor_conversion
 from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shape
 from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.internal.backend.numpy import numpy_array as array_ops
@@ -424,7 +425,9 @@ class LinearOperatorIdentity(BaseLinearOperatorIdentity):
       A `Tensor` with broadcast shape and same `dtype` as `self`.
     """
     with self._name_scope(name):  # pylint: disable=not-callable
-      mat = ops.convert_to_tensor(mat, name="mat")
+      mat = ops.convert_to_tensor(
+          mat, name="mat"
+      )
       mat_diag = _linalg.diag_part(mat)
       new_diag = 1 + mat_diag
       return _linalg.set_diag(mat, new_diag)
@@ -779,7 +782,9 @@ class LinearOperatorScaledIdentity(BaseLinearOperatorIdentity):
       multiplier_vector = array_ops.expand_dims(self.multiplier, -1)
 
       # Shape [C1,...,Cc, M, M]
-      mat = ops.convert_to_tensor(mat, name="mat")
+      mat = ops.convert_to_tensor(
+          mat, name="mat"
+      )
 
       # Shape [C1,...,Cc, M]
       mat_diag = _linalg.diag_part(mat)

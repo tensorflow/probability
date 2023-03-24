@@ -41,6 +41,7 @@ import numpy as np
 from tensorflow_probability.python.internal.backend.numpy import composite_tensor
 from tensorflow_probability.python.internal.backend.numpy import dtype as dtypes
 from tensorflow_probability.python.internal.backend.numpy import ops
+# from tensorflow.python.framework import tensor_conversion
 from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shape
 from tensorflow_probability.python.internal.backend.numpy import tensor_spec
 from tensorflow_probability.python.internal.backend.numpy import ops
@@ -440,7 +441,9 @@ class LinearOperator(
     # `shape` may be passed in if this can be pre-computed in a
     # more efficient manner, e.g. without excessive Tensor conversions.
     if self.tensor_rank is not None:
-      return ops.convert_to_tensor(self.tensor_rank)
+      return ops.convert_to_tensor(
+          self.tensor_rank
+      )
     else:
       shape = self.shape_tensor() if shape is None else shape
       return array_ops.size(shape)
@@ -889,7 +892,9 @@ class LinearOperator(
         return linear_operator_algebra.solve(left_operator, right_operator)
 
     with self._name_scope(name):  # pylint: disable=not-callable
-      rhs = ops.convert_to_tensor(rhs, name="rhs")
+      rhs = ops.convert_to_tensor(
+          rhs, name="rhs"
+      )
       # self._check_input_dtype(rhs)
 
       self_dim = -1 if adjoint else -2
@@ -946,7 +951,9 @@ class LinearOperator(
       NotImplementedError:  If `self.is_non_singular` or `is_square` is False.
     """
     with self._name_scope(name):  # pylint: disable=not-callable
-      rhs = ops.convert_to_tensor(rhs, name="rhs")
+      rhs = ops.convert_to_tensor(
+          rhs, name="rhs"
+      )
       # self._check_input_dtype(rhs)
       self_dim = -1 if adjoint else -2
       tensor_shape.dimension_at_index(
