@@ -47,6 +47,7 @@ __all__ = [
     'matrix_solve',
     'name_scope',
     'placeholder_with_default',
+    'reset_default_graph',
     'set_random_seed',
     'variable_scope',
 ]
@@ -130,6 +131,10 @@ placeholder_with_default = utils.copy_docstring(
 
 global_variables_initializer = utils.copy_docstring(
     'tf1.global_variables_initializer',
+    lambda: None)
+
+reset_default_graph = utils.copy_docstring(
+    'tf1.reset_default_graph',
     lambda: None)
 
 set_random_seed = utils.copy_docstring(
