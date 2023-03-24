@@ -108,12 +108,12 @@ def _validate_observation_data(
 
 
 _ALWAYS_YIELD_MVN_DEPRECATION_WARNING = (
-    '`always_yield_multivariate_normal` is deprecated. After 2023-02-15, this '
-    'arg will be ignored, and behavior will be as though '
-    '`always_yield_multivariate_normal=True`. This means that a'
-    '`GaussianProcessRegressionModel` evaluated at a single index point will '
-    'have event shape `[1]`. To reproduce the behavior of '
-    '`always_yield_multivariate_normal=False` squeeze the rightmost singleton '
+    '`always_yield_multivariate_normal` is deprecated. This arg is now ignored'
+    'and will be removed after 2023-07-01. A `GaussianProcessRegressionModel`'
+    'evaluated at a single index point now always has event shape `[1]` (the'
+    'previous behavior for `always_yield_multivariate_normal=True`). To'
+    'reproduce the previous behavior of'
+    '`always_yield_multivariate_normal=False`, squeeze the rightmost singleton'
     'dimension from the output of `mean`, `sample`, etc.')
 
 
@@ -397,10 +397,10 @@ class GaussianProcessRegressionModel(
   """
   # pylint:disable=invalid-name
 
-  @deprecation.deprecated_arg_values(
-      '2023-02-15',
+  @deprecation.deprecated_args(
+      '2023-07-01',
       _ALWAYS_YIELD_MVN_DEPRECATION_WARNING,
-      always_yield_multivariate_normal=False)
+      'always_yield_multivariate_normal')
   def __init__(self,
                kernel,
                index_points=None,
@@ -411,7 +411,7 @@ class GaussianProcessRegressionModel(
                mean_fn=None,
                cholesky_fn=None,
                jitter=1e-6,
-               always_yield_multivariate_normal=False,
+               always_yield_multivariate_normal=None,
                validate_args=False,
                allow_nan_stats=False,
                name='GaussianProcessRegressionModel',
@@ -480,11 +480,7 @@ class GaussianProcessRegressionModel(
         matrix to ensure positive definiteness of the covariance matrix.
         This argument is ignored if `cholesky_fn` is set.
         Default value: `1e-6`.
-      always_yield_multivariate_normal: Deprecated. If `False` (the default), we
-        produce a scalar `Normal` distribution when the number of
-        `index_points` is statically known to be `1`. If `True`, we avoid
-        this behavior, ensuring that the event shape will retain the `1` from
-        `index_points`.
+      always_yield_multivariate_normal: Deprecated and ignored.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -632,10 +628,10 @@ class GaussianProcessRegressionModel(
         self._parameters = parameters
 
   @staticmethod
-  @deprecation.deprecated_arg_values(
-      '2023-02-15',
+  @deprecation.deprecated_args(
+      '2023-07-01',
       _ALWAYS_YIELD_MVN_DEPRECATION_WARNING,
-      always_yield_multivariate_normal=False)
+      'always_yield_multivariate_normal')
   def precompute_regression_model(
       kernel,
       observation_index_points,
@@ -647,7 +643,7 @@ class GaussianProcessRegressionModel(
       mean_fn=None,
       cholesky_fn=None,
       jitter=1e-6,
-      always_yield_multivariate_normal=False,
+      always_yield_multivariate_normal=None,
       validate_args=False,
       allow_nan_stats=False,
       name='PrecomputedGaussianProcessRegressionModel',
@@ -741,11 +737,7 @@ class GaussianProcessRegressionModel(
       jitter: `float` scalar `Tensor` added to the diagonal of the covariance
         matrix to ensure positive definiteness of the covariance matrix.
         Default value: `1e-6`.
-      always_yield_multivariate_normal: Deprecated. If `False` (the default), we
-        produce a scalar `Normal` distribution when the number of
-        `index_points` is statically known to be `1`. If `True`, we avoid
-        this behavior, ensuring that the event shape will retain the `1` from
-        `index_points`.
+      always_yield_multivariate_normal: Deprecated and ignored.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect

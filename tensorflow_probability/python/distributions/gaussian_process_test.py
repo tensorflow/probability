@@ -22,7 +22,6 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import gaussian_process
 from tensorflow_probability.python.distributions import gaussian_process_regression_model as gprm
 from tensorflow_probability.python.distributions import mvn_diag
-from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
@@ -236,19 +235,6 @@ class _GaussianProcessTest(test_util.TestCase):
     self.assertIn("event_shape=?", repr(gp))
     self.assertIn("event_shape=[10]", repr(gp.copy(index_points=index_points)))
 
-  def testMarginalHasCorrectTypes(self):
-    gp = gaussian_process.GaussianProcess(
-        kernel=psd_kernels.ExponentiatedQuadratic(), validate_args=True)
-
-    self.assertIsInstance(
-        gp.get_marginal_distribution(
-            index_points=np.ones([1, 1], dtype=np.float32)), normal.Normal)
-
-    self.assertIsInstance(
-        gp.get_marginal_distribution(
-            index_points=np.ones([10, 1], dtype=np.float32)),
-        mvn_linear_operator.MultivariateNormalLinearOperator)
-
   def testOneOfCholeskyAndMarginalFn(self):
     with self.assertRaises(ValueError):
       index_points = np.array([3., 4., 5.])[..., np.newaxis]
@@ -413,30 +399,20 @@ class _GaussianProcessTest(test_util.TestCase):
     x = gp.sample(3, seed=test_util.test_seed())
     lp = gp.log_prob(x)
 
-    self.assertAllClose(lp, gp.log_prob(x, is_missing=[False, False]))
+    self.assertAllClose(lp, gp.log_prob(x, is_missing=[[False], [False]]))
     self.assertAllClose(tf.convert_to_tensor([np.zeros((3, 2)), lp]),
-                        gp.log_prob(x, is_missing=[[[True]], [[False]]]))
+                        gp.log_prob(x, is_missing=[[[[True]]], [[[False]]]]))
     self.assertAllClose(
         tf.convert_to_tensor([[lp[0, 0], 0.0], [0.0, 0.0], [0., lp[2, 1]]]),
-        gp.log_prob(x, is_missing=[[False, True], [True, True], [True, False]]))
-
-  def testAlwaysYieldMultivariateNormal(self):
-    gp = gaussian_process.GaussianProcess(
-        kernel=psd_kernels.ExponentiatedQuadratic(),
-        index_points=tf.ones([5, 1, 2]),
-        always_yield_multivariate_normal=False,
+        gp.log_prob(
+            x,
+            is_missing=[[[False], [True]], [[True], [True]], [[True], [False]]])
     )
-    self.assertAllEqual([5], self.evaluate(gp.batch_shape_tensor()))
-    self.assertAllEqual([], self.evaluate(gp.event_shape_tensor()))
-    gp_pp = gp.posterior_predictive(tf.ones([5, 1]),
-                                    predictive_index_points=tf.ones([5, 1, 2]))
-    self.assertAllEqual([5], self.evaluate(gp_pp.batch_shape_tensor()))
-    self.assertAllEqual([], self.evaluate(gp_pp.event_shape_tensor()))
 
+  def testSingleIndexPoint(self):
     gp = gaussian_process.GaussianProcess(
         kernel=psd_kernels.ExponentiatedQuadratic(),
         index_points=tf.ones([5, 1, 2]),
-        always_yield_multivariate_normal=True,
     )
     self.assertAllEqual([5], self.evaluate(gp.batch_shape_tensor()))
     self.assertAllEqual([1], self.evaluate(gp.event_shape_tensor()))

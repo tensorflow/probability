@@ -88,10 +88,8 @@ class _WeightedPowerScalarizationTest(object):
                   observations=observations[..., i],
                   seed=test_util.test_seed(),
                   **acquisition_kwargs)()))
-    # Keep the last dimension. This is because MTGP doesn't squeeze the index
-    # points dimension.
     expected_cheb_scalar = tf.reduce_max(
-        tf.stack(expected_cheb_scalars, axis=-1), axis=-1)
+        tf.concat(expected_cheb_scalars, axis=-1), axis=-1)
     self.assertAllNotNan(grad)
     self.assertAllClose(actual_cheb_scalar, expected_cheb_scalar, rtol=6e-4)
     self.assertDTypeEqual(actual_cheb_scalar, self.dtype)
