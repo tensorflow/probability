@@ -18,6 +18,7 @@ import collections
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 
 
 ButcherTableau = collections.namedtuple('ButcherTableau',
@@ -107,7 +108,7 @@ def nest_constant(structure, value=1.0, dtype=None):
   else:
     dtypes = [dtype] * len(flat_structure)
   flat_vals = [
-      value * tf.ones_like(c, dtype=dtype)
+      tf.fill(ps.shape(c), tf.cast(value, dtype))
       for c, dtype in zip(flat_structure, dtypes)
   ]
   return tf.nest.pack_sequence_as(structure, flat_vals)
