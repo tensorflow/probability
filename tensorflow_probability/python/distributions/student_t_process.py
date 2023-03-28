@@ -49,6 +49,19 @@ def _add_diagonal_shift(matrix, shift):
       matrix, tf.linalg.diag_part(matrix) + shift, name='add_diagonal_shift')
 
 
+_ALWAYS_YIELD_MVST_DEPRECATION_WARNING = (
+    '`always_yield_multivariate_student_t` is deprecated. After 2023-07-01, '
+    'this arg will be ignored, and behavior will be as though '
+    '`always_yield_multivariate_student_t=True`. This means that a '
+    '`StudentTProcess` evaluated at a single index point will have event shape '
+    '`[1]`. To reproduce the behavior of '
+    '`always_yield_multivariate_student_t=False` squeeze the rightmost '
+    'singleton dimension from the output of `mean`, `sample`, etc.')
+
+
+_GET_MARGINAL_DISTRIBUTION_ALREADY_WARNED = False
+
+
 def make_cholesky_factored_marginal_fn(cholesky_fn):
   """Construct a `marginal_fn` for use with `tfd.StudentTProcess`.
 
@@ -245,6 +258,10 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
       '2021-06-26',
       '`jitter` is deprecated; please use `marginal_fn` directly.',
       'jitter')
+  @deprecation.deprecated_arg_values(
+      '2023-07-01',
+      _ALWAYS_YIELD_MVST_DEPRECATION_WARNING,
+      always_yield_multivariate_student_t=False)
   def __init__(self,
                df,
                kernel,
@@ -254,6 +271,7 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
                marginal_fn=None,
                cholesky_fn=None,
                jitter=1e-6,
+               always_yield_multivariate_student_t=False,
                validate_args=False,
                allow_nan_stats=False,
                name='StudentTProcess'):
@@ -298,6 +316,11 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
         matrix to ensure positive definiteness of the covariance matrix.
         This argument is ignored if `cholesky_fn` is set.
         Default value: `1e-6`.
+      always_yield_multivariate_student_t: Deprecated. If `False` (the default),
+        we produce a scalar `StudentT` distribution when the number of
+        `index_points` is statically known to be `1`. If `True`, we avoid this
+        behavior, ensuring that the event shape will retain the `1` from
+        `index_points`.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -369,6 +392,8 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
       else:
         self._marginal_fn = marginal_fn
 
+      self._always_yield_multivariate_student_t = (
+          always_yield_multivariate_student_t)
       with tf.name_scope('init'):
         super(StudentTProcess, self).__init__(
             dtype=dtype,
@@ -409,6 +434,9 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
       multivariate. In the case of dynamic shape in the number of index points,
       defaults to "multivariate" since that's the best we can do.
     """
+    if self._always_yield_multivariate_student_t:
+      return False
+
     num_index_points = tf.nest.map_structure(
         lambda x, nd: tf.compat.dimension_value(x.shape[-(nd + 1)]),
         index_points, self.kernel.feature_ndims)
@@ -467,11 +495,31 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
         `kernel.batch_shape` and any batch dims yielded by `mean_fn`.
 
     Returns:
-      marginal: a `StudentT` or `MultivariateStudentT` distribution,
-        according to whether `index_points` consists of one or many index
-        points, respectively.
+      marginal: a Student T distribution with vector event shape, or
+        (deprecated) a scalar `StudentT` distribution if `index_points` consists
+        of a single index point and `always_yield_multivariate_student_t=False`.
     """
     with self._name_and_control_scope('get_marginal_distribution'):
+      global _GET_MARGINAL_DISTRIBUTION_ALREADY_WARNED
+      if (not _GET_MARGINAL_DISTRIBUTION_ALREADY_WARNED and  # pylint: disable=protected-access
+          not self._always_yield_multivariate_student_t):  # pylint: disable=protected-access
+        warnings.warn(
+            'After 2023-07-01, the `always_yield_multivariate_student_t` arg '
+            'to `StudentTProcess.__init__` will be ignored, which means that '
+            '`get_marginal_distribution` will always return a Student T '
+            'distribution with vector event shape. This is the current '
+            'behavior when `always_yield_multivariate_student_t=True`. '
+            'To recover the behavior of '
+            '`always_yield_multivariate_student_t=False` when `index_points` '
+            'contains a single index point, build a scalar `StudentT` '
+            'distribution as follows:\n'
+            '`mvst = get_marginal_distribution(index_points);`\n'
+            '`st = tfd.StudentT(`\n'
+            '`   mvst.df, loc=mvst.loc[..., 0], scale=mvst.stddev()[..., 0])`\n'
+            'To suppress these warnings, build the `StudentTProcess` with '
+            '`always_yield_multivariate_student_t=True`.',
+            FutureWarning)
+        _GET_MARGINAL_DISTRIBUTION_ALREADY_WARNED = True  # pylint: disable=protected-access
       df = tf.convert_to_tensor(self.df)
       index_points = self._get_index_points(index_points)
       covariance = self._compute_covariance(index_points)

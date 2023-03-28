@@ -338,6 +338,26 @@ class _StudentTProcessTest(test_util.TestCase):
                         stp_with_list.batch_shape_tensor())
     self.assertAllClose(base_stp.log_prob(s), stp_with_list.log_prob(s))
 
+  def testAlwaysYieldMultivariateStudentT(self):
+    df = np.float32(3.)
+    stp = student_t_process.StudentTProcess(
+        df=df,
+        kernel=psd_kernels.ExponentiatedQuadratic(),
+        index_points=tf.ones([5, 1, 2]),
+        always_yield_multivariate_student_t=False,
+    )
+    self.assertAllEqual([5], self.evaluate(stp.batch_shape_tensor()))
+    self.assertAllEqual([], self.evaluate(stp.event_shape_tensor()))
+
+    stp = student_t_process.StudentTProcess(
+        df=df,
+        kernel=psd_kernels.ExponentiatedQuadratic(),
+        index_points=tf.ones([5, 1, 2]),
+        always_yield_multivariate_student_t=True,
+    )
+    self.assertAllEqual([5], self.evaluate(stp.batch_shape_tensor()))
+    self.assertAllEqual([1], self.evaluate(stp.event_shape_tensor()))
+
 
 @test_util.test_all_tf_execution_regimes
 class StudentTProcessStaticTest(_StudentTProcessTest):

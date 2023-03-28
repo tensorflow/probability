@@ -31,6 +31,7 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.math.psd_kernels import schur_complement as schur_complement_lib
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -107,6 +108,16 @@ def _validate_observation_data(
                 index_point_count, observation_count))
 
   tf.nest.map_structure(_validate, observation_index_points, ndims)
+
+
+_ALWAYS_YIELD_MVST_DEPRECATION_WARNING = (
+    '`always_yield_multivariate_student_t` is deprecated. After 2023-07-01, '
+    'this arg will be ignored, and behavior will be as though '
+    '`always_yield_multivariate_student_t=True`. This means that a '
+    '`StudentTProcessRegressionModel` evaluated at a single index point will '
+    'have event shape `[1]`. To reproduce the behavior of '
+    '`always_yield_multivariate_student_t=False` squeeze the rightmost '
+    'singleton dimension from the output of `mean`, `sample`, etc.')
 
 
 class DampedSchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
@@ -274,6 +285,10 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
   """
   # pylint:disable=invalid-name
 
+  @deprecation.deprecated_arg_values(
+      '2023-07-01',
+      _ALWAYS_YIELD_MVST_DEPRECATION_WARNING,
+      always_yield_multivariate_student_t=False)
   def __init__(
       self,
       df,
@@ -286,6 +301,7 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
       mean_fn=None,
       cholesky_fn=None,
       marginal_fn=None,
+      always_yield_multivariate_student_t=False,
       validate_args=False,
       allow_nan_stats=False,
       name='StudentTProcessRegressionModel',
@@ -353,6 +369,11 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
         returns a multivariate Student-T subclass of `tfd.Distribution`.
         Default value: `None`, in which case a Cholesky-factorizing function
         is created using `make_cholesky_with_jitter_fn`.
+      always_yield_multivariate_student_t: Deprecated. If `False` (the default),
+        we produce a scalar `StudentT` distribution when the number of
+        `index_points` is statically known to be `1`. If `True`, we avoid this
+        behavior, ensuring that the event shape will retain the `1` from
+        `index_points`.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -489,11 +510,17 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
             cholesky_fn=cholesky_fn,
             index_points=index_points,
             observation_noise_variance=predictive_noise_variance,
+            always_yield_multivariate_student_t=(
+                always_yield_multivariate_student_t),
             validate_args=validate_args,
             allow_nan_stats=allow_nan_stats, name=name)
         self._parameters = parameters
 
   @staticmethod
+  @deprecation.deprecated_arg_values(
+      '2023-07-01',
+      _ALWAYS_YIELD_MVST_DEPRECATION_WARNING,
+      always_yield_multivariate_student_t=False)
   def precompute_regression_model(
       df,
       kernel,
@@ -504,6 +531,7 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
       predictive_noise_variance=None,
       mean_fn=None,
       cholesky_fn=None,
+      always_yield_multivariate_student_t=False,
       validate_args=False,
       allow_nan_stats=False,
       name='PrecomputedStudentTProcessRegressionModel',
@@ -591,6 +619,11 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
         returns a Cholesky-like lower triangular factor.  Default value: `None`,
         in which case `make_cholesky_with_jitter_fn` is used with the `jitter`
         parameter.
+      always_yield_multivariate_student_t: Deprecated. If `False` (the default),
+        we produce a scalar `StudentT` distribution when the number of
+        `index_points` is statically known to be `1`. If `True`, we avoid this
+        behavior, ensuring that the event shape will retain the `1` from
+        `index_points`.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -694,6 +727,8 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
           observation_noise_variance=observation_noise_variance,
           predictive_noise_variance=predictive_noise_variance,
           cholesky_fn=cholesky_fn,
+          always_yield_multivariate_student_t=(
+              always_yield_multivariate_student_t),
           _conditional_kernel=conditional_kernel,
           _conditional_mean_fn=conditional_mean_fn,
           validate_args=validate_args,
