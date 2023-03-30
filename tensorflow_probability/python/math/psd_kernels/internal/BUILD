@@ -66,7 +66,6 @@ multi_substrate_py_test(
     name = "util_test",
     size = "small",
     srcs = ["util_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         ":util",
         # numpy dep,

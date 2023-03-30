@@ -614,7 +614,7 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
     else:
       # The examples index is one position to the left of the feature dims.
       example_shape = tf.nest.map_structure(
-          lambda t, nd: ps.shape(t)[-(nd + 1):-nd],
+          lambda t, nd: ps.shape(t)[ps.rank(t) - (nd + 1):ps.rank(t) - nd],
           index_points, self.kernel.feature_ndims)
       return functools.reduce(ps.broadcast_shape,
                               tf.nest.flatten(example_shape), [])
@@ -627,7 +627,7 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
     else:
       # The examples index is one position to the left of the feature dims.
       example_shape = tf.nest.map_structure(
-          lambda t, nd: tf.TensorShape(t.shape[-(nd + 1):-nd]),
+          lambda t, nd: tf.TensorShape(t.shape[-(nd + 1)]),
           index_points, self.kernel.feature_ndims)
       flat_shapes = nest.flatten_up_to(self.kernel.feature_ndims, example_shape)
 

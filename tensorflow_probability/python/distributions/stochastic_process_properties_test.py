@@ -113,7 +113,7 @@ def stochastic_processes(draw,
   if feature_dim is None:
     feature_dim = draw(hps.integers(min_value=2, max_value=4))
   if feature_ndims is None:
-    feature_ndims = draw(hps.integers(min_value=1, max_value=3))
+    feature_ndims = draw(hps.integers(min_value=0, max_value=3))
 
   if process_name == 'GaussianProcess':
     return draw(gaussian_processes(

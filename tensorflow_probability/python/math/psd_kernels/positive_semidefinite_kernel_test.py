@@ -172,7 +172,6 @@ class PositiveSemidefiniteKernelTest(test_util.TestCase):
   @parameterized.named_parameters(
       ('String feature_ndims', 'non-integer'),
       ('Float feature_ndims', 4.2),
-      ('Zero feature_ndims', 0),
       ('Negative feature_ndims', -3))
   def testFeatureNdimsExceptions(self, feature_ndims):
 

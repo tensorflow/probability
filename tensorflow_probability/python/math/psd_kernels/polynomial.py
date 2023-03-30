@@ -160,19 +160,22 @@ class Polynomial(psd_kernel.AutoCompositeTensorPsdKernel):
     return self._exponent
 
   def _matrix(self, x1, x2):
-    if self.feature_ndims != 1:
+    if self.feature_ndims > 1:
       x1 = tf.reshape(x1, ps.concat(
-          [ps.shape(x1)[:-self.feature_ndims],
-           [-1]], axis=-1))
+          [ps.shape(x1)[:-self.feature_ndims], [-1]], axis=-1))
       x2 = tf.reshape(x2, ps.concat(
-          [ps.shape(x2)[:-self.feature_ndims],
-           [-1]], axis=-1))
-
+          [ps.shape(x2)[:-self.feature_ndims], [-1]], axis=-1))
     if self.shift is not None:
-      shift = self.shift[..., tf.newaxis, tf.newaxis]
+      if self.feature_ndims > 0:
+        shift = self.shift[..., tf.newaxis, tf.newaxis]
+      else:
+        shift = self.shift[..., tf.newaxis]
       x1 = x1 - shift
       x2 = x2 - shift
-    dot_prod = tf.linalg.matmul(x1, x2, transpose_b=True)
+    if self.feature_ndims > 0:
+      dot_prod = tf.linalg.matmul(x1, x2, transpose_b=True)
+    else:
+      dot_prod = tf.linalg.einsum('...i,...j->...ij', x1, x2)
 
     if self.exponent is not None:
       exponent = tf.convert_to_tensor(self.exponent)[

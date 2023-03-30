@@ -91,9 +91,13 @@ def _validate_observation_data(
   ndims = kernel.feature_ndims
 
   def _validate(t, nd):
-    if (tensorshape_util.is_fully_defined(t.shape[:-nd])
+    if nd > 0:
+      shape = t.shape[:-nd]
+    else:
+      shape = t.shape
+    if (tensorshape_util.is_fully_defined(shape)
         and tensorshape_util.is_fully_defined(observations.shape)):
-      index_point_count = t.shape[:-nd]
+      index_point_count = shape
       observation_count = observations.shape
       try:
         tf.broadcast_static_shape(index_point_count, observation_count)
