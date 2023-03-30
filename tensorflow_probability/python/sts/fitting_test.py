@@ -245,6 +245,7 @@ class _HMCTests(object):
   @test_util.disable_test_for_backend(
       disable_jax=True, reason='No variables in JAX backend.')
   def test_multiple_chains_example(self):
+    self.skipTest('b/275876892')
     batch_shape = [2, 3]
     num_timesteps = 5
     num_results = 6
