@@ -392,31 +392,42 @@ def smc_squared(
         initial_parameter_prior,
         parameter_proposal_kernel,
         num_particles,
-        observation_fn,
-        initial_parameter_proposal,
+        # observation_fn, # TODO: Is there observation of outside parameters. No right?
         rejuvenation_criterion_fn,
-        unbiased_gradients,
-        trace_fn,
-        trace_criterion_fn,
-        state_trace_allocation_size,
-        parallel_iterations,
-        particles_dim,
-        seed,
         inner_initial_state_prior,
         inner_transition_fn,
         inner_observation_fn,
         num_inner_particles,
-        inner_initial_state_proposal,
-        inner_proposal_fn,
-        inner_resample_fn,
-        inner_resample_criterion_fn,
-        inner_rejuvenation_fn,
-        inner_rejuvenation_criterion_fn,
-        num_inner_transitions_per_observation,
-        inner_trace_fn,
-        inner_trace_criterion_fn,
-        num_transitions_per_observation=1
+        inner_trace_fn=_default_trace_fn,
+        inner_trace_criterion_fn=_always_trace,
+        particles_dim=0,
+        inner_rejuvenation_fn=_no_rejuvenation,
+        inner_resample_fn=weighted_resampling.resample_systematic,
+        inner_resample_criterion_fn=smc_kernel.ess_below_threshold,
+        inner_proposal_fn=None,
+        inner_initial_state_proposal=None,
+        inner_rejuvenation_criterion_fn=lambda *_: False,
+        trace_fn=_default_trace_fn,
+        trace_criterion_fn=_always_trace,
+        outer_trace_criterion_fn=_always_trace,
+        parallel_iterations=1,
+        num_transitions_per_observation=1,
+        static_trace_allocation_size=None,
+        initial_parameter_proposal=None,
+        unbiased_gradients=True,
+        seed=None,
 ):
+    init_seed, loop_seed = samplers.split_seed(seed, salt='particle_filter')
+    num_observation_steps = ps.size0(tf.nest.flatten(inner_observations)[0])
+    num_timesteps = (
+            1 + num_transitions_per_observation * (num_observation_steps - 1))
+
+    # If trace criterion is `None`, we'll return only the final results.
+    never_trace = lambda *_: False
+    if inner_trace_criterion_fn is None:
+      static_trace_allocation_size = 0
+      inner_trace_criterion_fn = never_trace
+
     if initial_parameter_proposal is None:
         initial_state = initial_parameter_prior.sample(num_particles, seed=seed)
         initial_log_weights = ps.zeros_like(
@@ -437,9 +448,10 @@ def smc_squared(
 
     inner_weighted_particles = _particle_filter_initial_weighted_particles(
         observations=inner_observations,
-        observation_fn=inner_observation_fn,
-        initial_state_prior=inner_initial_state_prior,
-        initial_state_proposal=inner_initial_state_proposal,
+        observation_fn=inner_observation_fn(initial_state),
+        initial_state_prior=inner_initial_state_prior(initial_state),
+        initial_state_proposal=(inner_initial_state_proposal(initial_state)
+                                if inner_initial_state_proposal is not None else None),
         num_particles=num_inner_particles,
         particles_dim=particles_dim,
         seed=seed)
@@ -447,9 +459,10 @@ def smc_squared(
     propose_and_update_log_weights_fn = (
         _particle_filter_propose_and_update_log_weights_fn(
             observations=inner_observations,
-            transition_fn=inner_transition_fn,
-            proposal_fn=inner_proposal_fn,
-            observation_fn=observation_fn,
+            transition_fn=inner_transition_fn(initial_state),
+            proposal_fn=(inner_proposal_fn(initial_state)
+                         if inner_proposal_fn is not None else None),
+            observation_fn=inner_observation_fn(initial_state),
             particles_dim=particles_dim,
             num_transitions_per_observation=num_transitions_per_observation))
 
@@ -473,7 +486,68 @@ def smc_squared(
         log_weights=initial_weighted_parameters.log_weights,
         extra=pmcmc_extra)
 
-    return None
+    traced_results = sequential_monte_carlo(
+        initial_weighted_particles=initial_state,
+        propose_and_update_log_weights_fn=outer_propose_and_update_log_weights_fn,
+        resample_fn=None, # no_resample for now
+        resample_criterion_fn=None,  # never_sample for now
+        rejuvenation_fn=None,  # no rejuvenation for now
+        rejuvenation_criterion_fn=None,  # never_rejuvenate for now
+        trace_criterion_fn=outer_trace_criterion_fn,
+        static_trace_allocation_size=static_trace_allocation_size,
+        parallel_iterations=parallel_iterations,
+        unbiased_gradients=unbiased_gradients,
+        num_timesteps=num_timesteps,
+        particles_dim=particles_dim,
+        trace_fn=inner_trace_fn,
+        loop_seed=loop_seed,
+        never_trace=never_trace,
+    )
+
+    return traced_results
+
+
+def outer_propose_and_update_log_weights_fn(
+        state,
+        inner_observations,
+        inner_transition_fn,
+        inner_proposal_fn,
+        observation_fn,
+        particles_dim,
+        num_transitions_per_observation,
+        inner_resample_fn,
+        inner_resample_criterion_fn,
+        inner_rejuvenation_fn,
+        inner_rejuvenation_criterion_fn,
+        unbiased_gradients
+):
+    propose_and_update_log_weights_fn = (
+        _particle_filter_propose_and_update_log_weights_fn(
+            observations=inner_observations,
+            transition_fn=inner_transition_fn(state),
+            proposal_fn=(inner_proposal_fn(state)
+                         if inner_proposal_fn is not None else None),
+            observation_fn=observation_fn,
+            particles_dim=particles_dim,
+            num_transitions_per_observation=num_transitions_per_observation))
+
+    kernel = smc_kernel.SequentialMonteCarlo(
+        propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
+        resample_fn=inner_resample_fn,
+        resample_criterion_fn=inner_resample_criterion_fn,
+        rejuvenation_fn=inner_rejuvenation_fn,
+        rejuvenation_criterion_fn=inner_rejuvenation_criterion_fn,
+        particles_dim=particles_dim,
+        unbiased_gradients=unbiased_gradients)
+
+    inner_weighted_particles, filter_results = kernel.one_step(state.particles[1], state.particles[2])
+
+    return smc_kernel.WeightedParticles(
+        particles=(state.particles,  # without rejuvenation, this is inner particles
+                   inner_weighted_particles,   # WeightedParticles object
+                   filter_results),  # updates the inner filter results by one invocation of `filter_one_step`
+        log_weights=state.log_weights + filter_results.incremental_log_marginal_likelihood,
+        extra=state.pmcmc_extra)
 
 
 @docstring_util.expand_docstring(
