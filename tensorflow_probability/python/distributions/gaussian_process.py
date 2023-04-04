@@ -468,6 +468,18 @@ class GaussianProcess(
       self, index_points=None, is_missing=None, mask_loc=True):
     # TODO(cgs): consider caching the result here, keyed on `index_points`.
     index_points = self._get_index_points(index_points)
+    if is_missing is not None:
+      # Mask the index_points to avoid NaN gradients. NOTE: We are assuming the
+      # 0. vector is a valid sample. TODO(b/276969724): Mask out missing index
+      # points to something in the support of the kernel.
+      pad_shapes = lambda nd: psd_kernels_util.pad_shape_with_ones(  # pylint:disable=g-long-lambda
+          is_missing, nd, start=-1)
+      mask_is_missing = tf.nest.map_structure(
+          pad_shapes, self.kernel.feature_ndims)
+
+      mask = lambda m, x: tf.where(m, dtype_util.as_numpy_dtype(x.dtype)(0), x)
+      index_points = tf.nest.map_structure(mask, mask_is_missing, index_points)
+
     covariance = self._compute_covariance(index_points)
 
     loc = self._mean_fn(index_points)
