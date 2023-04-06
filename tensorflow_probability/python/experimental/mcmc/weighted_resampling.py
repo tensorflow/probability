@@ -76,7 +76,6 @@ def resample(particles, log_weights, resample_fn, target_log_weights=None, parti
     # Normalize the weights and sample the ancestral indices.
     log_probs = tf.math.log_softmax(log_weights, axis=particles_dim)
     resampled_indices = resample_fn(log_probs, num_particles, (), seed=seed)
-
     gather_ancestors = lambda x: (  # pylint: disable=g-long-lambda
         mcmc_util.index_remapping_gather(x, resampled_indices, axis=particles_dim))
     resampled_particles = tf.nest.map_structure(gather_ancestors, particles)
