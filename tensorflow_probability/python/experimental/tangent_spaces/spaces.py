@@ -16,6 +16,8 @@
 """Class definitions for tangent spaces."""
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import prefer_static as ps
 
 __all__ = [
     'AxisAlignedSpace',
@@ -25,6 +27,8 @@ __all__ = [
     'UnspecifiedTangentSpaceError',
     'ZeroSpace',
 ]
+
+JAX_MODE = False
 
 
 class TangentSpace(object):
@@ -184,7 +188,7 @@ class AxisAlignedSpace(TangentSpace):
       return 0, AxisAlignedSpace(new_live_dimensions)
 
   def transform_coordinatewise(self, x, f, **kwargs):
-    # TODO(pravnar): compute the derivative of f along x along the
+    # TODO(b/197680518): compute the derivative of f along x along the
     # live dimensions.
     raise NotImplementedError
 
@@ -216,21 +220,53 @@ class FullSpace(TangentSpace):
 
 
 def volume_coefficient(basis):
-  return tf.multiply(
-      tf.linalg.logdet(tf.linalg.matmul(basis, basis, transpose_b=True)), 0.5)
+  result = 0.5 * tf.linalg.logdet(
+      tf.linalg.matmul(basis, basis, transpose_b=True))
+  return result
 
 
 class GeneralSpace(TangentSpace):
   """Arbitrary tangent space when no more-efficient special case applies."""
 
-  def __init__(self, basis, computed_volume=None):
-    self.basis = basis
-    if computed_volume is None:
-      computed_volume = volume_coefficient(basis)
-    self.volume = computed_volume
+  def __init__(self, basis, computed_log_volume=None):
+    """Initialize a GeneralSpace with a basis.
 
-  def transform_general(self, x, f, **kwargs):
-    raise NotImplementedError
+    Args:
+      basis: `Tensor` of shape `[N, B1, ..., Bk, D1, ... Dl]`, where `N` is the
+        number of bases vectors, `Bi` are batch dimensions and `Di` refer to
+        the dimensions that this basis lives in.
+      computed_log_volume: Optional `Tensor` of shape `[B1, ..., Bk]`. Computed
+        log-volume coefficient.
+        Default `None`.
+    """
+    self.basis = basis
+    self.computed_log_volume = computed_log_volume
+
+  def transform_general(self, x, f, event_ndims=None, **kwargs):
+    # TODO(b/197680518): Clean up and extend the following code:
+    # 1) Add TF support.
+    # 2) Add Multipart Bijector Support.
+    basis = tf.convert_to_tensor(self.basis)
+
+    if JAX_MODE:
+      import jax  # pylint:disable=g-import-not-at-top
+      import jax.numpy as jnp  # pylint:disable=g-import-not-at-top
+      def compute_basis(b):
+        b = jnp.zeros_like(x) + b
+        return jax.jvp(f.forward, (x,), (b,))[1]
+      new_basis = jax.vmap(compute_basis)(basis)
+      if event_ndims is None:
+        event_ndims = f.forward_min_event_ndims
+      result = self.computed_log_volume
+      if self.computed_log_volume is None:
+        basis = _reshape_to_matrix(basis, event_ndims=event_ndims)
+        result = volume_coefficient(basis)
+      new_log_volume = volume_coefficient(
+          _reshape_to_matrix(new_basis, event_ndims=event_ndims))
+      result = result - new_log_volume
+      return result, GeneralSpace(new_basis, computed_log_volume=new_log_volume)
+    else:
+      raise ValueError('`transform_general` only available in JAX')
 
 
 class ZeroSpace(TangentSpace):
@@ -254,3 +290,15 @@ class UnspecifiedTangentSpaceError(Exception):
     message = ('Please specify one of the tangent spaces defined at '
                'tensorflow_probability.python.experimental.tangent_spaces.')
     super().__init__(message)
+
+
+def _reshape_to_matrix(basis, event_ndims):
+  # Reshape basis so that there is only one ambient dimension.
+  basis = ps.reshape(
+      basis, ps.concat(
+          [ps.shape(basis)[:ps.rank(basis) - event_ndims], [-1]], axis=0))
+  if event_ndims == 0:
+    basis = basis[..., tf.newaxis]
+  # Finally move the basis vector dimension to the end so we have shape [B1,
+  # ..., Bk, N, D].
+  return distribution_util.move_dimension(basis, 0, -2)

@@ -16,6 +16,7 @@
 load(
     "//tensorflow_probability/python:build_defs.bzl",
     "multi_substrate_py_library",
+    "multi_substrate_py_test",
 )
 
 package(
@@ -40,5 +41,27 @@ multi_substrate_py_library(
     srcs = ["spaces.py"],
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "spaces_test",
+    size = "medium",
+    srcs = ["spaces_test.py"],
+    shard_count = 4,
+    deps = [
+        ":spaces",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:exp",
+        "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/bijectors:reshape",
+        "//tensorflow_probability/python/bijectors:scale",
+        "//tensorflow_probability/python/bijectors:scale_matvec_tril",
+        "//tensorflow_probability/python/bijectors:transform_diagonal",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

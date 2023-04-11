@@ -56,7 +56,7 @@ __all__ = [
     'tensordot',
     'trace',
     'triangular_solve',
-    # 'cross',
+    'cross',
     # 'expm',
     # 'global_norm',
     # 'logm',
@@ -533,6 +533,10 @@ cholesky = utils.copy_docstring(
 cholesky_solve = utils.copy_docstring(
     'tf.linalg.cholesky_solve',
     _cholesky_solve)
+
+cross = utils.copy_docstring(
+    'tf.linalg.cross',
+    lambda a, b, name=None: np.cross(a, b))
 
 det = utils.copy_docstring(
     'tf.linalg.det',
