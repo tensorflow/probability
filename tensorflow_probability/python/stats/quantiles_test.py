@@ -207,7 +207,7 @@ class FindBinsTest(test_util.TestCase):
   def test_too_few_edges_raises(self):
     x = [1., 2., 3., 4.]
     edges = [2.]
-    with self.assertRaisesRegexp(ValueError, '1 or more bin'):
+    with self.assertRaisesRegex(ValueError, '1 or more bin'):
       quantiles.find_bins(x, edges)
 
 
@@ -628,7 +628,7 @@ class PercentileTestWithLinearInterpolation(
   _interpolation = 'linear'
 
   def test_integer_dtype_raises(self):
-    with self.assertRaisesRegexp(TypeError, 'not allowed with dtype'):
+    with self.assertRaisesRegex(TypeError, 'not allowed with dtype'):
       quantiles.percentile(x=[1, 2], q=30, interpolation='linear')
 
   def test_grads_at_sample_pts_with_no_preserve_gradients(self):
@@ -773,7 +773,7 @@ class PercentileTestWithMidpointInterpolation(
   _interpolation = 'midpoint'
 
   def test_integer_dtype_raises(self):
-    with self.assertRaisesRegexp(TypeError, 'not allowed with dtype'):
+    with self.assertRaisesRegex(TypeError, 'not allowed with dtype'):
       quantiles.percentile(x=[1, 2], q=30, interpolation='midpoint')
 
 
@@ -819,12 +819,12 @@ class PercentileTestWithNearestInterpolation(test_util.TestCase):
 
   def test_invalid_interpolation_raises(self):
     x = [1., 5., 3., 2., 4.]
-    with self.assertRaisesRegexp(ValueError, 'interpolation'):
+    with self.assertRaisesRegex(ValueError, 'interpolation'):
       quantiles.percentile(x, q=0.5, interpolation='bad')
 
   def test_2d_q_raises_static(self):
     x = [1., 5., 3., 2., 4.]
-    with self.assertRaisesRegexp(ValueError, 'Expected.*ndims'):
+    with self.assertRaisesRegex(ValueError, 'Expected.*ndims'):
       quantiles.percentile(x, q=[[0.5]])
 
   def test_2d_q_raises_dynamic(self):
