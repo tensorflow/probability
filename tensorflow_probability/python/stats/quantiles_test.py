@@ -285,6 +285,17 @@ class HistogramTest(test_util.TestCase):
         # which means an unseeded test fails with probability 3e-5.
         rtol=4 / np.sqrt(0.25 * n_samples))
 
+  def test_reducing_all_axes_is_same_as_default(self):
+    x = tf.constant([[1, 2, 3], [1, 2, 3.]])
+    weights = tf.ones_like(x)
+    edges = tf.constant([0, 2.5, 10])
+    axis = [0, 1]
+    counts = quantiles.histogram(x, edges=edges, axis=axis, weights=weights)
+
+    counts_no_axis = quantiles.histogram(x, edges=edges, weights=weights)
+
+    self.assertAllClose(counts, counts_no_axis)
+
   def test_2d_uniform_reduce_axis_0_yes_weights(self):
     n_samples = 1000
 
