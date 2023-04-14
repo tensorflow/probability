@@ -32,10 +32,11 @@ while not_done:
 """
 
 import collections
+from collections.abc import Mapping, Sequence
 import dataclasses
 import functools
 import typing
-from typing import Any, Callable, Dict, List, Mapping, NamedTuple, Optional, Sequence, Text, Tuple, Union  # pylint: disable=unused-import
+from typing import Any, Callable, NamedTuple, Optional, Union
 
 import numpy as np
 
@@ -154,24 +155,24 @@ BooleanNest = Union[BooleanTensor, Sequence[BooleanTensor],
                     Mapping[Any, BooleanTensor]]
 FloatNest = Union[FloatTensor, Sequence[FloatTensor], Mapping[Any, FloatTensor]]
 IntNest = Union[IntTensor, Sequence[IntTensor], Mapping[Any, IntTensor]]
-StringNest = Union[Text, Sequence[Text], Mapping[Any, Text]]
+StringNest = Union[str, Sequence[str], Mapping[Any, str]]
 DTypeNest = Union['tf.DType', Sequence['tf.DType'], Mapping[Any, 'tf.DType']]
 State = TensorNest  # pylint: disable=invalid-name
 StateExtra = TensorNest  # pylint: disable=invalid-name
-TransitionOperator = Callable[..., Tuple[State, TensorNest]]
-TransportMap = Callable[..., Tuple[State, TensorNest]]
-PotentialFn = Union[Callable[[TensorNest], Tuple['tf.Tensor', TensorNest]],
-                    Callable[..., Tuple['tf.Tensor', TensorNest]]]
-GradFn = Union[Callable[[TensorNest], Tuple[TensorNest, TensorNest]],
-               Callable[..., Tuple[TensorNest, TensorNest]]]
+TransitionOperator = Callable[..., tuple[State, TensorNest]]
+TransportMap = Callable[..., tuple[State, TensorNest]]
+PotentialFn = Union[Callable[[TensorNest], tuple['tf.Tensor', TensorNest]],
+                    Callable[..., tuple['tf.Tensor', TensorNest]]]
+GradFn = Union[Callable[[TensorNest], tuple[TensorNest, TensorNest]],
+               Callable[..., tuple[TensorNest, TensorNest]]]
 
 
-def _trace_extra(state: 'State', extra: 'TensorNest') -> 'TensorNest':
+def _trace_extra(state: State, extra: TensorNest) -> TensorNest:
   del state
   return extra
 
 
-def _split_trace(trace_element: Any, trace_mask: Any) -> Tuple[Any, Any]:
+def _split_trace(trace_element: Any, trace_mask: Any) -> tuple[Any, Any]:
   # The two return values of this function share the same shallow structure as
   # `trace_mask`, with the first return value being a version meant for
   # tracing, and the second return value meant for mere propagation.
@@ -203,14 +204,14 @@ def _combine_trace(untraced: Any, traced: Any, trace_mask: Any) -> Any:
 
 @util.named_call
 def trace(
-    state: 'State',
-    fn: 'TransitionOperator',
-    num_steps: 'IntTensor',
-    trace_fn: 'Callable[[State, TensorNest], TensorNest]' = _trace_extra,
-    trace_mask: 'BooleanNest' = True,
-    unroll: 'bool' = False,
-    parallel_iterations: 'int' = 10,
-) -> 'Tuple[State, TensorNest]':
+    state: State,
+    fn: TransitionOperator,
+    num_steps: IntTensor,
+    trace_fn: Callable[[State, TensorNest], TensorNest] = _trace_extra,
+    trace_mask: BooleanNest = True,
+    unroll: bool = False,
+    parallel_iterations: int = 10,
+) -> tuple[State, TensorNest]:
   """`TransitionOperator` that runs `fn` repeatedly and traces its outputs.
 
   Args:
@@ -305,21 +306,21 @@ class _TraceMaskHolder:
 class InterruptibleTraceState(NamedTuple):
   """State of the interruptible trace transition operator."""
 
-  state: 'State'
+  state: State
   traced: Optional[tuple[Any]]
   untraced: Optional[Any]
   step: Any
   # We need to store the static trace mask in the state. The most convenient,
   # backend agnostic method to do this is to place it into the key of a dict. We
   # use a helper type to fake immutability, if necessary.
-  trace_mask_holder: Dict[_TraceMaskHolder, Tuple[()]]
+  trace_mask_holder: dict[_TraceMaskHolder, tuple[()]]
 
   @property
-  def trace_mask(self) -> 'BooleanNest':
+  def trace_mask(self) -> BooleanNest:
     return next(iter(self.trace_mask_holder.keys())).trace_mask
 
   @util.named_call
-  def trace(self, only_valid=True) -> 'TensorNest':
+  def trace(self, only_valid=True) -> TensorNest:
     """Returns the stacked and unstacked values.
 
     Args:
@@ -338,11 +339,11 @@ class InterruptibleTraceState(NamedTuple):
 
 @util.named_call
 def interruptible_trace_init(
-    state: 'State',
-    fn: 'TransitionOperator',
+    state: State,
+    fn: TransitionOperator,
     num_steps: int,
-    trace_mask: 'BooleanNest' = True,
-) -> 'InterruptibleTraceState':
+    trace_mask: BooleanNest = True,
+) -> InterruptibleTraceState:
   """Initializes the state interruptible trace operator.
 
   Args:
@@ -386,8 +387,8 @@ def interruptible_trace_init(
 
 @util.named_call
 def interruptible_trace_step(
-    state: 'InterruptibleTraceState', fn: 'TransitionOperator'
-) -> 'Tuple[InterruptibleTraceState, Tuple[()]]':
+    state: InterruptibleTraceState, fn: TransitionOperator
+) -> tuple[InterruptibleTraceState, tuple[()]]:
   """Runs a step of the interruptible trace operator.
 
   Interruptible trace is like the regular `fun_mc.trace`, but can be
@@ -452,7 +453,7 @@ def interruptible_trace_step(
   )
 
 
-def _tree_repr(tree: 'Any') -> 'Text':
+def _tree_repr(tree: Any) -> str:
   """Utility to get a string representation of the the structure of `tree`."""
 
   class _LeafSentinel(object):
@@ -474,9 +475,9 @@ def _is_namedtuple_like(x):
 
 
 def call_fn(
-    fn: 'TransitionOperator',
-    args: 'Union[Tuple[Any], Mapping[Text, Any], Any]',
-) -> 'Any':
+    fn: TransitionOperator,
+    args: Union[tuple[Any], Mapping[str, Any], Any],
+) -> Any:
   """Calls a function with `args`.
 
   If `args` is a sequence, `fn` is called like `fn(*args)`. If `args` is a
@@ -498,8 +499,8 @@ def call_fn(
     return fn(args)
 
 
-def recover_state_from_args(args: 'Sequence[Any]', kwargs: 'Mapping[Text, Any]',
-                            state_structure: 'Any') -> 'Any':
+def recover_state_from_args(args: Sequence[Any], kwargs: Mapping[str, Any],
+                            state_structure: Any) -> Any:
   """Attempts to recover the state that was transmitted via *args, **kwargs."""
   orig_args = args
   if isinstance(state_structure, collections.abc.Mapping):
@@ -543,9 +544,9 @@ def recover_state_from_args(args: 'Sequence[Any]', kwargs: 'Mapping[Text, Any]',
 
 
 def call_potential_fn(
-    fn: 'PotentialFn',
-    args: 'Union[Tuple[Any], Mapping[Text, Any], Any]',
-) -> 'Tuple[tf.Tensor, Any]':
+    fn: PotentialFn,
+    args: Union[tuple[Any], Mapping[str, Any], Any],
+) -> tuple[tf.Tensor, Any]:
   """Calls a transition operator with `args`.
 
   `fn` must fulfill the `PotentialFn` contract:
@@ -583,9 +584,9 @@ def call_potential_fn(
 
 
 def call_transition_operator(
-    fn: 'TransitionOperator',
-    args: 'State',
-) -> 'Tuple[State, TensorNest]':
+    fn: TransitionOperator,
+    args: State,
+) -> tuple[State, TensorNest]:
   """Calls a transition operator with `args`.
 
   `fn` must fulfill the `TransitionOperator` contract:
@@ -644,9 +645,9 @@ def call_transition_operator(
 
 
 def call_transport_map(
-    fn: 'TransportMap',
-    args: 'State',
-) -> 'Tuple[State, TensorNest]':
+    fn: TransportMap,
+    args: State,
+) -> tuple[State, TensorNest]:
   """Calls a transport map with `args`.
 
   `fn` must fulfill the `TransportMap` contract:
@@ -675,7 +676,7 @@ def call_transport_map(
                     'A common solution is to adjust the `return`s in `fn` to '
                     'be `return args, ()`.')
 
-  if not isinstance(ret, collections.abc.Sequence) or len(ret) != 2:
+  if not isinstance(ret, Sequence) or len(ret) != 2:
     args_s = _tree_repr(args)
     ret_s = _tree_repr(ret)
     raise TypeError(
@@ -685,9 +686,9 @@ def call_transport_map(
 
 
 def call_transport_map_with_ldj(
-    fn: 'TransitionOperator',
-    args: 'State',
-) -> 'Tuple[State, TensorNest, TensorNest]':
+    fn: TransitionOperator,
+    args: State,
+) -> tuple[State, TensorNest, TensorNest]:
   """Calls `fn` and returns the log-det jacobian to `fn`'s first output.
 
   Args:
@@ -707,8 +708,8 @@ def call_transport_map_with_ldj(
 
 
 def call_potential_fn_with_grads(
-    fn: 'PotentialFn', args: 'Union[Tuple[Any], Mapping[Text, Any], Any]'
-) -> 'Tuple[tf.Tensor, TensorNest, TensorNest]':
+    fn: PotentialFn, args: Union[tuple[Any], Mapping[str, Any], Any]
+) -> tuple[tf.Tensor, TensorNest, TensorNest]:
   """Calls `fn` and returns the gradients with respect to `fn`'s first output.
 
   Args:
@@ -727,8 +728,8 @@ def call_potential_fn_with_grads(
   return util.value_and_grad(wrapper, args)
 
 
-def maybe_broadcast_structure(from_structure: 'Any',
-                              to_structure: 'Any') -> 'Any':
+def maybe_broadcast_structure(from_structure: Any,
+                              to_structure: Any) -> Any:
   """Maybe broadcasts `from_structure` to `to_structure`.
 
   If `from_structure` is a singleton, it is tiled to match the structure of
@@ -750,12 +751,12 @@ def maybe_broadcast_structure(from_structure: 'Any',
 
 
 def reparameterize_potential_fn(
-    potential_fn: 'PotentialFn',
-    transport_map_fn: 'TransportMap',
-    init_state: 'Optional[State]' = None,
-    state_structure: 'Optional[Any]' = None,
-    track_volume: 'bool' = True,
-) -> 'Tuple[PotentialFn, Optional[State]]':
+    potential_fn: PotentialFn,
+    transport_map_fn: TransportMap,
+    init_state: Optional[State] = None,
+    state_structure: Optional[Any] = None,
+    track_volume: bool = True,
+) -> tuple[PotentialFn, Optional[State]]:
   """Performs a change of variables of a potential function.
 
   This takes a potential function and creates a new potential function that now
@@ -834,9 +835,9 @@ def reparameterize_potential_fn(
   return wrapper, transformed_state
 
 
-def transform_log_prob_fn(log_prob_fn: 'PotentialFn',
-                          bijector: 'BijectorNest',
-                          init_state: 'Optional[State]' = None) -> 'Any':
+def transform_log_prob_fn(log_prob_fn: PotentialFn,
+                          bijector: BijectorNest,
+                          init_state: Optional[State] = None) -> Any:
   """Transforms a log-prob function using a bijector.
 
   This takes a log-prob function and creates a new log-prob function that now
@@ -902,33 +903,33 @@ def transform_log_prob_fn(log_prob_fn: 'PotentialFn',
 
 class IntegratorStepState(NamedTuple):
   """Integrator step state."""
-  state: 'State'
-  state_grads: 'State'
-  momentum: 'State'
+  state: State
+  state_grads: State
+  momentum: State
 
 
 class IntegratorStepExtras(NamedTuple):
   """Integrator step extras."""
-  target_log_prob: 'FloatTensor'
-  state_extra: 'StateExtra'
-  kinetic_energy: 'FloatTensor'
-  kinetic_energy_extra: 'Any'
-  momentum_grads: 'State'
+  target_log_prob: FloatTensor
+  state_extra: StateExtra
+  kinetic_energy: FloatTensor
+  kinetic_energy_extra: Any
+  momentum_grads: State
 
 
-IntegratorStep = Callable[[IntegratorStepState], Tuple[IntegratorStepState,
+IntegratorStep = Callable[[IntegratorStepState], tuple[IntegratorStepState,
                                                        IntegratorStepExtras]]
 
 
 @util.named_call
 def splitting_integrator_step(
-    integrator_step_state: 'IntegratorStepState',
-    step_size: 'FloatTensor',
-    target_log_prob_fn: 'PotentialFn',
-    kinetic_energy_fn: 'PotentialFn',
-    coefficients: 'Sequence[FloatTensor]',
-    forward: 'bool' = True,
-) -> 'Tuple[IntegratorStepState, IntegratorStepExtras]':
+    integrator_step_state: IntegratorStepState,
+    step_size: FloatTensor,
+    target_log_prob_fn: PotentialFn,
+    kinetic_energy_fn: PotentialFn,
+    coefficients: Sequence[FloatTensor],
+    forward: bool = True,
+) -> tuple[IntegratorStepState, IntegratorStepExtras]:
   """Symmetric symplectic integrator `TransitionOperator`.
 
   This implementation is based on Hamiltonian splitting, with the splits
@@ -1002,11 +1003,11 @@ def splitting_integrator_step(
 
 @util.named_call
 def leapfrog_step(
-    integrator_step_state: 'IntegratorStepState',
-    step_size: 'FloatTensor',
-    target_log_prob_fn: 'PotentialFn',
-    kinetic_energy_fn: 'PotentialFn',
-) -> 'Tuple[IntegratorStepState, IntegratorStepExtras]':
+    integrator_step_state: IntegratorStepState,
+    step_size: FloatTensor,
+    target_log_prob_fn: PotentialFn,
+    kinetic_energy_fn: PotentialFn,
+) -> tuple[IntegratorStepState, IntegratorStepExtras]:
   """Leapfrog integrator `TransitionOperator`.
 
   Args:
@@ -1031,11 +1032,11 @@ def leapfrog_step(
 
 @util.named_call
 def ruth4_step(
-    integrator_step_state: 'IntegratorStepState',
-    step_size: 'FloatTensor',
-    target_log_prob_fn: 'PotentialFn',
-    kinetic_energy_fn: 'PotentialFn',
-) -> 'Tuple[IntegratorStepState, IntegratorStepExtras]':
+    integrator_step_state: IntegratorStepState,
+    step_size: FloatTensor,
+    target_log_prob_fn: PotentialFn,
+    kinetic_energy_fn: PotentialFn,
+) -> tuple[IntegratorStepState, IntegratorStepExtras]:
   """Ruth 4th order integrator `TransitionOperator`.
 
   See [1] for details.
@@ -1069,11 +1070,11 @@ def ruth4_step(
 
 @util.named_call
 def blanes_3_stage_step(
-    integrator_step_state: 'IntegratorStepState',
-    step_size: 'FloatTensor',
-    target_log_prob_fn: 'PotentialFn',
-    kinetic_energy_fn: 'PotentialFn',
-) -> 'Tuple[IntegratorStepState, IntegratorStepExtras]':
+    integrator_step_state: IntegratorStepState,
+    step_size: FloatTensor,
+    target_log_prob_fn: PotentialFn,
+    kinetic_energy_fn: PotentialFn,
+) -> tuple[IntegratorStepState, IntegratorStepExtras]:
   """Blanes 3 stage integrator `TransitionOperator`.
 
   This integrator has second order. See [1] for details and [2] for further
@@ -1113,11 +1114,11 @@ def blanes_3_stage_step(
 
 @util.named_call
 def blanes_4_stage_step(
-    integrator_step_state: 'IntegratorStepState',
-    step_size: 'FloatTensor',
-    target_log_prob_fn: 'PotentialFn',
-    kinetic_energy_fn: 'PotentialFn',
-) -> 'Tuple[IntegratorStepState, IntegratorStepExtras]':
+    integrator_step_state: IntegratorStepState,
+    step_size: FloatTensor,
+    target_log_prob_fn: PotentialFn,
+    kinetic_energy_fn: PotentialFn,
+) -> tuple[IntegratorStepState, IntegratorStepExtras]:
   """Blanes 4 stage integrator `TransitionOperator`.
 
   See [1] for details. This integrator likely has second order.
@@ -1154,12 +1155,12 @@ def blanes_4_stage_step(
 
 @util.named_call
 def mclachlan_optimal_4th_order_step(
-    integrator_step_state: 'IntegratorStepState',
-    step_size: 'FloatTensor',
-    target_log_prob_fn: 'PotentialFn',
-    kinetic_energy_fn: 'PotentialFn',
-    forward: 'BooleanTensor',
-) -> 'Tuple[IntegratorStepState, IntegratorStepExtras]':
+    integrator_step_state: IntegratorStepState,
+    step_size: FloatTensor,
+    target_log_prob_fn: PotentialFn,
+    kinetic_energy_fn: PotentialFn,
+    forward: BooleanTensor,
+) -> tuple[IntegratorStepState, IntegratorStepExtras]:
   """4th order integrator for Hamiltonians with a quadratic kinetic energy.
 
   See [1] for details. Note that this integrator step is not reversible, so for
@@ -1185,7 +1186,7 @@ def mclachlan_optimal_4th_order_step(
   [1]: McLachlan R. I., & Atela P. (1992). The accuracy of symplectic
        integrators. Nonlinearity, 5, 541-562.
   """
-  # N.B. a's and b's are used in the opposite sense than the Blanes integrators
+  # N.B. as and bs are used in the opposite sense than the Blanes integrators
   # above.
   a1 = 0.5153528374311229364
   a2 = -0.085782019412973646
@@ -1217,17 +1218,17 @@ def mclachlan_optimal_4th_order_step(
 
 class MetropolisHastingsExtra(NamedTuple):
   """Metropolis-hastings extra outputs."""
-  is_accepted: 'FloatTensor'
-  log_uniform: 'FloatTensor'
+  is_accepted: FloatTensor
+  log_uniform: FloatTensor
 
 
 @util.named_call
 def metropolis_hastings_step(
-    current_state: 'State',
-    proposed_state: 'State',
-    energy_change: 'FloatTensor',
-    log_uniform: 'Optional[FloatTensor]' = None,
-    seed=None) -> 'Tuple[State, MetropolisHastingsExtra]':
+    current_state: State,
+    proposed_state: State,
+    energy_change: FloatTensor,
+    log_uniform: Optional[FloatTensor] = None,
+    seed=None) -> tuple[State, MetropolisHastingsExtra]:
   """Metropolis-Hastings step.
 
   This probabilistically chooses between `current_state` and `proposed_state`
@@ -1276,7 +1277,7 @@ class PersistentMetropolistHastingsState(NamedTuple):
   # We borrow the [-1, 1] encoding from the original paper; it has the effect of
   # flipping the drift direction automatically, which has the effect of
   # prolonging the persistent bouts of acceptance.
-  level: 'FloatTensor'
+  level: FloatTensor
 
 
 class PersistentMetropolistHastingsExtra(NamedTuple):
@@ -1286,16 +1287,16 @@ class PersistentMetropolistHastingsExtra(NamedTuple):
     is_accepted: Whether the proposed state was accepted.
     accepted_state: The accepted state.
   """
-  is_accepted: 'BooleanTensor'
-  accepted_state: 'State'
+  is_accepted: BooleanTensor
+  accepted_state: State
 
 
 @util.named_call
 def persistent_metropolis_hastings_init(
-    shape: 'IntTensor',
-    dtype: 'tf.DType' = tf.float32,
-    init_level: 'FloatTensor' = 0.,
-) -> 'PersistentMetropolistHastingsState':
+    shape: IntTensor,
+    dtype: tf.DType = tf.float32,
+    init_level: FloatTensor = 0.,
+) -> PersistentMetropolistHastingsState:
   """Initializes `PersistentMetropolistHastingsState`.
 
   Args:
@@ -1312,13 +1313,14 @@ def persistent_metropolis_hastings_init(
 
 @util.named_call
 def persistent_metropolis_hastings_step(
-    pmh_state: 'PersistentMetropolistHastingsState',
-    current_state: 'State',
-    proposed_state: 'State',
-    energy_change: 'FloatTensor',
-    drift: 'FloatTensor',
-) -> ('Tuple[PersistentMetropolistHastingsState, '
-      'PersistentMetropolistHastingsExtra]'):
+    pmh_state: PersistentMetropolistHastingsState,
+    current_state: State,
+    proposed_state: State,
+    energy_change: FloatTensor,
+    drift: FloatTensor,
+) -> tuple[
+    PersistentMetropolistHastingsState, PersistentMetropolistHastingsExtra
+]:
   """Persistent metropolis hastings step.
 
   This implements the algorithm from [1]. The net effect of this algorithm is
@@ -1361,11 +1363,11 @@ MomentumSampleFn = Callable[[Any], State]
 
 
 @util.named_call
-def gaussian_momentum_sample(state: 'Optional[State]' = None,
-                             shape: 'Optional[IntTensor]' = None,
-                             dtype: 'Optional[DTypeNest]' = None,
-                             named_axis: 'Optional[StringNest]' = None,
-                             seed=None) -> 'State':
+def gaussian_momentum_sample(state: Optional[State] = None,
+                             shape: Optional[IntTensor] = None,
+                             dtype: Optional[DTypeNest] = None,
+                             named_axis: Optional[StringNest] = None,
+                             seed=None) -> State:
   """Generates a sample from a Gaussian (Normal) momentum distribution.
 
   One of `state` or the pair of `shape`/`dtype` need to be specified to obtain
@@ -1402,9 +1404,9 @@ def gaussian_momentum_sample(state: 'Optional[State]' = None,
 
 
 def make_gaussian_kinetic_energy_fn(
-    chain_ndims: 'IntTensor',
-    named_axis: 'Optional[StringNest]' = None,
-) -> 'Callable[..., Tuple[tf.Tensor, TensorNest]]':
+    chain_ndims: IntTensor,
+    named_axis: Optional[StringNest] = None,
+) -> Callable[..., tuple[tf.Tensor, TensorNest]]:
   """Returns a function that computes the kinetic energy of a state.
 
   Args:
@@ -1447,29 +1449,289 @@ def make_gaussian_kinetic_energy_fn(
   return kinetic_energy_fn
 
 
+class IntegratorState(NamedTuple):
+  """Integrator state."""
+  state: State
+  state_extra: StateExtra
+  state_grads: State
+  target_log_prob: FloatTensor
+  momentum: State
+
+
+class IntegratorExtras(NamedTuple):
+  """Integrator extra outputs."""
+  initial_energy: FloatTensor
+  initial_kinetic_energy: FloatTensor
+  initial_kinetic_energy_extra: Any
+  final_energy: FloatTensor
+  final_kinetic_energy: FloatTensor
+  final_kinetic_energy_extra: Any
+  energy_change: FloatTensor
+  integrator_trace: Any
+  momentum_grads: State
+
+
+@util.named_call
+def hamiltonian_integrator(
+    int_state: IntegratorState,
+    num_steps: IntTensor,
+    integrator_step_fn: IntegratorStep,
+    kinetic_energy_fn: PotentialFn,
+    integrator_trace_fn: Callable[
+        [IntegratorStepState, IntegratorStepExtras], TensorNest
+    ] = lambda *args: (),
+    unroll: bool = False,
+    max_num_steps: Optional[IntTensor] = None,
+) -> tuple[IntegratorState, IntegratorExtras]:
+  """Intergrates a discretized set of Hamiltonian equations.
+
+  This function will use the passed `integrator_step_fn` to evolve the system
+  for `num_steps`. The `integrator_step_fn` is assumed to be reversible.
+
+  Args:
+    int_state: Current `IntegratorState`.
+    num_steps: Integer scalar or N-D `Tensor`. Number of steps to take. If this
+      is not a scalar, then each corresponding independent system will be
+      evaluated for that number of steps, followed by copying the final state to
+      avoid creating a ragged Tensor. Keep this in mind when interpreting the
+      `integrator_trace` in the auxiliary output.
+    integrator_step_fn: Instance of `IntegratorStep`.
+    kinetic_energy_fn: Function to compute the kinetic energy from momentums.
+    integrator_trace_fn: Trace function for the integrator.
+    unroll: Whether to unroll the loop in the integrator. Only works if
+      `num_steps`/`max_num_steps' is statically known.
+    max_num_steps: Maximum number of integrator steps to take. Useful when
+      `num_steps` is dynamic, and yet you still want gradients/tracing to work.
+
+  Returns:
+    integrator_state: `IntegratorState`
+    integrator_exras: `IntegratorExtras`
+  """
+  target_log_prob = int_state.target_log_prob
+  momentum = int_state.momentum
+  state = int_state.state
+  state_grads = int_state.state_grads
+  state_extra = int_state.state_extra
+
+  num_steps = ps.convert_to_shape_tensor(num_steps)
+  is_ragged = len(num_steps.shape) > 0 or max_num_steps is not None  # pylint: disable=g-explicit-length-test
+
+  initial_kinetic_energy, initial_kinetic_energy_extra = call_potential_fn(
+      kinetic_energy_fn, momentum)
+  initial_energy = -target_log_prob + initial_kinetic_energy
+
+  if is_ragged:
+    step = 0
+    # TODO(siege): Use cond for the common padding, ala the old RNN code.
+    if max_num_steps is None:
+      max_num_steps = ps.reduce_max(num_steps)
+  else:
+    step = []
+    max_num_steps = num_steps
+
+  # We need to carry around the integrator state extras so we can properly do
+  # the ragged computation.
+  # TODO(siege): In principle we can condition this on `is_ragged`, but doesn't
+  # seem worthwhile at the time.
+  integrator_wrapper_state = (
+      step,
+      IntegratorStepState(state, state_grads, momentum),
+      IntegratorStepExtras(target_log_prob, state_extra, initial_kinetic_energy,
+                           initial_kinetic_energy_extra,
+                           util.map_tree(tf.zeros_like, momentum)),
+  )
+
+  def integrator_wrapper(step, integrator_step_state, integrator_step_extra):
+    """Integrator wrapper that tracks extra state."""
+    old_integrator_step_state = integrator_step_state
+    old_integrator_step_extra = integrator_step_extra
+    integrator_step_state, integrator_step_extra = integrator_step_fn(
+        integrator_step_state)
+
+    if is_ragged:
+      integrator_step_state = choose(step < num_steps, integrator_step_state,
+                                     old_integrator_step_state)
+      integrator_step_extra = choose(step < num_steps, integrator_step_extra,
+                                     old_integrator_step_extra)
+      step = step + 1
+
+    return (step, integrator_step_state, integrator_step_extra), []
+
+  def integrator_trace_wrapper_fn(args, _):
+    return integrator_trace_fn(args[1], args[2])
+
+  [_, integrator_step_state, integrator_step_extra], integrator_trace = trace(
+      integrator_wrapper_state,
+      integrator_wrapper,
+      max_num_steps,
+      trace_fn=integrator_trace_wrapper_fn,
+      unroll=unroll,
+  )
+
+  final_energy = (-integrator_step_extra.target_log_prob +
+                  integrator_step_extra.kinetic_energy)
+
+  state = IntegratorState(
+      state=integrator_step_state.state,
+      state_extra=integrator_step_extra.state_extra,
+      state_grads=integrator_step_state.state_grads,
+      target_log_prob=integrator_step_extra.target_log_prob,
+      momentum=integrator_step_state.momentum)
+
+  extra = IntegratorExtras(
+      initial_energy=initial_energy,
+      initial_kinetic_energy=integrator_step_extra.kinetic_energy,
+      initial_kinetic_energy_extra=integrator_step_extra.kinetic_energy_extra,
+      final_energy=final_energy,
+      final_kinetic_energy=integrator_step_extra.kinetic_energy,
+      final_kinetic_energy_extra=integrator_step_extra.kinetic_energy_extra,
+      energy_change=final_energy - initial_energy,
+      integrator_trace=integrator_trace,
+      momentum_grads=integrator_step_extra.momentum_grads)
+
+  return state, extra
+
+
+@util.named_call
+def obabo_langevin_integrator(
+    int_state: IntegratorState,
+    num_steps: IntTensor,
+    integrator_step_fn: IntegratorStep,
+    momentum_refresh_fn: Callable[[State, Any], State],
+    energy_change_fn: Callable[
+        [IntegratorState, IntegratorState], tuple[FloatTensor, Any]
+    ],
+    integrator_trace_fn: Callable[
+        [IntegratorState, IntegratorStepState, IntegratorStepExtras], TensorNest
+    ] = lambda *args: (),
+    unroll: bool = False,
+    seed: Any = None,
+) -> tuple[IntegratorState, IntegratorExtras]:
+  """Integrates discretized Langevin dynamics.
+
+  This implements a generalized version of the OBABO integrator from [1]. In
+  this integrator, the Langevin dynamics are split into Hamiltonian dynamics and
+  an thermostat moves. The former is solved typically solved using the leapfrog
+  integrator (generalized here to the `integrator_step_fn`), corresponding to
+  the BAB steps. The latter is exactly solved by the `momentum_refresh_fn`, and
+  corresponds to the two O steps.
+
+  In the typical configuration where a leapfrog integrator is used for the
+  Hamiltonian part, the momentum refreshment steps should implement half-steps.
+  The integration error is assumed to only arise from `integrator_step_fn`.
+
+  Args:
+    int_state: Current `IntegratorState`.
+    num_steps: Integer scalar. Number of steps to take.
+    integrator_step_fn: Instance of `IntegratorStep`.
+    momentum_refresh_fn: Momentum refreshment step. This must preserve the
+      momentum density implied by the `integrator_step_fn`.
+    energy_change_fn: Computes the change in energy between two integrator
+      states.
+    integrator_trace_fn: Trace function for the integrator.
+    unroll: Whether to unroll the loop in the integrator. Only works if
+      `num_steps` is statically known.
+    seed: For reproducibility.
+
+  Returns:
+    integrator_state: `IntegratorState`
+    integrator_exras: `IntegratorExtras`. Due to the structure of this
+      integrator, the initial/final energy terms in `IntegratorExtras` return
+      value are set to empty tuples.
+
+  #### References
+
+  [1]: Bussi, G., & Parrinello, M. (2008). Accurate sampling using Langevin
+       dynamics. http://arxiv.org/abs/0803.4083
+  """
+
+  def step_fn(int_state, energy_change, seed):
+    seed, refresh_seed_1, refresh_seed_2 = util.split_seed(seed, 3)
+
+    # Refresh.
+    momentum = momentum_refresh_fn(int_state.momentum, refresh_seed_1)
+    int_state = int_state._replace(momentum=momentum)
+
+    integrator_step_state = IntegratorStepState(
+        state=int_state.state,
+        state_grads=int_state.state_grads,
+        momentum=int_state.momentum)
+
+    # Integrate.
+    integrator_step_state, integrator_step_extra = integrator_step_fn(
+        integrator_step_state)
+
+    new_int_state = int_state._replace(
+        state=integrator_step_state.state,
+        state_extra=integrator_step_extra.state_extra,
+        state_grads=integrator_step_state.state_grads,
+        momentum=integrator_step_state.momentum,
+        target_log_prob=integrator_step_extra.target_log_prob,
+    )
+
+    # TODO(siege): Somehow return the energy change extra.
+    new_energy_change, _ = energy_change_fn(int_state, new_int_state)
+    energy_change += new_energy_change
+
+    # Refresh.
+    momentum = momentum_refresh_fn(new_int_state.momentum, refresh_seed_2)
+    new_int_state = new_int_state._replace(momentum=momentum)
+
+    if integrator_trace_fn is None:
+      integrator_trace = ()
+    else:
+      integrator_trace = integrator_trace_fn(new_int_state,
+                                             integrator_step_state,
+                                             integrator_step_extra)
+    return (new_int_state, energy_change, seed), (integrator_trace,
+                                                  integrator_step_extra)
+
+  (int_state, energy_change,
+   _), (integrator_trace, integrator_step_extra) = trace(
+       (int_state, tf.zeros_like(int_state.target_log_prob), seed),
+       step_fn,
+       num_steps,
+       unroll=unroll,
+       trace_mask=(True, False),
+   )
+
+  extra = IntegratorExtras(
+      initial_energy=(),
+      initial_kinetic_energy=(),
+      initial_kinetic_energy_extra=(),
+      final_energy=(),
+      final_kinetic_energy=(),
+      final_kinetic_energy_extra=(),
+      energy_change=energy_change,
+      integrator_trace=integrator_trace,
+      momentum_grads=integrator_step_extra.momentum_grads)
+
+  return int_state, extra
+
+
 class HamiltonianMonteCarloState(NamedTuple):
   """Hamiltonian Monte Carlo state."""
-  state: 'State'
-  state_grads: 'State'
-  target_log_prob: 'FloatTensor'
-  state_extra: 'StateExtra'
+  state: State
+  state_grads: State
+  target_log_prob: FloatTensor
+  state_extra: StateExtra
 
 
 class HamiltonianMonteCarloExtra(NamedTuple):
   """Hamiltonian Monte Carlo extra outputs."""
-  is_accepted: 'BooleanTensor'
-  log_accept_ratio: 'FloatTensor'
-  proposed_hmc_state: 'State'
-  integrator_state: 'IntegratorState'
-  integrator_extra: 'IntegratorExtras'
-  initial_momentum: 'State'
-  energy_change_extra: 'Any'
+  is_accepted: BooleanTensor
+  log_accept_ratio: FloatTensor
+  proposed_hmc_state: State
+  integrator_state: IntegratorState
+  integrator_extra: IntegratorExtras
+  initial_momentum: State
+  energy_change_extra: Any
 
 
 @util.named_call
 def hamiltonian_monte_carlo_init(
-    state: 'TensorNest',
-    target_log_prob_fn: 'PotentialFn') -> 'HamiltonianMonteCarloState':
+    state: TensorNest,
+    target_log_prob_fn: PotentialFn) -> HamiltonianMonteCarloState:
   """Initializes the `HamiltonianMonteCarloState`.
 
   Args:
@@ -1490,10 +1752,10 @@ def hamiltonian_monte_carlo_init(
 
 @util.named_call
 def _default_hamiltonian_monte_carlo_energy_change_fn(
-    current_integrator_state: 'IntegratorState',
-    proposed_integrator_state: 'IntegratorState',
-    integrator_extra: 'IntegratorExtras',
-) -> 'Tuple[FloatTensor, Any]':
+    current_integrator_state: IntegratorState,
+    proposed_integrator_state: IntegratorState,
+    integrator_extra: IntegratorExtras,
+) -> tuple[FloatTensor, Any]:
   """Default HMC energy change function."""
   del current_integrator_state
   del proposed_integrator_state
@@ -1502,25 +1764,27 @@ def _default_hamiltonian_monte_carlo_energy_change_fn(
 
 @util.named_call
 def hamiltonian_monte_carlo_step(
-    hmc_state: 'HamiltonianMonteCarloState',
-    target_log_prob_fn: 'PotentialFn',
-    step_size: 'Optional[Any]' = None,
-    num_integrator_steps: 'Optional[IntTensor]' = None,
-    momentum: 'Optional[State]' = None,
-    kinetic_energy_fn: 'Optional[PotentialFn]' = None,
-    momentum_sample_fn: 'Optional[MomentumSampleFn]' = None,
-    integrator_trace_fn: 'Callable[[IntegratorStepState, IntegratorStepExtras],'
-    'TensorNest]' = lambda *args: (),
-    log_uniform: 'Optional[FloatTensor]' = None,
+    hmc_state: HamiltonianMonteCarloState,
+    target_log_prob_fn: PotentialFn,
+    step_size: Optional[Any] = None,
+    num_integrator_steps: Optional[IntTensor] = None,
+    momentum: Optional[State] = None,
+    kinetic_energy_fn: Optional[PotentialFn] = None,
+    momentum_sample_fn: Optional[MomentumSampleFn] = None,
+    integrator_trace_fn: Callable[
+        [IntegratorStepState, IntegratorStepExtras], TensorNest
+    ] = lambda *args: (),
+    log_uniform: Optional[FloatTensor] = None,
     integrator_fn=None,
-    unroll_integrator: 'bool' = False,
-    max_num_integrator_steps: 'Optional[IntTensor]' = None,
-    energy_change_fn:
-    'Callable[[IntegratorState, IntegratorState, IntegratorExtras], '
-    'Tuple[FloatTensor, Any]]' = _default_hamiltonian_monte_carlo_energy_change_fn,
-    named_axis: 'Optional[StringNest]' = None,
+    unroll_integrator: bool = False,
+    max_num_integrator_steps: Optional[IntTensor] = None,
+    energy_change_fn: Callable[
+        [IntegratorState, IntegratorState, IntegratorExtras],
+        tuple[FloatTensor, Any],
+    ] = _default_hamiltonian_monte_carlo_energy_change_fn,
+    named_axis: Optional[StringNest] = None,
     seed=None,
-) -> 'Tuple[HamiltonianMonteCarloState, HamiltonianMonteCarloExtra]':
+) -> tuple[HamiltonianMonteCarloState, HamiltonianMonteCarloExtra]:
   """Hamiltonian Monte Carlo `TransitionOperator`.
 
   #### Example
@@ -1667,269 +1931,11 @@ def hamiltonian_monte_carlo_step(
       initial_momentum=momentum)
 
 
-class IntegratorState(NamedTuple):
-  """Integrator state."""
-  state: 'State'
-  state_extra: 'StateExtra'
-  state_grads: 'State'
-  target_log_prob: 'FloatTensor'
-  momentum: 'State'
-
-
-class IntegratorExtras(NamedTuple):
-  """Integrator extra outputs."""
-  initial_energy: 'FloatTensor'
-  initial_kinetic_energy: 'FloatTensor'
-  initial_kinetic_energy_extra: Any
-  final_energy: 'FloatTensor'
-  final_kinetic_energy: 'FloatTensor'
-  final_kinetic_energy_extra: Any
-  energy_change: 'FloatTensor'
-  integrator_trace: Any
-  momentum_grads: 'State'
-
-
 @util.named_call
-def hamiltonian_integrator(
-    int_state: 'IntegratorState',
-    num_steps: 'IntTensor',
-    integrator_step_fn: 'IntegratorStep',
-    kinetic_energy_fn: 'PotentialFn',
-    integrator_trace_fn: 'Callable[[IntegratorStepState, IntegratorStepExtras],'
-    'TensorNest]' = lambda *args: (),
-    unroll: 'bool' = False,
-    max_num_steps: 'Optional[IntTensor]' = None,
-) -> 'Tuple[IntegratorState, IntegratorExtras]':
-  """Intergrates a discretized set of Hamiltonian equations.
-
-  This function will use the passed `integrator_step_fn` to evolve the system
-  for `num_steps`. The `integrator_step_fn` is assumed to be reversible.
-
-  Args:
-    int_state: Current `IntegratorState`.
-    num_steps: Integer scalar or N-D `Tensor`. Number of steps to take. If this
-      is not a scalar, then each corresponding independent system will be
-      evaluated for that number of steps, followed by copying the final state to
-      avoid creating a ragged Tensor. Keep this in mind when interpreting the
-      `integrator_trace` in the auxiliary output.
-    integrator_step_fn: Instance of `IntegratorStep`.
-    kinetic_energy_fn: Function to compute the kinetic energy from momentums.
-    integrator_trace_fn: Trace function for the integrator.
-    unroll: Whether to unroll the loop in the integrator. Only works if
-      `num_steps`/`max_num_steps' is statically known.
-    max_num_steps: Maximum number of integrator steps to take. Useful when
-      `num_steps` is dynamic, and yet you still want gradients/tracing to work.
-
-  Returns:
-    integrator_state: `IntegratorState`
-    integrator_exras: `IntegratorExtras`
-  """
-  target_log_prob = int_state.target_log_prob
-  momentum = int_state.momentum
-  state = int_state.state
-  state_grads = int_state.state_grads
-  state_extra = int_state.state_extra
-
-  num_steps = ps.convert_to_shape_tensor(num_steps)
-  is_ragged = len(num_steps.shape) > 0 or max_num_steps is not None  # pylint: disable=g-explicit-length-test
-
-  initial_kinetic_energy, initial_kinetic_energy_extra = call_potential_fn(
-      kinetic_energy_fn, momentum)
-  initial_energy = -target_log_prob + initial_kinetic_energy
-
-  if is_ragged:
-    step = 0
-    # TODO(siege): Use cond for the common padding, ala the old RNN code.
-    if max_num_steps is None:
-      max_num_steps = ps.reduce_max(num_steps)
-  else:
-    step = []
-    max_num_steps = num_steps
-
-  # We need to carry around the integrator state extras so we can properly do
-  # the ragged computation.
-  # TODO(siege): In principle we can condition this on `is_ragged`, but doesn't
-  # seem worthwhile at the time.
-  integrator_wrapper_state = (
-      step,
-      IntegratorStepState(state, state_grads, momentum),
-      IntegratorStepExtras(target_log_prob, state_extra, initial_kinetic_energy,
-                           initial_kinetic_energy_extra,
-                           util.map_tree(tf.zeros_like, momentum)),
-  )
-
-  def integrator_wrapper(step, integrator_step_state, integrator_step_extra):
-    """Integrator wrapper that tracks extra state."""
-    old_integrator_step_state = integrator_step_state
-    old_integrator_step_extra = integrator_step_extra
-    integrator_step_state, integrator_step_extra = integrator_step_fn(
-        integrator_step_state)
-
-    if is_ragged:
-      integrator_step_state = choose(step < num_steps, integrator_step_state,
-                                     old_integrator_step_state)
-      integrator_step_extra = choose(step < num_steps, integrator_step_extra,
-                                     old_integrator_step_extra)
-      step = step + 1
-
-    return (step, integrator_step_state, integrator_step_extra), []
-
-  def integrator_trace_wrapper_fn(args, _):
-    return integrator_trace_fn(args[1], args[2])
-
-  [_, integrator_step_state, integrator_step_extra], integrator_trace = trace(
-      integrator_wrapper_state,
-      integrator_wrapper,
-      max_num_steps,
-      trace_fn=integrator_trace_wrapper_fn,
-      unroll=unroll,
-  )
-
-  final_energy = (-integrator_step_extra.target_log_prob +
-                  integrator_step_extra.kinetic_energy)
-
-  state = IntegratorState(
-      state=integrator_step_state.state,
-      state_extra=integrator_step_extra.state_extra,
-      state_grads=integrator_step_state.state_grads,
-      target_log_prob=integrator_step_extra.target_log_prob,
-      momentum=integrator_step_state.momentum)
-
-  extra = IntegratorExtras(
-      initial_energy=initial_energy,
-      initial_kinetic_energy=integrator_step_extra.kinetic_energy,
-      initial_kinetic_energy_extra=integrator_step_extra.kinetic_energy_extra,
-      final_energy=final_energy,
-      final_kinetic_energy=integrator_step_extra.kinetic_energy,
-      final_kinetic_energy_extra=integrator_step_extra.kinetic_energy_extra,
-      energy_change=final_energy - initial_energy,
-      integrator_trace=integrator_trace,
-      momentum_grads=integrator_step_extra.momentum_grads)
-
-  return state, extra
-
-
-@util.named_call
-def obabo_langevin_integrator(
-    int_state: 'IntegratorState',
-    num_steps: 'IntTensor',
-    integrator_step_fn: 'IntegratorStep',
-    momentum_refresh_fn: 'Callable[[State, Any], State]',
-    energy_change_fn: 'Callable[[IntegratorState, IntegratorState], '
-                      'Tuple[FloatTensor, Any]]',
-    integrator_trace_fn: 'Callable[[IntegratorState, IntegratorStepState, '
-                         'IntegratorStepExtras], '
-    'TensorNest]' = lambda *args: (),
-    unroll: 'bool' = False,
-    seed: Any = None,
-) -> 'Tuple[IntegratorState, IntegratorExtras]':
-  """Integrates discretized Langevin dynamics.
-
-  This implements a generalized version of the OBABO integrator from [1]. In
-  this integrator, the Langevin dynamics are split into Hamiltonian dynamics and
-  an thermostat moves. The former is solved typically solved using the leapfrog
-  integrator (generalized here to the `integrator_step_fn`), corresponding to
-  the BAB steps. The latter is exactly solved by the `momentum_refresh_fn`, and
-  corresponds to the two O steps.
-
-  In the typical configuration where a leapfrog integrator is used for the
-  Hamiltonian part, the momentum refreshment steps should implement half-steps.
-  The integration error is assumed to only arise from `integrator_step_fn`.
-
-  Args:
-    int_state: Current `IntegratorState`.
-    num_steps: Integer scalar. Number of steps to take.
-    integrator_step_fn: Instance of `IntegratorStep`.
-    momentum_refresh_fn: Momentum refreshment step. This must preserve the
-      momentum density implied by the `integrator_step_fn`.
-    energy_change_fn: Computes the change in energy between two integrator
-      states.
-    integrator_trace_fn: Trace function for the integrator.
-    unroll: Whether to unroll the loop in the integrator. Only works if
-      `num_steps` is statically known.
-    seed: For reproducibility.
-
-  Returns:
-    integrator_state: `IntegratorState`
-    integrator_exras: `IntegratorExtras`. Due to the structure of this
-      integrator, the initial/final energy terms in `IntegratorExtras` return
-      value are set to empty tuples.
-
-  #### References
-
-  [1]: Bussi, G., & Parrinello, M. (2008). Accurate sampling using Langevin
-       dynamics. http://arxiv.org/abs/0803.4083
-  """
-
-  def step_fn(int_state, energy_change, seed):
-    seed, refresh_seed_1, refresh_seed_2 = util.split_seed(seed, 3)
-
-    # Refresh.
-    momentum = momentum_refresh_fn(int_state.momentum, refresh_seed_1)
-    int_state = int_state._replace(momentum=momentum)
-
-    integrator_step_state = IntegratorStepState(
-        state=int_state.state,
-        state_grads=int_state.state_grads,
-        momentum=int_state.momentum)
-
-    # Integrate.
-    integrator_step_state, integrator_step_extra = integrator_step_fn(
-        integrator_step_state)
-
-    new_int_state = int_state._replace(
-        state=integrator_step_state.state,
-        state_extra=integrator_step_extra.state_extra,
-        state_grads=integrator_step_state.state_grads,
-        momentum=integrator_step_state.momentum,
-        target_log_prob=integrator_step_extra.target_log_prob,
-    )
-
-    # TODO(siege): Somehow return the energy change extra.
-    new_energy_change, _ = energy_change_fn(int_state, new_int_state)
-    energy_change += new_energy_change
-
-    # Refresh.
-    momentum = momentum_refresh_fn(new_int_state.momentum, refresh_seed_2)
-    new_int_state = new_int_state._replace(momentum=momentum)
-
-    if integrator_trace_fn is None:
-      integrator_trace = ()
-    else:
-      integrator_trace = integrator_trace_fn(new_int_state,
-                                             integrator_step_state,
-                                             integrator_step_extra)
-    return (new_int_state, energy_change, seed), (integrator_trace,
-                                                  integrator_step_extra)
-
-  (int_state, energy_change,
-   _), (integrator_trace, integrator_step_extra) = trace(
-       (int_state, tf.zeros_like(int_state.target_log_prob), seed),
-       step_fn,
-       num_steps,
-       unroll=unroll,
-       trace_mask=(True, False),
-   )
-
-  extra = IntegratorExtras(
-      initial_energy=(),
-      initial_kinetic_energy=(),
-      initial_kinetic_energy_extra=(),
-      final_energy=(),
-      final_kinetic_energy=(),
-      final_kinetic_energy_extra=(),
-      energy_change=energy_change,
-      integrator_trace=integrator_trace,
-      momentum_grads=integrator_step_extra.momentum_grads)
-
-  return int_state, extra
-
-
-@util.named_call
-def sign_adaptation(control: 'FloatNest',
-                    output: 'FloatTensor',
-                    set_point: 'FloatTensor',
-                    adaptation_rate: 'FloatTensor' = 0.01) -> 'FloatNest':
+def sign_adaptation(control: FloatNest,
+                    output: FloatTensor,
+                    set_point: FloatTensor,
+                    adaptation_rate: FloatTensor = 0.01) -> FloatNest:
   """A function to do simple sign-based control of a variable.
 
   ```
@@ -1968,7 +1974,7 @@ def choose(condition, x, y):
     y: Input two.
 
   Returns:
-    z: Elements of `x` where 'condition' is `True`, and `y` otherwise.
+    z: Elements of `x` where condition is `True`, and `y` otherwise.
   """
 
   def _choose_base_case(condition, x, y):
@@ -1992,21 +1998,21 @@ def choose(condition, x, y):
 
 class AdamState(NamedTuple):
   """Adam state."""
-  state: 'State'
-  m: 'State'
-  v: 'State'
-  t: 'IntTensor'
+  state: State
+  m: State
+  v: State
+  t: IntTensor
 
 
 class AdamExtra(NamedTuple):
   """Adam extra outputs."""
-  loss: 'FloatTensor'
+  loss: FloatTensor
   loss_extra: Any
-  grads: 'State'
+  grads: State
 
 
 @util.named_call
-def adam_init(state: 'FloatNest') -> 'AdamState':
+def adam_init(state: FloatNest) -> AdamState:
   """Initializes `AdamState`."""
   state = util.map_tree(tf.convert_to_tensor, state)
   return AdamState(
@@ -2017,12 +2023,12 @@ def adam_init(state: 'FloatNest') -> 'AdamState':
 
 
 @util.named_call
-def adam_step(adam_state: 'AdamState',
-              loss_fn: 'PotentialFn',
-              learning_rate: 'FloatNest',
-              beta_1: 'FloatNest' = 0.9,
-              beta_2: 'FloatNest' = 0.999,
-              epsilon: 'FloatNest' = 1e-8) -> 'Tuple[AdamState, AdamExtra]':
+def adam_step(adam_state: AdamState,
+              loss_fn: PotentialFn,
+              learning_rate: FloatNest,
+              beta_1: FloatNest = 0.9,
+              beta_2: FloatNest = 0.999,
+              epsilon: FloatNest = 1e-8) -> tuple[AdamState, AdamExtra]:
   """Performs one step of the Adam optimization method.
 
   Args:
@@ -2087,18 +2093,18 @@ def adam_step(adam_state: 'AdamState',
 
 class GradientDescentState(NamedTuple):
   """Gradient Descent state."""
-  state: 'State'
+  state: State
 
 
 class GradientDescentExtra(NamedTuple):
   """Gradient Descent extra outputs."""
-  loss: 'FloatTensor'
+  loss: FloatTensor
   loss_extra: Any
-  grads: 'State'
+  grads: State
 
 
 @util.named_call
-def gradient_descent_init(state: 'FloatNest') -> 'GradientDescentState':
+def gradient_descent_init(state: FloatNest) -> GradientDescentState:
   """Initializes `GradientDescentState`."""
   state = util.map_tree(tf.convert_to_tensor, state)
   return GradientDescentState(state=state)
@@ -2106,9 +2112,9 @@ def gradient_descent_init(state: 'FloatNest') -> 'GradientDescentState':
 
 @util.named_call
 def gradient_descent_step(
-    gd_state: 'GradientDescentState', loss_fn: 'PotentialFn',
-    learning_rate: 'FloatNest'
-) -> 'Tuple[GradientDescentState, GradientDescentExtra]':
+    gd_state: GradientDescentState, loss_fn: PotentialFn,
+    learning_rate: FloatNest
+) -> tuple[GradientDescentState, GradientDescentExtra]:
   """Performs a step of regular gradient descent.
 
   Args:
@@ -2139,10 +2145,10 @@ def gradient_descent_step(
 
 @util.named_call
 def gaussian_proposal(
-    state: 'State',
-    scale: 'FloatNest' = 1.,
-    named_axis: 'Optional[StringNest]' = None,
-    seed: 'Optional[Any]' = None) -> 'Tuple[State, Tuple[Tuple[()], float]]':
+    state: State,
+    scale: FloatNest = 1.,
+    named_axis: Optional[StringNest] = None,
+    seed: Optional[Any] = None) -> tuple[State, tuple[tuple[()], float]]:
   """Axis-aligned gaussian random-walk proposal.
 
   Args:
@@ -2174,19 +2180,19 @@ def gaussian_proposal(
 
 class MaximalReflectiveCouplingProposalExtra(NamedTuple):
   """Extra results from the `maximal_reflection_coupling_proposal`."""
-  log_couple_ratio: 'FloatTensor'
-  coupling_proposed: 'BooleanTensor'
+  log_couple_ratio: FloatTensor
+  coupling_proposed: BooleanTensor
 
 
 @util.named_call
 def maximal_reflection_coupling_proposal(
-    state: 'State',
-    chain_ndims: 'int' = 0,
-    scale: 'FloatNest' = 1,
-    named_axis: 'Optional[StringNest]' = None,
-    epsilon: 'FloatTensor' = 1e-20,
-    seed: 'Optional[Any]' = None
-) -> 'Tuple[State, Tuple[MaximalReflectiveCouplingProposalExtra, float]]':
+    state: State,
+    chain_ndims: int = 0,
+    scale: FloatNest = 1,
+    named_axis: Optional[StringNest] = None,
+    epsilon: FloatTensor = 1e-20,
+    seed: Optional[Any] = None
+) -> tuple[State, tuple[MaximalReflectiveCouplingProposalExtra, float]]:
   """Maximal reflection coupling proposal.
 
   Given two MCMC chains with the same, axis-aligned symmetrical Gaussian
@@ -2292,23 +2298,23 @@ def maximal_reflection_coupling_proposal(
 
 class RandomWalkMetropolisState(NamedTuple):
   """Random Walk Metropolis state."""
-  state: 'State'
-  target_log_prob: 'FloatTensor'
-  state_extra: 'StateExtra'
+  state: State
+  target_log_prob: FloatTensor
+  state_extra: StateExtra
 
 
 class RandomWalkMetropolisExtra(NamedTuple):
   """Random Walk Metropolis extra outputs."""
-  is_accepted: 'BooleanTensor'
-  log_accept_ratio: 'FloatTensor'
+  is_accepted: BooleanTensor
+  log_accept_ratio: FloatTensor
   proposal_extra: Any
-  proposed_rwm_state: 'RandomWalkMetropolisState'
+  proposed_rwm_state: RandomWalkMetropolisState
 
 
 @util.named_call
 def random_walk_metropolis_init(
-    state: 'State',
-    target_log_prob_fn: 'PotentialFn') -> 'RandomWalkMetropolisState':
+    state: State,
+    target_log_prob_fn: PotentialFn) -> RandomWalkMetropolisState:
   """Initializes the `RandomWalkMetropolisState`.
 
   Args:
@@ -2328,11 +2334,11 @@ def random_walk_metropolis_init(
 
 @util.named_call
 def random_walk_metropolis_step(
-    rwm_state: 'RandomWalkMetropolisState',
-    target_log_prob_fn: 'PotentialFn',
-    proposal_fn: 'TransitionOperator',
-    log_uniform: 'Optional[FloatTensor]' = None,
-    seed=None) -> 'Tuple[RandomWalkMetropolisState, RandomWalkMetropolisExtra]':
+    rwm_state: RandomWalkMetropolisState,
+    target_log_prob_fn: PotentialFn,
+    proposal_fn: TransitionOperator,
+    log_uniform: Optional[FloatTensor] = None,
+    seed=None) -> tuple[RandomWalkMetropolisState, RandomWalkMetropolisExtra]:
   """Random Walk Metropolis Hastings `TransitionOperator`.
 
   The `proposal_fn` takes in the current state, and must return a proposed
@@ -2392,14 +2398,14 @@ def random_walk_metropolis_step(
 
 
 class RunningVarianceState(NamedTuple):
-  num_points: 'IntTensor'
-  mean: 'FloatNest'
-  variance: 'FloatNest'
+  num_points: IntTensor
+  mean: FloatNest
+  variance: FloatNest
 
 
 @util.named_call
-def running_variance_init(shape: 'IntTensor',
-                          dtype: 'DTypeNest') -> 'RunningVarianceState':
+def running_variance_init(shape: IntTensor,
+                          dtype: DTypeNest) -> RunningVarianceState:
   """Initializes the `RunningVarianceState`.
 
   Args:
@@ -2421,11 +2427,11 @@ def running_variance_init(shape: 'IntTensor',
 
 @util.named_call
 def running_variance_step(
-    state: 'RunningVarianceState',
-    vec: 'FloatNest',
-    axis: 'Optional[Union[int, List[int], Tuple[int]]]' = None,
-    window_size: 'Optional[IntNest]' = None,
-) -> 'Tuple[RunningVarianceState, Tuple[()]]':
+    state: RunningVarianceState,
+    vec: FloatNest,
+    axis: Optional[Union[int, list[int], tuple[int]]] = None,
+    window_size: Optional[IntNest] = None,
+) -> tuple[RunningVarianceState, tuple[()]]:
   """Updates the `RunningVarianceState`.
 
   As a computational convenience, this allows computing both independent
@@ -2509,14 +2515,14 @@ def running_variance_step(
 
 class RunningCovarianceState(NamedTuple):
   """Running Covariance state."""
-  num_points: 'IntNest'
-  mean: 'FloatNest'
-  covariance: 'FloatNest'
+  num_points: IntNest
+  mean: FloatNest
+  covariance: FloatNest
 
 
 @util.named_call
-def running_covariance_init(shape: 'IntTensor',
-                            dtype: 'DTypeNest') -> 'RunningCovarianceState':
+def running_covariance_init(shape: IntTensor,
+                            dtype: DTypeNest) -> RunningCovarianceState:
   """Initializes the `RunningCovarianceState`.
 
   Args:
@@ -2546,11 +2552,11 @@ def running_covariance_init(shape: 'IntTensor',
 
 @util.named_call
 def running_covariance_step(
-    state: 'RunningCovarianceState',
-    vec: 'FloatNest',
-    axis: 'Optional[Union[int, List[int], Tuple[int]]]' = None,
-    window_size: 'Optional[IntNest]' = None,
-) -> 'Tuple[RunningCovarianceState, Tuple[()]]':
+    state: RunningCovarianceState,
+    vec: FloatNest,
+    axis: Optional[Union[int, list[int], tuple[int]]] = None,
+    window_size: Optional[IntNest] = None,
+) -> tuple[RunningCovarianceState, tuple[()]]:
   """Updates the `RunningCovarianceState`.
 
   As a computational convenience, this allows computing both independent
@@ -2639,13 +2645,13 @@ def running_covariance_step(
 
 class RunningMeanState(NamedTuple):
   """Running Mean state."""
-  num_points: 'IntNest'
-  mean: 'FloatTensor'
+  num_points: IntNest
+  mean: FloatTensor
 
 
 @util.named_call
-def running_mean_init(shape: 'IntTensor',
-                      dtype: 'DTypeNest') -> 'RunningMeanState':
+def running_mean_init(shape: IntTensor,
+                      dtype: DTypeNest) -> RunningMeanState:
   """Initializes the `RunningMeanState`.
 
   Args:
@@ -2663,11 +2669,11 @@ def running_mean_init(shape: 'IntTensor',
 
 @util.named_call
 def running_mean_step(
-    state: 'RunningMeanState',
-    vec: 'FloatNest',
-    axis: 'Optional[Union[int, List[int], Tuple[int]]]' = None,
-    window_size: 'Optional[IntNest]' = None,
-) -> 'Tuple[RunningMeanState, Tuple[()]]':
+    state: RunningMeanState,
+    vec: FloatNest,
+    axis: Optional[Union[int, list[int], tuple[int]]] = None,
+    window_size: Optional[IntNest] = None,
+) -> tuple[RunningMeanState, tuple[()]]:
   """Updates the `RunningMeanState`.
 
   As a computational convenience, this allows computing both independent
@@ -2740,7 +2746,7 @@ class PotentialScaleReductionState(RunningVarianceState):
 
 @util.named_call
 def potential_scale_reduction_init(shape,
-                                   dtype) -> 'PotentialScaleReductionState':
+                                   dtype) -> PotentialScaleReductionState:
   """Initializes `PotentialScaleReductionState`.
 
   Args:
@@ -2758,11 +2764,11 @@ def potential_scale_reduction_init(shape,
 
 @util.named_call
 def potential_scale_reduction_step(
-    state: 'PotentialScaleReductionState',
-    sample) -> 'Tuple[PotentialScaleReductionState, Tuple[()]]':
+    state: PotentialScaleReductionState,
+    sample) -> tuple[PotentialScaleReductionState, tuple[()]]:
   """Updates `PotentialScaleReductionState`.
 
-  This computes the 'potential scale reduction' statistic from [1]. Note that
+  This computes the potential scale reduction statistic from [1]. Note that
   this actually refers to the potential *variance* reduction, but the scale
   terminology has stuck. When this is close to 1, the chains are often
   considered converged.
@@ -2793,9 +2799,9 @@ def potential_scale_reduction_step(
 
 @util.named_call
 def potential_scale_reduction_extract(
-    state: 'PotentialScaleReductionState',
-    independent_chain_ndims: 'IntNest' = 1) -> 'FloatNest':
-  """Extracts the 'potential scale reduction' statistic.
+    state: PotentialScaleReductionState,
+    independent_chain_ndims: IntNest = 1) -> FloatNest:
+  """Extracts the potential scale reduction statistic.
 
   Args:
     state: `PotentialScaleReductionState`.
@@ -2835,19 +2841,19 @@ def potential_scale_reduction_extract(
 
 class RunningApproximateAutoCovarianceState(NamedTuple):
   """Running Approximate Auto-Covariance state."""
-  buffer: 'FloatNest'
-  num_steps: 'IntTensor'
-  mean: 'FloatNest'
-  auto_covariance: 'FloatNest'
+  buffer: FloatNest
+  num_steps: IntTensor
+  mean: FloatNest
+  auto_covariance: FloatNest
 
 
 @util.named_call
 def running_approximate_auto_covariance_init(
-    max_lags: 'int',
-    state_shape: 'IntTensor',
-    dtype: 'DTypeNest',
-    axis: 'Optional[Union[int, List[int], Tuple[int]]]' = None,
-) -> 'RunningApproximateAutoCovarianceState':
+    max_lags: int,
+    state_shape: IntTensor,
+    dtype: DTypeNest,
+    axis: Optional[Union[int, list[int], tuple[int]]] = None,
+) -> RunningApproximateAutoCovarianceState:
   """Initializes `RunningApproximateAutoCovarianceState`.
 
   Args:
@@ -2892,10 +2898,10 @@ def running_approximate_auto_covariance_init(
 
 @util.named_call
 def running_approximate_auto_covariance_step(
-    state: 'RunningApproximateAutoCovarianceState',
-    vec: 'TensorNest',
-    axis: 'Optional[Union[int, List[int], Tuple[int]]]' = None,
-) -> 'Tuple[RunningApproximateAutoCovarianceState, Tuple[()]]':
+    state: RunningApproximateAutoCovarianceState,
+    vec: TensorNest,
+    axis: Optional[Union[int, list[int], tuple[int]]] = None,
+) -> tuple[RunningApproximateAutoCovarianceState, tuple[()]]:
   """Updates `RunningApproximateAutoCovarianceState`.
 
   This computes a running auto-covariance of a sequence using a biased
@@ -2999,9 +3005,9 @@ def running_approximate_auto_covariance_step(
 
 
 def make_surrogate_loss_fn(
-    grad_fn: 'Optional[GradFn]' = None,
-    loss_value: 'tf.Tensor' = 0.,
-) -> 'Any':
+    grad_fn: Optional[GradFn] = None,
+    loss_value: tf.Tensor = 0.,
+) -> Any:
   """Creates a surrogate loss function with specified gradients.
 
   This wrapper converts `grad_fn` with signature `state -> grad, extra` which
@@ -3053,22 +3059,22 @@ def make_surrogate_loss_fn(
 
 class SimpleDualAveragesState(NamedTuple):
   """Simple Dual Averages state."""
-  state: 'State'
-  step: 'IntTensor'
-  grad_running_mean_state: 'RunningMeanState'
+  state: State
+  step: IntTensor
+  grad_running_mean_state: RunningMeanState
 
 
 class SimpleDualAveragesExtra(NamedTuple):
-  loss: 'FloatTensor'
+  loss: FloatTensor
   loss_extra: Any
-  grads: 'State'
+  grads: State
 
 
 @util.named_call
 def simple_dual_averages_init(
-    state: 'FloatNest',
-    grad_mean_smoothing_steps: 'IntNest' = 0,
-) -> 'SimpleDualAveragesState':
+    state: FloatNest,
+    grad_mean_smoothing_steps: IntNest = 0,
+) -> SimpleDualAveragesState:
   """Initializes Simple Dual Averages state.
 
   Note that the `state` argument only affects the initial value read from the
@@ -3100,11 +3106,11 @@ def simple_dual_averages_init(
 
 @util.named_call
 def simple_dual_averages_step(
-    sda_state: 'SimpleDualAveragesState',
-    loss_fn: 'PotentialFn',
-    shrink_weight: 'FloatNest',
-    shrink_point: 'State' = 0.,
-) -> 'Tuple[SimpleDualAveragesState, SimpleDualAveragesExtra]':
+    sda_state: SimpleDualAveragesState,
+    loss_fn: PotentialFn,
+    shrink_weight: FloatNest,
+    shrink_point: State = 0.,
+) -> tuple[SimpleDualAveragesState, SimpleDualAveragesExtra]:
   """Performs one step of the Simple Dual Averages algorithm [1].
 
   This function implements equation 3.4 from [1], with the following choices:
@@ -3166,14 +3172,14 @@ def simple_dual_averages_step(
   return sda_state, sda_extra
 
 
-def _global_norm(x: 'FloatNest') -> 'FloatTensor':
+def _global_norm(x: FloatNest) -> FloatTensor:
   return tf.sqrt(sum(tf.reduce_sum(tf.square(v)) for v in util.flatten_tree(x)))
 
 
-def clip_grads(x: 'FloatNest',
-               max_global_norm: 'FloatTensor',
-               eps: 'FloatTensor' = 1e-9,
-               zero_out_nan: 'bool' = True) -> 'FloatNest':
+def clip_grads(x: FloatNest,
+               max_global_norm: FloatTensor,
+               eps: FloatTensor = 1e-9,
+               zero_out_nan: bool = True) -> FloatNest:
   """Clip gradients flowing through x.
 
   By default, non-finite gradients are zeroed out.
@@ -3229,9 +3235,9 @@ class AnnealedImportanceSamplingState(NamedTuple):
     log_weight: Log weight of the particles.
     stage: Current stage.
   """
-  state: 'Any'
-  log_weight: 'FloatTensor'
-  stage: 'Stage'
+  state: Any
+  log_weight: FloatTensor
+  stage: Stage
 
   def ess(self) -> FloatTensor:
     """Estimates the effective sample size."""
@@ -3247,16 +3253,16 @@ class AnnealedImportanceSamplingExtra(NamedTuple):
     transition_extra: Extra outputs from the transition operator.
     log_weight_extra: Extra outputs from log-weight computation.
   """
-  stage_log_weight: 'FloatTensor'
-  transition_extra: 'TransitionExtra'
-  log_weight_extra: 'LogWeightExtra'
+  stage_log_weight: FloatTensor
+  transition_extra: TransitionExtra
+  log_weight_extra: LogWeightExtra
 
 
 @util.named_call
 def annealed_importance_sampling_init(
-    state: 'State',
-    initial_log_weight: 'FloatTensor',
-    initial_stage: 'Stage' = 0) -> 'AnnealedImportanceSamplingState':
+    state: State,
+    initial_log_weight: FloatTensor,
+    initial_stage: Stage = 0) -> AnnealedImportanceSamplingState:
   """Initializes the annealed importance sampler.
 
   Args:
@@ -3277,15 +3283,18 @@ def annealed_importance_sampling_init(
 
 @util.named_call
 def annealed_importance_sampling_step(
-    ais_state: 'AnnealedImportanceSamplingState',
-    transition_operator:
-    'Callable[[State, Stage, Callable[[State], Tuple[FloatTensor, '
-    'StateExtra]]], Tuple[State, TransitionExtra]]',
-    make_tlp_fn:
-    'Callable[[Stage], PotentialFn]',
-    log_weight_fn: 'Optional[Callable[[State, State, Stage, TransitionExtra], '
-    'Tuple[FloatTensor, Any]]]' = None,
-) -> 'Tuple[AnnealedImportanceSamplingState, AnnealedImportanceSamplingExtra]':
+    ais_state: AnnealedImportanceSamplingState,
+    transition_operator: Callable[
+        [State, Stage, Callable[[State], tuple[FloatTensor, StateExtra]]],
+        tuple[State, TransitionExtra],
+    ],
+    make_tlp_fn: Callable[[Stage], PotentialFn],
+    log_weight_fn: Optional[
+        Callable[
+            [State, State, Stage, TransitionExtra], tuple[FloatTensor, Any]
+        ]
+    ] = None,
+) -> tuple[AnnealedImportanceSamplingState, AnnealedImportanceSamplingExtra]:
   """Takes a step of the annealed importance sampler (AIS).
 
   AIS is a simple Sequential Monte Carlo (SMC) sampler that generates weighted
@@ -3356,9 +3365,9 @@ def annealed_importance_sampling_step(
 
   weights = jnp.exp(ais_state.log_weight)
   # Should be close to 4.
-  print('estimated z2/z1', weights.mean())
+  print(estimated z2/z1, weights.mean())
   # Should be close to 2.
-  print('estimated mean', (jax.nn.softmax(ais_state.log_weight)
+  print(estimated mean, (jax.nn.softmax(ais_state.log_weight)
                            * ais_state.state).sum())
   ```
 
@@ -3411,8 +3420,8 @@ def annealed_importance_sampling_step(
 
 @util.named_call
 def systematic_resample(
-    particles: 'State', log_weights: 'FloatTensor',
-    seed: 'Any') -> ('Tuple[Tuple[State, FloatTensor], IntTensor]'):
+    particles: State, log_weights: FloatTensor,
+    seed: Any) -> (tuple[tuple[State, FloatTensor], IntTensor]):
   """Systematically resamples particles in proportion to their weights.
 
   This uses the algorithm from [1].
@@ -3423,7 +3432,7 @@ def systematic_resample(
     seed: PRNG seed.
 
   Returns:
-    particles_and_weights: Tuple of resampled particles and weights.
+    particles_and_weights: tuple of resampled particles and weights.
     ancestor_idx: Indices from which the returned particles were sampled from.
 
   #### References
@@ -3452,13 +3461,13 @@ def systematic_resample(
 
 @util.named_call
 def annealed_importance_sampling_resample(
-    ais_state: 'AnnealedImportanceSamplingState',
-    resample_fn:
-    'Callable[[State, FloatTensor, Any], Tuple[Tuple[State, tf.Tensor], '
-    'ResampleExtra]]' = systematic_resample,
-    min_ess_threshold: 'FloatTensor' = 0.5,
-    seed: 'Any' = None,
-) -> 'Tuple[AnnealedImportanceSamplingState, ResampleExtra]':
+    ais_state: AnnealedImportanceSamplingState,
+    resample_fn: Callable[
+        [State, FloatTensor, Any], tuple[tuple[State, tf.Tensor], ResampleExtra]
+    ] = systematic_resample,
+    min_ess_threshold: FloatTensor = 0.5,
+    seed: Any = None,
+) -> tuple[AnnealedImportanceSamplingState, ResampleExtra]:
   """Resamples the particles in AnnealedImportanceSamplingState."""
 
   (state, log_weight), extra = resample_fn(ais_state.state,
@@ -3486,12 +3495,12 @@ class GeometricAnnealingPathExtra(NamedTuple):
 
 
 def geometric_annealing_path(
-    stage: 'Stage',
-    num_stages: 'Stage',
-    initial_target_log_prob_fn: 'PotentialFn',
-    final_target_log_prob_fn: 'PotentialFn',
-    fraction_fn: 'Optional[Callable[[FloatTensor], tf.Tensor]]' = None,
-) -> 'Callable[[Stage], PotentialFn]':
+    stage: Stage,
+    num_stages: Stage,
+    initial_target_log_prob_fn: PotentialFn,
+    final_target_log_prob_fn: PotentialFn,
+    fraction_fn: Optional[Callable[[FloatTensor], tf.Tensor]] = None,
+) -> Callable[[Stage], PotentialFn]:
   """Returns a geometrically interpolated target density function.
 
   This interpolates between `initial_target_log_prob_fn` and

@@ -24,7 +24,7 @@ strives to be easy to copy paste and modify in this manner.
 
 import functools
 import typing
-from typing import Any, Callable, Dict, Iterable, NamedTuple, Optional, Tuple  # pylint: disable=unused-import
+from typing import Any, Callable, Iterable, NamedTuple, Optional  # pylint: disable=unused-import
 
 import numpy as np
 
@@ -53,11 +53,11 @@ __all__ = [
 
 
 @util.named_call(name='polynomial_decay')
-def _polynomial_decay(step: 'fun_mc.AnyTensor',
-                      step_size: 'fun_mc.FloatTensor',
-                      decay_steps: 'fun_mc.AnyTensor',
-                      final_step_size: 'fun_mc.FloatTensor',
-                      power: 'fun_mc.FloatTensor' = 1.) -> 'fun_mc.FloatTensor':
+def _polynomial_decay(step: fun_mc.AnyTensor,
+                      step_size: fun_mc.FloatTensor,
+                      decay_steps: fun_mc.AnyTensor,
+                      final_step_size: fun_mc.FloatTensor,
+                      power: fun_mc.FloatTensor = 1.) -> fun_mc.FloatTensor:
   """Polynomial decay step size schedule."""
   step_size = tf.convert_to_tensor(step_size)
   step_f = tf.cast(step, step_size.dtype)
@@ -67,24 +67,164 @@ def _polynomial_decay(step: 'fun_mc.AnyTensor',
   return step_mult * (step_size - final_step_size) + final_step_size
 
 
+class StepSizeAdaptationState(NamedTuple):
+  """Step size adaptation state."""
+  step: fun_mc.IntTensor
+  opt_state: fun_mc.AdamState
+  rms_state: fun_mc.RunningMeanState
+
+  def opt_step_size(self):
+    return tf.exp(self.opt_state.state)
+
+  @property
+  def rms_step_size(self):
+    return self.rms_state.mean
+
+  def step_size(self, num_adaptation_steps=None):
+    if num_adaptation_steps is not None:
+      return tf.where(self.step < num_adaptation_steps, self.opt_step_size(),
+                      self.rms_step_size)
+    else:
+      return self.opt_step_size()
+
+
+class StepSizeAdaptationExtra(NamedTuple):
+  opt_extra: fun_mc.AdamExtra
+  accept_prob: fun_mc.FloatTensor
+
+
+@util.named_call
+def step_size_adaptation_init(
+    init_step_size: fun_mc.FloatTensor) -> StepSizeAdaptationState:
+  """Initializes `StepSizeAdaptationState`.
+
+  Args:
+    init_step_size: Floating point Tensor. Initial step size.
+
+  Returns:
+    step_size_adaptation_state: `StepSizeAdaptationState`
+  """
+  init_step_size = tf.convert_to_tensor(init_step_size)
+  rms_state = fun_mc.running_mean_init(init_step_size.shape,
+                                       init_step_size.dtype)
+  rms_state = rms_state._replace(mean=init_step_size)
+
+  return StepSizeAdaptationState(
+      step=tf.constant(0, tf.int32),
+      opt_state=fun_mc.adam_init(tf.math.log(init_step_size)),
+      rms_state=rms_state,
+  )
+
+
+@util.named_call
+def step_size_adaptation_step(
+    state: StepSizeAdaptationState,
+    log_accept_ratio: fun_mc.FloatTensor,
+    num_adaptation_steps: Optional[fun_mc.IntTensor],
+    target_accept_prob: fun_mc.FloatTensor = 0.8,
+    adaptation_rate: fun_mc.FloatTensor = 0.05,
+    adaptation_rate_decay_power: fun_mc.FloatTensor = 0.1,
+    averaging_window_steps: fun_mc.IntTensor = 100,
+    min_log_accept_prob: fun_mc.FloatTensor = np.log(1e-5),
+    reduce_fn: Callable[[fun_mc.FloatTensor], fun_mc.FloatTensor] = (
+        tfp.math.reduce_logmeanexp
+    ),
+    opt_kwargs: Optional[dict[str, Any]] = None,
+) -> tuple[StepSizeAdaptationState, StepSizeAdaptationExtra]:
+  """Gradient based step size adaptation using ADAM.
+
+  Given the `log_accept_ratio` statistic from an Metropolis-Hastings algorithm,
+  this adapts the step size hyperparameter to make that statistic hit some
+  `target_accept_prob`. The step size can be extracted using the `step_size`
+  method on the state structure.
+
+  Args:
+    state: `StepSizeAdaptationState`
+    log_accept_ratio: Float tensor. The logarithm of the accept ratio.
+    num_adaptation_steps: Number of adaptation steps, can be `None`.
+    target_accept_prob: Target acceptance probability.
+    adaptation_rate: Step size adaptation rate.
+    adaptation_rate_decay_power:  Power of the polynomial schedule for
+      `trajectory_length_factor` warmup.
+    averaging_window_steps: Number of steps to compute the averaged step size.
+    min_log_accept_prob: Clamps acceptance probability to this value for
+      numerical stability.
+    reduce_fn: A function that reduces `log_accept_ratio` in log-space. By
+      default, this computes the log-mean-exp.
+    opt_kwargs: Additional arguments to pass to the optimizer.
+
+  Returns:
+    step_size_adaptation_state: `StepSizeAdaptationState`
+    step_size_adaptation_extra: `StepSizeAdaptationExtra`
+  """
+  opt_kwargs = {} if opt_kwargs is None else opt_kwargs
+  dtype = log_accept_ratio.dtype
+  adaptation_rate = tf.convert_to_tensor(adaptation_rate, dtype=dtype)
+  target_accept_prob = tf.convert_to_tensor(target_accept_prob, dtype=dtype)
+  adaptation_rate_decay_power = tf.convert_to_tensor(
+      adaptation_rate_decay_power, dtype=dtype)
+  min_log_accept_prob = tf.fill(log_accept_ratio.shape,
+                                tf.constant(min_log_accept_prob, dtype))
+
+  log_accept_prob = tf.minimum(log_accept_ratio, tf.zeros([], dtype))
+  log_accept_prob = tf.maximum(log_accept_prob, min_log_accept_prob)
+  log_accept_prob = tf.where(
+      tf.math.is_finite(log_accept_prob), log_accept_prob, min_log_accept_prob)
+  accept_prob = tf.exp(reduce_fn(log_accept_prob))
+
+  loss_fn = fun_mc.make_surrogate_loss_fn(lambda _:  # pylint: disable=g-long-lambda
+                                          (target_accept_prob - accept_prob, ()
+                                          ))
+
+  if num_adaptation_steps is not None:
+    adaptation_rate = _polynomial_decay(
+        step=state.step,
+        step_size=adaptation_rate,
+        decay_steps=num_adaptation_steps,
+        final_step_size=0.,
+        power=adaptation_rate_decay_power,
+    )
+
+  # Optimize step size.
+  opt_state, opt_extra = fun_mc.adam_step(state.opt_state, loss_fn,
+                                          adaptation_rate, **opt_kwargs)
+
+  # Do iterate averaging.
+  old_rms_state = state.rms_state
+  rms_state, _ = fun_mc.running_mean_step(
+      old_rms_state,
+      tf.exp(opt_state.state),
+      window_size=averaging_window_steps)
+
+  if num_adaptation_steps is not None:
+    rms_state = util.map_tree(
+        lambda n, o: tf.where(state.step < num_adaptation_steps, n, o),
+        rms_state, old_rms_state)
+
+  state = state._replace(
+      opt_state=opt_state, rms_state=rms_state, step=state.step + 1)
+  extra = StepSizeAdaptationExtra(opt_extra=opt_extra, accept_prob=accept_prob)
+  return state, extra
+
+
 class AdaptiveHamiltonianMonteCarloState(NamedTuple):
   """Adaptive HMC `TransitionOperator` state."""
-  hmc_state: 'fun_mc.HamiltonianMonteCarloState'
-  running_var_state: 'fun_mc.RunningVarianceState'
-  ssa_state: 'StepSizeAdaptationState'
-  step: 'fun_mc.IntTensor'
+  hmc_state: fun_mc.HamiltonianMonteCarloState
+  running_var_state: fun_mc.RunningVarianceState
+  ssa_state: StepSizeAdaptationState
+  step: fun_mc.IntTensor
 
 
 class AdaptiveHamiltonianMonteCarloExtra(NamedTuple):
   """Extra outputs for Adaptive HMC `TransitionOperator`."""
-  hmc_state: 'fun_mc.HamiltonianMonteCarloState'
-  hmc_extra: 'fun_mc.HamiltonianMonteCarloExtra'
-  step_size: 'fun_mc.FloatTensor'
-  num_leapfrog_steps: 'fun_mc.IntTensor'
-  mean_num_leapfrog_steps: 'fun_mc.IntTensor'
+  hmc_state: fun_mc.HamiltonianMonteCarloState
+  hmc_extra: fun_mc.HamiltonianMonteCarloExtra
+  step_size: fun_mc.FloatTensor
+  num_leapfrog_steps: fun_mc.IntTensor
+  mean_num_leapfrog_steps: fun_mc.IntTensor
 
   @property
-  def state(self) -> 'fun_mc.TensorNest':
+  def state(self) -> fun_mc.TensorNest:
     """Returns the chain state.
 
     Note that this assumes that `target_log_prob_fn` has the `state_extra` be a
@@ -94,19 +234,19 @@ class AdaptiveHamiltonianMonteCarloExtra(NamedTuple):
     return self.hmc_state.state_extra[0]
 
   @property
-  def is_accepted(self) -> 'fun_mc.BooleanTensor':
+  def is_accepted(self) -> fun_mc.BooleanTensor:
     return self.hmc_extra.is_accepted
 
 
 @util.named_call
 def adaptive_hamiltonian_monte_carlo_init(
-    state: 'fun_mc.TensorNest',
-    target_log_prob_fn: 'fun_mc.PotentialFn',
-    step_size: 'fun_mc.FloatTensor' = 1e-2,
-    initial_mean: 'fun_mc.FloatNest' = 0.,
-    initial_scale: 'fun_mc.FloatNest' = 1.,
-    scale_smoothing_steps: 'fun_mc.IntTensor' = 10,
-) -> 'AdaptiveHamiltonianMonteCarloState':
+    state: fun_mc.TensorNest,
+    target_log_prob_fn: fun_mc.PotentialFn,
+    step_size: fun_mc.FloatTensor = 1e-2,
+    initial_mean: fun_mc.FloatNest = 0.,
+    initial_scale: fun_mc.FloatNest = 1.,
+    scale_smoothing_steps: fun_mc.IntTensor = 10,
+) -> AdaptiveHamiltonianMonteCarloState:
   """Initializes `AdaptiveHamiltonianMonteCarloState`.
 
   Args:
@@ -175,28 +315,29 @@ def _uniform_jitter(mean_num_leapfrog_steps, step, seed):
 
 @util.named_call
 def adaptive_hamiltonian_monte_carlo_step(
-    adaptive_hmc_state: 'AdaptiveHamiltonianMonteCarloState',
-    target_log_prob_fn: 'fun_mc.PotentialFn',
-    num_adaptation_steps: 'Optional[fun_mc.IntTensor]',
-    variance_window_steps: 'fun_mc.IntTensor' = 100,
-    trajectory_length_factor: 'fun_mc.FloatTensor' = 1.,
-    num_trajectory_ramp_steps: 'Optional[int]' = 100,
-    trajectory_warmup_power: 'fun_mc.FloatTensor' = 1.,
-    max_num_leapfrog_steps: 'Optional[int]' = 100,
-    step_size_adaptation_rate: 'fun_mc.FloatTensor' = 0.05,
-    step_size_adaptation_rate_decay_power: 'fun_mc.FloatTensor' = 0.1,
-    target_accept_prob: 'fun_mc.FloatTensor' = 0.8,
-    step_size_averaging_window_steps: 'fun_mc.IntTensor' = 100,
-    jitter_sample_fn:
-    'Callable[[fun_mc.IntTensor, fun_mc.IntTensor, Any], fun_mc.IntTensor]' = (
-        _uniform_jitter),
-    log_accept_ratio_reduce_fn:
-    'Callable[[fun_mc.FloatTensor], fun_mc.FloatTensor]' = (
-        tfp.math.reduce_logmeanexp),
-    hmc_kwargs: 'Optional[Dict[str, Any]]' = None,
-    seed: 'Any' = None,
-) -> ('Tuple[AdaptiveHamiltonianMonteCarloState, '
-      'AdaptiveHamiltonianMonteCarloExtra]'):
+    adaptive_hmc_state: AdaptiveHamiltonianMonteCarloState,
+    target_log_prob_fn: fun_mc.PotentialFn,
+    num_adaptation_steps: Optional[fun_mc.IntTensor],
+    variance_window_steps: fun_mc.IntTensor = 100,
+    trajectory_length_factor: fun_mc.FloatTensor = 1.0,
+    num_trajectory_ramp_steps: Optional[int] = 100,
+    trajectory_warmup_power: fun_mc.FloatTensor = 1.0,
+    max_num_leapfrog_steps: Optional[int] = 100,
+    step_size_adaptation_rate: fun_mc.FloatTensor = 0.05,
+    step_size_adaptation_rate_decay_power: fun_mc.FloatTensor = 0.1,
+    target_accept_prob: fun_mc.FloatTensor = 0.8,
+    step_size_averaging_window_steps: fun_mc.IntTensor = 100,
+    jitter_sample_fn: Callable[
+        [fun_mc.IntTensor, fun_mc.IntTensor, Any], fun_mc.IntTensor
+    ] = (_uniform_jitter),
+    log_accept_ratio_reduce_fn: Callable[
+        [fun_mc.FloatTensor], fun_mc.FloatTensor
+    ] = (tfp.math.reduce_logmeanexp),
+    hmc_kwargs: Optional[dict[str, Any]] = None,
+    seed: Any = None,
+) -> tuple[
+    AdaptiveHamiltonianMonteCarloState, AdaptiveHamiltonianMonteCarloExtra
+]:
   """Adaptive Hamiltonian Monte Carlo `TransitionOperator`.
 
   This implements a relatively straighforward adaptive HMC algorithm with
@@ -426,7 +567,7 @@ def adaptive_hamiltonian_monte_carlo_step(
   return adaptive_hmc_state, extra
 
 
-def _tqdm_progress_bar_fn(iterable: 'Iterable[Any]') -> 'Iterable[Any]':
+def _tqdm_progress_bar_fn(iterable: Iterable[Any]) -> Iterable[Any]:
   """The TQDM progress bar function."""
   # pytype: disable=import-error
   import tqdm  # pylint: disable=g-import-not-at-top
@@ -435,15 +576,16 @@ def _tqdm_progress_bar_fn(iterable: 'Iterable[Any]') -> 'Iterable[Any]':
 
 
 def interactive_trace(
-    state: 'fun_mc.State',
-    fn: 'fun_mc.TransitionOperator',
-    num_steps: 'fun_mc.IntTensor',
-    trace_mask: 'fun_mc.BooleanNest' = True,
+    state: fun_mc.State,
+    fn: fun_mc.TransitionOperator,
+    num_steps: fun_mc.IntTensor,
+    trace_mask: fun_mc.BooleanNest = True,
     iteration_axis: int = 0,
-    block_until_ready: 'bool' = True,
-    progress_bar_fn: 'Callable[[Iterable[Any]], Iterable[Any]]' = (
-        _tqdm_progress_bar_fn),
-) -> 'Tuple[fun_mc.State, fun_mc.TensorNest]':
+    block_until_ready: bool = True,
+    progress_bar_fn: Callable[[Iterable[Any]], Iterable[Any]] = (
+        _tqdm_progress_bar_fn
+    ),
+) -> tuple[fun_mc.State, fun_mc.TensorNest]:
   """Wrapped around fun_mc.trace, suited for interactive work.
 
   This is accomplished through unrolling fun_mc.trace, as well as optionally
@@ -524,174 +666,35 @@ def interactive_trace(
   return state, trace
 
 
-class StepSizeAdaptationState(NamedTuple):
-  """Step size adaptation state."""
-  step: 'fun_mc.IntTensor'
-  opt_state: 'fun_mc.AdamState'
-  rms_state: 'fun_mc.RunningMeanState'
-
-  def opt_step_size(self):
-    return tf.exp(self.opt_state.state)
-
-  @property
-  def rms_step_size(self):
-    return self.rms_state.mean
-
-  def step_size(self, num_adaptation_steps=None):
-    if num_adaptation_steps is not None:
-      return tf.where(self.step < num_adaptation_steps, self.opt_step_size(),
-                      self.rms_step_size)
-    else:
-      return self.opt_step_size()
-
-
-class StepSizeAdaptationExtra(NamedTuple):
-  opt_extra: 'fun_mc.AdamExtra'
-  accept_prob: 'fun_mc.FloatTensor'
-
-
-@util.named_call
-def step_size_adaptation_init(
-    init_step_size: 'fun_mc.FloatTensor') -> 'StepSizeAdaptationState':
-  """Initializes `StepSizeAdaptationState`.
-
-  Args:
-    init_step_size: Floating point Tensor. Initial step size.
-
-  Returns:
-    step_size_adaptation_state: `StepSizeAdaptationState`
-  """
-  init_step_size = tf.convert_to_tensor(init_step_size)
-  rms_state = fun_mc.running_mean_init(init_step_size.shape,
-                                       init_step_size.dtype)
-  rms_state = rms_state._replace(mean=init_step_size)
-
-  return StepSizeAdaptationState(
-      step=tf.constant(0, tf.int32),
-      opt_state=fun_mc.adam_init(tf.math.log(init_step_size)),
-      rms_state=rms_state,
-  )
-
-
-@util.named_call
-def step_size_adaptation_step(
-    state: 'StepSizeAdaptationState',
-    log_accept_ratio: 'fun_mc.FloatTensor',
-    num_adaptation_steps: 'Optional[fun_mc.IntTensor]',
-    target_accept_prob: 'fun_mc.FloatTensor' = 0.8,
-    adaptation_rate: 'fun_mc.FloatTensor' = 0.05,
-    adaptation_rate_decay_power: 'fun_mc.FloatTensor' = 0.1,
-    averaging_window_steps: 'fun_mc.IntTensor' = 100,
-    min_log_accept_prob: 'fun_mc.FloatTensor' = np.log(1e-5),
-    reduce_fn: 'Callable[[fun_mc.FloatTensor], fun_mc.FloatTensor]' = (
-        tfp.math.reduce_logmeanexp),
-    opt_kwargs: 'Optional[Dict[str, Any]]' = None,
-) -> 'Tuple[StepSizeAdaptationState, StepSizeAdaptationExtra]':
-  """Gradient based step size adaptation using ADAM.
-
-  Given the `log_accept_ratio` statistic from an Metropolis-Hastings algorithm,
-  this adapts the step size hyperparameter to make that statistic hit some
-  `target_accept_prob`. The step size can be extracted using the `step_size`
-  method on the state structure.
-
-  Args:
-    state: `StepSizeAdaptationState`
-    log_accept_ratio: Float tensor. The logarithm of the accept ratio.
-    num_adaptation_steps: Number of adaptation steps, can be `None`.
-    target_accept_prob: Target acceptance probability.
-    adaptation_rate: Step size adaptation rate.
-    adaptation_rate_decay_power:  Power of the polynomial schedule for
-      `trajectory_length_factor` warmup.
-    averaging_window_steps: Number of steps to compute the averaged step size.
-    min_log_accept_prob: Clamps acceptance probability to this value for
-      numerical stability.
-    reduce_fn: A function that reduces `log_accept_ratio` in log-space. By
-      default, this computes the log-mean-exp.
-    opt_kwargs: Additional arguments to pass to the optimizer.
-
-  Returns:
-    step_size_adaptation_state: `StepSizeAdaptationState`
-    step_size_adaptation_extra: `StepSizeAdaptationExtra`
-  """
-  opt_kwargs = {} if opt_kwargs is None else opt_kwargs
-  dtype = log_accept_ratio.dtype
-  adaptation_rate = tf.convert_to_tensor(adaptation_rate, dtype=dtype)
-  target_accept_prob = tf.convert_to_tensor(target_accept_prob, dtype=dtype)
-  adaptation_rate_decay_power = tf.convert_to_tensor(
-      adaptation_rate_decay_power, dtype=dtype)
-  min_log_accept_prob = tf.fill(log_accept_ratio.shape,
-                                tf.constant(min_log_accept_prob, dtype))
-
-  log_accept_prob = tf.minimum(log_accept_ratio, tf.zeros([], dtype))
-  log_accept_prob = tf.maximum(log_accept_prob, min_log_accept_prob)
-  log_accept_prob = tf.where(
-      tf.math.is_finite(log_accept_prob), log_accept_prob, min_log_accept_prob)
-  accept_prob = tf.exp(reduce_fn(log_accept_prob))
-
-  loss_fn = fun_mc.make_surrogate_loss_fn(lambda _:  # pylint: disable=g-long-lambda
-                                          (target_accept_prob - accept_prob, ()
-                                          ))
-
-  if num_adaptation_steps is not None:
-    adaptation_rate = _polynomial_decay(
-        step=state.step,
-        step_size=adaptation_rate,
-        decay_steps=num_adaptation_steps,
-        final_step_size=0.,
-        power=adaptation_rate_decay_power,
-    )
-
-  # Optimize step size.
-  opt_state, opt_extra = fun_mc.adam_step(state.opt_state, loss_fn,
-                                          adaptation_rate, **opt_kwargs)
-
-  # Do iterate averaging.
-  old_rms_state = state.rms_state
-  rms_state, _ = fun_mc.running_mean_step(
-      old_rms_state,
-      tf.exp(opt_state.state),
-      window_size=averaging_window_steps)
-
-  if num_adaptation_steps is not None:
-    rms_state = util.map_tree(
-        lambda n, o: tf.where(state.step < num_adaptation_steps, n, o),
-        rms_state, old_rms_state)
-
-  state = state._replace(
-      opt_state=opt_state, rms_state=rms_state, step=state.step + 1)
-  extra = StepSizeAdaptationExtra(opt_extra=opt_extra, accept_prob=accept_prob)
-  return state, extra
-
-
 class PersistentHamiltonianMonteCarloState(NamedTuple):
   """Persistent Hamiltonian Monte Carlo state."""
-  state: 'fun_mc.State'
-  state_grads: 'fun_mc.State'
-  momentum: 'fun_mc.State'
-  target_log_prob: 'fun_mc.FloatTensor'
-  state_extra: 'Any'
-  direction: 'fun_mc.FloatTensor'
-  pmh_state: 'fun_mc.PersistentMetropolistHastingsState'
+  state: fun_mc.State
+  state_grads: fun_mc.State
+  momentum: fun_mc.State
+  target_log_prob: fun_mc.FloatTensor
+  state_extra: Any
+  direction: fun_mc.FloatTensor
+  pmh_state: fun_mc.PersistentMetropolistHastingsState
 
 
 class PersistentHamiltonianMonteCarloExtra(NamedTuple):
   """Persistent Hamiltonian Monte Carlo extra outputs."""
-  is_accepted: 'fun_mc.BooleanTensor'
-  log_accept_ratio: 'fun_mc.FloatTensor'
-  proposed_phmc_state: 'fun_mc.State'
-  integrator_state: 'fun_mc.IntegratorState'
-  integrator_extra: 'fun_mc.IntegratorExtras'
-  initial_momentum: 'fun_mc.State'
-  energy_change_extra: 'Any'
+  is_accepted: fun_mc.BooleanTensor
+  log_accept_ratio: fun_mc.FloatTensor
+  proposed_phmc_state: fun_mc.State
+  integrator_state: fun_mc.IntegratorState
+  integrator_extra: fun_mc.IntegratorExtras
+  initial_momentum: fun_mc.State
+  energy_change_extra: Any
 
 
 @util.named_call
 def persistent_hamiltonian_monte_carlo_init(
-    state: 'fun_mc.TensorNest',
-    target_log_prob_fn: 'fun_mc.PotentialFn',
-    momentum: 'Optional[fun_mc.State]' = None,
-    init_level: 'fun_mc.FloatTensor' = 0.,
-) -> 'PersistentHamiltonianMonteCarloState':
+    state: fun_mc.TensorNest,
+    target_log_prob_fn: fun_mc.PotentialFn,
+    momentum: Optional[fun_mc.State] = None,
+    init_level: fun_mc.FloatTensor = 0.,
+) -> PersistentHamiltonianMonteCarloState:
   """Initializes the `PersistentHamiltonianMonteCarloState`.
 
   Args:
@@ -728,30 +731,42 @@ PersistentMomentumSampleFn = Callable[[fun_mc.State, Any], fun_mc.State]
 
 @util.named_call
 def persistent_hamiltonian_monte_carlo_step(
-    phmc_state: 'PersistentHamiltonianMonteCarloState',
-    target_log_prob_fn: 'fun_mc.PotentialFn',
-    step_size: 'Optional[Any]' = None,
-    num_integrator_steps: 'Optional[fun_mc.IntTensor]' = None,
-    noise_fraction: 'Optional[fun_mc.FloatTensor]' = None,
-    mh_drift: 'Optional[fun_mc.FloatTensor]' = None,
-    kinetic_energy_fn: 'Optional[fun_mc.PotentialFn]' = None,
-    momentum_sample_fn: 'Optional[PersistentMomentumSampleFn]' = None,
-    integrator_trace_fn: 'Callable[[fun_mc.IntegratorStepState, '
-    'fun_mc.IntegratorStepExtras], fun_mc.TensorNest]' = lambda *args: (),
-    log_uniform: 'Optional[fun_mc.FloatTensor]' = None,
-    integrator_fn: 'Optional[Callable[[fun_mc.IntegratorState, '
-    'fun_mc.FloatTensor], Tuple[fun_mc.IntegratorState, '
-    'fun_mc.IntegratorExtras]]]' = None,
-    unroll_integrator: 'bool' = False,
-    max_num_integrator_steps: 'Optional[fun_mc.IntTensor]' = None,
-    energy_change_fn: 'Callable[[fun_mc.IntegratorState, '
-    'fun_mc.IntegratorState, fun_mc.IntegratorExtras], '
-    'Tuple[fun_mc.FloatTensor, Any]]' = (
-        fun_mc._default_hamiltonian_monte_carlo_energy_change_fn),  # pylint: disable=protected-access
-    named_axis: 'Optional[fun_mc.StringNest]' = None,
+    phmc_state: PersistentHamiltonianMonteCarloState,
+    target_log_prob_fn: fun_mc.PotentialFn,
+    step_size: Optional[Any] = None,
+    num_integrator_steps: Optional[fun_mc.IntTensor] = None,
+    noise_fraction: Optional[fun_mc.FloatTensor] = None,
+    mh_drift: Optional[fun_mc.FloatTensor] = None,
+    kinetic_energy_fn: Optional[fun_mc.PotentialFn] = None,
+    momentum_sample_fn: Optional[PersistentMomentumSampleFn] = None,
+    integrator_trace_fn: Callable[
+        [fun_mc.IntegratorStepState, fun_mc.IntegratorStepExtras],
+        fun_mc.TensorNest,
+    ] = lambda *args: (),
+    log_uniform: Optional[fun_mc.FloatTensor] = None,
+    integrator_fn: Optional[
+        Callable[
+            [fun_mc.IntegratorState, fun_mc.FloatTensor],
+            tuple[fun_mc.IntegratorState, fun_mc.IntegratorExtras],
+        ]
+    ] = None,
+    unroll_integrator: bool = False,
+    max_num_integrator_steps: Optional[fun_mc.IntTensor] = None,
+    energy_change_fn: Callable[
+        [
+            fun_mc.IntegratorState,
+            fun_mc.IntegratorState,
+            fun_mc.IntegratorExtras,
+        ],
+        tuple[fun_mc.FloatTensor, Any],
+    ] = (
+        fun_mc._default_hamiltonian_monte_carlo_energy_change_fn  # pylint: disable=protected-access
+    ),
+    named_axis: Optional[fun_mc.StringNest] = None,
     seed=None,
-) -> ('Tuple[PersistentHamiltonianMonteCarloState, '
-      'PersistentHamiltonianMonteCarloExtra]'):
+) -> tuple[
+    PersistentHamiltonianMonteCarloState, PersistentHamiltonianMonteCarloExtra
+]:
   """A step of the Persistent Hamiltonian Monte Carlo `TransitionOperator`.
 
   This is an implementation of the generalized HMC with persistent momentum
@@ -874,7 +889,7 @@ def persistent_hamiltonian_monte_carlo_step(
       named_axis = util.map_tree(lambda _: [], state)
 
     def _momentum_sample_fn(old_momentum: fun_mc.State,
-                            seed: Any) -> Tuple[fun_mc.State, Tuple[()]]:
+                            seed: Any) -> tuple[fun_mc.State, tuple[()]]:
       seeds = util.unflatten_tree(
           old_momentum,
           util.split_seed(seed, len(util.flatten_tree(old_momentum))))
@@ -898,7 +913,7 @@ def persistent_hamiltonian_monte_carlo_step(
 
     def _integrator_fn(
         state: fun_mc.IntegratorState, direction: fun_mc.FloatTensor
-    ) -> Tuple[fun_mc.IntegratorState, fun_mc.IntegratorExtras]:
+    ) -> tuple[fun_mc.IntegratorState, fun_mc.IntegratorExtras]:
 
       directional_step_size = util.map_tree(
           lambda step_size, state: (  # pylint: disable=g-long-lambda
