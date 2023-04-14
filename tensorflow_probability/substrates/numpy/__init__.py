@@ -23,6 +23,7 @@ from tensorflow_probability.python.version import __version__
 from tensorflow_probability.substrates.numpy import bijectors
 from tensorflow_probability.substrates.numpy import distributions
 from tensorflow_probability.substrates.numpy import experimental
+from tensorflow_probability.substrates.numpy import glm
 from tensorflow_probability.substrates.numpy import internal
 from tensorflow_probability.substrates.numpy import math
 from tensorflow_probability.substrates.numpy import mcmc

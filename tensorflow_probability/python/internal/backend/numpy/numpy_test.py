@@ -304,7 +304,7 @@ def matmul_compatible_pairs(draw,
   x_strategy = x_strategy or single_arrays(
       shape=shapes(min_dims=2, max_dims=5, min_side=0),
       dtype=dtype, elements=elements)
-  x = draw(x_strategy)
+  x = draw(x_strategy).astype(dtype)
   x_shape = tuple(map(int, x.shape))
   y_shape = x_shape[:-2] + x_shape[-1:] + (draw(hps.integers(1, 10)),)
   y = draw(hnp.arrays(dtype, y_shape, elements=elements))
@@ -613,6 +613,15 @@ def top_k_params(draw):
   array = draw(single_arrays(dtype=np.float32, unique=True, shape=array_shape))
   k = draw(hps.integers(1, int(array.shape[-1])))
   return array, k
+
+
+@hps.composite
+def lstsq_params(draw):
+  matrix, rhs = draw(matmul_compatible_pairs(x_strategy=pd_matrices()))
+  return (matrix,
+          rhs,
+          0.,  # l2_regularization
+          False)  # fast=False
 
 
 @hps.composite
@@ -1188,6 +1197,11 @@ NUMPY_TEST_CASES = [
     TestCase('linalg.solve', [
         matmul_compatible_pairs(x_strategy=pd_matrices())
     ]),
+
+    TestCase('linalg.lstsq', [lstsq_params()],
+             xla_disabled=True),  # Missing kernel.
+
+    TestCase('linalg.tensor_diag', [single_arrays(shape=shapes(min_dims=1))]),
 
     # ArgSpec(args=['shape_x', 'shape_y'], varargs=None, keywords=None,
     #         defaults=None)

@@ -14,6 +14,7 @@
 # ============================================================================
 """Experimental Numpy backend."""
 
+import collections
 import contextlib
 
 import numpy as np
@@ -35,6 +36,7 @@ __all__ = [
     'Dimension',
     'Module',
     'Session',
+    'SparseTensorValue',
     'TensorArray',
     'colocate_with',
     'control_flow_v2_enabled',
@@ -61,7 +63,7 @@ def _dummy_scope(*_, **__):  # pylint: disable=unused-argument
   yield
 
 
-def _get_variable(  # pylint: disable=unused-argument
+def _get_variable(  # pylint: disable=unused-argument,redefined-outer-name
     name, shape=None, dtype=None, initializer=None, regularizer=None,
     trainable=None, collections=None, caching_device=None, partitioner=None,
     validate_shape=True, use_resource=None, custom_getter=None, constraint=None,
@@ -181,3 +183,7 @@ class variable_scope(object):  # pylint: disable=invalid-name
 
   def __exit__(self, *_, **__):
     pass
+
+
+SparseTensorValue = collections.namedtuple('SparseTensorValue',
+                                           ['indices', 'values', 'dense_shape'])

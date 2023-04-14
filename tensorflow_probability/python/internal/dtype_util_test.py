@@ -238,9 +238,10 @@ class FloatDTypeTest(test_util.TestCase):
     self.assertRaises(ValueError, dtype_util.assert_same_float_dtype,
                       [const_float], tf.int32)
 
-    if not hasattr(tf, 'SparseTensor'):
-      # No SparseTensor in numpy/jax mode.
-      return
+  @test_util.disable_test_for_backend(disable_numpy=True, disable_jax=True,
+                                      reason='SparseTensor')
+  def test_sparse(self):
+    const_float = tf.constant(3.0, dtype=tf.float32)
     sparse_float = tf.SparseTensor(
         tf.constant([[111], [232]], tf.int64),
         tf.constant([23.4, -43.2], tf.float32),

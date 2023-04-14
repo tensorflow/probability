@@ -41,6 +41,7 @@ from tensorflow_probability.python.version import __version__
 from tensorflow_probability.substrates.jax import bijectors
 from tensorflow_probability.substrates.jax import distributions
 from tensorflow_probability.substrates.jax import experimental
+from tensorflow_probability.substrates.jax import glm
 from tensorflow_probability.substrates.jax import internal
 from tensorflow_probability.substrates.jax import math
 from tensorflow_probability.substrates.jax import mcmc

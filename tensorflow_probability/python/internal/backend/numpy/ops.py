@@ -56,6 +56,7 @@ __all__ = [
     'stop_gradient',
     'GradientTape',
     'Module',
+    'SparseTensor',
     'Tensor',
     'Variable',
     # 'gradients',
@@ -366,6 +367,15 @@ class GradientTape(object):
                      unconnected_gradients=None,  # pylint: disable=unused-argument
                      parallel_iterations=None, experimental_use_pfor=True):  # pylint: disable=unused-argument
     raise NotImplementedError
+
+
+class SparseTensor(object):
+  """tf.SparseTensor stub."""
+
+  def __init__(self, *args, **kwargs):
+    raise NotImplementedError(
+        'SparseTensor not currently supported in JAX and NumPy backends.')
+
 
 bitcast = utils.copy_docstring(
     'tf.bitcast',
@@ -726,6 +736,10 @@ class Module(object):
 
   def _no_dependency(self, x):
     return x
+
+  @property
+  def name(self):
+    return self._name
 
   @property
   def trainable_variables(self):
