@@ -301,7 +301,6 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
       with tf.name_scope('one_step'):
         seed = samplers.sanitize_seed(seed)
         proposal_seed, resample_seed = samplers.split_seed(seed)
-        print('how many times here')
         state = WeightedParticles(*state)  # Canonicalize.
 
         # Propose new particles and update weights for this step, unless it's
