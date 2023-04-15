@@ -301,7 +301,7 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
       with tf.name_scope('one_step'):
         seed = samplers.sanitize_seed(seed)
         proposal_seed, resample_seed = samplers.split_seed(seed)
-
+        print('how many times here')
         state = WeightedParticles(*state)  # Canonicalize.
 
         # Propose new particles and update weights for this step, unless it's
@@ -312,6 +312,7 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
             ps.maximum(0, kernel_results.steps - 1),
             state,
             seed=proposal_seed)
+
         is_initial_step = ps.equal(kernel_results.steps, 0)
         # TODO(davmre): this `where` assumes the state size didn't change.
         state = tf.nest.map_structure(

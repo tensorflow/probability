@@ -46,14 +46,14 @@ class _ParticleFilterTest(test_util.TestCase):
       results = self.evaluate(
           particle_filter.smc_squared(
               inner_observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
-              inner_initial_state_prior=lambda _, state: normal.Normal(0., 1.),
+              inner_initial_state_prior=lambda _, state: normal.Normal(tf.zeros_like(state), 1.),
               initial_parameter_prior=normal.Normal(0., 1.),
               parameter_proposal_kernel=1,  # TODO
-              num_particles=1024,
-              rejuvenation_criterion_fn=lambda *_: False,
+              num_outer_particles=20,
+              outer_rejuvenation_criterion_fn=lambda *_: False,
               inner_transition_fn=lambda _, state: normal.Normal(state, 1.),
               inner_observation_fn=lambda _, state: normal.Normal(state, 1.),
-              num_inner_particles=1024,
+              num_inner_particles=10,
               seed=1)
       )
 
