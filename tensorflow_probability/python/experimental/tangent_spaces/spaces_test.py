@@ -30,32 +30,24 @@ from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import gradient
 
-JAX_MODE = False
-
 
 class _SpacesTest(test_util.TestCase):
 
-  def _testGeneralSpace(
+  def _testSpace(
       self, bijector_class, event_ndims, bijector_params):
-    # Ensure that the arclength is preserved under transformations.
-    if not JAX_MODE:
-      self.skipTest('`GeneralSpace` only works in JAX mode.')
+    # Ensure that the 'measure' is preserved under transformations.
     bijector = bijector_class(**bijector_params)
 
-    def circle_tangent_space(x):
-      # Tangent Space at a point on the unit circle. Only one tangent vector.
-      return spaces.GeneralSpace(self.tangent_basis(x))
-
     def transformed_log_prob(x):
-      return -self.log_volume() + circle_tangent_space(
+      return -self.log_volume() - self.tangent_space(
           x).transform_general(x, bijector, event_ndims=event_ndims)[0]
 
     coords = self.generate_coords()
     z = self.embed_coords(coords)
     local_grads = []
     # Consider the batch shape here.
-    bijector_batch_shape = bijector.experimental_batch_shape(
-        x_event_ndims=event_ndims)
+    bijector_batch_shape = tensorshape_util.as_list(
+        bijector.experimental_batch_shape(x_event_ndims=event_ndims))
     # We need to compute gradients without reducing over batch members.
     if tensorshape_util.rank(bijector_batch_shape):
       batch_indices = np.indices(bijector_batch_shape)
@@ -104,6 +96,48 @@ class _SpacesTest(test_util.TestCase):
     """Set this if your event space is a non-vector."""
     return identity.Identity()
 
+  def tangent_space(self, x):
+    # Tangent Space at a point on the unit circle. Only one tangent vector.
+    return spaces.GeneralSpace(self.tangent_basis(x))
+
+
+class DiscreteZeroSpaceTest(_SpacesTest):
+
+  def generate_coords(self):
+    return tf.range(1., 11.)
+
+  def embed_coords(self, coords):
+    return tf.stack([coords, 2 * coords - 1], axis=-1)
+
+  def log_local_area(self, local_grads):
+    # Each coordinate is a 10th of the volume.
+    return -np.log(10.) * tf.ones_like(local_grads[..., 0])
+
+  def log_volume(self):
+    # Total volume is 1.
+    return 0.
+
+  def tangent_space(self, x):
+    return spaces.ZeroSpace()
+
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(
+      {'testcase_name': 'ExpDiscrete',
+       'bijector_class': exp.Exp,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {}
+       },
+      {'testcase_name': 'ScaleDiscrete',
+       'bijector_class': scale.Scale,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {'scale': [2., 20.]}
+       },
+  )
+  def testZeroSpace(self, bijector_class, event_ndims, bijector_params):
+    self._testSpace(bijector_class, event_ndims, bijector_params)
+
 
 class CircleSpaceTest(_SpacesTest):
   """Test GeneralSpace works on a Circle."""
@@ -117,7 +151,8 @@ class CircleSpaceTest(_SpacesTest):
     return tf.stack([tf.math.cos(coords), tf.math.sin(coords)], axis=-1)
 
   def tangent_basis(self, x):
-    return tf.stack([-x[..., 1], x[..., 0]], axis=-1)[tf.newaxis, ...]
+    return spaces.DenseBasis(
+        tf.stack([-x[..., 1], x[..., 0]], axis=-1)[tf.newaxis, ...])
 
   def log_local_area(self, local_grads):
     return np.log(self.delta) + 0.5 * tf.reduce_logsumexp(
@@ -126,6 +161,7 @@ class CircleSpaceTest(_SpacesTest):
   def log_volume(self):
     return np.log(2 * np.pi)
 
+  @test_util.numpy_disable_gradient_test
   @parameterized.named_parameters(
       {'testcase_name': 'ExpCircle',
        'bijector_class': exp.Exp,
@@ -153,7 +189,7 @@ class CircleSpaceTest(_SpacesTest):
        },
   )
   def testGeneralSpace(self, bijector_class, event_ndims, bijector_params):
-    self._testGeneralSpace(bijector_class, event_ndims, bijector_params)
+    self._testSpace(bijector_class, event_ndims, bijector_params)
 
 
 class HalfSphereSpaceTest(_SpacesTest):
@@ -180,10 +216,10 @@ class HalfSphereSpaceTest(_SpacesTest):
     # Hairy Ball Theorem kicks in so that this parameterization is not going to
     # be valid for the whole sphere. However, we are only computing this on the
     # half-sphere so we should have a well defined tangent space.
-    return tf.stack([
+    return spaces.DenseBasis(tf.stack([
         tf.stack([-x[..., 1], x[..., 0], tf.zeros_like(x[..., 0])], axis=-1),
         tf.stack([tf.zeros_like(x[..., 1]), -x[..., 2], x[..., 1]], axis=-1)
-    ], axis=0)
+    ], axis=0))
 
   def log_local_area(self, local_grads):
     grads_0, grads_1 = tf.unstack(local_grads, axis=-2)
@@ -193,6 +229,7 @@ class HalfSphereSpaceTest(_SpacesTest):
   def log_volume(self):
     return np.log(2 * np.pi)
 
+  @test_util.numpy_disable_gradient_test
   @parameterized.named_parameters(
       {'testcase_name': 'ExpSphere',
        'bijector_class': exp.Exp,
@@ -221,7 +258,7 @@ class HalfSphereSpaceTest(_SpacesTest):
        },
   )
   def testGeneralSpace(self, bijector_class, event_ndims, bijector_params):
-    self._testGeneralSpace(bijector_class, event_ndims, bijector_params)
+    self._testSpace(bijector_class, event_ndims, bijector_params)
 
 
 class SymmetricMatrixTest(_SpacesTest):
@@ -247,10 +284,10 @@ class SymmetricMatrixTest(_SpacesTest):
     # Tangent vectors are just the embedded unit vectors that result in
     # symmetric matrices.
     # This tests a constant bases, and that broadcasting works appropriately.
-    return np.array([
+    return spaces.DenseBasis(np.array([
         [[1., 0.], [0., 0.]],
         [[0., 1.], [1., 0.]],
-        [[0., 0.], [0., 1.]]]).astype(np.float32)
+        [[0., 0.], [0., 1.]]]).astype(np.float32))
 
   def log_local_area(self, local_grads):
     # We can elide out the third entry of each vector since it's the same.
@@ -269,6 +306,7 @@ class SymmetricMatrixTest(_SpacesTest):
   def flatten_bijector(self):
     return reshape.Reshape(event_shape_in=[2, 2], event_shape_out=[4])
 
+  @test_util.numpy_disable_gradient_test
   @parameterized.named_parameters(
       {'testcase_name': 'ExpSymmetric',
        'bijector_class': exp.Exp,
@@ -284,11 +322,10 @@ class SymmetricMatrixTest(_SpacesTest):
        },
   )
   def testGeneralSpace(self, bijector_class, event_ndims, bijector_params):
-    self._testGeneralSpace(bijector_class, event_ndims, bijector_params)
+    self._testSpace(bijector_class, event_ndims, bijector_params)
 
+  @test_util.numpy_disable_gradient_test
   def testTransformGeneralTransformDiagonal(self):
-    if not JAX_MODE:
-      self.skipTest('`GeneralSpace` only works in JAX mode.')
     tangent_basis = np.array([
         [[1., 0.], [0., 0.]],
         [[0., 1.], [1., 0.]],
@@ -300,15 +337,15 @@ class SymmetricMatrixTest(_SpacesTest):
         [[-1., 2.], [2., 1.]]]).astype(np.float32)
 
     bijector = transform_diagonal.TransformDiagonal(exp.Exp())
-    gs = spaces.GeneralSpace(tangent_basis)
+    gs = spaces.GeneralSpace(spaces.DenseBasis(tangent_basis))
     correction, new_gs = gs.transform_general(x, bijector)
 
     # Test that we get a correction only from the diagonal elements.
     diag_x = np.diagonal(x, axis1=-2, axis2=-1)
-    self.assertAllClose(self.evaluate(correction), -np.sum(diag_x, axis=-1))
+    self.assertAllClose(self.evaluate(correction), np.sum(diag_x, axis=-1))
     # Test that the new basis retains the middle element. This is because the
     # bijector only modifies the diagonal elements.
-    new_basis = self.evaluate(new_gs.basis)
+    new_basis = self.evaluate(new_gs.basis.to_dense())
     middle_element = np.array([[0., 1.], [1., 0.]]).astype(np.float32)
     middle_element = np.broadcast_to(middle_element, [4, 2, 2])
     self.assertAllClose(new_basis[1], middle_element)
