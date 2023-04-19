@@ -26,6 +26,7 @@ __all__ = [
     'AxisAlignedSpace',
     'FullSpace',
     'GeneralSpace',
+    'SphericalSpace',
     'TangentSpace',
     'UnspecifiedTangentSpaceError',
     'ZeroSpace',
@@ -178,7 +179,7 @@ class TangentSpace(object):
     return self._transform_coordinatewise(x, f, **kwargs)
 
   def _transform_coordinatewise(self, x, f, **kwargs):
-    return self._transform_general(x, f, **kwargs)
+    return self._transform_dimension_preserving(x, f, **kwargs)
 
 # TODO(b/197680518): Ensure that these methods are implemented.
 
@@ -370,6 +371,81 @@ class ZeroSpace(TangentSpace):
   def _transform_general(self, x, f, **kwargs):
     del x, f
     return 0, ZeroSpace()
+
+
+class SphericalSpace(TangentSpace):
+  """Tangent space of M for Spherical distributions in R^n."""
+
+  def compute_spherical_basis(self, x):
+    """Returns a `Basis` representing the tangent space of the n-sphere."""
+    # TODO(b/197680518): Is there a cheaper way to represent this basis /
+    # compute JVPs with it (perhaps we don't need to represent this dense
+    # basis when doing transformations)?
+
+    # Given the Hairy Ball Theorem, we can't find a non-zero smooth vector field
+    # for an n-sphere, for even n.
+    # Thus we exclude the north pole of the sphere, and then add a basis for
+    # this at the end.
+
+    # Choose the zero vector when `x` is the north pole. This is not the north
+    # pole, but it is safe for all further calculations.
+    is_north_pole = tf.math.equal(x[..., -1], 1.)
+    safe_x = tf.where(is_north_pole[..., tf.newaxis], tf.zeros_like(x), x)
+
+    # The stereographic projection is a diffeomorphism from the n-sphere without
+    # the north pole to R^{n}. We can find a basis `B` at `stereographic_x`
+    # (the unit basis), and then compute B* = f_*^-1(B), where f_*^-1 is the
+    # pushforward of f^-1, and f^-1 is the inverse stereographic projection.
+    # The pushforward is
+    # just the differential, or in otherwords the the Jacobian matrix of f_*^-1.
+
+    # Using the derivation in `tfb.UnitVector`, we have that
+    # J_{i, i} = 2 * (s^2 - 2z_i^2 + 1) / (s^2 + 1)^2
+    # J_{i, j} = 4z_iz_j/(s^2 + 1)^2 for 0 <= i, j <= n - 1
+    # J_{n, i} = 4z_i/(s^2 + 1)^2
+    # where z_i are the stereographic coordinates, and s^2 is the sum of those
+    # coordinates squared.
+    # Factoring out 1 / (s^2 + 1)^2, we have that the last row is just 4z, and
+    # that the rest of the matrix is 2(s^2 + 1)I - 4zz^T.
+
+    # Finally rewriting all this in the original coordinate system,
+    # we have (1 - x_n) I - yy^T for the first n - 1 rows, and (1 - x_n) * y for
+    # the last row, where y omits the last coordinate of x. We then transpose
+    # this to get the number of bases vectors as the first dimension, and
+    # rescale by 1 / (1 - x_n) in order to get bases with unit volume.
+    n = ps.shape(x)[-1]
+    y = safe_x[..., :-1]
+    basis_tensor = -y[..., tf.newaxis] * y[..., tf.newaxis, :]
+    basis_tensor = basis_tensor / (1 - safe_x[..., -1:][..., tf.newaxis])
+    basis_tensor = tf.linalg.set_diag(
+        basis_tensor, tf.linalg.diag_part(basis_tensor) + 1)
+    basis_tensor = tf.concat([basis_tensor, y[..., tf.newaxis]], axis=-1)
+
+    # Finally handle the north pole by using the unit basis.
+    north_pole_basis_tensor = tf.eye(num_rows=n-1, num_columns=n, dtype=x.dtype)
+    basis_tensor = tf.where(
+        is_north_pole[..., tf.newaxis, tf.newaxis],
+        north_pole_basis_tensor, basis_tensor)
+    basis_tensor = distribution_util.move_dimension(basis_tensor, -2, 0)
+    basis = DenseBasis(basis_tensor)
+    return basis
+
+  def _transform_general(self, x, f, event_ndims=None, **kwargs):
+    basis = self.compute_spherical_basis(x)
+    new_basis = _compute_new_basis(f, x, basis)
+    if event_ndims is None:
+      event_ndims = f.forward_min_event_ndims
+    new_log_volume = volume_coefficient(
+        distribution_util.move_dimension(new_basis, 0, -2))
+    # The original basis has 0 log_volume.
+    return new_log_volume, GeneralSpace(
+        DenseBasis(new_basis), computed_log_volume=new_log_volume)
+
+  def _transform_coordinatewise(self, x, f, **kwargs):
+    # TODO(b/197680518): For coordinatewise maps, we can compute the diagonal
+    # of the jacobian, and use the fact that the basis has a low rank form to
+    # compute the new basis efficiently, potentially avoiding storage costs.
+    return self._transform_general(self, x, f, **kwargs)
 
 
 class UnspecifiedTangentSpaceError(Exception):

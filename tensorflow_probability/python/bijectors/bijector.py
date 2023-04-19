@@ -1669,6 +1669,14 @@ class Bijector(tf.Module, metaclass=abc.ABCMeta):
         `TangentSpace` has been called explicitly.
 
     """
+    return self._experimental_compute_density_correction(
+        x, tangent_space, backward_compat=backward_compat, **kwargs)
+
+  def _experimental_compute_density_correction(self,
+                                               x,
+                                               tangent_space,
+                                               backward_compat=False,
+                                               **kwargs):
     if backward_compat:
       return tangent_space.transform_dimension_preserving(x, self, **kwargs)
     else:

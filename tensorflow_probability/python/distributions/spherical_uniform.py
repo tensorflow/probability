@@ -198,6 +198,10 @@ class SphericalUniform(distribution.AutoCompositeTensorDistribution):
             validate_args=self.validate_args)
     ], validate_args=self.validate_args)
 
+  def _experimental_tangent_space(self, x):
+    from tensorflow_probability.python.experimental.tangent_spaces import spaces  # pylint:disable=g-import-not-at-top
+    return spaces.SphericalSpace()
+
   def _sample_control_dependencies(self, samples):
     inner_sample_dim = samples.shape[-1]
     shape_msg = ('Samples must have innermost dimension matching that of '

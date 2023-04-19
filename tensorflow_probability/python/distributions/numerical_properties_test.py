@@ -44,6 +44,12 @@ WORKING_PRECISION_TEST_BLOCK_LIST = (
     # The difficulty concerns Mixtures of component distributions whose samples
     # have different dtypes.
     'Mixture',
+    # TODO(b/197680518): ForwardAccumulator does not work under tf1.Graph.
+    'PowerSpherical',
+    # TODO(b/197680518): ForwardAccumulator does not work under tf1.Graph.
+    'SphericalUniform',
+    # TODO(b/197680518): ForwardAccumulator does not work under tf1.Graph.
+    'VonMisesFisher',
     'ZeroInflatedNegativeBinomial')
 
 

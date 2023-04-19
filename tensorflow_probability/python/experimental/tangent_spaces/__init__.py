@@ -17,6 +17,7 @@
 from tensorflow_probability.python.experimental.tangent_spaces.spaces import AxisAlignedSpace
 from tensorflow_probability.python.experimental.tangent_spaces.spaces import FullSpace
 from tensorflow_probability.python.experimental.tangent_spaces.spaces import GeneralSpace
+from tensorflow_probability.python.experimental.tangent_spaces.spaces import SphericalSpace
 from tensorflow_probability.python.experimental.tangent_spaces.spaces import TangentSpace
 from tensorflow_probability.python.experimental.tangent_spaces.spaces import UnspecifiedTangentSpaceError
 from tensorflow_probability.python.experimental.tangent_spaces.spaces import ZeroSpace
@@ -25,6 +26,7 @@ __all__ = [
     'AxisAlignedSpace',
     'FullSpace',
     'GeneralSpace',
+    'SphericalSpace',
     'TangentSpace',
     'UnspecifiedTangentSpaceError',
     'ZeroSpace',
