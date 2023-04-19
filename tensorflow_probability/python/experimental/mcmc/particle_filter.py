@@ -409,7 +409,6 @@ def smc_squared(
         num_inner_particles,
         inner_trace_fn=_default_trace_fn,
         inner_trace_criterion_fn=_always_trace,
-        particles_dim=0,
         inner_rejuvenation_fn=_no_rejuvenation,
         inner_resample_fn=weighted_resampling.resample_systematic,
         inner_resample_criterion_fn=smc_kernel.ess_below_threshold,
@@ -515,7 +514,7 @@ def smc_squared(
             inner_rejuvenation_fn=inner_rejuvenation_fn,
             inner_rejuvenation_criterion_fn=inner_rejuvenation_criterion_fn,
             parameter_proposal_kernel=parameter_proposal_kernel,
-            particles_dim=particles_dim,
+            particles_dim=0,
             num_transitions_per_observation=num_transitions_per_observation,
             unbiased_gradients=unbiased_gradients)
     )
@@ -532,7 +531,7 @@ def smc_squared(
         parallel_iterations=parallel_iterations,
         unbiased_gradients=unbiased_gradients,
         num_timesteps=num_timesteps,
-        particles_dim=particles_dim,
+        particles_dim=0,
         trace_fn=inner_trace_fn,
         loop_seed=loop_seed,
         never_trace=never_trace,
@@ -569,7 +568,7 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
                 proposal_fn=(inner_proposal_fn
                              if inner_proposal_fn is not None else None),
                 observation_fn=inner_observation_fn,
-                particles_dim=particles_dim,
+                particles_dim=1,
                 num_transitions_per_observation=num_transitions_per_observation))
 
         kernel = smc_kernel.SequentialMonteCarlo(
@@ -578,9 +577,10 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
             resample_criterion_fn=inner_resample_criterion_fn,
             rejuvenation_fn=inner_rejuvenation_fn,
             rejuvenation_criterion_fn=inner_rejuvenation_criterion_fn,
-            particles_dim=particles_dim,
+            particles_dim=1,
             unbiased_gradients=unbiased_gradients)
-
+        # print('inner', inner_particles)  # dim (20, 10)
+        # print(filter_results)  # dim 20
         inner_weighted_particles, filter_results = kernel.one_step(inner_particles, filter_results)
 
         # Outer rejuvenation

@@ -33,6 +33,8 @@ from tensorflow_probability.python.distributions import poisson
 from tensorflow_probability.python.distributions import sample as sample_dist_lib
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
+from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_systematic
+from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample
 from tensorflow_probability.python.experimental.mcmc import particle_filter
 from tensorflow_probability.python.experimental.mcmc import sequential_monte_carlo_kernel as smc_kernel
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -43,6 +45,7 @@ from tensorflow_probability.python.math import gradient
 @test_util.test_all_tf_execution_regimes
 class _ParticleFilterTest(test_util.TestCase):
   def test_smc_squared(self):
+
       results = self.evaluate(
           particle_filter.smc_squared(
               inner_observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
@@ -57,15 +60,33 @@ class _ParticleFilterTest(test_util.TestCase):
               seed=1)
       )
 
-      # results = self.evaluate(
-      #     particle_filter.particle_filter(
-      #         observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
-      #         initial_state_prior=normal.Normal(0., 1.),
-      #         transition_fn=lambda _, state: normal.Normal(state, 1.),
-      #         observation_fn=lambda _, state: normal.Normal(state, 1.),
-      #         num_particles=1024,
-      #         seed=1)
-      # )
+      results = self.evaluate(
+          particle_filter.particle_filter(
+              observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
+              initial_state_prior=normal.Normal(0., 1.),
+              transition_fn=lambda _, state: normal.Normal(state, 1.),
+              observation_fn=lambda _, state: normal.Normal(state, 1.),
+              num_particles=1024,
+              seed=1)
+      )
+
+      # # TODO: RESAMPLE TEST
+      # particles = tf.tile(tf.expand_dims(tf.range(10, dtype=tf.float32), 0), [3, 1])
+      # print(particles)
+      # # particles = tf.constant(np.linspace(1., 10., num=10, dtype=np.float32))
+      # log_weights = tf.constant([-211, 4, -233.])
+      #
+      # new_particles, _, new_log_weights = resample(
+      #     particles, log_weights, particles_dim=0,
+      #     resample_fn=resample_systematic)
+      #
+      # print('result')
+      # print(new_particles)
+      # print(new_log_weights)
+      # print('-------')
+
+
+
 
 # TODO(b/186068104): add tests with dynamic shapes.
 class ParticleFilterTestFloat32(_ParticleFilterTest):

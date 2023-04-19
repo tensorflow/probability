@@ -70,15 +70,19 @@ def resample(particles, log_weights, resample_fn, target_log_weights=None, parti
       resampling are uniformly equal to `-log(num_particles)`.
   """
   with tf.name_scope('resample'):
-    num_particles = ps.size0(log_weights)
+    num_particles = ps.size0(log_weights) if particles_dim == 0 else ps.size0(log_weights[particles_dim])
+
     log_num_particles = tf.math.log(tf.cast(num_particles, log_weights.dtype))
 
     # Normalize the weights and sample the ancestral indices.
     log_probs = tf.math.log_softmax(log_weights, axis=particles_dim)
-    resampled_indices = resample_fn(log_probs, num_particles, (), seed=seed)
+    resampled_indices = resample_fn(log_probs, num_particles, (), particles_dim, seed=seed)
+    # print('resampled_indices,', resampled_indices)
+    # print('particles,', particles)
     gather_ancestors = lambda x: (  # pylint: disable=g-long-lambda
         mcmc_util.index_remapping_gather(x, resampled_indices, axis=particles_dim))
     resampled_particles = tf.nest.map_structure(gather_ancestors, particles)
+    # print('resampled_particles,', resampled_particles)
     if target_log_weights is None:
       log_weights_after_resampling = tf.fill(ps.shape(log_weights),
                                              -log_num_particles)
@@ -241,7 +245,7 @@ def resample_independent(log_probs, event_size, sample_shape,
 
 
 # TODO(b/153689734): rewrite so as not to use `move_dimension`.
-def resample_systematic(log_probs, event_size, sample_shape,
+def resample_systematic(log_probs, event_size, sample_shape, particles_dim=0,
                         seed=None, name=None):
   """A systematic resampler for sequential Monte Carlo.
 
@@ -293,7 +297,7 @@ def resample_systematic(log_probs, event_size, sample_shape,
   """
   with tf.name_scope(name or 'resample_systematic') as name:
     log_probs = tf.convert_to_tensor(log_probs, dtype_hint=tf.float32)
-    log_probs = dist_util.move_dimension(log_probs, source_idx=0, dest_idx=-1)
+    log_probs = dist_util.move_dimension(log_probs, source_idx=particles_dim, dest_idx=-1)
     working_shape = ps.concat([sample_shape,
                                ps.shape(log_probs)[:-1]], axis=0)
     points_shape = ps.concat([working_shape, [event_size]], axis=0)
@@ -310,7 +314,7 @@ def resample_systematic(log_probs, event_size, sample_shape,
     log_points = tf.broadcast_to(tf.math.log(even_spacing), points_shape)
 
     resampled = _resample_using_log_points(log_probs, sample_shape, log_points)
-    return dist_util.move_dimension(resampled, source_idx=-1, dest_idx=0)
+    return dist_util.move_dimension(resampled, source_idx=-1, dest_idx=particles_dim)
 
 
 # TODO(b/153689734): rewrite so as not to use `move_dimension`.
