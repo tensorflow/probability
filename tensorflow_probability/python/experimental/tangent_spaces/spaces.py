@@ -451,7 +451,7 @@ class SphericalSpace(TangentSpace):
     # TODO(b/197680518): For coordinatewise maps, we can compute the diagonal
     # of the jacobian, and use the fact that the basis has a low rank form to
     # compute the new basis efficiently, potentially avoiding storage costs.
-    return self._transform_general(self, x, f, **kwargs)
+    return self._transform_general(x, f, **kwargs)
 
 
 class ProbabilitySimplexSpace(TangentSpace):
@@ -494,7 +494,7 @@ class ProbabilitySimplexSpace(TangentSpace):
     # TODO(b/197680518): For coordinatewise maps, we can compute the diagonal
     # of the jacobian, and use the fact that the basis is very simple to compute
     # it.
-    return self._transform_general(self, x, f, **kwargs)
+    return self._transform_general(x, f, **kwargs)
 
 
 class UnspecifiedTangentSpaceError(Exception):

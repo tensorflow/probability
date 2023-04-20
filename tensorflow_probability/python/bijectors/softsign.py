@@ -26,7 +26,9 @@ __all__ = [
 ]
 
 
-class Softsign(bijector.AutoCompositeTensorBijector):
+class Softsign(
+    bijector.CoordinatewiseBijectorMixin,
+    bijector.AutoCompositeTensorBijector):
   """Bijector which computes `Y = g(X) = X / (1 + |X|)`.
 
   The softsign `Bijector` has the following two useful properties:

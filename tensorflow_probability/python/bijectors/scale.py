@@ -28,7 +28,9 @@ __all__ = [
 ]
 
 
-class Scale(bijector.AutoCompositeTensorBijector):
+class Scale(
+    bijector.CoordinatewiseBijectorMixin,
+    bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X; scale) = scale * X`.
 
   Examples:

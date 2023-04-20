@@ -1955,6 +1955,23 @@ class Bijector(tf.Module, metaclass=abc.ABCMeta):
                 dtype_y=_str_dtype(self.forward_dtype())))
 
 
+class CoordinatewiseBijectorMixin(object):
+  """Mixin for Bijectors that operate coordinatewise.
+
+  This mixin identifies a `Bijector` as an coordinatewise bijector, which in
+  turn allows for potentially more efficient jacobian corrections when
+  transforming distributions over manifolds.
+  """
+
+  def _experimental_compute_density_correction(self,
+                                               x,
+                                               tangent_space,
+                                               backward_compat=False,
+                                               **kwargs):
+    del backward_compat
+    return tangent_space.transform_coordinatewise(x, self, **kwargs)
+
+
 class _AutoCompositeTensorBijectorMeta(abc.ABCMeta):
   """Metaclass for `AutoCompositeTensorBijector`."""
 
