@@ -15,8 +15,10 @@
 
 """Class definitions for tangent spaces."""
 
+import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
@@ -38,16 +40,20 @@ TF_MODE = not (JAX_MODE or NUMPY_MODE)
 
 
 def _jvp(f, x, b):
+  """Computes jvp of `f` with respect to `x`."""
+  x = tf.convert_to_tensor(x)
+  b = tf.convert_to_tensor(b)
+  b = tf.zeros_like(x) + b
   if JAX_MODE:
     import jax  # pylint:disable=g-import-not-at-top
-    import jax.numpy as jnp  # pylint:disable=g-import-not-at-top
-    b = jnp.zeros_like(x) + b
     return jax.jvp(f.forward, (x,), (b,))[1]
   elif TF_MODE:
-    b = tf.zeros_like(x) + b
-    with tf.autodiff.ForwardAccumulator(primals=x, tangents=b) as acc:
-      y = f.forward(x)
-    return acc.jvp(y)
+    @tf.function
+    def jvp(b):
+      with tf.autodiff.ForwardAccumulator(primals=x, tangents=b) as acc:
+        y = f.forward(x)
+      return acc.jvp(y)
+    return jvp(b)
 
 
 def _compute_new_basis(f, x, basis):
@@ -445,6 +451,49 @@ class SphericalSpace(TangentSpace):
     # TODO(b/197680518): For coordinatewise maps, we can compute the diagonal
     # of the jacobian, and use the fact that the basis has a low rank form to
     # compute the new basis efficiently, potentially avoiding storage costs.
+    return self._transform_general(self, x, f, **kwargs)
+
+
+class ProbabilitySimplexSpace(TangentSpace):
+  """Tangent space of M for Simplex distributions in R^n."""
+
+  def compute_basis(self, x):
+    """Returns a `TangentSpace` of a n-simplex."""
+    # The tangent space of the simplex satisfies `{x | <1, x> = 0}`, where `1`
+    # is the vector of all `1`s. This can be seen by the fact that `1` is
+    # orthogonal to the unit simplex.
+    # We can do this by using the basis:  e_i - e_n, 1 <= i <= n - 1. For n = 4,
+    # this looks like:
+    # [[1, 0., 0., -1],
+    #  [0, 1., 0., -1],
+    #  [0, 0., 1., -1]]
+    dim = ps.shape(x)[-1]
+    simplex_basis = tf.eye(dim - 1, dtype=x.dtype)
+    simplex_basis = tf.concat(
+        [simplex_basis, -tf.ones([dim - 1, 1], dtype=x.dtype)],
+        axis=-1)
+    return DenseBasis(simplex_basis)
+
+  def _transform_general(self, x, f, event_ndims=None, **kwargs):
+    basis = self.compute_basis(x)
+    # Note that B @ B.T results in the matrix I + 11^T, where 1 is the vector of
+    # all ones. By the matrix determinant lemma we have det(I + 11^T) = n + 1,
+    # or the dimension of the ambient space.
+    dim = ps.shape(x)[-1]
+    result = dtype_util.as_numpy_dtype(x.dtype)(0.5 * np.log(dim))
+    new_basis_tensor = _compute_new_basis(f, x, basis)
+    if event_ndims is None:
+      event_ndims = f.forward_min_event_ndims
+    new_log_volume = volume_coefficient(
+        distribution_util.move_dimension(new_basis_tensor, 0, -2))
+    result = new_log_volume - result
+    return new_log_volume, GeneralSpace(
+        DenseBasis(new_basis_tensor), computed_log_volume=new_log_volume)
+
+  def _transform_coordinatewise(self, x, f, **kwargs):
+    # TODO(b/197680518): For coordinatewise maps, we can compute the diagonal
+    # of the jacobian, and use the fact that the basis is very simple to compute
+    # it.
     return self._transform_general(self, x, f, **kwargs)
 
 

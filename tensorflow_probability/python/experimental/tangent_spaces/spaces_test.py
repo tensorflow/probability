@@ -437,6 +437,145 @@ class FiveSphereSpaceTest(_SpheresTest):
     self._testSpace(bijector_class, event_ndims, bijector_params)
 
 
+class _SimplexTest(_SpacesTest):
+
+  def generate_coords(self):
+    # Ensure that this represents the positive orthant of the sphere.
+    logits = []
+    for _ in range(self.dims):
+      logits.append(tf.range(-50., 50., self.delta))
+    return tf.reshape(
+        tf.stack(tf.meshgrid(*logits), axis=-1), [-1, self.dims])
+
+  def embed_coords(self, coords):
+    # Use logit embedding.
+    logits = tf.concat([coords, tf.zeros_like(coords[..., -1:])], axis=-1)
+    return tf.nn.softmax(logits)
+
+  def tangent_space(self, x):
+    del x
+    return spaces.ProbabilitySimplexSpace()
+
+  def log_local_area(self, local_grads):
+    log_volume = 0.5 * tf.linalg.logdet(
+        tf.linalg.matmul(local_grads, local_grads, transpose_b=True))
+    return self.dims * np.log(self.delta) + log_volume
+
+  def log_volume(self):
+    return -sp_special.gammaln(self.dims + 1)
+
+
+class OneSimplexTest(_SimplexTest):
+  delta = 1e-1
+  dims = 1
+
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(
+      {'testcase_name': 'Scale',
+       'bijector_class': scale.Scale,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {'scale': [2., 20.]}
+       },
+      {'testcase_name': 'Exp',
+       'bijector_class': exp.Exp,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {}
+       },
+      {'testcase_name': 'Identity',
+       'bijector_class': identity.Identity,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {}
+       },
+  )
+  def testSimplex(self, bijector_class, event_ndims, bijector_params):
+    self._testSpace(bijector_class, event_ndims, bijector_params)
+
+
+class TwoSimplexTest(_SimplexTest):
+  delta = 1e-1
+  atol = 3.5e-3
+  dims = 2
+
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(
+      {'testcase_name': 'Scale',
+       'bijector_class': scale.Scale,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {'scale': [1.2, 0.8, 3.]}
+       },
+      {'testcase_name': 'Exp',
+       'bijector_class': exp.Exp,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {}
+       },
+  )
+  def testSimplex(self, bijector_class, event_ndims, bijector_params):
+    self._testSpace(bijector_class, event_ndims, bijector_params)
+
+
+# Because we are gridding the space, we need to reduce the atol for
+# higher dimensions due to not enough grid points.
+
+
+class ThreeSimplexTest(_SimplexTest):
+  delta = 0.8
+  atol = 1.1e-2
+  dims = 3
+
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(
+      {'testcase_name': 'Scale',
+       'bijector_class': scale.Scale,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {'scale': [0.2, 1.8, 3., 2.]}
+       },
+      {'testcase_name': 'Exp',
+       'bijector_class': exp.Exp,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {}
+       },
+      {'testcase_name': 'Identity',
+       'bijector_class': identity.Identity,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {}
+       },
+  )
+  def testSimplex(self, bijector_class, event_ndims, bijector_params):
+    self._testSpace(bijector_class, event_ndims, bijector_params)
+
+
+class FourSimplexTest(_SimplexTest):
+  delta = 2.
+  atol = 4e-2
+  dims = 4
+
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(
+      {'testcase_name': 'Scale',
+       'bijector_class': scale.Scale,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {'scale': [0.2, 1.8, 3., 2., 5.]}
+       },
+      {'testcase_name': 'Exp',
+       'bijector_class': exp.Exp,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {}
+       },
+  )
+  def testSimplex(self, bijector_class, event_ndims, bijector_params):
+    self._testSpace(bijector_class, event_ndims, bijector_params)
+
+
 class SymmetricMatrixTest(_SpacesTest):
   """Test GeneralSpace works on a Symmetric Matrix."""
 
@@ -543,6 +682,7 @@ class SymmetricMatrixTest(_SpacesTest):
                         expected_log_volume)
 
 
+del _SimplexTest
 del _SpacesTest
 del _SpheresTest
 

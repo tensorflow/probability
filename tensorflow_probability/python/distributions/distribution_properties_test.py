@@ -72,7 +72,11 @@ INSTANTIABLE_BUT_NOT_SLICABLE = (
 
 TF1_GRAPH_MODE_BROKEN = (
     # TODO(b/197680518): ForwardAccumulator does not work under tf1.Graph.
+    'Dirichlet',
+    # TODO(b/197680518): ForwardAccumulator does not work under tf1.Graph.
     'PowerSpherical',
+    # TODO(b/197680518): ForwardAccumulator does not work under tf1.Graph.
+    'RelaxedOneHotCategorical',
     # TODO(b/197680518): ForwardAccumulator does not work under tf1.Graph.
     'SphericalUniform',
     # TODO(b/197680518): ForwardAccumulator does not work under tf1.Graph.
@@ -661,7 +665,8 @@ class DistributionSlicingTest(test_util.TestCase):
   @tfp_hps.tfp_hp_settings()
   def testDistributions(self, dist_name, data):
     def ok(name):
-      return name not in INSTANTIABLE_BUT_NOT_SLICABLE
+      return ((name not in INSTANTIABLE_BUT_NOT_SLICABLE) and
+              (name not in TF1_GRAPH_MODE_BROKEN))
 
     dist = data.draw(dhps.distributions(dist_name=dist_name,
                                         enable_vars=False,
