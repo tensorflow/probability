@@ -109,6 +109,27 @@ py_test(
 )
 
 multi_substrate_py_library(
+    name = "linear_operator_row_block",
+    srcs = ["linear_operator_row_block.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "linear_operator_row_block_test",
+    srcs = ["linear_operator_row_block_test.py"],
+    python_version = "PY3",
+    deps = [
+        ":linear_operator_row_block",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "linear_operator_unitary",
     srcs = ["linear_operator_unitary.py"],
     deps = [

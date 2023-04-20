@@ -17,6 +17,7 @@
 
 import numpy as np
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.experimental.linalg import linear_operator_row_block as lorb
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import nest_util
@@ -41,9 +42,8 @@ TF_MODE = not (JAX_MODE or NUMPY_MODE)
 
 def _jvp(f, x, b):
   """Computes jvp of `f` with respect to `x`."""
-  x = tf.convert_to_tensor(x)
-  b = tf.convert_to_tensor(b)
-  b = tf.zeros_like(x) + b
+  broadcast_shape = ps.broadcast_shape(ps.shape(x), ps.shape(b))
+  b = tf.broadcast_to(b, broadcast_shape)
   if JAX_MODE:
     import jax  # pylint:disable=g-import-not-at-top
     return jax.jvp(f.forward, (x,), (b,))[1]
@@ -54,6 +54,13 @@ def _jvp(f, x, b):
         y = f.forward(x)
       return acc.jvp(y)
     return jvp(b)
+
+
+def _elementwise_jvp(f, x):
+  """Returns the diagonal of the jacobian of an elementwise `f`."""
+  # If `f` acts elementwise, then multiplying by the Jacobian by
+  # the ones vector will retrieve the diagonal.
+  return _jvp(f, x, tf.ones_like(x))
 
 
 def _compute_new_basis(f, x, basis):
@@ -204,8 +211,45 @@ class Basis:
     """
     return self._to_dense()
 
+  def to_dense_matrix(self, event_ndims):
+    """Returns densified version of this Basis as a matrix.
+
+    Args:
+      event_ndims: Python `int` representing the number of right most dimensions
+        that are the dimensions of the tangent space.
+    Returns:
+      Tensor of shape `[B1, ..., Bn, N, F], where
+      `N` is the number of bases elements, `Bi` are possible
+      batch dimensions, and `F` are the last `event_ndims` dimensions
+      reshaped as one dimension.
+    """
+    return self._to_dense_matrix(event_ndims)
+
   def _to_dense(self):
     raise NotImplementedError
+
+  def _to_dense_matrix(self, event_ndims):
+    dense_tensor = self._to_dense()
+    return _reshape_to_matrix(dense_tensor, event_ndims)
+
+
+class LinearOperatorBasis(Basis):
+  """Basis parameterized by a `LinearOperator`."""
+
+  def __init__(self, basis_linop):
+    self._basis_linop = basis_linop
+
+  def _to_dense(self):
+    dense = self._basis_linop.to_dense()
+    return distribution_util.move_dimension(dense, -2, 0)
+
+  def _to_dense_matrix(self, event_ndims):
+    del event_ndims
+    return self._basis_linop.to_dense()
+
+  @property
+  def basis_linop(self):
+    return self._basis_linop
 
 
 class DenseBasis(Basis):
@@ -344,25 +388,40 @@ class GeneralSpace(TangentSpace):
     self.basis = basis
     self.computed_log_volume = computed_log_volume
 
+  def _transform_from_basis(self, new_basis, event_ndims):
+    result = self.computed_log_volume
+    if self.computed_log_volume is None:
+      basis_matrix = self.basis.to_dense_matrix(event_ndims)
+      result = volume_coefficient(basis_matrix)
+    new_log_volume = volume_coefficient(new_basis.to_dense_matrix(event_ndims))
+    result = new_log_volume - result
+    return result, GeneralSpace(
+        new_basis, computed_log_volume=new_log_volume)
+
   def _transform_general(self, x, f, event_ndims=None, **kwargs):
     # TODO(b/197680518): Clean up and extend the following code:
     # 1) Add Multipart Bijector Support.
     if NUMPY_MODE:
       raise ValueError('`transform_general` not available in Numpy')
 
-    new_basis = _compute_new_basis(f, x, self.basis)
+    new_basis_tensor = _compute_new_basis(f, x, self.basis)
+    new_basis = DenseBasis(new_basis_tensor)
     if event_ndims is None:
       event_ndims = f.forward_min_event_ndims
-    result = self.computed_log_volume
-    if self.computed_log_volume is None:
-      basis = _reshape_to_matrix(
-          self.basis.to_dense(), event_ndims=event_ndims)
-      result = volume_coefficient(basis)
-    new_log_volume = volume_coefficient(
-        _reshape_to_matrix(new_basis, event_ndims=event_ndims))
-    result = new_log_volume - result
-    return result, GeneralSpace(
-        DenseBasis(new_basis), computed_log_volume=new_log_volume)
+    return self._transform_from_basis(new_basis, event_ndims)
+
+  def _transform_coordinatewise(self, x, f, **kwargs):
+    diag_jacobian = self._elementwise_jvp(f, x)
+    diag_linop = tf.linalg.LinearOperatorDiag(diag_jacobian)
+    if isinstance(self.basis, LinearOperatorBasis):
+      new_basis = LinearOperatorBasis(self.basis.basis_linop @ diag_linop)
+    else:
+      new_basis = LinearOperatorBasis(
+          tf.linalg.LinearOperatorFullMatrix(
+              self.basis.to_dense_matrix() * diag_jacobian[..., tf.newaxis, :]))
+    if event_ndims is None:
+      event_ndims = f.forward_min_event_ndims
+    return self._transform_from_basis(new_basis, event_ndims)
 
 
 class ZeroSpace(TangentSpace):
@@ -419,22 +478,20 @@ class SphericalSpace(TangentSpace):
     # the last row, where y omits the last coordinate of x. We then transpose
     # this to get the number of bases vectors as the first dimension, and
     # rescale by 1 / (1 - x_n) in order to get bases with unit volume.
-    n = ps.shape(x)[-1]
+    # Note: When we are at the north pole, due to computing safe_x, we have
+    # x_n = 0 and y = 0, which results in the identity matrix, which is the
+    # correct basis.
     y = safe_x[..., :-1]
-    basis_tensor = -y[..., tf.newaxis] * y[..., tf.newaxis, :]
-    basis_tensor = basis_tensor / (1 - safe_x[..., -1:][..., tf.newaxis])
-    basis_tensor = tf.linalg.set_diag(
-        basis_tensor, tf.linalg.diag_part(basis_tensor) + 1)
-    basis_tensor = tf.concat([basis_tensor, y[..., tf.newaxis]], axis=-1)
 
-    # Finally handle the north pole by using the unit basis.
-    north_pole_basis_tensor = tf.eye(num_rows=n-1, num_columns=n, dtype=x.dtype)
-    basis_tensor = tf.where(
-        is_north_pole[..., tf.newaxis, tf.newaxis],
-        north_pole_basis_tensor, basis_tensor)
-    basis_tensor = distribution_util.move_dimension(basis_tensor, -2, 0)
-    basis = DenseBasis(basis_tensor)
-    return basis
+    base_operator = tf.linalg.LinearOperatorIdentity(
+        ps.shape(y)[-1], batch_shape=ps.shape(x)[:-1], dtype=x.dtype)
+    block1 = tf.linalg.LinearOperatorLowRankUpdate(
+        base_operator=base_operator,
+        u=y[..., tf.newaxis],
+        diag_update=-tf.math.reciprocal(1. - safe_x[..., -1:]))
+    block2 = tf.linalg.LinearOperatorFullMatrix(y[..., tf.newaxis])
+    sphere_basis_linop = lorb.LinearOperatorRowBlock([block1, block2])
+    return LinearOperatorBasis(sphere_basis_linop)
 
   def _transform_general(self, x, f, event_ndims=None, **kwargs):
     basis = self.compute_spherical_basis(x)
@@ -446,12 +503,6 @@ class SphericalSpace(TangentSpace):
     # The original basis has 0 log_volume.
     return new_log_volume, GeneralSpace(
         DenseBasis(new_basis), computed_log_volume=new_log_volume)
-
-  def _transform_coordinatewise(self, x, f, **kwargs):
-    # TODO(b/197680518): For coordinatewise maps, we can compute the diagonal
-    # of the jacobian, and use the fact that the basis has a low rank form to
-    # compute the new basis efficiently, potentially avoiding storage costs.
-    return self._transform_general(x, f, **kwargs)
 
 
 class ProbabilitySimplexSpace(TangentSpace):
@@ -468,11 +519,11 @@ class ProbabilitySimplexSpace(TangentSpace):
     #  [0, 1., 0., -1],
     #  [0, 0., 1., -1]]
     dim = ps.shape(x)[-1]
-    simplex_basis = tf.eye(dim - 1, dtype=x.dtype)
-    simplex_basis = tf.concat(
-        [simplex_basis, -tf.ones([dim - 1, 1], dtype=x.dtype)],
-        axis=-1)
-    return DenseBasis(simplex_basis)
+    block1 = tf.linalg.LinearOperatorIdentity(num_rows=dim - 1, dtype=x.dtype)
+    block2 = tf.linalg.LinearOperatorFullMatrix(
+        -tf.ones([dim - 1, 1], dtype=x.dtype))
+    simplex_basis_linop = lorb.LinearOperatorRowBlock([block1, block2])
+    return LinearOperatorBasis(simplex_basis_linop)
 
   def _transform_general(self, x, f, event_ndims=None, **kwargs):
     basis = self.compute_basis(x)
@@ -491,10 +542,24 @@ class ProbabilitySimplexSpace(TangentSpace):
         DenseBasis(new_basis_tensor), computed_log_volume=new_log_volume)
 
   def _transform_coordinatewise(self, x, f, **kwargs):
-    # TODO(b/197680518): For coordinatewise maps, we can compute the diagonal
-    # of the jacobian, and use the fact that the basis is very simple to compute
-    # it.
-    return self._transform_general(x, f, **kwargs)
+    # Compute the diagonal. New matrix is Linop that we can easily write.
+    dim = ps.shape(x)[-1]
+    diag_jacobian = _elementwise_jvp(f, x)
+    # Multiplying the basis written in block form as [I, 1] by the diagonal
+    # results in this operator:
+    block1 = tf.linalg.LinearOperatorDiag(diag_jacobian[..., :-1])
+    block2 = tf.linalg.LinearOperatorFullMatrix(
+        diag_jacobian[..., -1] * tf.ones([dim - 1, 1], dtype=x.dtype))
+    linop = lorb.LinearOperatorRowBlock([block1, block2])
+    # The volume can be calculated again by the matrix determinant lemma:
+    # det(D**2 + d_n**2 11^T) = (1 + d_n**2 1(D^-1)**21^T) * det(D**2)
+    # = (\sum d_i**-2) * \prod d_i**2
+    log_diag_jacobian = tf.math.log(tf.math.abs(diag_jacobian))
+    log_volume = tf.math.reduce_sum(log_diag_jacobian, axis=-1)
+    log_volume = log_volume + 0.5 * tf.math.reduce_logsumexp(
+        -2. * log_diag_jacobian, axis=-1)
+    return log_volume, GeneralSpace(
+        LinearOperatorBasis(linop), computed_log_volume=log_volume)
 
 
 class UnspecifiedTangentSpaceError(Exception):
