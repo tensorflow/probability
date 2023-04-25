@@ -52,7 +52,12 @@ def _jvp(f, x, b):
     def jvp(b):
       with tf.autodiff.ForwardAccumulator(primals=x, tangents=b) as acc:
         y = f.forward(x)
-      return acc.jvp(y)
+      result = acc.jvp(y)
+      # TODO(srvasude): "result is None" might be caused by tf.Graph mode,
+      # rather than missing the dependency of y w.r.t. x.
+      if result is None:
+        result = tf.zeros_like(y)
+      return result
     return jvp(b)
 
 
@@ -411,7 +416,7 @@ class GeneralSpace(TangentSpace):
     return self._transform_from_basis(new_basis, event_ndims)
 
   def _transform_coordinatewise(self, x, f, **kwargs):
-    diag_jacobian = self._elementwise_jvp(f, x)
+    diag_jacobian = _elementwise_jvp(f, x)
     diag_linop = tf.linalg.LinearOperatorDiag(diag_jacobian)
     if isinstance(self.basis, LinearOperatorBasis):
       new_basis = LinearOperatorBasis(self.basis.basis_linop @ diag_linop)
@@ -549,7 +554,8 @@ class ProbabilitySimplexSpace(TangentSpace):
     # results in this operator:
     block1 = tf.linalg.LinearOperatorDiag(diag_jacobian[..., :-1])
     block2 = tf.linalg.LinearOperatorFullMatrix(
-        diag_jacobian[..., -1] * tf.ones([dim - 1, 1], dtype=x.dtype))
+        diag_jacobian[..., -1:] * tf.ones([dim - 1, 1], dtype=x.dtype)
+    )
     linop = lorb.LinearOperatorRowBlock([block1, block2])
     # The volume can be calculated again by the matrix determinant lemma:
     # det(D**2 + d_n**2 11^T) = (1 + d_n**2 1(D^-1)**21^T) * det(D**2)
@@ -572,11 +578,18 @@ class UnspecifiedTangentSpaceError(Exception):
 
 
 def _reshape_to_matrix(basis_tensor, event_ndims):
-  # Reshape basis so that there is only one ambient dimension.
-  basis_tensor = ps.reshape(
-      basis_tensor, ps.concat(
-          [ps.shape(basis_tensor)[
-              :ps.rank(basis_tensor) - event_ndims], [-1]], axis=0))
+  """Reshape basis so that there is only one ambient dimension."""
+  # Compute event_size explicitly so that we can reshape a 0-size basis_tensor.
+  event_shape = ps.shape(basis_tensor)[ps.rank(basis_tensor) - event_ndims :]
+  event_size = tensorshape_util.num_elements(tf.TensorShape(event_shape))
+  new_shape = ps.concat(
+      [
+          ps.shape(basis_tensor)[: ps.rank(basis_tensor) - event_ndims],
+          [event_size],
+      ],
+      axis=0,
+  )
+  basis_tensor = ps.reshape(basis_tensor, new_shape)
   if event_ndims == 0:
     basis_tensor = basis_tensor[..., tf.newaxis]
   # Finally move the basis vector dimension to the end so we have shape [B1,

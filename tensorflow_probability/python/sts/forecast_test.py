@@ -202,12 +202,24 @@ class _ForecastTest(object):
     observed_time_series = self._build_tensor(np.random.randn(
         *(batch_shape + [num_timesteps])))
     model = self._build_model(observed_time_series)
-    samples, _ = fitting.fit_with_hmc(
-        model,
-        observed_time_series,
-        num_results=num_results,
-        num_warmup_steps=2,
-        num_variational_steps=2)
+    try:
+      samples, _ = fitting.fit_with_hmc(
+          model,
+          observed_time_series,
+          num_results=num_results,
+          num_warmup_steps=2,
+          num_variational_steps=2,
+      )
+    except NotImplementedError as e:
+      err_str = str(e)
+      if "'Tensor' object has no attribute '_name'" in err_str:
+        # TODO(b/279596122): Enable the test after the upstream issue is fixed.
+        self.skipTest(
+            'test_forecast_from_hmc is failing due to Tensor object'
+            'has no attribute `shape`.'
+        )
+      else:
+        raise e
 
     forecast_dist = forecast.forecast(
         model,
