@@ -1687,6 +1687,10 @@ class NumpyTest(test_util.TestCase):
                          [-2000. * state[0] * state[1] - 1.,
                           1000. * (1. - state[0]**2)]]).dtype)
 
+  def test_unstack_with_zero_dimension(self):
+    self.assertAllEqual([], nptf.unstack(nptf.zeros((5, 3, 0)), axis=-1))
+    self.assertAllEqual([], nptf.unstack(nptf.zeros((4, 0, 2)), axis=1))
+
   def test_concat_infers_dtype(self):
     self.assertEqual(np.int32, nptf.concat([[1], []], 0).dtype)
     self.assertEqual(np.float32, nptf.concat([[], [1]], 0).dtype)

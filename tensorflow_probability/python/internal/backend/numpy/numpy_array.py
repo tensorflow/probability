@@ -382,9 +382,11 @@ def _unstack(value, num=None, axis=0, name='unstack'):
   value = ops.convert_to_tensor(value)
   if axis == 0:
     return list(value)
-  return list(
-      np.squeeze(x, axis=axis)
-      for x in np.split(value, value.shape[axis] if num is None else num, axis))
+  if num is None:
+    num = value.shape[axis]
+  if num == 0:
+    return []
+  return list(np.squeeze(x, axis=axis) for x in np.split(value, num, axis))
 
 
 def _where(condition, x=None, y=None, name='where'):  # pylint: disable=unused-argument
