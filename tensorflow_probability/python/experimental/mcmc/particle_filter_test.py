@@ -45,47 +45,45 @@ from tensorflow_probability.python.math import gradient
 @test_util.test_all_tf_execution_regimes
 class _ParticleFilterTest(test_util.TestCase):
   def test_smc_squared(self):
-
-      results = self.evaluate(
-          particle_filter.smc_squared(
-              inner_observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
-              inner_initial_state_prior=lambda _, state: normal.Normal(tf.zeros_like(state), 1.),
-              initial_parameter_prior=normal.Normal(0., 1.),
-              parameter_proposal_kernel=1,  # TODO
-              num_outer_particles=20,
-              outer_rejuvenation_criterion_fn=lambda *_: False,
-              inner_transition_fn=lambda _, state: normal.Normal(state, 1.),
-              inner_observation_fn=lambda _, state: normal.Normal(state, 1.),
-              num_inner_particles=10,
-              seed=1)
-      )
-
-      results = self.evaluate(
-          particle_filter.particle_filter(
-              observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
-              initial_state_prior=normal.Normal(0., 1.),
-              transition_fn=lambda _, state: normal.Normal(state, 1.),
-              observation_fn=lambda _, state: normal.Normal(state, 1.),
-              num_particles=1024,
-              seed=1)
-      )
+      #
+      # results = self.evaluate(
+      #     particle_filter.smc_squared(
+      #         inner_observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
+      #         inner_initial_state_prior=lambda _, state: normal.Normal(tf.zeros_like(state), 1.),
+      #         initial_parameter_prior=normal.Normal(0., 1.),
+      #         parameter_proposal_kernel=1,  # TODO
+      #         num_outer_particles=20,
+      #         outer_rejuvenation_criterion_fn=lambda *_: False,
+      #         inner_transition_fn=lambda _, state: normal.Normal(state, 1.),
+      #         inner_observation_fn=lambda _, state: normal.Normal(state, 1.),
+      #         num_inner_particles=10,
+      #         seed=1)
+      # )
+      #
+      # results = self.evaluate(
+      #     particle_filter.particle_filter(
+      #         observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
+      #         initial_state_prior=normal.Normal(0., 1.),
+      #         transition_fn=lambda _, state: normal.Normal(state, 1.),
+      #         observation_fn=lambda _, state: normal.Normal(state, 1.),
+      #         num_particles=1024,
+      #         seed=1)
+      # )
 
       # # TODO: RESAMPLE TEST
-      # particles = tf.tile(tf.expand_dims(tf.range(10, dtype=tf.float32), 0), [3, 1])
-      # print(particles)
-      # # particles = tf.constant(np.linspace(1., 10., num=10, dtype=np.float32))
+      particles = tf.tile(tf.expand_dims(tf.range(10, dtype=tf.float32), 0), [3, 1])
+
+      # particles = tf.constant(np.linspace(1., 10., num=10, dtype=np.float32))
       # log_weights = tf.constant([-211, 4, -233.])
-      #
-      # new_particles, _, new_log_weights = resample(
-      #     particles, log_weights, particles_dim=0,
-      #     resample_fn=resample_systematic)
-      #
+      log_weights = poisson.Poisson(20.).log_prob(particles)
+      print('log_weights---', particles)
+      new_particles, _, new_log_weights = resample(
+          particles, log_weights, particles_dim=1,
+          resample_fn=resample_systematic)
       # print('result')
       # print(new_particles)
       # print(new_log_weights)
       # print('-------')
-
-
 
 
 # TODO(b/186068104): add tests with dynamic shapes.
