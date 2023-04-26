@@ -56,8 +56,10 @@ multi_substrate_py_test(
     name = "spaces_test",
     size = "medium",
     srcs = ["spaces_test.py"],
-    shard_count = 6,
-    tags = ["tf1-broken"],
+    shard_count = 10,
+    tags = [
+        "tf1-broken",
+    ],
     deps = [
         ":spaces",
         # numpy dep,

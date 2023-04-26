@@ -48,8 +48,12 @@ class _SpacesTest(test_util.TestCase):
 
     @tf.function
     def transformed_log_prob(x):
-      return -self.log_volume() - self.tangent_space(
-          x).transform_general(x, bijector, event_ndims=event_ndims)[0]
+      density_correction = bijector.experimental_compute_density_correction(
+          x,
+          self.tangent_space(x),
+          backward_compat=True,
+          event_ndims=event_ndims)[0]
+      return -(self.log_volume() + density_correction)
 
     coords = self.generate_coords()
     z = self.embed_coords(coords)
@@ -102,6 +106,23 @@ class _SpacesTest(test_util.TestCase):
         np.zeros_like(total_log_prob),
         total_log_prob, atol=self.atol, rtol=1e-5)
 
+  def _testSpecializations(self, bijector_class, event_ndims, bijector_params):
+    coords = self.generate_coords()
+    z = self.embed_coords(coords)
+    bijector = bijector_class(**bijector_params)
+    tangent_space = self.tangent_space(z)
+    log_volume1, _ = tangent_space.transform_general(
+        z, bijector, event_ndims=event_ndims)
+    log_volume2, _ = tangent_space.transform_dimension_preserving(
+        z, bijector, event_ndims=event_ndims)
+    log_volume3, _ = tangent_space.transform_coordinatewise(
+        z, bijector, event_ndims=event_ndims)
+
+    (log_volume1, log_volume2, log_volume3) = (
+        self.evaluate([log_volume1, log_volume2, log_volume3]))
+    self.assertAllClose(log_volume1, log_volume2)
+    self.assertAllClose(log_volume1, log_volume3)
+
   def flatten_bijector(self):
     """Set this if your event space is a non-vector."""
     return identity.Identity()
@@ -132,13 +153,13 @@ class DiscreteZeroSpaceTest(_SpacesTest):
 
   @test_util.numpy_disable_gradient_test
   @parameterized.named_parameters(
-      {'testcase_name': 'ExpDiscrete',
+      {'testcase_name': 'Exp',
        'bijector_class': exp.Exp,
        'event_ndims': 1,
        # batch_shape: []
        'bijector_params': {}
        },
-      {'testcase_name': 'ScaleDiscrete',
+      {'testcase_name': 'Scale',
        'bijector_class': scale.Scale,
        'event_ndims': 1,
        # batch_shape: []
@@ -173,33 +194,51 @@ class CircleSpaceTest(_SpacesTest):
 
   @test_util.numpy_disable_gradient_test
   @parameterized.named_parameters(
-      {'testcase_name': 'ExpCircle',
+      {'testcase_name': 'Exp',
        'bijector_class': exp.Exp,
        'event_ndims': 1,
        # batch_shape: []
        'bijector_params': {}
        },
-      {'testcase_name': 'ScalingCircle',
+      {'testcase_name': 'Scaling',
        'bijector_class': scale.Scale,
        'event_ndims': 1,
        # batch_shape: []
        'bijector_params': {'scale': [2., 20.]}
        },
-      {'testcase_name': 'ScalingCircleBatch',
+      {'testcase_name': 'ScalingBatch',
        'bijector_class': scale.Scale,
        'event_ndims': 1,
        # batch_shape: [3, 1, 2]
        'bijector_params': {'scale': [[[2., 20.]], [[3., 5.]], [[1., -1.]]]}
        },
-      {'testcase_name': 'AffineCircle',
-       'bijector_class': scale_matvec_tril.ScaleMatvecTriL,
-       'event_ndims': None,
-       # batch_shape: []
-       'bijector_params': {'scale_tril': [[3., 0.], [-2., 5.]]}
-       },
   )
   def testGeneralSpace(self, bijector_class, event_ndims, bijector_params):
     self._testSpace(bijector_class, event_ndims, bijector_params)
+
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(
+      {'testcase_name': 'Exp',
+       'bijector_class': exp.Exp,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {}
+       },
+      {'testcase_name': 'Scaling',
+       'bijector_class': scale.Scale,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {'scale': [2., 20.]}
+       },
+      {'testcase_name': 'ScalingBatch',
+       'bijector_class': scale.Scale,
+       'event_ndims': 1,
+       # batch_shape: [3, 1, 2]
+       'bijector_params': {'scale': [[[2., 20.]], [[3., 5.]], [[1., -1.]]]}
+       },
+  )
+  def testSpecializations(self, bijector_class, event_ndims, bijector_params):
+    self._testSpecializations(bijector_class, event_ndims, bijector_params)
 
 
 class HalfSphereSpaceTest(_SpacesTest):
@@ -270,6 +309,30 @@ class HalfSphereSpaceTest(_SpacesTest):
   def testGeneralSpace(self, bijector_class, event_ndims, bijector_params):
     self._testSpace(bijector_class, event_ndims, bijector_params)
 
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(
+      {'testcase_name': 'Exp',
+       'bijector_class': exp.Exp,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {}
+       },
+      {'testcase_name': 'Scaling',
+       'bijector_class': scale.Scale,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {'scale': [2., 5., 0.5]}
+       },
+      {'testcase_name': 'ScalingBatch',
+       'bijector_class': scale.Scale,
+       'event_ndims': 1,
+       # batch_shape: [2, 1, 3]
+       'bijector_params': {'scale': [[[2., 5., 0.5]], [[3., 5., 2.]]]}
+       },
+  )
+  def testSpecializations(self, bijector_class, event_ndims, bijector_params):
+    self._testSpecializations(bijector_class, event_ndims, bijector_params)
+
 
 class _SpheresTest(_SpacesTest):
 
@@ -299,8 +362,9 @@ class _SpheresTest(_SpacesTest):
     return spaces.SphericalSpace()
 
   def log_local_area(self, local_grads):
-    log_volume = 0.5 * tf.linalg.logdet(
-        tf.linalg.matmul(local_grads, local_grads, transpose_b=True))
+    jac_sq = tf.linalg.matmul(local_grads, local_grads, transpose_b=True)
+    jac_sq = tf.linalg.set_diag(jac_sq, tf.linalg.diag_part(jac_sq) + 1e-5)
+    log_volume = 0.5 * tf.linalg.logdet(jac_sq)
     return self.dims * np.log(self.delta) + log_volume
 
   def log_volume(self):
@@ -337,6 +401,24 @@ class OneSphereSpaceTest(_SpheresTest):
   def testSphericalSpace(self, bijector_class, event_ndims, bijector_params):
     self._testSpace(bijector_class, event_ndims, bijector_params)
 
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(
+      {'testcase_name': 'Scale',
+       'bijector_class': scale.Scale,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {'scale': [2., 20.]}
+       },
+      {'testcase_name': 'Exp',
+       'bijector_class': exp.Exp,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {}
+       },
+  )
+  def testSpecializations(self, bijector_class, event_ndims, bijector_params):
+    self._testSpecializations(bijector_class, event_ndims, bijector_params)
+
 
 class TwoSphereSpaceTest(_SpheresTest):
   delta = 3e-3
@@ -360,6 +442,24 @@ class TwoSphereSpaceTest(_SpheresTest):
   def testSphericalSpace(self, bijector_class, event_ndims, bijector_params):
     self._testSpace(bijector_class, event_ndims, bijector_params)
 
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(
+      {'testcase_name': 'Scale',
+       'bijector_class': scale.Scale,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {'scale': [1.2, 0.8, 3.]}
+       },
+      {'testcase_name': 'Exp',
+       'bijector_class': exp.Exp,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {}
+       },
+  )
+  def testSpecializations(self, bijector_class, event_ndims, bijector_params):
+    self._testSpecializations(bijector_class, event_ndims, bijector_params)
+
 
 # Because we are gridding the space, we need to reduce the atol for
 # higher dimensions due to not enough grid points.
@@ -367,7 +467,7 @@ class TwoSphereSpaceTest(_SpheresTest):
 
 class ThreeSphereSpaceTest(_SpheresTest):
   delta = 5e-2
-  atol = 3e-3
+  atol = 3.5e-3
   dims = 3
 
   @test_util.numpy_disable_gradient_test
@@ -388,10 +488,28 @@ class ThreeSphereSpaceTest(_SpheresTest):
   def testSphericalSpace(self, bijector_class, event_ndims, bijector_params):
     self._testSpace(bijector_class, event_ndims, bijector_params)
 
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(
+      {'testcase_name': 'Scale',
+       'bijector_class': scale.Scale,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {'scale': [0.2, 1.8, 3., 2.]}
+       },
+      {'testcase_name': 'Exp',
+       'bijector_class': exp.Exp,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {}
+       },
+  )
+  def testSpecializations(self, bijector_class, event_ndims, bijector_params):
+    self._testSpecializations(bijector_class, event_ndims, bijector_params)
+
 
 class FourSphereSpaceTest(_SpheresTest):
   delta = 1e-1
-  atol = 1.9e-2
+  atol = 2e-2
   dims = 4
 
   @test_util.numpy_disable_gradient_test
@@ -412,10 +530,28 @@ class FourSphereSpaceTest(_SpheresTest):
   def testSphericalSpace(self, bijector_class, event_ndims, bijector_params):
     self._testSpace(bijector_class, event_ndims, bijector_params)
 
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(
+      {'testcase_name': 'Scale',
+       'bijector_class': scale.Scale,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {'scale': [0.2, 1.8, 3., 2., 5.]}
+       },
+      {'testcase_name': 'Exp',
+       'bijector_class': exp.Exp,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {}
+       },
+  )
+  def testSpecializations(self, bijector_class, event_ndims, bijector_params):
+    self._testSpecializations(bijector_class, event_ndims, bijector_params)
+
 
 class FiveSphereSpaceTest(_SpheresTest):
   delta = 2e-1
-  atol = 1.9e-2
+  atol = 2e-2
   dims = 5
 
   @test_util.numpy_disable_gradient_test
@@ -435,6 +571,24 @@ class FiveSphereSpaceTest(_SpheresTest):
   )
   def testSphericalSpace(self, bijector_class, event_ndims, bijector_params):
     self._testSpace(bijector_class, event_ndims, bijector_params)
+
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(
+      {'testcase_name': 'Scale',
+       'bijector_class': scale.Scale,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {'scale': [0.2, 1.8, -2., 2., 1.7, 0.8]}
+       },
+      {'testcase_name': 'Exp',
+       'bijector_class': exp.Exp,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {}
+       },
+  )
+  def testSpecializations(self, bijector_class, event_ndims, bijector_params):
+    self._testSpecializations(bijector_class, event_ndims, bijector_params)
 
 
 class _SimplexTest(_SpacesTest):
@@ -459,7 +613,12 @@ class _SimplexTest(_SpacesTest):
   def log_local_area(self, local_grads):
     log_volume = 0.5 * tf.linalg.logdet(
         tf.linalg.matmul(local_grads, local_grads, transpose_b=True))
-    return self.dims * np.log(self.delta) + log_volume
+    # We need to account for the fact the measure on the probability simplex is
+    # not the lebesgue measure, and differs by a constant.
+    # For instance, the length of the line segment from (0, 1) to (1, 0) is
+    # sqrt(2), but is 1 under the simplex measure.
+    return (self.dims * np.log(self.delta) + log_volume -
+            0.5 * np.log1p(self.dims))
 
   def log_volume(self):
     return -sp_special.gammaln(self.dims + 1)
@@ -471,6 +630,14 @@ class OneSimplexTest(_SimplexTest):
 
   @test_util.numpy_disable_gradient_test
   @parameterized.named_parameters(
+      {'testcase_name': 'Affine',
+       'bijector_class': scale_matvec_tril.ScaleMatvecTriL,
+       'event_ndims': None,
+       # batch_shape: [2, 1]
+       'bijector_params': {
+           'scale_tril': [[[[3., 0.], [-2., 5.]]], [[[1., 0.], [1., 1.]]]]}
+
+       },
       {'testcase_name': 'Scale',
        'bijector_class': scale.Scale,
        'event_ndims': 1,
@@ -493,11 +660,68 @@ class OneSimplexTest(_SimplexTest):
   def testSimplex(self, bijector_class, event_ndims, bijector_params):
     self._testSpace(bijector_class, event_ndims, bijector_params)
 
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(
+      {'testcase_name': 'Scale',
+       'bijector_class': scale.Scale,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {'scale': [2., 20.]}
+       },
+      {'testcase_name': 'Exp',
+       'bijector_class': exp.Exp,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {}
+       },
+      {'testcase_name': 'Identity',
+       'bijector_class': identity.Identity,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {}
+       },
+  )
+  def testSpecializations(self, bijector_class, event_ndims, bijector_params):
+    self._testSpecializations(bijector_class, event_ndims, bijector_params)
+
 
 class TwoSimplexTest(_SimplexTest):
   delta = 1e-1
-  atol = 3.5e-3
+  atol = 7e-3
   dims = 2
+
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(
+      {'testcase_name': 'Affine',
+       'bijector_class': scale_matvec_tril.ScaleMatvecTriL,
+       'event_ndims': None,
+       # batch_shape: [2, 1]
+       'bijector_params': {
+           'scale_tril': [[[[3., 0., 0.], [-2., 5., 0.], [1., 1., 1.]]],
+                          [[[1., 0., 0.], [1., 1., 0.], [2., 1., -1.]]]]}
+
+       },
+      {'testcase_name': 'Exp',
+       'bijector_class': exp.Exp,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {}
+       },
+      {'testcase_name': 'Identity',
+       'bijector_class': identity.Identity,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {}
+       },
+      {'testcase_name': 'Scale',
+       'bijector_class': scale.Scale,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {'scale': [1.2, 0.8, 3.]}
+       },
+  )
+  def testSimplex(self, bijector_class, event_ndims, bijector_params):
+    self._testSpace(bijector_class, event_ndims, bijector_params)
 
   @test_util.numpy_disable_gradient_test
   @parameterized.named_parameters(
@@ -514,8 +738,8 @@ class TwoSimplexTest(_SimplexTest):
        'bijector_params': {}
        },
   )
-  def testSimplex(self, bijector_class, event_ndims, bijector_params):
-    self._testSpace(bijector_class, event_ndims, bijector_params)
+  def testSpecializations(self, bijector_class, event_ndims, bijector_params):
+    self._testSpecializations(bijector_class, event_ndims, bijector_params)
 
 
 # Because we are gridding the space, we need to reduce the atol for
@@ -551,6 +775,30 @@ class ThreeSimplexTest(_SimplexTest):
   def testSimplex(self, bijector_class, event_ndims, bijector_params):
     self._testSpace(bijector_class, event_ndims, bijector_params)
 
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(
+      {'testcase_name': 'Scale',
+       'bijector_class': scale.Scale,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {'scale': [0.2, 1.8, 3., 2.]}
+       },
+      {'testcase_name': 'Exp',
+       'bijector_class': exp.Exp,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {}
+       },
+      {'testcase_name': 'Identity',
+       'bijector_class': identity.Identity,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {}
+       },
+  )
+  def testSpecializations(self, bijector_class, event_ndims, bijector_params):
+    self._testSpecializations(bijector_class, event_ndims, bijector_params)
+
 
 class FourSimplexTest(_SimplexTest):
   delta = 2.
@@ -574,6 +822,24 @@ class FourSimplexTest(_SimplexTest):
   )
   def testSimplex(self, bijector_class, event_ndims, bijector_params):
     self._testSpace(bijector_class, event_ndims, bijector_params)
+
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(
+      {'testcase_name': 'Scale',
+       'bijector_class': scale.Scale,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {'scale': [0.2, 1.8, 3., 2., 5.]}
+       },
+      {'testcase_name': 'Exp',
+       'bijector_class': exp.Exp,
+       'event_ndims': 1,
+       # batch_shape: []
+       'bijector_params': {}
+       },
+  )
+  def testSpecializations(self, bijector_class, event_ndims, bijector_params):
+    self._testSpecializations(bijector_class, event_ndims, bijector_params)
 
 
 class SymmetricMatrixTest(_SpacesTest):

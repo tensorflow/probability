@@ -61,9 +61,9 @@ def _jvp(f, x, b):
     return jvp(b)
 
 
-def _elementwise_jvp(f, x):
-  """Returns the diagonal of the jacobian of an elementwise `f`."""
-  # If `f` acts elementwise, then multiplying by the Jacobian by
+def _coordinatewise_jvp(f, x):
+  """Returns the diagonal of the jacobian of an coordinatewise `f`."""
+  # If `f` acts coordinatewise, then multiplying by the Jacobian by
   # the ones vector will retrieve the diagonal.
   return _jvp(f, x, tf.ones_like(x))
 
@@ -415,17 +415,20 @@ class GeneralSpace(TangentSpace):
       event_ndims = f.forward_min_event_ndims
     return self._transform_from_basis(new_basis, event_ndims)
 
-  def _transform_coordinatewise(self, x, f, **kwargs):
-    diag_jacobian = _elementwise_jvp(f, x)
+  def _transform_coordinatewise(self, x, f, event_ndims=None, **kwargs):
+    diag_jacobian = _coordinatewise_jvp(f, x)
     diag_linop = tf.linalg.LinearOperatorDiag(diag_jacobian)
+    if event_ndims is None:
+      event_ndims = f.forward_min_event_ndims
     if isinstance(self.basis, LinearOperatorBasis):
       new_basis = LinearOperatorBasis(self.basis.basis_linop @ diag_linop)
     else:
+      diag_jacobian_reshape = _reshape_to_matrix(
+          diag_jacobian[tf.newaxis, ...], event_ndims)
       new_basis = LinearOperatorBasis(
           tf.linalg.LinearOperatorFullMatrix(
-              self.basis.to_dense_matrix() * diag_jacobian[..., tf.newaxis, :]))
-    if event_ndims is None:
-      event_ndims = f.forward_min_event_ndims
+              self.basis.to_dense_matrix(event_ndims) *
+              diag_jacobian_reshape))
     return self._transform_from_basis(new_basis, event_ndims)
 
 
@@ -498,11 +501,9 @@ class SphericalSpace(TangentSpace):
     sphere_basis_linop = lorb.LinearOperatorRowBlock([block1, block2])
     return LinearOperatorBasis(sphere_basis_linop)
 
-  def _transform_general(self, x, f, event_ndims=None, **kwargs):
+  def _transform_general(self, x, f, **kwargs):
     basis = self.compute_spherical_basis(x)
     new_basis = _compute_new_basis(f, x, basis)
-    if event_ndims is None:
-      event_ndims = f.forward_min_event_ndims
     new_log_volume = volume_coefficient(
         distribution_util.move_dimension(new_basis, 0, -2))
     # The original basis has 0 log_volume.
@@ -530,7 +531,7 @@ class ProbabilitySimplexSpace(TangentSpace):
     simplex_basis_linop = lorb.LinearOperatorRowBlock([block1, block2])
     return LinearOperatorBasis(simplex_basis_linop)
 
-  def _transform_general(self, x, f, event_ndims=None, **kwargs):
+  def _transform_general(self, x, f, **kwargs):
     basis = self.compute_basis(x)
     # Note that B @ B.T results in the matrix I + 11^T, where 1 is the vector of
     # all ones. By the matrix determinant lemma we have det(I + 11^T) = n + 1,
@@ -538,32 +539,31 @@ class ProbabilitySimplexSpace(TangentSpace):
     dim = ps.shape(x)[-1]
     result = dtype_util.as_numpy_dtype(x.dtype)(0.5 * np.log(dim))
     new_basis_tensor = _compute_new_basis(f, x, basis)
-    if event_ndims is None:
-      event_ndims = f.forward_min_event_ndims
     new_log_volume = volume_coefficient(
         distribution_util.move_dimension(new_basis_tensor, 0, -2))
     result = new_log_volume - result
-    return new_log_volume, GeneralSpace(
+    return result, GeneralSpace(
         DenseBasis(new_basis_tensor), computed_log_volume=new_log_volume)
 
   def _transform_coordinatewise(self, x, f, **kwargs):
     # Compute the diagonal. New matrix is Linop that we can easily write.
     dim = ps.shape(x)[-1]
-    diag_jacobian = _elementwise_jvp(f, x)
+    diag_jacobian = _coordinatewise_jvp(f, x)
     # Multiplying the basis written in block form as [I, 1] by the diagonal
     # results in this operator:
     block1 = tf.linalg.LinearOperatorDiag(diag_jacobian[..., :-1])
     block2 = tf.linalg.LinearOperatorFullMatrix(
-        diag_jacobian[..., -1:] * tf.ones([dim - 1, 1], dtype=x.dtype)
-    )
+        diag_jacobian[..., -1:, tf.newaxis] *
+        tf.ones([dim - 1, 1], dtype=x.dtype))
     linop = lorb.LinearOperatorRowBlock([block1, block2])
+
     # The volume can be calculated again by the matrix determinant lemma:
     # det(D**2 + d_n**2 11^T) = (1 + d_n**2 1(D^-1)**21^T) * det(D**2)
     # = (\sum d_i**-2) * \prod d_i**2
     log_diag_jacobian = tf.math.log(tf.math.abs(diag_jacobian))
     log_volume = tf.math.reduce_sum(log_diag_jacobian, axis=-1)
     log_volume = log_volume + 0.5 * tf.math.reduce_logsumexp(
-        -2. * log_diag_jacobian, axis=-1)
+        -2. * log_diag_jacobian, axis=-1) - 0.5 * np.log(dim)
     return log_volume, GeneralSpace(
         LinearOperatorBasis(linop), computed_log_volume=log_volume)
 
@@ -578,18 +578,11 @@ class UnspecifiedTangentSpaceError(Exception):
 
 
 def _reshape_to_matrix(basis_tensor, event_ndims):
-  """Reshape basis so that there is only one ambient dimension."""
-  # Compute event_size explicitly so that we can reshape a 0-size basis_tensor.
-  event_shape = ps.shape(basis_tensor)[ps.rank(basis_tensor) - event_ndims :]
-  event_size = tensorshape_util.num_elements(tf.TensorShape(event_shape))
-  new_shape = ps.concat(
-      [
-          ps.shape(basis_tensor)[: ps.rank(basis_tensor) - event_ndims],
-          [event_size],
-      ],
-      axis=0,
-  )
-  basis_tensor = ps.reshape(basis_tensor, new_shape)
+  # Reshape basis so that there is only one ambient dimension.
+  basis_tensor = ps.reshape(
+      basis_tensor, ps.concat(
+          [ps.shape(basis_tensor)[
+              :ps.rank(basis_tensor) - event_ndims], [-1]], axis=0))
   if event_ndims == 0:
     basis_tensor = basis_tensor[..., tf.newaxis]
   # Finally move the basis vector dimension to the end so we have shape [B1,
