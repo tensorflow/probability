@@ -142,10 +142,19 @@ def _compute_flattened_scale(
     kronecker_diags = []
     kronecker_orths = []
     for block in kernel_matrix.operators:
-      diag, orth = tf.linalg.eigh(block.to_dense())
-      kronecker_diags.append(tf.linalg.LinearOperatorDiag(diag))
-      kronecker_orths.append(
-          linear_operator_unitary.LinearOperatorUnitary(orth))
+      # No need to take an eigenvalue decomposition for diagonal operators since
+      # they are already in factored form.
+      if isinstance(block, (tf.linalg.LinearOperatorDiag,
+                            tf.linalg.LinearOperatorIdentity,
+                            tf.linalg.LinearOperatorScaledIdentity)):
+        kronecker_diags.append(block)
+        kronecker_orths.append(tf.linalg.LinearOperatorIdentity(
+            block.domain_dimension(), dtype=block.dtype))
+      else:
+        diag, orth = tf.linalg.eigh(block.to_dense())
+        kronecker_diags.append(tf.linalg.LinearOperatorDiag(diag))
+        kronecker_orths.append(
+            linear_operator_unitary.LinearOperatorUnitary(orth))
 
     full_diag = tf.linalg.LinearOperatorKronecker(kronecker_diags).diag_part()
     full_diag = full_diag + observation_noise_variance[..., tf.newaxis]
