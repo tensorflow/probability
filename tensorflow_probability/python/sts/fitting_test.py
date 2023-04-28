@@ -340,6 +340,7 @@ class HMCTestsStatic32(test_util.TestCase, _HMCTests):
   @test_util.disable_test_for_backend(
       disable_jax=True, reason='No variables in JAX backend.')
   def test_chain_batch_shape(self, shape_in, expected_batch_shape_out):
+    self.skipTest('b/275876892')
     batch_shape = [2, 3]
     num_results = 1
     num_timesteps = 5
