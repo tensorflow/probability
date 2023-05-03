@@ -428,10 +428,15 @@ def low_rank_cholesky(matrix, max_rank, trace_atol=0, trace_rtol=0, name=None):
     name: Optional name for the op.
 
   Returns:
-    A pair (LR, r) of a matrix LR such that the rank of LR is r <= max_rank
-    and if r is < max_rank, trace(matrix - LR * LR^t) < trace_atol.
-    If matrix is of shape (b1, ..., bn, m, m), then LR will be of shape
-    (b1, ..., bn, m, r) where r <= max_rank.
+    A triplet (LR, r, residual_diag) of
+    LR: a matrix such that LR * LR^t is approximately the input matrix.
+      If matrix is of shape (b1, ..., bn, m, m), then LR will be of shape
+      (b1, ..., bn, m, r) where r <= max_rank.
+    r: the rank of LR.  If r is < max_rank, then
+      trace(matrix - LR * LR^t) < trace_atol, and
+    residual_diag: The diagonal entries of matrix - LR * LR^t.  This is
+      returned because together with LR, it is useful for preconditioning
+      the input matrix.
   """
   with tf.name_scope(name or 'low_rank_cholesky'):
     dtype = dtype_util.common_dtype([matrix, trace_atol, trace_rtol],
@@ -498,14 +503,14 @@ def low_rank_cholesky(matrix, max_rank, trace_atol=0, trace_rtol=0, name=None):
     lr = tf.zeros(matrix.shape, dtype=matrix.dtype)[..., :max_rank]
 
     mdiag = tf.linalg.diag_part(matrix)
-    i, lr, _ = tf.while_loop(
+    i, lr, residual_diag = tf.while_loop(
         cond=lr_cholesky_cond,
         body=lr_cholesky_body,
         loop_vars=(0, lr, mdiag),
         maximum_iterations=max_rank
     )
 
-    return lr, i
+    return lr, i, residual_diag
 
 
 def lu_solve(lower_upper, perm, rhs,

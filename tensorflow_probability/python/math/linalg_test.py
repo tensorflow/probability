@@ -429,16 +429,24 @@ class _LowRankCholesky(test_util.TestCase):
     matrix = self._random_batch_psd(dim)
     true_diag = tf.linalg.diag_part(matrix)
 
-    pchol, r = linalg.low_rank_cholesky(matrix, max_rank=1)
+    pchol, r, residual_diag = linalg.low_rank_cholesky(matrix, max_rank=1)
     self.assertEqual(1, self.evaluate(r))
+    self.assertEqual((2, 11), residual_diag.shape)
     mat = tf.matmul(pchol, pchol, transpose_b=True)
     diag_diff_prev = self.evaluate(tf.abs(tf.linalg.diag_part(mat) - true_diag))
     diff_norm_prev = self.evaluate(
         tf.linalg.norm(mat - matrix, ord='fro', axis=[-1, -2]))
+    old_residual_trace = None
     for rank in range(2, dim + 1):
       # Specifying trace_rtol forces the full max_rank decomposition.
-      pchol, r = linalg.low_rank_cholesky(matrix, max_rank=rank, trace_rtol=-1)
+      pchol, r, residual_diag = linalg.low_rank_cholesky(
+          matrix, max_rank=rank, trace_rtol=-1)
       self.assertEqual(rank, self.evaluate(r))
+      residual_trace = tf.math.reduce_sum(residual_diag, axis=-1)
+      if old_residual_trace is not None:
+        self.assertTrue(self.evaluate(tf.reduce_all(
+            residual_trace < old_residual_trace)))
+      old_residual_trace = residual_trace
       # Compared to pivot_cholesky, low_rank_cholesky will sometimes have
       # approximate zeros like 7e-17 or -2.6e-7 where it "should" have a
       # real zero.
@@ -471,7 +479,7 @@ class _LowRankCholesky(test_util.TestCase):
     dim = 11
 
     def fn(matrix):
-      chol, _ = linalg.low_rank_cholesky(matrix, max_rank=dim // 3)
+      chol, _, _ = linalg.low_rank_cholesky(matrix, max_rank=dim // 3)
       return chol
     def grad(matrix):
       _, dmatrix = gradient.value_and_gradient(fn, matrix)
@@ -494,7 +502,7 @@ class _LowRankCholesky(test_util.TestCase):
     def grad(matrix):
       with tf.GradientTape() as tape:
         tape.watch(matrix)
-        pchol, _ = linalg.low_rank_cholesky(matrix, max_rank=dim // 3)
+        pchol, _, _ = linalg.low_rank_cholesky(matrix, max_rank=dim // 3)
       dmatrix = tape.gradient(
           pchol, matrix, output_gradients=tf.ones_like(pchol) * .01)
       return dmatrix
@@ -561,7 +569,7 @@ class _LowRankCholesky(test_util.TestCase):
 
     mat = np.matmul(mat, mat.T)
     for rank in range(1, max_rank):
-      lr_chol, r = fns[rank](mat)
+      lr_chol, r, _ = fns[rank](mat)
       self.assertEqual(self.evaluate(r), rank)
       self.assertAllClose(
           oracle_pchol[..., :rank], lr_chol[..., :rank], atol=1e-4)
