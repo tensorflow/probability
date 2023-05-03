@@ -204,6 +204,30 @@ class _ExpectedImprovementTest(object):
         self.evaluate(actual_ei), self.evaluate(expected_ei), rtol=1e-1)
     self.assertDTypeEqual(actual_ei, self.dtype)
 
+  def test_transform_fn_identity(self):
+    shape = [5, 20]
+    df = self.dtype(50.)
+    loc = 2. * np.random.uniform(size=shape).astype(self.dtype)
+    scale = 3. + np.random.uniform(size=[20]).astype(self.dtype)
+    observations = np.array([2., 3., 4.]).astype(self.dtype)
+    model = student_t.StudentT(
+        df, loc[..., tf.newaxis], scale[..., tf.newaxis], validate_args=True)
+    shared_seed = test_util.test_seed(sampler_type='stateless')
+    expected_ei = expected_improvement.ParallelExpectedImprovement(
+        predictive_distribution=model,
+        observations=observations,
+        exploration=1.,
+        num_samples=30,
+        seed=shared_seed)()
+    actual_ei = expected_improvement.ParallelExpectedImprovement(
+        predictive_distribution=model,
+        observations=observations,
+        exploration=1.,
+        transform_fn=lambda x: x,
+        num_samples=30,
+        seed=shared_seed)()
+    self.assertAllClose(self.evaluate(actual_ei), self.evaluate(expected_ei))
+
 
 @test_util.test_all_tf_execution_regimes
 class ExpectedImprovementFloat32Test(

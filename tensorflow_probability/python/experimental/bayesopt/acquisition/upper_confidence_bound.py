@@ -14,7 +14,6 @@
 # ============================================================================
 """Upper Confidence Bound."""
 
-import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.bayesopt.acquisition import acquisition_function
@@ -125,6 +124,11 @@ class ParallelUpperConfidenceBound(acquisition_function.AcquisitionFunction):
     Returns:
       Parallel upper confidence bounds at index points implied by
       `predictive_distribution` (or overridden in `**kwargs`).
+
+    #### References
+    [1] J. Wilson, R. Moriconi, F. Hutter, M. Deisenroth
+    The reparameterization trick for acquisition functions
+    https://bayesopt.github.io/papers/2017/32.pdf
     """
     # Fix the seed so we get a deterministic objective per iteration.
     seed = samplers.sanitize_seed(
@@ -133,16 +137,17 @@ class ParallelUpperConfidenceBound(acquisition_function.AcquisitionFunction):
     samples = self.predictive_distribution.sample(
         self.num_samples, seed=seed, **kwargs)
 
+    # This parameterization differs from [1] in that we don't assume that
+    # samples come from a Normal distribution with a rescaled covariance. This
+    # effectively reparameterizes the exploration parameter by a factor of
+    # sqrt(pi / 2).
     if self._transform_fn is not None:
-      mean = tf.math.reduce_mean(self._transform_fn(samples), axis=0)
-      stddev = tf.math.reduce_std(self._transform_fn(samples), axis=0)
-      qucb = mean + self.exploration * stddev
+      samples = self._transform_fn(samples)
+      mean = tf.math.reduce_mean(samples, axis=0)
     else:
-      # This differs from [1] in that UCB is usually defined as mean + sqrt(e) *
-      # stddev, whereas we use mean + e * stddev.
       mean = self.predictive_distribution.mean(**kwargs)
-      qucb = mean + self.exploration * tf.math.sqrt(
-          tf.cast(np.pi, mean.dtype) / 2.) * tf.math.abs(samples - mean)
+
+    qucb = mean + self.exploration * tf.math.abs(samples - mean)
     return tf.reduce_mean(tf.reduce_max(qucb, axis=-1), axis=0)
 
 

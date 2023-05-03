@@ -92,8 +92,34 @@ class _UpperConfidenceBoundTest(object):
         num_samples=int(2e4),
         seed=test_util.test_seed())()
     self.assertAllClose(
-        self.evaluate(actual_ucb), self.evaluate(expected_ucb), rtol=1e-1)
+        self.evaluate(actual_ucb), self.evaluate(expected_ucb), rtol=1e-3)
     self.assertDTypeEqual(actual_ucb, self.dtype)
+
+  def test_transform_fn_identity(self):
+    shape = [5, 20, 1]
+    loc = 2. * np.random.uniform(size=shape).astype(self.dtype)
+    scale = 3. + np.random.uniform(size=[20]).astype(self.dtype)
+    model = normal.Normal(loc, scale, validate_args=True)
+    observations = [2., 3., 4.]
+    shared_seed = test_util.test_seed(sampler_type='stateless')
+
+    expected_ucb = upper_confidence_bound.ParallelUpperConfidenceBound(
+        predictive_distribution=model,
+        observations=observations,
+        exploration=1.,
+        num_samples=int(1e4),
+        seed=shared_seed)()
+
+    actual_ucb = upper_confidence_bound.ParallelUpperConfidenceBound(
+        predictive_distribution=model,
+        observations=observations,
+        exploration=1.,
+        transform_fn=lambda x: x,
+        num_samples=int(1e4),
+        seed=shared_seed)()
+    self.assertAllClose(
+        self.evaluate(actual_ucb),
+        self.evaluate(expected_ucb), rtol=8e-3)
 
 
 @test_util.test_all_tf_execution_regimes
