@@ -190,7 +190,6 @@ class _ForecastTest(object):
 
   @test_util.jax_disable_test_missing_functionality('fit_with_hmc')
   def test_forecast_from_hmc(self):
-    self.skipTest('b/275876892')
     if not tf1.control_flow_v2_enabled():
       self.skipTest('test_forecast_from_hmc does not currently work with TF1')
 
