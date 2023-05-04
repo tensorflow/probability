@@ -199,8 +199,8 @@ class SphericalUniform(distribution.AutoCompositeTensorDistribution):
     ], validate_args=self.validate_args)
 
   def _experimental_tangent_space(self, x):
-    from tensorflow_probability.python.experimental.tangent_spaces import spaces  # pylint:disable=g-import-not-at-top
-    return spaces.SphericalSpace()
+    from tensorflow_probability.python.experimental.tangent_spaces import spherical  # pylint:disable=g-import-not-at-top
+    return spherical.SphericalSpace()
 
   def _sample_control_dependencies(self, samples):
     inner_sample_dim = samples.shape[-1]

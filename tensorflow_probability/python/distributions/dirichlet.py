@@ -316,8 +316,8 @@ class Dirichlet(distribution.AutoCompositeTensorDistribution):
         validate_args=self.validate_args)
 
   def _experimental_tangent_space(self, x):
-    from tensorflow_probability.python.experimental.tangent_spaces import spaces  # pylint:disable=g-import-not-at-top
-    return spaces.ProbabilitySimplexSpace()
+    from tensorflow_probability.python.experimental.tangent_spaces import simplex  # pylint:disable=g-import-not-at-top
+    return simplex.ProbabilitySimplexSpace()
 
   def _sample_control_dependencies(self, x):
     """Checks the validity of a sample."""
