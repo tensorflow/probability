@@ -148,7 +148,7 @@ def gen_module(module_name):
       'from tensorflow_probability.python.internal.backend.numpy '
       'import data_structures')
   code = code.replace(
-      'from tensorflow.python.trackable '
+      'from tensorflow.python.training.tracking '
       'import data_structures',
       'from tensorflow_probability.python.internal.backend.numpy '
       'import data_structures')
