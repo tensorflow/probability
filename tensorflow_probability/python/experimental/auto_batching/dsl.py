@@ -307,16 +307,16 @@ class ProgramBuilder(object):
     if vars_in is None:
       # Deduce the intended variable names from the argument list of the callee.
       # Expected use case: the callee is an inline lambda expression.
-      args, varargs, keywords, _ = inspect.getargspec(f)
+      args, varargs, varkw, _, kwonlyargs, _, _ = inspect.getfullargspec(f)
       vars_in = []
-      for arg in args:
+      for arg in args + kwonlyargs:
         if arg in self._locals:
           vars_in.append(self._locals[arg])
         else:
           raise ValueError('Auto-referencing unbound variable {}.'.format(arg))
       if varargs is not None:
         raise ValueError('Varargs are not supported for primops')
-      if keywords is not None:
+      if varkw is not None:
         raise ValueError('kwargs are not supported for primops')
     for var in vars_in:
       if var not in self._var_defs:
