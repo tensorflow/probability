@@ -333,6 +333,10 @@ class Categorical(
         _mul_exp(log_probs, log_probs),
         axis=-1)
 
+  def _mean(self):
+    probs = self.probs_parameter()
+    return tf.reduce_sum(tf.range(self._num_categories(probs),dtype=probs.dtype) * probs, axis=-1) / tf.reduce_sum(probs, axis=-1)
+  
   def _mode(self):
     x = self._probs if self._logits is None else self._logits
     mode = tf.cast(tf.argmax(x, axis=-1), self.dtype)
