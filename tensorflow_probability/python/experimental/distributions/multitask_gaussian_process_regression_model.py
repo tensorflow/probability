@@ -141,7 +141,7 @@ def _scale_from_precomputed(precomputed_cholesky, kernel):
   if 'tril' in precomputed_cholesky:
     return tf.linalg.LinearOperatorLowerTriangular(
         params['chol_tril'], is_non_singular=True)
-  if 'multitask' in precomputed_cholesky:
+  if 'independent' in precomputed_cholesky:
     return tf.linalg.LinearOperatorKronecker(
         [tf.linalg.LinearOperatorLowerTriangular(
             params['chol_tril'], is_non_singular=True),
@@ -155,10 +155,19 @@ def _scale_from_precomputed(precomputed_cholesky, kernel):
         is_square=True,
         is_non_singular=True,
         is_positive_definite=True)
+    ops = []
+    for param in params['kronecker_orths']:
+      if 'identity' in param:
+        ops.append(tf.linalg.LinearOperatorIdentity(
+            param['identity'], dtype=params['diag'].dtype))
+      elif 'unitary' in param:
+        ops.append(
+            linear_operator_unitary.LinearOperatorUnitary(param['unitary'])
+        )
+      else:
+        raise ValueError(f'Unexpected param: {param}')
     orthogonal_op = tf.linalg.LinearOperatorKronecker(
-        [linear_operator_unitary.LinearOperatorUnitary(orth)
-         for orth in params['kronecker_orths']],
-        is_square=True, is_non_singular=True)
+        ops, is_square=True, is_non_singular=True)
     return orthogonal_op.matmul(diag_op)
   # This should not happen.
   raise ValueError(
@@ -171,10 +180,13 @@ def _precomputed_from_scale(observation_scale, kernel):
     return {'tril': {'chol_tril': observation_scale.tril}}
   if isinstance(kernel, multitask_kernel.Independent):
     base_kernel_chol_op = observation_scale.operators[0]
-    return {'multitask': {'chol_tril': base_kernel_chol_op.tril}}
+    return {'independent': {'chol_tril': base_kernel_chol_op.tril}}
   if isinstance(kernel, multitask_kernel.Separable):
     kronecker_op, diag_op = observation_scale.operators
-    kronecker_orths = [k.matrix for k in kronecker_op.operators]
+    kronecker_orths = [
+        {'identity': k.domain_dimension_tensor()}
+        if isinstance(k, tf.linalg.LinearOperatorIdentity)
+        else {'unitary': k.matrix} for k in kronecker_op.operators]
     return {'separable': {'kronecker_orths': kronecker_orths,
                           'diag': diag_op.diag}}
   # This should not happen.

@@ -149,7 +149,7 @@ def _compute_flattened_scale(
                             tf.linalg.LinearOperatorScaledIdentity)):
         kronecker_diags.append(block)
         kronecker_orths.append(tf.linalg.LinearOperatorIdentity(
-            block.domain_dimension(), dtype=block.dtype))
+            block.domain_dimension_tensor(), dtype=block.dtype))
       else:
         diag, orth = tf.linalg.eigh(block.to_dense())
         kronecker_diags.append(tf.linalg.LinearOperatorDiag(diag))
