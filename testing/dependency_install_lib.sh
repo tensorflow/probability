@@ -69,9 +69,7 @@ install_tensorflow() {
   PIP_FLAGS=${2-}
   # NB: tf-nightly pulls in other deps, like numpy, absl, and six, transitively.
   TF_VERSION_STR=$(find_good_tf_nightly_version_str $TF_NIGHTLY_PACKAGE)
-  python -m pip install $PIP_FLAGS \
-    $TF_NIGHTLY_PACKAGE==$TF_VERSION_STR \
-    keras-nightly==2.13.0.dev2023032307  # b/275356962
+  python -m pip install $PIP_FLAGS $TF_NIGHTLY_PACKAGE==$TF_VERSION_STR
 }
 
 install_jax() {
