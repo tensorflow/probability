@@ -17,6 +17,7 @@
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
+from scipy import stats
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
@@ -607,7 +608,7 @@ class CategoricalTest(test_util.TestCase):
     self.assertAllEqual((1,), dist.mean().shape)
     # Expected mean will be the same as in a Multinomial with n = 1
     expected_means = stats.multinomial.mean(n=1, p=p).argmax(axis=-1)
-    self.assertAllClose(expected_means, self.evaluate(binom.mean()))
+    self.assertAllClose(expected_means, self.evaluate(dist.mean()))
 
 
 @test_util.test_all_tf_execution_regimes
