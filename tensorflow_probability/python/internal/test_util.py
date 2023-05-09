@@ -157,11 +157,14 @@ class TestCase(*_TEST_BASE_CLASSES):
     if TF_MODE:
       return super(TestCase, self).evaluate(x)
 
+    if JAX_MODE:
+      import jax  # pylint: disable=g-import-not-at-top
+
     def _evaluate(x):
       if x is None:
         return x
       # TODO(b/223267515): Improve handling of JAX PRNGKeyArray objects.
-      if type(x).__name__ == 'PRNGKeyArray':
+      if JAX_MODE and isinstance(x, jax.random.PRNGKeyArray):
         return x
       return np.array(x)
     return tf.nest.map_structure(_evaluate, x, expand_composites=True)
@@ -172,6 +175,14 @@ class TestCase(*_TEST_BASE_CLASSES):
     return np.array(a)
 
   def _evaluateTensors(self, a, b):
+    if JAX_MODE:
+      import jax  # pylint: disable=g-import-not-at-top
+      # HACK: In assertions (like self.assertAllClose), convert PRNGKeyArrays
+      # to "normal" arrays so they can be compared with our existing machinery.
+      if isinstance(a, jax.random.PRNGKeyArray):
+        a = jax.random.key_data(a)
+      if isinstance(b, jax.random.PRNGKeyArray):
+        b = jax.random.key_data(b)
     if tf.is_tensor(a) and tf.is_tensor(b):
       (a, b) = self.evaluate([a, b])
     elif tf.is_tensor(a) and not tf.is_tensor(b):
@@ -561,22 +572,6 @@ class TestCase(*_TEST_BASE_CLASSES):
             type(exception).__name__, exception)
       # Drop the final two newlines.
       raise AssertionError(final_msg[:-2])
-
-  def assertSeedsEqual(self, x, y, msg=None):
-    """Asserts that two PRNG seeds are equal."""
-    self.assertAllEqual(
-        tf.nest.flatten(x, expand_composites=True),
-        tf.nest.flatten(y, expand_composites=True),
-        msg=msg)
-
-  def assertSeedsNotEqual(self, x, y, msg=None):
-    """Asserts that two PRNG seeds are not equal."""
-    self.assertFalse(
-        np.all(
-            np.equal(
-                tf.nest.flatten(x, expand_composites=True),
-                tf.nest.flatten(y, expand_composites=True))),
-        msg=msg)
 
   def assertAllInRange(self,
                        target,

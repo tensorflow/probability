@@ -65,17 +65,22 @@ class RandomTest(test_util.TestCase):
     seed2 = samplers.sanitize_seed(seed=None)
     self.assertNotAllEqual(seed1, seed2)
 
-  def test_sanitize_tensor_or_tensorlike(self):
+  def test_sanitize_stateless_seeds(self):
     seed = test_util.test_seed(sampler_type='stateless')
     seed1 = samplers.sanitize_seed(seed=self.evaluate(seed))
     seed2 = samplers.sanitize_seed(seed)
     seed1, seed2 = self.evaluate([seed1, seed2])
-    self.assertSeedsEqual(seed1, seed2)
+    self.assertAllEqual(seed1, seed2)
 
-    seed3 = samplers.sanitize_seed([0, 1])
-    seed4 = samplers.sanitize_seed(np.array([0, 1]))
-    seed3, seed4 = self.evaluate([seed3, seed4])
-    self.assertSeedsEqual(seed3, seed4)
+  @test_util.disable_test_for_backend(
+      disable_jax=True, reason='JAX seeds must be jax.random.PRNGKey objects')
+  def test_sanitize_tensor_or_tensorlike(self):
+    # TODO(b/223267515): In JAX mode, test that we raise a user-friendly error
+    # when the seed is not a PRNGKey.
+    seed1 = samplers.sanitize_seed([0, 1])
+    seed2 = samplers.sanitize_seed(np.array([0, 1]))
+    seed1, seed2 = self.evaluate([seed1, seed2])
+    self.assertAllEqual(seed1, seed2)
 
   def test_split(self):
     seed = test_util.test_seed(sampler_type='stateless')
@@ -83,11 +88,11 @@ class RandomTest(test_util.TestCase):
     seed3, seed4 = samplers.split_seed(seed)
     seed, seed1, seed2, seed3, seed4 = self.evaluate(
         [seed, seed1, seed2, seed3, seed4])
-    self.assertSeedsNotEqual(seed, seed1)
-    self.assertSeedsNotEqual(seed, seed2)
-    self.assertSeedsNotEqual(seed1, seed2)
-    self.assertSeedsEqual(seed1, seed3)
-    self.assertSeedsEqual(seed2, seed4)
+    self.assertNotAllEqual(seed, seed1)
+    self.assertNotAllEqual(seed, seed2)
+    self.assertNotAllEqual(seed1, seed2)
+    self.assertAllEqual(seed1, seed3)
+    self.assertAllEqual(seed2, seed4)
 
   def test_salted_split(self):
     seed = test_util.test_seed(sampler_type='stateless')
@@ -95,12 +100,12 @@ class RandomTest(test_util.TestCase):
     seed3, seed4 = samplers.split_seed(seed, salt='lognormal')
     seed, seed1, seed2, seed3, seed4 = self.evaluate(
         [seed, seed1, seed2, seed3, seed4])
-    self.assertSeedsNotEqual(seed, seed1)
-    self.assertSeedsNotEqual(seed, seed2)
-    self.assertSeedsNotEqual(seed1, seed2)
-    self.assertSeedsNotEqual(seed1, seed3)
-    self.assertSeedsNotEqual(seed2, seed4)
-    self.assertSeedsNotEqual(seed3, seed4)
+    self.assertNotAllEqual(seed, seed1)
+    self.assertNotAllEqual(seed, seed2)
+    self.assertNotAllEqual(seed1, seed2)
+    self.assertNotAllEqual(seed1, seed3)
+    self.assertNotAllEqual(seed2, seed4)
+    self.assertNotAllEqual(seed3, seed4)
 
   @parameterized.named_parameters(
       dict(testcase_name='_categorical',

@@ -55,29 +55,28 @@ class SeedSettingTest(test_util.TestCase):
 
   def testSameness(self):
     with flagsaver.flagsaver(vary_seed=False):
-      self.assertSeedsEqual(test_util.test_seed(), test_util.test_seed())
-      self.assertSeedsEqual(test_util.test_seed_stream()(),
-                            test_util.test_seed_stream()())
+      self.assertAllEqual(test_util.test_seed(), test_util.test_seed())
+      self.assertAllEqual(test_util.test_seed_stream()(),
+                          test_util.test_seed_stream()())
       with flagsaver.flagsaver(fixed_seed=None):
         x = 47
         expected = _maybe_jax(x)
-        self.assertSeedsEqual(expected, test_util.test_seed(hardcoded_seed=x))
+        self.assertAllEqual(expected, test_util.test_seed(hardcoded_seed=x))
 
   def testVariation(self):
     with flagsaver.flagsaver(vary_seed=True, fixed_seed=None):
-      self.assertSeedsNotEqual(test_util.test_seed(), test_util.test_seed())
-      self.assertSeedsNotEqual(test_util.test_seed_stream()(),
-                               test_util.test_seed_stream()())
+      self.assertNotAllEqual(test_util.test_seed(), test_util.test_seed())
+      self.assertNotAllEqual(test_util.test_seed_stream()(),
+                             test_util.test_seed_stream()())
       x = 47
       expect_not = _maybe_jax(x)
-      self.assertSeedsNotEqual(expect_not,
-                               test_util.test_seed(hardcoded_seed=x))
+      self.assertNotAllEqual(expect_not, test_util.test_seed(hardcoded_seed=x))
 
   def testFixing(self):
     expected = _maybe_jax(58)
     with flagsaver.flagsaver(fixed_seed=58):
-      self.assertSeedsEqual(expected, test_util.test_seed())
-      self.assertSeedsEqual(expected, test_util.test_seed(hardcoded_seed=47))
+      self.assertAllEqual(expected, test_util.test_seed())
+      self.assertAllEqual(expected, test_util.test_seed(hardcoded_seed=47))
 
 
 class _TestCaseTest(object):
@@ -111,7 +110,7 @@ class _TestCaseTest(object):
     a = np.linspace(0., 1., num_elem)
     a[50] = np.nan
     a = tf.reshape(tf.convert_to_tensor(value=a, dtype=self.dtype), shape)
-    with self.assertRaisesRegexp(AssertionError, 'Arrays are not equal'):
+    with self.assertRaisesRegex(AssertionError, 'Arrays are not equal'):
       self.assertAllFinite(a)
 
   def test_assert_all_finite_input_inf(self):
@@ -121,7 +120,7 @@ class _TestCaseTest(object):
     a = np.linspace(0., 1., num_elem)
     a[100] = np.inf
     a = tf.reshape(tf.convert_to_tensor(value=a, dtype=self.dtype), shape)
-    with self.assertRaisesRegexp(AssertionError, 'Arrays are not equal'):
+    with self.assertRaisesRegex(AssertionError, 'Arrays are not equal'):
       self.assertAllFinite(a)
 
   def test_assert_all_finite_input_py_literal(self):
@@ -144,18 +143,18 @@ class _TestCaseTest(object):
     a = np.random.rand(10, 10, 10)
     a[1, :, :] = np.nan
     a = tf.convert_to_tensor(value=a, dtype=self.dtype)
-    with self.assertRaisesRegexp(AssertionError, 'Arrays are not equal'):
+    with self.assertRaisesRegex(AssertionError, 'Arrays are not equal'):
       self.assertAllNan(a)
 
   def test_assert_all_nan_input_numpy_rand(self):
     a = np.random.rand(10, 10, 10).astype(dtype_util.as_numpy_dtype(self.dtype))
-    with self.assertRaisesRegexp(AssertionError, 'Arrays are not equal'):
+    with self.assertRaisesRegex(AssertionError, 'Arrays are not equal'):
       self.assertAllNan(a)
 
   def test_assert_all_nan_input_inf(self):
     a = tf.convert_to_tensor(
         value=np.full((10, 10, 10), np.inf), dtype=self.dtype)
-    with self.assertRaisesRegexp(AssertionError, 'Arrays are not equal'):
+    with self.assertRaisesRegex(AssertionError, 'Arrays are not equal'):
       self.assertAllNan(a)
 
   def test_assert_all_nan_input_placeholder_with_default(self):
@@ -169,7 +168,7 @@ class _TestCaseTest(object):
     self.assertAllNotNone(no_nones)
 
     has_nones = [1, 2, None]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         AssertionError,
         r'Expected no entry to be `None` but found `None` in positions \[2\]'):
       self.assertAllNotNone(has_nones)
@@ -183,7 +182,7 @@ class _TestCaseTest(object):
         "Input structure has type <(class|type) 'list'>, while shallow "
         "structure has type <(class|type) 'dict'>.")
 
-    with self.assertRaisesRegexp(AssertionError, expected_msg):
+    with self.assertRaisesRegex(AssertionError, expected_msg):
       self.assertAllAssertsNested(self.assertEqual, {'a': 3}, [3], msg='test')
 
   def test_assert_nested_mismatched_elements(self):
@@ -203,7 +202,7 @@ Exception: AssertionError
 
     namedtuple = collections.namedtuple('A', 'a, b')
 
-    with self.assertRaisesRegexp(AssertionError, expected_msg):
+    with self.assertRaisesRegex(AssertionError, expected_msg):
       self.assertAllAssertsNested(
           self.assertEqual,
           namedtuple(a=3, b=4),

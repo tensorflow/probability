@@ -131,6 +131,9 @@ def sanitize_seed(seed, salt=None, name=None):
                                maxval=np.iinfo(SEED_DTYPE).max,
                                dtype=SEED_DTYPE, name='seed')
 
+    # TODO(b/223267515): In JAX mode, raise a user-friendly error if seed is
+    # not a PRNGKey.
+
     # TODO(b/159209541): Consider ignoring salts for stateless seeds, for
     # performance and because using stateless seeds already requires the
     # discipline of splitting.
@@ -139,6 +142,9 @@ def sanitize_seed(seed, salt=None, name=None):
       salt = int(hashlib.sha512(str(salt).encode('utf-8')).hexdigest(), 16)
       seed = fold_in(seed, salt)
 
+    if JAX_MODE:
+      # Seed must be a jax.PRNGKey -- so just return it.
+      return seed
     return tf.convert_to_tensor(seed, dtype=SEED_DTYPE, name='seed')
 
 
