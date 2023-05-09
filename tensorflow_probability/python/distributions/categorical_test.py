@@ -598,6 +598,16 @@ class CategoricalTest(test_util.TestCase):
     self.assertAllClose(
         *self.evaluate([x, d.probs_parameter()]),
         atol=0, rtol=1e-4)
+    
+    
+  def testCategoricalMean(self):
+    p = [0.2, 0.75, 0.05, 0.]
+    dist = categorical.Categorical(probs=p, validate_args=True)
+    # Mean will be broadcast to a singleton dimension 
+    self.assertAllEqual((1,), dist.mean().shape)
+    # Expected mean will be the same as in a Multinomial with n = 1
+    expected_means = stats.multinomial.mean(n=1, p=p).argmax(axis=-1)
+    self.assertAllClose(expected_means, self.evaluate(binom.mean()))
 
 
 @test_util.test_all_tf_execution_regimes
