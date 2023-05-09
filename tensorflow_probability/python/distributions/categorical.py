@@ -30,6 +30,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import reduce_weighted_logsumexp
 
 
 def _broadcast_cat_event_and_params(event, params, base_dtype):
