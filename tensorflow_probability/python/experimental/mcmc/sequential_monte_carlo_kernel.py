@@ -17,7 +17,6 @@
 import collections
 
 import tensorflow.compat.v2 as tf
-import numpy as np
 from tensorflow_probability.python.experimental.mcmc import weighted_resampling
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
@@ -321,8 +320,11 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
         # Every entry of `log_weights` differs from `normalized_log_weights`
         # by the same normalizing constant. We extract that constant by
         # examining an arbitrary entry.
-        incremental_log_marginal_likelihood = (state.log_weights[0] -
-                                               normalized_log_weights[0])
+
+        incremental_log_marginal_likelihood = (
+                tf.gather(state.log_weights, 0, axis=self._particles_dim) -
+                tf.gather(normalized_log_weights, 0, axis=self._particles_dim))
+
 
         do_resample = self.resample_criterion_fn(state)
         # Some batch elements may require resampling and others not, so
@@ -333,6 +335,9 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
         # needed---but we're ultimately interested in adaptive resampling
         # for statistical (not computational) purposes, so this isn't a
         # dealbreaker.
+        # if self._particles_dim == 0:
+        #     print('particles',state.particles)
+        #     print('weights', state.log_weights)
         [
             new_particles,
             new_indices,
@@ -349,6 +354,7 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
                                 if self.unbiased_gradients else None),
             particles_dim=self._particles_dim,
             seed=resample_seed)
+
         (new_particles,
          new_indices,
          log_weights) = tf.nest.map_structure(
