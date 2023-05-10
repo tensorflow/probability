@@ -585,10 +585,8 @@ def _two_piece_normal_sample_fwd(sample_shape, skewness, seed):
   return samples, (skewness, samples)
 
 
-def _two_piece_normal_sample_bwd(sample_shape, seed, aux, dy):
+def _two_piece_normal_sample_bwd(_, aux, dy):
   """The gradients of Two Piece Normal samples w.r.t. `skewness`."""
-  del sample_shape
-  del seed
   skewness, samples = aux
   broadcast_skewness = tf.broadcast_to(skewness, ps.shape(samples))
 
@@ -599,13 +597,14 @@ def _two_piece_normal_sample_bwd(sample_shape, seed, aux, dy):
                            ps.rank(skewness))
 
   # None gradients for seed
-  return tf.reduce_sum(grad, axis=ps.range(num_sample_dimensions))
+  return tf.reduce_sum(grad, axis=ps.range(num_sample_dimensions)), None
 
 
-def _two_piece_normal_sample_jvp(sample_shape, seed, primals, tangents):
+def _two_piece_normal_sample_jvp(sample_shape, primals, tangents):
   """Compute primals and tangents using implicit derivative."""
-  skewness, = primals
-  dskewness, = tangents
+  skewness, seed = primals
+  dskewness, dseed = tangents
+  del dseed
 
   broadcast_skewness = tf.broadcast_to(skewness, sample_shape)
   broadcast_dskewness = tf.broadcast_to(dskewness, sample_shape)
@@ -621,7 +620,7 @@ def _two_piece_normal_sample_jvp(sample_shape, seed, primals, tangents):
     vjp_fwd=_two_piece_normal_sample_fwd,
     vjp_bwd=_two_piece_normal_sample_bwd,
     jvp_fn=_two_piece_normal_sample_jvp,
-    nondiff_argnums=(0, 2))
+    nondiff_argnums=(0,))
 def _two_piece_normal_sample_with_gradient(sample_shape, skewness, seed):
   """Generate samples from Two-Piece Normal distribution.
 

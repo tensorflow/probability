@@ -602,9 +602,8 @@ def _random_gamma_fwd(shape, concentration, rate, log_rate, seed, log_space):
           (samples, concentration, rate, log_rate))
 
 
-def _random_gamma_bwd(shape, seed, log_space, aux, g):
+def _random_gamma_bwd(shape, log_space, aux, g):
   """The gradient of the gamma samples."""
-  del seed
   samples, concentration, rate, log_rate = aux
   dsamples, dimpl = g
   # Ignore any gradient contributions that come from the implementation enum.
@@ -631,7 +630,7 @@ def _random_gamma_bwd(shape, seed, log_space, aux, g):
   if (tensorshape_util.is_fully_defined(concentration.shape) and
       tensorshape_util.is_fully_defined(rate_tensorshape) and
       concentration.shape == rate_tensorshape):
-    return grad_concentration, grad_rate, grad_log_rate
+    return grad_concentration, grad_rate, grad_log_rate, None  # seed=None
 
   # Dummy parameter used for fix_gradient_for_broadcasting.
   rate_param = tf.ones_like(concentration)
@@ -652,13 +651,14 @@ def _random_gamma_bwd(shape, seed, log_space, aux, g):
   if grad_log_rate is not None:
     grad_log_rate = grad_rate_param
 
-  return grad_concentration, grad_rate, grad_log_rate
+  return grad_concentration, grad_rate, grad_log_rate, None  # seed=None
 
 
-def _random_gamma_jvp(shape, seed, log_space, primals, tangents):
+def _random_gamma_jvp(shape, log_space, primals, tangents):
   """Computes JVP for gamma sample (supports JAX custom derivative)."""
-  concentration, rate, log_rate = primals
-  dconcentration, drate, dlog_rate = tangents
+  concentration, rate, log_rate, seed = primals
+  dconcentration, drate, dlog_rate, dseed = tangents
+  del dseed
   # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
   dconcentration = tf.broadcast_to(dconcentration, shape)
   drate = 0 if drate is None else tf.broadcast_to(drate, shape)
@@ -682,7 +682,7 @@ def _random_gamma_jvp(shape, seed, log_space, primals, tangents):
     vjp_fwd=_random_gamma_fwd,
     vjp_bwd=_random_gamma_bwd,
     jvp_fn=_random_gamma_jvp,
-    nondiff_argnums=(0, 4, 5))
+    nondiff_argnums=(0, 5))
 def _random_gamma_gradient(
     shape, concentration, rate, log_rate, seed, log_space):
   return _random_gamma_no_gradient(
