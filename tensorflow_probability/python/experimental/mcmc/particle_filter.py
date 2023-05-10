@@ -17,7 +17,6 @@
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-import tensorflow_probability
 from tensorflow_probability.python.experimental.mcmc import sequential_monte_carlo_kernel as smc_kernel
 from tensorflow_probability.python.experimental.mcmc import weighted_resampling
 from tensorflow_probability.python.internal import assert_util
@@ -28,7 +27,8 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from tensorflow_probability.python.distributions import batch_reshape
 from tensorflow_probability.python.distributions import batch_broadcast
-from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import normal
+
 
 
 __all__ = [
@@ -56,6 +56,39 @@ def _no_rejuvenation(state,
                     extra,
                     step):
   return (particles, indices, log_weights, extra)
+
+
+def _default_kernel(state):
+  mean, variance = tf.nn.moments(state.particles[0], axes=[0])
+  proposed_parameters = normal.Normal(loc=mean, scale=tf.sqrt(variance)).sample(20)
+  return proposed_parameters
+
+
+def _acceptance_prob(weights_from, weights_to):
+    return tf.minimum(1.0, weights_to / weights_from)
+
+
+def where_fn(accept, a, b):
+    is_scalar = tf.rank(a).numpy() == 0
+    is_nan = tf.math.is_nan(tf.cast(a, tf.float32))
+    is_all_nan = tf.reduce_all(is_nan).numpy()
+    if is_scalar and is_all_nan:
+        return a
+    elif a.shape == 2 and b.shape == 2:
+        # pick seed
+        return a
+    elif len(a.shape) == 1 and len(b.shape) == 1:
+        # Both tensors have shape [outer_particles]
+        return tf.where(accept, a, b)
+    elif len(a.shape) == 2 and len(b.shape) == 2:
+        # Both tensors have shape [outer_particles, inner_particles]
+        # Assuming accept has shape [outer_particles], we need to expand its dimensions to match the tensors
+        expanded_accept = tf.expand_dims(accept, axis=-1)
+        return tf.where(expanded_accept, a, b)
+    elif a.shape == () and b.shape == ():
+        return a
+    else:
+        raise ValueError("Unexpected tensor shapes")
 
 
 particle_filter_arg_str = """\
@@ -306,6 +339,7 @@ def sequential_monte_carlo(loop_seed,
         static_trace_allocation_size=None,
         never_trace=lambda *_: False,
         ):
+
     """Samples a series of particles representing filtered latent states.
 
       The particle filter samples from the sequence of "filtering" distributions
@@ -371,11 +405,10 @@ def sequential_monte_carlo(loop_seed,
         seed, state, results = seed_state_results
 
         one_step_seed, next_seed = samplers.split_seed(seed)
-        # after here
+
         next_state, next_results = kernel.one_step(
             state, results, seed=one_step_seed)
 
-        # Never reach here
         return next_seed, next_state, next_results
 
     final_seed_state_result, traced_results = loop_util.trace_scan(
@@ -401,7 +434,6 @@ def sequential_monte_carlo(loop_seed,
 def smc_squared(
         inner_observations,
         initial_parameter_prior,
-        parameter_proposal_kernel,
         num_outer_particles,
         inner_initial_state_prior,
         inner_transition_fn,
@@ -414,13 +446,13 @@ def smc_squared(
         inner_resample_criterion_fn=smc_kernel.ess_below_threshold,
         outer_resample_fn=weighted_resampling.resample_systematic,
         outer_resample_criterion_fn=smc_kernel.ess_below_threshold,
+        parameter_proposal_kernel=_default_kernel,
         inner_proposal_fn=None,
         inner_initial_state_proposal=None,
         inner_rejuvenation_criterion_fn=lambda *_: False,
         outer_rejuvenation_criterion_fn=lambda *_: False,
-        outer_rejuvenation_fn=None,
-        trace_fn=_default_trace_fn,
-        trace_criterion_fn=_always_trace,
+        trace_fn=_default_trace_fn,  # TODO: eventually control on both
+        trace_criterion_fn=None,
         outer_trace_criterion_fn=_always_trace,
         parallel_iterations=1,
         num_transitions_per_observation=1,
@@ -450,13 +482,14 @@ def smc_squared(
                                initial_parameter_proposal.log_prob(initial_state))
     # Normalize the initial weights. If we used a proposal, the weights are
     # normalized in expectation, but actually normalizing them reduces variance.
-    initial_log_weights = tf.nn.log_softmax(initial_log_weights, axis=0)   # Particle dim 0 outside, 1 inside
+    initial_log_weights = tf.nn.log_softmax(initial_log_weights, axis=0)
 
     # Particles weighted by the initial observation.
     initial_weighted_parameters = smc_kernel.WeightedParticles(
         particles=initial_state,
         log_weights=initial_log_weights,
-        extra=np.nan)
+        extra=0)
+
 
     inner_weighted_particles = _particle_filter_initial_weighted_particles(
         observations=inner_observations,
@@ -468,42 +501,28 @@ def smc_squared(
         particles_dim=1,
         seed=seed)
 
-    propose_and_update_log_weights_fn = (
-        _particle_filter_propose_and_update_log_weights_fn(
-            observations=inner_observations,
-            transition_fn=inner_transition_fn(0, initial_state),
-            proposal_fn=(inner_proposal_fn(0, initial_state)
-                         if inner_proposal_fn is not None else None),
-            observation_fn=inner_observation_fn,
-            particles_dim=1,
-            num_transitions_per_observation=num_transitions_per_observation)
-    )
+    init_state = smc_kernel.WeightedParticles(*inner_weighted_particles)
 
-    kernel = smc_kernel.SequentialMonteCarlo(
-        propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
-        resample_fn=inner_resample_fn,
-        resample_criterion_fn=inner_resample_criterion_fn,
-        rejuvenation_fn=inner_rejuvenation_fn,
-        rejuvenation_criterion_fn=inner_rejuvenation_criterion_fn,
-        particles_dim=1,
-        unbiased_gradients=unbiased_gradients)
+    batch_zeros = tf.zeros(
+        ps.shape(init_state.log_weights)[0],
+        dtype=init_state.log_weights.dtype)
 
-    initial_filter_results = kernel.bootstrap_results(inner_weighted_particles)
-
-    # Don't know what to put here in unit test, for now empty
-    # pmcmc_extra = parameter_proposal_kernel.bootstrap_results(initial_weighted_parameters)
-    pmcmc_extra = 0
+    initial_filter_results = smc_kernel.SequentialMonteCarloResults(
+        steps=0,
+        parent_indices=smc_kernel._dummy_indices_like(init_state.log_weights),
+        incremental_log_marginal_likelihood=batch_zeros,
+        accumulated_log_marginal_likelihood=batch_zeros,
+        seed=samplers.zeros_seed())
 
     initial_state = smc_kernel.WeightedParticles(
         particles=(initial_weighted_parameters.particles,
                    inner_weighted_particles,
                    initial_filter_results),
         log_weights=initial_weighted_parameters.log_weights,
-        extra=pmcmc_extra)
+        extra=0)
 
     outer_propose_and_update_log_weights_fn = (
         _outer_particle_filter_propose_and_update_log_weights_fn(
-            outer_rejuvenation_fn=outer_rejuvenation_fn,
             outer_rejuvenation_criterion_fn=outer_rejuvenation_criterion_fn,
             inner_observations=inner_observations,
             inner_transition_fn=inner_transition_fn,
@@ -514,18 +533,23 @@ def smc_squared(
             inner_rejuvenation_fn=inner_rejuvenation_fn,
             inner_rejuvenation_criterion_fn=inner_rejuvenation_criterion_fn,
             parameter_proposal_kernel=parameter_proposal_kernel,
-            particles_dim=0,
+            initial_parameter_prior=initial_parameter_prior,
             num_transitions_per_observation=num_transitions_per_observation,
-            unbiased_gradients=unbiased_gradients)
+            unbiased_gradients=unbiased_gradients,
+            initial_parameter_proposal=initial_parameter_proposal,
+            inner_initial_state_prior=inner_initial_state_prior,
+            inner_initial_state_proposal=inner_initial_state_proposal,
+            loop_seed=loop_seed
+        )
     )
 
     traced_results = sequential_monte_carlo(
         initial_weighted_particles=initial_state,
         propose_and_update_log_weights_fn=outer_propose_and_update_log_weights_fn,
-        resample_fn=outer_resample_fn,  # no_resample for now
-        resample_criterion_fn=outer_resample_criterion_fn,  # never_sample for now
-        rejuvenation_fn=None,  # no rejuvenation for now
-        rejuvenation_criterion_fn=None,  # never_rejuvenate for now
+        resample_fn=outer_resample_fn,
+        resample_criterion_fn=outer_resample_criterion_fn,
+        rejuvenation_fn=_no_rejuvenation,
+        rejuvenation_criterion_fn=lambda *_: False,
         trace_criterion_fn=outer_trace_criterion_fn,
         static_trace_allocation_size=static_trace_allocation_size,
         parallel_iterations=parallel_iterations,
@@ -545,21 +569,28 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
         inner_transition_fn,
         inner_proposal_fn,
         inner_observation_fn,
-        particles_dim,
+        initial_parameter_proposal,
+        initial_parameter_prior,
+        inner_initial_state_prior,
+        inner_initial_state_proposal,
         num_transitions_per_observation,
         inner_resample_fn,
         inner_resample_criterion_fn,
         inner_rejuvenation_fn,
         inner_rejuvenation_criterion_fn,
-        outer_rejuvenation_fn,
         outer_rejuvenation_criterion_fn,
         unbiased_gradients,
-        parameter_proposal_kernel
+        parameter_proposal_kernel,
+        loop_seed
 ):
     """Build a function specifying a particle filter update step."""
     def _outer_propose_and_update_log_weights_fn(step, state, seed=None):
+        outside_parameters = state.particles[0]
         inner_particles, log_weights = state.particles[1], state.log_weights
         filter_results = state.particles[2]
+
+        num_outer_particles = ps.shape(inner_particles.particles)[0]
+        num_inner_particles = ps.shape(inner_particles.particles)[1]
 
         inner_propose_and_update_log_weights_fn = (
             _particle_filter_propose_and_update_log_weights_fn(
@@ -579,30 +610,74 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
             rejuvenation_criterion_fn=inner_rejuvenation_criterion_fn,
             particles_dim=1,
             unbiased_gradients=unbiased_gradients)
-        # print('inner', inner_particles)  # dim (20, 10)
-        # print(filter_results)  # dim 20
+
         inner_weighted_particles, filter_results = kernel.one_step(inner_particles, filter_results)
 
-        # Outer rejuvenation
-        # do_rejuvenation = outer_rejuvenation_criterion_fn(state)
+        updated_log_weights = log_weights + filter_results.incremental_log_marginal_likelihood
 
-        #
-        # a. Generate new proposed outer parameters.
-        #
-        # b. For those proposed outer parameters, rerun the whole inner particle filter up to this point.
-        #
-        # c. For each outer parameter, decide whether to keep the old parameter +
-        # inner filter results, or whether to switch to the new parameter + inner filter results.
+        do_rejuvenation = outer_rejuvenation_criterion_fn(state)
 
-        # proposed_parameters = tf.reduce_mean(inner_weighted_particles.particles, 0)
-        # Compute the mean/variance of each parameter over axis=0, and then samples num_particles of each parameter from a
-        #   Normal distribution with that mean and variance.
+        if do_rejuvenation:
+            proposed_parameters = parameter_proposal_kernel(state)
+
+            if initial_parameter_proposal is None:
+                initial_state = initial_parameter_prior.sample(num_outer_particles, seed=seed)
+            else:
+                initial_state = initial_parameter_proposal.sample(num_outer_particles, seed=seed)
+
+            rej_inner_weighted_particles = _particle_filter_initial_weighted_particles(
+                observations=inner_observations,
+                observation_fn=inner_observation_fn,
+                initial_state_prior=inner_initial_state_prior(0, initial_state),
+                initial_state_proposal=(inner_initial_state_proposal(0, initial_state)
+                                        if inner_initial_state_proposal is not None else None),
+                num_particles=num_inner_particles,
+                particles_dim=1,
+                seed=seed)
+
+            batch_zeros = tf.zeros(
+                ps.shape(log_weights)[0],
+                dtype=log_weights.dtype)
+
+            rej_filter_results = smc_kernel.SequentialMonteCarloResults(
+                steps=tf.constant(0, dtype=tf.int32),
+                parent_indices=smc_kernel._dummy_indices_like(rej_inner_weighted_particles.log_weights),
+                incremental_log_marginal_likelihood=batch_zeros,
+                accumulated_log_marginal_likelihood=batch_zeros,
+                seed=samplers.zeros_seed())
+
+            rej_parameters_weights = rej_filter_results.incremental_log_marginal_likelihood
+            # TODO: tf.while
+            for _ in range(state.particles[2].steps):
+                rej_inner_weighted_particles, rej_filter_results = kernel.one_step(
+                    rej_inner_weighted_particles, rej_filter_results
+                )
+                rej_parameters_weights += filter_results.incremental_log_marginal_likelihood
+
+            # Perform metropolis hastings
+            acceptance_probs = _acceptance_prob(log_weights, rej_parameters_weights)
+
+            random_numbers = tf.random.uniform([num_outer_particles])
+
+            # # Determine if the proposed particle should be accepted or reject
+            accept = random_numbers < acceptance_probs
+
+            # Update the chosen particles based on the acceptance step
+            outside_parameters = tf.where(accept, outside_parameters, proposed_parameters)
+            updated_log_weights = tf.where(accept, log_weights, rej_parameters_weights)
+
+            inner_weighted_particles = tf.nest.map_structure(
+                lambda a, b: where_fn(accept, a, b),
+                inner_weighted_particles,
+                rej_inner_weighted_particles)
+            filter_results = tf.nest.map_structure(
+                lambda a, b: where_fn(accept, a, b), filter_results, rej_filter_results)
 
         return smc_kernel.WeightedParticles(
-            particles=(state.particles[0],  # without rejuvenation, this is inner particles
-                       inner_weighted_particles,   # WeightedParticles object
-                       filter_results),  # updates the inner filter results by one invocation of `filter_one_step`
-            log_weights=state.log_weights + filter_results.incremental_log_marginal_likelihood,
+            particles=(outside_parameters,
+                       inner_weighted_particles,
+                       filter_results),
+            log_weights=updated_log_weights,
             extra=state.extra)
     return _outer_propose_and_update_log_weights_fn
 
@@ -747,14 +822,15 @@ def _particle_filter_initial_weighted_particles(observations,
   if initial_state_proposal is None:
     if particles_dim == 0:
       initial_state = initial_state_prior.sample(num_particles, seed=seed)
+      initial_log_weights = ps.zeros_like(initial_state_prior.log_prob(initial_state))
     else:
       initial_state = sample_at_dim(
           initial_state_prior,
           particles_dim,
           num_particles
       )
-
-    initial_log_weights = ps.zeros_like(initial_state)
+      # TODO: The following is wrong, what is the correct one so that I can generalize to other initial_state
+      initial_log_weights = ps.zeros_like(initial_state)
 
   else:
     initial_state = initial_state_proposal.sample(num_particles, seed=seed)
