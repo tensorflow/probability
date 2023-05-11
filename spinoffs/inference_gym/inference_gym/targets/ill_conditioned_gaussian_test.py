@@ -40,10 +40,11 @@ class IllConditionedGaussianTest(test_util.InferenceGymTestCase):
   @test_util.numpy_disable_gradient_test
   def testHMC(self):
     """Checks approximate samples from the model against the ground truth."""
-    # Note the side-effect of setting the eager seed.
-    seed = tfp_test_util.test_seed_stream()
     model = ill_conditioned_gaussian.IllConditionedGaussian(
-        ndims=10, gamma_shape_parameter=2., seed=seed())
+        ndims=10,
+        gamma_shape_parameter=2.0,
+        seed=tfp_test_util.test_seed(sampler_type='integer'),
+    )
 
     self.validate_ground_truth_using_hmc(
         model,
@@ -51,20 +52,21 @@ class IllConditionedGaussianTest(test_util.InferenceGymTestCase):
         num_steps=2000,
         num_leapfrog_steps=3,
         step_size=0.5,
-        seed=seed(),
+        seed=tfp_test_util.test_seed(),
     )
 
   def testMC(self):
     """Checks true samples from the model against the ground truth."""
-    # Note the side-effect of setting the eager seed.
-    seed = tfp_test_util.test_seed_stream()
     model = ill_conditioned_gaussian.IllConditionedGaussian(
-        ndims=10, gamma_shape_parameter=2., seed=seed())
+        ndims=10,
+        gamma_shape_parameter=2.0,
+        seed=tfp_test_util.test_seed(sampler_type='integer'),
+    )
 
     self.validate_ground_truth_using_monte_carlo(
         model,
         num_samples=int(1e6),
-        seed=seed(),
+        seed=tfp_test_util.test_seed(),
     )
 
 
