@@ -162,7 +162,7 @@ class FFJORDBijectorTest(test_util.TestCase):
     seed = test_util.test_seed()
     tf_dtype = tf.as_dtype(dtype)
     num_dims = 10
-    np.random.seed(seed=seed)
+    np.random.seed(seed=test_util.test_seed(sampler_type='integer'))
     matrix_diagonal = np.random.uniform(size=[num_dims]).astype(dtype)
     scaling_matrix = np.diag(matrix_diagonal).astype(dtype)
     one_time_scale_matrix = np.diag(np.exp(matrix_diagonal))
