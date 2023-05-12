@@ -388,6 +388,7 @@ multi_substrate_py_test(
         ":auto_composite_tensor",
         ":loop_util",
         ":prefer_static",
+        ":samplers",
         ":tensorshape_util",
         ":test_util",
         # tensorflow dep,

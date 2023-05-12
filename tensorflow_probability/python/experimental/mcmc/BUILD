@@ -967,6 +967,7 @@ multi_substrate_py_library(
     deps = [
         ":reducer",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:loop_util",
         "//tensorflow_probability/python/mcmc/internal:util",
     ],
 )

@@ -20,6 +20,7 @@ import collections
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.mcmc import reducer as reducer_base
+from tensorflow_probability.python.internal import loop_util
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 
@@ -123,11 +124,10 @@ class TracingReducer(reducer_base.Reducer):
       def _map_body(trace_state):
         if not tf.is_tensor(trace_state):
           trace_state = tf.convert_to_tensor(trace_state)
-        return tf.TensorArray(
-            dtype=trace_state.dtype,
+        return loop_util.tensor_array_from_element(
+            trace_state,
             size=size,
             dynamic_size=dynamic_size,
-            element_shape=trace_state.shape,
             clear_after_read=False)
 
       trace_state = tf.nest.map_structure(
