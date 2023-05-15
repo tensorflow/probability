@@ -43,6 +43,7 @@ multi_substrate_py_library(
     deps = [
         ":linear_operator_interpolated_psd_kernel",
         ":linear_operator_psd_kernel",
+        ":linear_operator_row_block",
         ":linear_operator_unitary",
         ":no_pivot_ldl",
         "//tensorflow_probability/python/internal:all_util",
