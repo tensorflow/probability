@@ -18,6 +18,7 @@ import functools
 import warnings
 
 # Dependency imports
+import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import identity as identity_bijector
@@ -26,6 +27,7 @@ from tensorflow_probability.python.distributions import cholesky_util
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import multivariate_student_t
 from tensorflow_probability.python.distributions import student_t
+from tensorflow_probability.python.distributions.internal import stochastic_process_util
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import distribution_util
@@ -35,18 +37,14 @@ from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import linalg
+from tensorflow_probability.python.math import special
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'StudentTProcess',
 ]
-
-
-def _add_diagonal_shift(matrix, shift):
-  return tf.linalg.set_diag(
-      matrix, tf.linalg.diag_part(matrix) + shift, name='add_diagonal_shift')
 
 
 _ALWAYS_YIELD_MVST_DEPRECATION_WARNING = (
@@ -370,11 +368,7 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
       self._index_points = index_points
       # Default to a constant zero function, borrowing the dtype from
       # index_points to ensure consistency.
-      if mean_fn is None:
-        mean_fn = lambda x: tf.zeros([1], dtype=dtype)
-      else:
-        if not callable(mean_fn):
-          raise ValueError('`mean_fn` must be a Python callable')
+      mean_fn = stochastic_process_util.maybe_create_mean_fn(mean_fn, dtype)
       self._df = df
       self._observation_noise_variance = observation_noise_variance
       self._mean_fn = mean_fn
@@ -402,24 +396,6 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
             allow_nan_stats=allow_nan_stats,
             parameters=parameters,
             name=name)
-
-  @classmethod
-  def _parameter_properties(cls, dtype, num_classes=None):
-    return dict(
-        df=parameter_properties.ParameterProperties(
-            default_constraining_bijector_fn=(
-                lambda: softplus_bijector.Softplus(  # pylint: disable=g-long-lambda
-                    low=dtype_util.as_numpy_dtype(dtype)(2.)))),
-        index_points=parameter_properties.ParameterProperties(
-            event_ndims=lambda self: tf.nest.map_structure(  # pylint: disable=g-long-lambda
-                lambda nd: nd + 1, self.kernel.feature_ndims),
-            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
-        ),
-        kernel=parameter_properties.BatchedComponentProperties(),
-        observation_noise_variance=parameter_properties.ParameterProperties(
-            default_constraining_bijector_fn=(
-                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype))),
-            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED))
 
   def _is_univariate_marginal(self, index_points):
     """True if the given index_points would yield a univariate marginal.
@@ -457,28 +433,23 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
           'some methods, like `cdf` unavailable.')
     return all(n == 1 for n in flat_num_index_points)
 
-  def _compute_covariance(self, index_points):
-    kernel_matrix = self.kernel.matrix(index_points, index_points)
-    if self._is_univariate_marginal(index_points):
-      # kernel_matrix thus has shape [..., 1, 1]; squeeze off the last dims and
-      # tack on the observation noise variance.
-      return (tf.squeeze(kernel_matrix, axis=[-2, -1]) +
-              self.observation_noise_variance)
-    else:
-      observation_noise_variance = tf.convert_to_tensor(
-          self.observation_noise_variance)
-      # We are compute K + obs_noise_variance * I. The shape of this matrix
-      # is going to be a broadcast of the shapes of K and obs_noise_variance *
-      # I.
-      broadcast_shape = distribution_util.get_broadcast_shape(
-          kernel_matrix,
-          # We pad with two single dimension since this represents a batch of
-          # scaled identity matrices.
-          observation_noise_variance[..., tf.newaxis, tf.newaxis])
-
-      kernel_matrix = tf.broadcast_to(kernel_matrix, broadcast_shape)
-      return _add_diagonal_shift(
-          kernel_matrix, observation_noise_variance[..., tf.newaxis])
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        df=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(  # pylint: disable=g-long-lambda
+                    low=dtype_util.as_numpy_dtype(dtype)(2.)))),
+        index_points=parameter_properties.ParameterProperties(
+            event_ndims=lambda self: tf.nest.map_structure(  # pylint: disable=g-long-lambda
+                lambda nd: nd + 1, self.kernel.feature_ndims),
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
+        ),
+        kernel=parameter_properties.BatchedComponentProperties(),
+        observation_noise_variance=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype))),
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED))
 
   def get_marginal_distribution(self, index_points=None):
     """Compute the marginal over function values at `index_points`.
@@ -522,13 +493,15 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
         _GET_MARGINAL_DISTRIBUTION_ALREADY_WARNED = True  # pylint: disable=protected-access
       df = tf.convert_to_tensor(self.df)
       index_points = self._get_index_points(index_points)
-      covariance = self._compute_covariance(index_points)
+      covariance = stochastic_process_util.compute_kernel_matrix(
+          self.kernel, index_points, self.observation_noise_variance)
       loc = self._mean_fn(index_points)
 
       # If we're sure the number of index points is 1, we can just construct a
       # scalar Normal. This has computational benefits and supports things like
       # CDF that aren't otherwise straightforward to provide.
       if self._is_univariate_marginal(index_points):
+        covariance = tf.squeeze(covariance, axis=[-1, -2])
         squared_scale = (df - 2.) / df * covariance
         scale = tf.sqrt(squared_scale)
         # `loc` has a trailing 1 in the shape; squeeze it.
@@ -604,37 +577,99 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
         index_points if index_points is not None else self._index_points,
         dtype_hint=self.kernel.dtype, allow_packing=True)
 
-  def _log_prob(self, value, index_points=None):
-    return self.get_marginal_distribution(index_points).log_prob(value)
+  @distribution_util.AppendDocstring(kwargs_dict={
+      'index_points':
+          'optional `float` `Tensor` representing a finite (batch of) of '
+          'points in the index set over which this STP is defined. The shape '
+          '(or shape of each nested component) has the form `[b1, ..., bB, e,'
+          'f1, ..., fF]` where `F` is the ' 'number of feature dimensions and '
+          'must equal ' '`self.kernel.feature_ndims` (or its corresponding '
+          'nested component) and `e` is the number of index points in each '
+          'batch. Ultimately, this distribution corresponds to an '
+          '`e`-dimensional multivariate normal. The batch shape must be '
+          'broadcastable with `kernel.batch_shape` and any batch dims yielded'
+          'by `mean_fn`. If not specified, `self.index_points` is used. '
+          'Default value: `None`.',
+      'is_missing':
+          'optional `bool` `Tensor` of shape `[..., e]`, where `e` is the '
+          'number of index points in each batch.  Represents a batch of '
+          'Boolean masks.  When `is_missing` is not `None`, the returned '
+          'log-prob is for the *marginal* distribution, in which all '
+          'dimensions for which `is_missing` is `True` have been marginalized '
+          'out.  The batch dimensions of `is_missing` must broadcast with the '
+          'sample and batch dimensions of `value` and of this `Distribution`. '
+          'Default value: `None`.'
+  })
+  def _log_prob(self, value, index_points=None, is_missing=None):
+    if is_missing is not None:
+      is_missing = tf.convert_to_tensor(is_missing)
+    value = tf.convert_to_tensor(value, dtype=self.dtype)
+    index_points = self._get_index_points(index_points)
+    if self._is_univariate_marginal(index_points):
+      value = value[..., tf.newaxis]
+    observation_noise_variance = tf.convert_to_tensor(
+        self.observation_noise_variance)
+    loc, covariance = stochastic_process_util.get_loc_and_kernel_matrix(
+        kernel=self.kernel,
+        index_points=index_points,
+        mean_fn=self._mean_fn,
+        observation_noise_variance=observation_noise_variance,
+        is_missing=is_missing,
+        mask_loc=False)
+    event_shape = self._event_shape_tensor(index_points=index_points)
+    # Use marginal_fn if cholesky_fn doesn't exist.
+    if self.cholesky_fn is None:
+      # TODO(b/280821509): Add support for `is_missing` with `marginal_fn`.
+      if is_missing is not None:
+        raise ValueError(
+            '`is_missing` can not be used with `marginal_fn`. '
+            'If you need this functionality, please contact '
+            '`tfprobability@tensorflow.org`.')
+      return self.get_marginal_distribution(index_points).log_prob(value)
+    df = tf.convert_to_tensor(self.df)
+    value = value - loc
+    num_masked_dims = 0.
+    if is_missing is not None:
+      value = tf.where(is_missing, 0., value)
+      num_masked_dims = tf.cast(
+          tf.math.count_nonzero(is_missing, axis=-1), self.dtype)
+    if self._is_univariate_marginal(index_points):
+      num_dims = 1
+    else:
+      num_dims = tf.cast(event_shape[-1], self.dtype)
+
+    if self._is_univariate_marginal(index_points):
+      covariance = tf.squeeze(covariance, axis=[-1, -2])
+      value = tf.squeeze(value, axis=-1)
+      lp = -(df + num_dims - num_masked_dims) / 2. * tf.math.log1p(
+          tf.math.square(value) / (covariance * (df - 2.)))
+      lp = lp - 0.5 * tf.math.log(covariance)
+    else:
+      chol_covariance = self.cholesky_fn(covariance)  # pylint: disable=not-callable
+      lp = -(df + num_dims - num_masked_dims) / 2. * tf.math.log1p(
+          linalg.hpsd_quadratic_form_solvevec(
+              covariance, value, cholesky_matrix=chol_covariance) / (df - 2.))
+      lp = lp - 0.5 * linalg.hpsd_logdet(
+          covariance, cholesky_matrix=chol_covariance)
+
+    lp = lp - special.log_gamma_difference(
+        (num_dims - num_masked_dims) / 2., df / 2.)
+    lp = lp - (num_dims - num_masked_dims) / 2. * (
+        tf.math.log(df - 2.) + tf.cast(np.log(np.pi), self.dtype))
+    return lp
 
   def _event_shape_tensor(self, index_points=None):
     index_points = self._get_index_points(index_points)
     if self._is_univariate_marginal(index_points):
       return tf.constant([], dtype=tf.int32)
-    else:
-      # The examples index is one position to the left of the feature dims.
-      example_shape = tf.nest.map_structure(
-          lambda t, nd: ps.shape(t)[ps.rank(t) - (nd + 1):ps.rank(t) - nd],
-          index_points, self.kernel.feature_ndims)
-      return functools.reduce(ps.broadcast_shape,
-                              tf.nest.flatten(example_shape), [])
+    return stochastic_process_util.event_shape_tensor(self.kernel, index_points)
 
   def _event_shape(self, index_points=None):
     index_points = (
         index_points if index_points is not None else self._index_points)
     if self._is_univariate_marginal(index_points):
       return tf.TensorShape([])
-    else:
-      # The examples index is one position to the left of the feature dims.
-      example_shape = tf.nest.map_structure(
-          lambda t, nd: tf.TensorShape(t.shape[-(nd + 1)]),
-          index_points, self.kernel.feature_ndims)
-      flat_shapes = nest.flatten_up_to(self.kernel.feature_ndims, example_shape)
-
-      if None in [tensorshape_util.rank(s) for s in flat_shapes]:
-        return tf.TensorShape([None])
-      return functools.reduce(
-          tf.broadcast_static_shape, flat_shapes, tf.TensorShape([]))
+    return stochastic_process_util.event_shape(self.kernel, index_points)
 
   def _batch_shape(self, index_points=None):
     # TODO(b/249858459): Update `batch_shape_lib` so it can take override
@@ -647,12 +682,6 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
       flat_shapes = nest.flatten_up_to(self.kernel.feature_ndims, shapes)
       return functools.reduce(ps.broadcast_shape, flat_shapes, result)
     return result
-
-  def _batch_shape_tensor(self, index_points=None):
-    kwargs = {}
-    if index_points is not None:
-      kwargs = {'index_points': index_points}
-    return batch_shape_lib.inferred_batch_shape_tensor(self, **kwargs)
 
   def _sample_n(self, n, seed=None, index_points=None):
     return self.get_marginal_distribution(index_points).sample(n, seed=seed)
@@ -706,10 +735,19 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
       return kernel_diag + self.observation_noise_variance[..., tf.newaxis]
 
   def _covariance(self, index_points=None):
-    # Using the result of get_marginal_distribution would involve an extra
-    # matmul, and possibly even an unnecessary cholesky first. We can avoid that
-    # by going straight through the kernel function.
-    return self._compute_covariance(self._get_index_points(index_points))
+    observation_noise_variance = tf.convert_to_tensor(
+        self.observation_noise_variance)
+    index_points = self._get_index_points(index_points)
+    kernel_matrix = stochastic_process_util.compute_kernel_matrix(
+        kernel=self.kernel,
+        index_points=index_points,
+        observation_noise_variance=observation_noise_variance)
+    if self._is_univariate_marginal(index_points):
+      # kernel_matrix thus has shape [..., 1, 1]; squeeze off the last dims and
+      # tack on the observation noise variance.
+      return tf.squeeze(kernel_matrix, axis=[-2, -1])
+    else:
+      return kernel_matrix
 
   def _mode(self, index_points=None):
     return self.get_marginal_distribution(index_points).mode()

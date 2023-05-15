@@ -96,6 +96,7 @@ DISABLED_BY_PKG = {
 LIBS = ('bijectors', 'distributions', 'experimental', 'glm', 'math', 'mcmc',
         'monte_carlo', 'optimizer', 'random', 'staging', 'stats', 'sts',
         'tfp_google', 'util', 'vi')
+DISTRIBUTION_INTERNALS = ('stochastic_process_util',)
 INTERNALS = ('assert_util', 'auto_composite_tensor',
              'batched_rejection_sampler',
              'batch_shape_lib', 'broadcast_util', 'cache_util',
@@ -166,12 +167,19 @@ def main(argv):
       'tensorflow_probability.substrates.numpy.google import {}'.format(lib)
       for lib in LIBS
   })
+  # pylint: disable=g-complex-comprehension
+  replacements.update({
+      'tensorflow_probability.python.distributions.internal.{}'.format(
+          internal):
+      'tensorflow_probability.substrates.numpy.distributions.'
+      'internal.{}'.format(internal)
+      for internal in DISTRIBUTION_INTERNALS
+  })
   replacements.update({
       'tensorflow_probability.python.internal.{}'.format(internal):
       'tensorflow_probability.substrates.numpy.internal.{}'.format(internal)
       for internal in INTERNALS
   })
-  # pylint: disable=g-complex-comprehension
   replacements.update({
       'tensorflow_probability.python.internal import {}'.format(internal):
           'tensorflow_probability.substrates.numpy.internal import {}'.format(

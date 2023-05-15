@@ -21,11 +21,11 @@ from tensorflow_probability.python.bijectors import softplus as softplus_bijecto
 from tensorflow_probability.python.distributions import cholesky_util
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import gaussian_process
+from tensorflow_probability.python.distributions.internal import stochastic_process_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.psd_kernels import schur_complement
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
@@ -33,82 +33,6 @@ from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tenso
 __all__ = [
     'GaussianProcessRegressionModel',
 ]
-
-
-def _is_empty_observation_data(
-    feature_ndims, observation_index_points, observations):
-  """Returns `True` if given observation data is empty.
-
-  Emptiness means either
-    1. Both `observation_index_points` and `observations` are `None`, or
-    2. the "number of observations" shape is 0. The shape of
-    `observation_index_points` (or each of its components, if nested) is
-    `[..., N, f1, ..., fF]`, where `N` is the number of observations and the
-    `f`s are feature dims. Thus, we look at the shape element just to the
-    left of the leftmost feature dim. If that shape is zero, we consider the
-    data empty.
-
-  We don't check the shape of observations; validations are checked elsewhere in
-  the calling code, to ensure these shapes are consistent.
-
-  Args:
-    feature_ndims: the number of feature dims, as reported by the GP kernel.
-    observation_index_points: the observation data locations in the index set.
-    observations: the observation data.
-
-  Returns:
-    is_empty: True if the data were deemed to be empty.
-  """
-  # If both input locations and observations are `None`, we consider this
-  # "empty" observation data.
-  if observation_index_points is None and observations is None:
-    return True
-  num_obs = tf.nest.map_structure(
-      lambda t, nd: tf.compat.dimension_value(t.shape[-(nd + 1)]),
-      observation_index_points, feature_ndims)
-  if all(n is not None and n == 0 for n in tf.nest.flatten(num_obs)):
-    return True
-  return False
-
-
-def _validate_observation_data(
-    kernel, observation_index_points, observations):
-  """Ensure that observation data and locations have consistent shapes.
-
-  This basically means that the batch shapes are broadcastable. We can only
-  ensure this when those shapes are fully statically defined.
-
-
-  Args:
-    kernel: The GP kernel.
-    observation_index_points: the observation data locations in the index set.
-    observations: the observation data.
-
-  Raises:
-    ValueError: if the observations' batch shapes are not broadcastable.
-  """
-  # Check that observation index points and observation counts broadcast.
-  ndims = kernel.feature_ndims
-
-  def _validate(t, nd):
-    if nd > 0:
-      shape = t.shape[:-nd]
-    else:
-      shape = t.shape
-    if (tensorshape_util.is_fully_defined(shape)
-        and tensorshape_util.is_fully_defined(observations.shape)):
-      index_point_count = shape
-      observation_count = observations.shape
-      try:
-        tf.broadcast_static_shape(index_point_count, observation_count)
-      except ValueError:
-        # Re-raise with our own more contextual error message.
-        raise ValueError(
-            'Observation index point and observation counts are not '
-            'broadcastable: {} and {}, respectively.'.format(
-                index_point_count, observation_count))
-
-  tf.nest.map_structure(_validate, observation_index_points, ndims)
 
 
 _ALWAYS_YIELD_MVN_DEPRECATION_WARNING = (
@@ -554,12 +478,7 @@ class GaussianProcessRegressionModel(
                 observations, observation_index_points))
       # Default to a constant zero function, borrowing the dtype from
       # index_points to ensure consistency.
-      if mean_fn is None:
-        mean_fn = lambda x: tf.zeros([1], dtype=dtype)
-      else:
-        if not callable(mean_fn):
-          raise ValueError('`mean_fn` must be a Python callable')
-
+      mean_fn = stochastic_process_util.maybe_create_mean_fn(mean_fn, dtype)
       if cholesky_fn is None:
         cholesky_fn = cholesky_util.make_cholesky_with_jitter_fn(jitter)
 
@@ -580,14 +499,14 @@ class GaussianProcessRegressionModel(
               diag_shift=observation_noise_variance)
         # Special logic for mean_fn only; SchurComplement already handles the
         # case of empty observations (ie, falls back to base_kernel).
-        if _is_empty_observation_data(
+        if stochastic_process_util.is_empty_observation_data(
             feature_ndims=kernel.feature_ndims,
             observation_index_points=observation_index_points,
             observations=observations):
           if _conditional_mean_fn is None:
             _conditional_mean_fn = mean_fn
         else:
-          _validate_observation_data(
+          stochastic_process_util.validate_observation_data(
               kernel=kernel,
               observation_index_points=observation_index_points,
               observations=observations)
@@ -804,11 +723,7 @@ class GaussianProcessRegressionModel(
           _precomputed_divisor_matrix_cholesky=(
               _precomputed_divisor_matrix_cholesky))
 
-      if mean_fn is None:
-        mean_fn = lambda x: tf.zeros([1], dtype=dtype)
-      else:
-        if not callable(mean_fn):
-          raise ValueError('`mean_fn` must be a Python callable')
+      mean_fn = stochastic_process_util.maybe_create_mean_fn(mean_fn, dtype)
 
       solve_on_observation = _precomputed_solve_on_observation
       if solve_on_observation is None:

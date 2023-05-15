@@ -27,6 +27,7 @@ from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions.internal import stochastic_process_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
@@ -895,11 +896,7 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess,
 
       # Default to a constant zero function, borrowing the dtype from
       # index_points to ensure consistency.
-      if mean_fn is None:
-        mean_fn = lambda x: tf.zeros([1], dtype=dtype)
-      else:
-        if not callable(mean_fn):
-          raise ValueError('`mean_fn` must be a Python callable')
+      mean_fn = stochastic_process_util.maybe_create_mean_fn(mean_fn, dtype)
       self._prior_mean_fn = mean_fn
 
       # Set up the prior over function values at inducing points using the
@@ -1326,11 +1323,7 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess,
         cholesky_fn = cholesky_util.make_cholesky_with_jitter_fn(jitter)
 
       # Default to a constant zero function.
-      if mean_fn is None:
-        mean_fn = lambda x: tf.zeros([1], dtype=dtype)
-      else:
-        if not callable(mean_fn):
-          raise ValueError('`mean_fn` must be a Python callable')
+      mean_fn = stochastic_process_util.maybe_create_mean_fn(mean_fn, dtype)
 
       # z are the inducing points and x are the observation index points.
       kzz = kernel.matrix(inducing_index_points, inducing_index_points)

@@ -23,6 +23,7 @@ from tensorflow_probability.python.bijectors import softplus as softplus_bijecto
 from tensorflow_probability.python.distributions import cholesky_util
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import mvn_linear_operator
+from tensorflow_probability.python.distributions.internal import stochastic_process_util
 from tensorflow_probability.python.experimental.distributions import multitask_gaussian_process as mtgp
 from tensorflow_probability.python.experimental.linalg import linear_operator_unitary
 from tensorflow_probability.python.experimental.psd_kernels import multitask_kernel
@@ -36,7 +37,6 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.psd_kernels.internal import util as psd_kernels_util
-from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
 def _vec(x):
@@ -343,22 +343,8 @@ class MultiTaskGaussianProcessRegressionModel(
       self._kernel = kernel
       self._index_points = index_points
 
-      # Scalar or vector the size of the number of tasks.
-      if mean_fn is None:
-        def _mean_fn(x):
-          # Shape B1 + [E, N], where E is the number of index points, and N is
-          # the number of tasks.
-          flat_shapes = tf.nest.flatten(
-              tf.nest.map_structure(lambda z, d: ps.shape(z)[:-d],
-                                    x, self.kernel.feature_ndims))
-          bcast_shape = functools.reduce(ps.broadcast_shape, flat_shapes, [])
-          return tf.zeros(
-              ps.concat([
-                  bcast_shape, [self.kernel.num_tasks]], axis=0), dtype=dtype)
-        mean_fn = _mean_fn
-      else:
-        if not callable(mean_fn):
-          raise ValueError('`mean_fn` must be a Python callable')
+      mean_fn = stochastic_process_util.maybe_create_multitask_mean_fn(
+          mean_fn, kernel, dtype)
       self._mean_fn = mean_fn
       self._observation_noise_variance = observation_noise_variance
       self._predictive_noise_variance = predictive_noise_variance
@@ -763,40 +749,21 @@ class MultiTaskGaussianProcessRegressionModel(
   def _event_shape(self):
     # The examples index is one position to the left of the feature dims.
     index_points = self.index_points
-
     if index_points is None:
       return tf.TensorShape([None, self.kernel.num_tasks])
-    example_shape = tf.nest.map_structure(
-        lambda t, nd: tf.TensorShape(t.shape[-(nd + 1):-nd]),
-        index_points, self.kernel.feature_ndims)
-    flat_shapes = nest.flatten_up_to(self.kernel.feature_ndims, example_shape)
-    if None in [tensorshape_util.rank(s) for s in flat_shapes]:
-      return tf.TensorShape([None, self.kernel.num_tasks])
-    bcast_shape = functools.reduce(
-        tf.broadcast_static_shape, flat_shapes, tf.TensorShape([]))
-    return tensorshape_util.concatenate(
-        bcast_shape, [self.kernel.num_tasks])
+    return stochastic_process_util.multitask_event_shape(
+        self.kernel, index_points)
 
   def _event_shape_tensor(self, index_points=None):
     index_points = self._get_index_points(index_points)
-    example_shape = tf.nest.map_structure(
-        lambda t, nd: ps.shape(t)[-(nd + 1):-nd],
-        index_points, self.kernel.feature_ndims)
-    shape = functools.reduce(ps.broadcast_shape,
-                             tf.nest.flatten(example_shape), [])
-    return ps.concat([shape, [self.kernel.num_tasks]], axis=0)
+    return stochastic_process_util.multitask_event_shape_tensor(
+        self.kernel, index_points)
 
   def _batch_shape(self, index_points=None):
     kwargs = {}
     if index_points is not None:
       kwargs = {'index_points': index_points}
     return batch_shape_lib.inferred_batch_shape(self, **kwargs)
-
-  def _batch_shape_tensor(self, index_points=None):
-    kwargs = {}
-    if index_points is not None:
-      kwargs = {'index_points': index_points}
-    return batch_shape_lib.inferred_batch_shape_tensor(self, **kwargs)
 
   def _compute_flattened_covariance(self, index_points=None):
     # This is of shape KN x KN, where K is the number of outputs

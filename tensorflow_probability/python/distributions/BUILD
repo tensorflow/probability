@@ -746,6 +746,7 @@ multi_substrate_py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/distributions/internal:stochastic_process_util",
         "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
@@ -767,6 +768,7 @@ multi_substrate_py_library(
         ":distribution",
         ":gaussian_process",
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions/internal:stochastic_process_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:nest_util",
@@ -2172,6 +2174,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:identity",
         "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/distributions/internal:stochastic_process_util",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:batch_shape_lib",
         "//tensorflow_probability/python/internal:dtype_util",
@@ -2180,6 +2183,8 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/math:linalg",
+        "//tensorflow_probability/python/math:special",
     ],
 )
 
@@ -2194,6 +2199,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:identity",
         "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/distributions/internal:stochastic_process_util",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:nest_util",
@@ -2384,6 +2390,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:fill_scale_tril",
         "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/distributions/internal:stochastic_process_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:tensor_util",
@@ -4486,6 +4493,7 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
         "//tensorflow_probability/python/math/psd_kernels",
     ],
 )
@@ -4504,7 +4512,9 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
-        "//tensorflow_probability/python/math/psd_kernels",
+        "//tensorflow_probability/python/math/psd_kernels:exp_sin_squared",
+        "//tensorflow_probability/python/math/psd_kernels:exponentiated_quadratic",
+        "//tensorflow_probability/python/math/psd_kernels/internal:test_util",
     ],
 )
 
