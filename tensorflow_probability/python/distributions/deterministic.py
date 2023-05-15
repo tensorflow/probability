@@ -132,7 +132,9 @@ class _BaseDeterministic(distribution.AutoCompositeTensorDistribution):
     return self._rtol
 
   def _entropy(self):
-    return tf.zeros(self.batch_shape_tensor(), dtype=self.dtype)
+    entropy_dtype = self.dtype if dtype_util.is_floating(
+        self.dtype) else tf.float32
+    return tf.zeros(self.batch_shape_tensor(), dtype=entropy_dtype)
 
   def _mean(self):
     loc = tf.convert_to_tensor(self.loc)

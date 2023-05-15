@@ -371,7 +371,7 @@ genrule(
     srcs = [],
     outs = ["tensor_shape_gen.py"],
     cmd = "$(location //tensorflow_probability/python/internal/backend/meta:gen_tensor_shape) > $@",
-    exec_tools = ["//tensorflow_probability/python/internal/backend/meta:gen_tensor_shape"],
+    tools = ["//tensorflow_probability/python/internal/backend/meta:gen_tensor_shape"],
 )
 
 py_library(
@@ -571,7 +571,7 @@ LINOP_FILES = [
         filename,
         ",".join(LINOP_FILES),
     ),
-    exec_tools = ["//tensorflow_probability/python/internal/backend/meta:gen_linear_operators"],
+    tools = ["//tensorflow_probability/python/internal/backend/meta:gen_linear_operators"],
 ) for filename in LINOP_FILES]
 
 # Rules helpful for generating new rewritten files.
@@ -585,7 +585,7 @@ LINOP_FILES = [
         filename,
         ",".join(LINOP_FILES),
     ),
-    exec_tools = ["//tensorflow_probability/python/internal/backend/meta:gen_linear_operators"],
+    tools = ["//tensorflow_probability/python/internal/backend/meta:gen_linear_operators"],
 ) for filename in LINOP_FILES]
 
 py_library(

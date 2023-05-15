@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-from absl.testing import absltest
 import jax
 from fun_mc import using_jax as fun_mc
+from absl.testing import absltest
 
 
 class JaxIntegrationTest(absltest.TestCase):

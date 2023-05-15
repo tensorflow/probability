@@ -210,7 +210,7 @@ class PositiveSemidefiniteKernel(tf.Module, metaclass=abc.ABCMeta):
 
     Raises:
       ValueError: if `feature_ndims` (or any element, if nested) is not an
-        integer greater than 0.
+        integer greater than or equal to 0.
 
     Inputs to PositiveSemidefiniteKernel methods (or each element, if nested)
     partition into 3 pieces:
@@ -227,11 +227,11 @@ class PositiveSemidefiniteKernel(tf.Module, metaclass=abc.ABCMeta):
     dimensions belong to the feature dimensions. This enables us to predict
     which shape dimensions will be 'reduced' away during kernel computation.
     """
-    if not all(isinstance(ndim, int) and ndim > 0
+    if not all(isinstance(ndim, int) and ndim >= 0
                for ndim in tf.nest.flatten(feature_ndims)):
       raise ValueError(
           '`feature_ndims` must contain only Python `integer`s greater than '
-          f'zero. Got: {feature_ndims}')
+          f'or equal to zero. Got: {feature_ndims}')
     self._feature_ndims = feature_ndims
 
     # If dtype is not provided, ensure that it has the same nested structure as

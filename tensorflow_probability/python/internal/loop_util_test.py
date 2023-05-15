@@ -30,6 +30,8 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import loop_util
+from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import gradient
@@ -122,6 +124,25 @@ class TraceScanTest(test_util.TestCase):
     self.assertAllClose(3, final_state)
     self.assertAllClose([1, 3], trace[0])
     self.assertAllClose([2, 6], trace[1])
+
+  def testRandomSeeds(self):
+
+    def _loop_fn(state, _):
+      return samplers.split_seed(state, 2)[1]
+
+    def _trace_fn(state):
+      return [state,
+              samplers.split_seed(state, ps.convert_to_shape_tensor(5)),
+              tf.broadcast_to(state, tf.TensorShape([2, 4]) + state.shape)]
+
+    _, trace = loop_util.trace_scan(
+        loop_fn=_loop_fn,
+        initial_state=test_util.test_seed(sampler_type='stateless'),
+        elems=[1, 2, 3], trace_fn=_trace_fn)
+
+    self.assertAllEqual(3, trace[0].shape[0])
+    self.assertAllEqual((3, 5), trace[1].shape[:2])
+    self.assertAllEqual((3, 2, 4), trace[2].shape[:3])
 
   @test_util.jax_disable_test_missing_functionality('b/157611426')
   @parameterized.named_parameters(

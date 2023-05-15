@@ -24,6 +24,7 @@ from tensorflow_probability.python.distributions import student_t
 from tensorflow_probability.python.distributions import student_t_process
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
 from tensorflow_probability.python.math import psd_kernels
 from tensorflow_probability.python.math.psd_kernels.internal import test_util as psd_kernel_test_util
 
@@ -337,6 +338,163 @@ class _StudentTProcessTest(test_util.TestCase):
     self.assertAllEqual(base_stp.batch_shape_tensor(),
                         stp_with_list.batch_shape_tensor())
     self.assertAllClose(base_stp.log_prob(s), stp_with_list.log_prob(s))
+
+  def testAlwaysYieldMultivariateStudentT(self):
+    df = np.float32(3.)
+    stp = student_t_process.StudentTProcess(
+        df=df,
+        kernel=psd_kernels.ExponentiatedQuadratic(),
+        index_points=tf.ones([5, 1, 2]),
+        always_yield_multivariate_student_t=False,
+    )
+    self.assertAllEqual([5], self.evaluate(stp.batch_shape_tensor()))
+    self.assertAllEqual([], self.evaluate(stp.event_shape_tensor()))
+
+    stp = student_t_process.StudentTProcess(
+        df=df,
+        kernel=psd_kernels.ExponentiatedQuadratic(),
+        index_points=tf.ones([5, 1, 2]),
+        always_yield_multivariate_student_t=True,
+    )
+    self.assertAllEqual([5], self.evaluate(stp.batch_shape_tensor()))
+    self.assertAllEqual([1], self.evaluate(stp.event_shape_tensor()))
+
+  def testLogProbMatchesMVT(self):
+    df = tf.convert_to_tensor(3.)
+    index_points = tf.convert_to_tensor(
+        [[-1.0, 0.0], [-0.5, -0.5], [1.5, 0.0], [1.6, 1.5]])
+    amplitude = tf.convert_to_tensor(1.1)
+    length_scale = tf.convert_to_tensor(0.9)
+    kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
+
+    stp = student_t_process.StudentTProcess(
+        df=df,
+        kernel=kernel,
+        index_points=index_points,
+        mean_fn=lambda x: tf.reduce_mean(x, axis=-1),
+        observation_noise_variance=.05,
+        jitter=0.0)
+    x = stp.sample(5, seed=test_util.test_seed())
+    scale = kernel.matrix(index_points, index_points)
+    scale = tf.linalg.set_diag(
+        scale, tf.linalg.diag_part(scale) + .05)
+    scale = (df - 2.) / df * scale
+    scale = tf.linalg.cholesky(scale)
+    mvt = mvst.MultivariateStudentTLinearOperator(
+        loc=tf.reduce_mean(index_points, axis=-1),
+        df=df,
+        scale=tf.linalg.LinearOperatorLowerTriangular(scale))
+    actual_log_prob, expected_log_prob = self.evaluate([
+        stp.log_prob(x), mvt.log_prob(x)])
+    self.assertAllClose(actual_log_prob, expected_log_prob)
+
+  def testLogProbWithIsMissing(self):
+    df = tf.convert_to_tensor(3.)
+    index_points = tf.Variable(
+        [[-1.0, 0.0], [-0.5, -0.5], [1.5, 0.0], [1.6, 1.5]],
+        shape=None if self.is_static else tf.TensorShape(None))
+    self.evaluate(index_points.initializer)
+    amplitude = tf.convert_to_tensor(1.1)
+    length_scale = tf.convert_to_tensor(0.9)
+
+    stp = student_t_process.StudentTProcess(
+        df=df,
+        kernel=psd_kernels.ExponentiatedQuadratic(amplitude, length_scale),
+        index_points=index_points,
+        mean_fn=lambda x: tf.reduce_mean(x, axis=-1),
+        observation_noise_variance=.05,
+        jitter=0.0)
+
+    x = stp.sample(5, seed=test_util.test_seed())
+
+    is_missing = np.array([
+        [False, True, False, False],
+        [False, False, False, False],
+        [True, False, True, True],
+        [True, False, False, True],
+        [False, False, True, True],
+    ])
+
+    lp = stp.log_prob(tf.where(is_missing, np.nan, x), is_missing=is_missing)
+
+    # For each batch member, check that the log_prob is the same as for a
+    # StudentTProcess without the missing index points.
+    for i in range(5):
+      stp_i = student_t_process.StudentTProcess(
+          df=df,
+          kernel=psd_kernels.ExponentiatedQuadratic(amplitude, length_scale),
+          index_points=tf.gather(index_points, (~is_missing[i]).nonzero()[0]),
+          mean_fn=lambda x: tf.reduce_mean(x, axis=-1),
+          observation_noise_variance=.05,
+          jitter=0.0)
+      lp_i = stp_i.log_prob(tf.gather(x[i], (~is_missing[i]).nonzero()[0]))
+      # NOTE: This reshape is necessary because lp_i has shape [1] when
+      # stp_i.index_points contains a single index point.
+      self.assertAllClose(tf.reshape(lp_i, []), lp[i])
+
+    # The log_prob should be zero when all points are missing out.
+    self.assertAllClose(tf.zeros((3, 2)),
+                        stp.log_prob(
+                            tf.ones((3, 1, 4)) * np.nan,
+                            is_missing=tf.constant(True, shape=(2, 4))))
+
+  def testUnivariateLogProbWithIsMissing(self):
+    index_points = tf.convert_to_tensor([[[0.0, 0.0]], [[0.5, 1.0]]])
+    df = tf.convert_to_tensor(3.)
+    amplitude = tf.convert_to_tensor(1.1)
+    length_scale = tf.convert_to_tensor(0.9)
+
+    stp = student_t_process.StudentTProcess(
+        df=df,
+        kernel=psd_kernels.ExponentiatedQuadratic(amplitude, length_scale),
+        index_points=index_points,
+        mean_fn=lambda x: tf.reduce_mean(x, axis=-1),
+        observation_noise_variance=.05,
+        jitter=0.0)
+
+    x = stp.sample(3, seed=test_util.test_seed())
+    lp = stp.log_prob(x)
+
+    self.assertAllClose(lp, stp.log_prob(x, is_missing=[[False], [False]]))
+    self.assertAllClose(tf.convert_to_tensor([np.zeros((3, 2)), lp]),
+                        stp.log_prob(x, is_missing=[[[[True]]], [[[False]]]]))
+    self.assertAllClose(
+        tf.convert_to_tensor([[lp[0, 0], 0.0], [0.0, 0.0], [0., lp[2, 1]]]),
+        stp.log_prob(
+            x,
+            is_missing=[[[False], [True]], [[True], [True]], [[True], [False]]])
+    )
+
+  @test_util.numpy_disable_gradient_test
+  def test_gradient_non_nan(self):
+    x_obs = np.linspace(1., 10., num=30).reshape([5, 2, 3]).astype(np.float32)
+    y_obs = tf.reduce_sum(x_obs, axis=(-1, -2))
+    x_obs = tf.concat(
+        [x_obs, np.full([3, 2, 3], np.nan, dtype=np.float32)], axis=0)
+    y_obs = tf.concat([y_obs, np.full([3], np.nan, dtype=np.float32)], axis=0)
+    is_missing = np.array([False] * 5 + [True] * 3)
+
+    def loss(x, y, l, o):
+      kernel = psd_kernels.ExponentiatedQuadratic(
+          amplitude=1e-2, feature_ndims=2)
+      kernel = psd_kernels.FeatureScaled(
+          kernel, scale_diag=tf.math.sqrt(l))
+      return student_t_process.StudentTProcess(
+          df=4.,
+          kernel=kernel,
+          index_points=x,
+          observation_noise_variance=o
+      ).log_prob(y, is_missing=is_missing)
+
+    observation_noise_variance = tf.constant(1e-3)
+    lscales = tf.convert_to_tensor([[11.67385626, 1.21246016, 1.5215677],
+                                    [1.08823962, 1.22416186, 1.16885594]])
+
+    value, grads = gradient.value_and_gradient(
+        loss, [x_obs, y_obs, lscales, observation_noise_variance])
+    self.assertAllNotNan(value)
+    for g in grads:
+      self.assertAllNotNan(g)
 
 
 @test_util.test_all_tf_execution_regimes

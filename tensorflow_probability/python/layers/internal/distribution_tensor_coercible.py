@@ -60,7 +60,7 @@ class _TensorCoercible(tfd.Distribution):
   def __setattr__(self, name, value):
     """Support self.foo = trackable syntax.
 
-    Redefined from `tensorflow/python/training/tracking/tracking.py` to avoid
+    Redefined from `tensorflow/python/trackable/tracking.py` to avoid
     calling `getattr`, which causes an infinite loop.
 
     Args:

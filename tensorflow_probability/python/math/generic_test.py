@@ -37,6 +37,8 @@ from tensorflow_probability.python.math.gradient import batch_jacobian
 
 
 JAX_MODE = False
+NUMPY_MODE = False
+TF_MODE = not (JAX_MODE or NUMPY_MODE)
 
 
 def _allow_all_gather(fn):
@@ -714,6 +716,8 @@ class CollectiveTest(distribute_test_lib.DistributedTest):
       ), (None, 0, 1, 2, [0, 1], [1, 2], [0, 2], [0, 1, 2]))))
   def test_reduce_with_collectives_matches_reduce_without_collectives(
       self, reduce_op, axes):
+    if (tf.executing_eagerly() and TF_MODE):
+      self.skipTest('Not supported in Eager.')
 
     if axes is None:
       pos_axes = list(range(2))

@@ -22,6 +22,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import cholesky_util
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import mvn_linear_operator
+from tensorflow_probability.python.distributions.internal import stochastic_process_util
 from tensorflow_probability.python.experimental.linalg import linear_operator_unitary
 from tensorflow_probability.python.experimental.psd_kernels import multitask_kernel
 from tensorflow_probability.python.internal import batch_shape_lib
@@ -142,10 +143,19 @@ def _compute_flattened_scale(
     kronecker_diags = []
     kronecker_orths = []
     for block in kernel_matrix.operators:
-      diag, orth = tf.linalg.eigh(block.to_dense())
-      kronecker_diags.append(tf.linalg.LinearOperatorDiag(diag))
-      kronecker_orths.append(
-          linear_operator_unitary.LinearOperatorUnitary(orth))
+      # No need to take an eigenvalue decomposition for diagonal operators since
+      # they are already in factored form.
+      if isinstance(block, (tf.linalg.LinearOperatorDiag,
+                            tf.linalg.LinearOperatorIdentity,
+                            tf.linalg.LinearOperatorScaledIdentity)):
+        kronecker_diags.append(block)
+        kronecker_orths.append(tf.linalg.LinearOperatorIdentity(
+            block.domain_dimension_tensor(), dtype=block.dtype))
+      else:
+        diag, orth = tf.linalg.eigh(block.to_dense())
+        kronecker_diags.append(tf.linalg.LinearOperatorDiag(diag))
+        kronecker_orths.append(
+            linear_operator_unitary.LinearOperatorUnitary(orth))
 
     full_diag = tf.linalg.LinearOperatorKronecker(kronecker_diags).diag_part()
     full_diag = full_diag + observation_noise_variance[..., tf.newaxis]
@@ -264,20 +274,8 @@ class MultiTaskGaussianProcess(distribution.AutoCompositeTensorDistribution):
       self._kernel = kernel
       self._index_points = index_points
 
-      if mean_fn is None:
-        def _mean_fn(x):
-          # Shape B1 + [E, N], where E is the number of index points, and N is
-          # the number of tasks.
-          flat_shapes = tf.nest.flatten(
-              tf.nest.map_structure(lambda z, d: ps.shape(z)[:-d],
-                                    x, self.kernel.feature_ndims))
-          bcast_shape = functools.reduce(ps.broadcast_shape, flat_shapes, [])
-          return tf.zeros(ps.concat(
-              [bcast_shape, [self.kernel.num_tasks]], axis=0), dtype=dtype)
-        mean_fn = _mean_fn
-      else:
-        if not callable(mean_fn):
-          raise ValueError('`mean_fn` must be a Python callable')
+      mean_fn = stochastic_process_util.maybe_create_multitask_mean_fn(
+          mean_fn, kernel, dtype)
       self._mean_fn = mean_fn
       # Scalar or vector the size of the number of tasks.
       self._observation_noise_variance = observation_noise_variance
@@ -407,25 +405,13 @@ class MultiTaskGaussianProcess(distribution.AutoCompositeTensorDistribution):
 
   def _event_shape(self, index_points=None):
     index_points = self._get_index_points(index_points)
-    example_shape = tf.nest.map_structure(
-        lambda t, nd: tf.TensorShape(t.shape[-(nd + 1):-nd]),
-        index_points, self.kernel.feature_ndims)
-    flat_shapes = nest.flatten_up_to(self.kernel.feature_ndims, example_shape)
-
-    if None in [tensorshape_util.rank(s) for s in flat_shapes]:
-      return tf.TensorShape([None, self.kernel.num_tasks])
-    shape = functools.reduce(
-        tf.broadcast_static_shape, flat_shapes, tf.TensorShape([]))
-    return tensorshape_util.concatenate(shape, [self.kernel.num_tasks])
+    return stochastic_process_util.multitask_event_shape(
+        self.kernel, index_points)
 
   def _event_shape_tensor(self, index_points=None):
     index_points = self._get_index_points(index_points)
-    example_shape = tf.nest.map_structure(
-        lambda t, nd: ps.shape(t)[-(nd + 1):-nd],
-        index_points, self.kernel.feature_ndims)
-    shape = functools.reduce(ps.broadcast_shape,
-                             tf.nest.flatten(example_shape), [])
-    return ps.concat([shape, [self.kernel.num_tasks]], axis=0)
+    return stochastic_process_util.multitask_event_shape_tensor(
+        self.kernel, index_points)
 
   def _batch_shape(self, index_points=None):
     # TODO(b/249858459): Update `batch_shape_lib` so it can take override
@@ -438,12 +424,6 @@ class MultiTaskGaussianProcess(distribution.AutoCompositeTensorDistribution):
       flat_shapes = nest.flatten_up_to(self.kernel.feature_ndims, shapes)
       return functools.reduce(ps.broadcast_shape, flat_shapes, result)
     return result
-
-  def _batch_shape_tensor(self, index_points=None):
-    kwargs = {}
-    if index_points is not None:
-      kwargs = {'index_points': index_points}
-    return batch_shape_lib.inferred_batch_shape_tensor(self, **kwargs)
 
   def _get_flattened_marginal_distribution(self, index_points=None):
     # This returns a MVN of event size [N * E], where N is the number of tasks

@@ -16,6 +16,11 @@
 """Class definitions for tangent spaces."""
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import nest_util
+from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     'AxisAlignedSpace',
@@ -25,6 +30,47 @@ __all__ = [
     'UnspecifiedTangentSpaceError',
     'ZeroSpace',
 ]
+
+JAX_MODE = False
+NUMPY_MODE = False
+TF_MODE = not (JAX_MODE or NUMPY_MODE)
+
+
+def _jvp(f, x, b):
+  """Computes jvp of `f` with respect to `x`."""
+  broadcast_shape = ps.broadcast_shape(ps.shape(x), ps.shape(b))
+  b = tf.broadcast_to(b, broadcast_shape)
+  if JAX_MODE:
+    import jax  # pylint:disable=g-import-not-at-top
+    return jax.jvp(f.forward, (x,), (b,))[1]
+  elif TF_MODE:
+    @tf.function
+    def jvp(b):
+      with tf.autodiff.ForwardAccumulator(primals=x, tangents=b) as acc:
+        y = f.forward(x)
+      result = acc.jvp(y)
+      # TODO(srvasude): "result is None" might be caused by tf.Graph mode,
+      # rather than missing the dependency of y w.r.t. x.
+      if result is None:
+        result = tf.zeros_like(y)
+      return result
+    return jvp(b)
+
+
+def coordinatewise_jvp(f, x):
+  """Returns the diagonal of the jacobian of an coordinatewise `f`."""
+  # If `f` acts coordinatewise, then multiplying by the Jacobian by
+  # the ones vector will retrieve the diagonal.
+  return _jvp(f, x, tf.ones_like(x))
+
+
+def compute_new_basis_tensor(f, x, basis):
+  # TODO(b/197680518): Add special handling for different kind of bases
+  # and `LinearOperator`s in order to be more efficient. For instance, we may be
+  # able to avoid densifying the basis in some circumstances.
+  def compute_basis(b):
+    return _jvp(f, x, b)
+  return tf.vectorized_map(compute_basis, basis.to_dense())
 
 
 class TangentSpace(object):
@@ -68,6 +114,10 @@ class TangentSpace(object):
       NotImplementedError: if the `TangentSpace` subclass does not implement
         this method.
     """
+    x = tf.convert_to_tensor(x)
+    return self._transform_general(x, f, **kwargs)
+
+  def _transform_general(self, x, f, **kwargs):
     raise NotImplementedError
 
   def transform_dimension_preserving(self, x, f, **kwargs):
@@ -90,7 +140,10 @@ class TangentSpace(object):
         `transform_general`.
 
     """
-    return self.transform_general(x, f, **kwargs)
+    return self._transform_dimension_preserving(x, f, **kwargs)
+
+  def _transform_dimension_preserving(self, x, f, **kwargs):
+    return self._transform_general(x, f, **kwargs)
 
   def transform_projection(self, x, f, **kwargs):
     """Same as `transform_general`, with f a projection (or its inverse).
@@ -111,7 +164,10 @@ class TangentSpace(object):
       NotImplementedError: if the `TangentSpace` subclass does not implement
         `transform_general`.
     """
-    return self.transform_general(x, f, **kwargs)
+    return self._transform_projection(x, f, **kwargs)
+
+  def _transform_projection(self, x, f, **kwargs):
+    return self._transform_general(x, f, **kwargs)
 
   def transform_coordinatewise(self, x, f, **kwargs):
     """Same as `transform_dimension_preserving`, for a coordinatewise f.
@@ -133,15 +189,106 @@ class TangentSpace(object):
         `transform_dimension_preserving`.
 
     """
-    return self.transform_dimension_preserving(x, f, **kwargs)
+    x = nest_util.convert_to_nested_tensor(x, dtype=f.dtype)
+    return self._transform_coordinatewise(x, f, **kwargs)
+
+  def _transform_coordinatewise(self, x, f, **kwargs):
+    return self._transform_dimension_preserving(x, f, **kwargs)
 
 
-def unit_basis():
-  raise NotImplementedError
+class Basis:
+  """Represents the basis of a `TangentSpace`."""
+
+  def to_dense(self):
+    """Returns densified version of this Basis.
+
+    Returns:
+      Tensor of shape `[N, B1, ..., Bn, D1, ... Dk], where
+      `N` is the number of bases elements, `Bi` are possible
+      batch dimensions, and `Di` are the dimensions of the
+      tangent space (i.e. `R^{D1 x ... x Dk}`).
+    """
+    return self._to_dense()
+
+  def to_dense_matrix(self, event_ndims):
+    """Returns densified version of this Basis as a matrix.
+
+    Args:
+      event_ndims: Python `int` representing the number of right most dimensions
+        that are the dimensions of the tangent space.
+    Returns:
+      Tensor of shape `[B1, ..., Bn, N, F], where
+      `N` is the number of bases elements, `Bi` are possible
+      batch dimensions, and `F` are the last `event_ndims` dimensions
+      reshaped as one dimension.
+    """
+    return self._to_dense_matrix(event_ndims)
+
+  def _to_dense(self):
+    raise NotImplementedError
+
+  def _to_dense_matrix(self, event_ndims):
+    dense_tensor = self._to_dense()
+    return _reshape_to_matrix(dense_tensor, event_ndims)
 
 
-def unit_basis_on(axis_mask):
-  raise NotImplementedError
+class LinearOperatorBasis(Basis):
+  """Basis parameterized by a `LinearOperator`."""
+
+  def __init__(self, basis_linop):
+    self._basis_linop = basis_linop
+
+  def _to_dense(self):
+    dense = self._basis_linop.to_dense()
+    return distribution_util.move_dimension(dense, -2, 0)
+
+  def _to_dense_matrix(self, event_ndims):
+    del event_ndims
+    return self._basis_linop.to_dense()
+
+  @property
+  def basis_linop(self):
+    return self._basis_linop
+
+
+class DenseBasis(Basis):
+  """Basis parameterized by a dense tensor."""
+
+  def __init__(self, basis_tensor):
+    self.basis_tensor = tensor_util.convert_nonref_to_tensor(
+        basis_tensor, name='basis_tensor')
+
+  def _to_dense(self):
+    return tf.convert_to_tensor(self.basis_tensor)
+
+
+class FullUnitBasis(Basis):
+  """Represents a full axis aligned unit basis."""
+
+  def __init__(self, event_shape, dtype):
+    """Initialize a basis of axis aligned unit vectors.
+
+    Args:
+      event_shape: object representing the shape of the ambient space;
+        convertible to `tf.TensorShape`.
+      dtype: `Dtype` of this basis.
+    """
+    self._event_shape = event_shape
+    self._dtype = dtype
+
+  def _to_dense(self):
+    size = tensorshape_util.num_elements(self._event_shape)
+    result = tf.eye(size, dtype=self._dtype)
+    return tf.reshape(
+        result,
+        ps.concat([[size], self._event_shape], axis=0))
+
+
+class FullUnitBasisOn(Basis):
+  """Represents an axis aligned unit basis on a masked portion of the space."""
+
+  def __init__(self, axis_mask):
+    self.axis_mask = axis_mask
 
 
 class AxisAlignedSpace(TangentSpace):
@@ -163,19 +310,19 @@ class AxisAlignedSpace(TangentSpace):
     Args:
       axis_mask: `Tensor`. A bit-mask of the live dimensions of the space.
     """
-    self.axis_mask = axis_mask
+    self._axis_mask = axis_mask
 
-  def transform_general(self, x, f, **kwargs):
-    as_general_space = GeneralSpace(unit_basis_on(self.axis_mask), 1)
+  def _transform_general(self, x, f, **kwargs):
+    as_general_space = GeneralSpace(FullUnitBasisOn(self._axis_mask), 1)
     return as_general_space.transform_general(x, f, **kwargs)
 
-  def transform_projection(self, x, f, **kwargs):
+  def _transform_projection(self, x, f, **kwargs):
     if not hasattr(f, 'experimental_update_live_dimensions'):
       msg = ('When calling `transform_projection` the Bijector must implement '
              'the `experimental_update_live_dimensions` method.')
       raise NotImplementedError(msg)
     new_live_dimensions = f.experimental_update_live_dimensions(
-        self.axis_mask, **kwargs)
+        self._axis_mask, **kwargs)
     if all(tf.get_static_value(new_live_dimensions)):
       # Special-case a bijector (direction) that knows that the result
       # of the projection will be a full space
@@ -183,8 +330,8 @@ class AxisAlignedSpace(TangentSpace):
     else:
       return 0, AxisAlignedSpace(new_live_dimensions)
 
-  def transform_coordinatewise(self, x, f, **kwargs):
-    # TODO(pravnar): compute the derivative of f along x along the
+  def _transform_coordinatewise(self, x, f, **kwargs):
+    # TODO(b/197680518): compute the derivative of f along x along the
     # live dimensions.
     raise NotImplementedError
 
@@ -202,35 +349,81 @@ class FullSpace(TangentSpace):
   at all.
   """
 
-  def transform_general(self, x, f, **kwargs):
+  def _transform_general(self, x, f, **kwargs):
     """If the bijector is weird, fall back to the general case."""
-    as_general_space = GeneralSpace(unit_basis(), 1)
+    as_general_space = GeneralSpace(
+        FullUnitBasis([x.shape[-1]], dtype=f.dtype), 1)
     return as_general_space.transform_general(x, f, **kwargs)
 
-  def transform_dimension_preserving(self, x, f, **kwargs):
+  def _transform_dimension_preserving(self, x, f, **kwargs):
     return jacobian_determinant(x, f, **kwargs), FullSpace()
 
-  def transform_projection(self, x, f, **kwargs):
+  def _transform_projection(self, x, f, **kwargs):
     return AxisAlignedSpace(tf.ones_like(x)).transform_projection(
         x, f, **kwargs)
 
 
 def volume_coefficient(basis):
-  return tf.multiply(
-      tf.linalg.logdet(tf.linalg.matmul(basis, basis, transpose_b=True)), 0.5)
+  result = 0.5 * tf.linalg.logdet(
+      tf.linalg.matmul(basis, basis, transpose_b=True))
+  return result
 
 
 class GeneralSpace(TangentSpace):
   """Arbitrary tangent space when no more-efficient special case applies."""
 
-  def __init__(self, basis, computed_volume=None):
-    self.basis = basis
-    if computed_volume is None:
-      computed_volume = volume_coefficient(basis)
-    self.volume = computed_volume
+  def __init__(self, basis, computed_log_volume=None):
+    """Initialize a GeneralSpace with a basis.
 
-  def transform_general(self, x, f, **kwargs):
-    raise NotImplementedError
+    Args:
+      basis: `Basis` object representing a basis of shape
+        `[N, B1, ..., Bk, D1, ... Dl]`, where `N` is the
+        number of bases vectors, `Bi` are batch dimensions and `Di` refer to
+        the dimensions that this basis lives in.
+      computed_log_volume: Optional `Tensor` of shape `[B1, ..., Bk]`. Computed
+        log-volume coefficient.
+        Default `None`.
+    """
+    self.basis = basis
+    self.computed_log_volume = computed_log_volume
+
+  def _transform_from_basis(self, new_basis, event_ndims):
+    result = self.computed_log_volume
+    if self.computed_log_volume is None:
+      basis_matrix = self.basis.to_dense_matrix(event_ndims)
+      result = volume_coefficient(basis_matrix)
+    new_log_volume = volume_coefficient(new_basis.to_dense_matrix(event_ndims))
+    result = new_log_volume - result
+    return result, GeneralSpace(
+        new_basis, computed_log_volume=new_log_volume)
+
+  def _transform_general(self, x, f, event_ndims=None, **kwargs):
+    # TODO(b/197680518): Clean up and extend the following code:
+    # 1) Add Multipart Bijector Support.
+    if NUMPY_MODE:
+      raise ValueError('`transform_general` not available in Numpy')
+
+    new_basis_tensor = compute_new_basis_tensor(f, x, self.basis)
+    new_basis = DenseBasis(new_basis_tensor)
+    if event_ndims is None:
+      event_ndims = f.forward_min_event_ndims
+    return self._transform_from_basis(new_basis, event_ndims)
+
+  def _transform_coordinatewise(self, x, f, event_ndims=None, **kwargs):
+    diag_jacobian = coordinatewise_jvp(f, x)
+    diag_linop = tf.linalg.LinearOperatorDiag(diag_jacobian)
+    if event_ndims is None:
+      event_ndims = f.forward_min_event_ndims
+    if isinstance(self.basis, LinearOperatorBasis):
+      new_basis = LinearOperatorBasis(self.basis.basis_linop @ diag_linop)
+    else:
+      diag_jacobian_reshape = _reshape_to_matrix(
+          diag_jacobian[tf.newaxis, ...], event_ndims)
+      new_basis = LinearOperatorBasis(
+          tf.linalg.LinearOperatorFullMatrix(
+              self.basis.to_dense_matrix(event_ndims) *
+              diag_jacobian_reshape))
+    return self._transform_from_basis(new_basis, event_ndims)
 
 
 class ZeroSpace(TangentSpace):
@@ -242,7 +435,7 @@ class ZeroSpace(TangentSpace):
 
   """
 
-  def transform_general(self, x, f, **kwargs):
+  def _transform_general(self, x, f, **kwargs):
     del x, f
     return 0, ZeroSpace()
 
@@ -254,3 +447,16 @@ class UnspecifiedTangentSpaceError(Exception):
     message = ('Please specify one of the tangent spaces defined at '
                'tensorflow_probability.python.experimental.tangent_spaces.')
     super().__init__(message)
+
+
+def _reshape_to_matrix(basis_tensor, event_ndims):
+  # Reshape basis so that there is only one ambient dimension.
+  basis_tensor = ps.reshape(
+      basis_tensor, ps.concat(
+          [ps.shape(basis_tensor)[
+              :ps.rank(basis_tensor) - event_ndims], [-1]], axis=0))
+  if event_ndims == 0:
+    basis_tensor = basis_tensor[..., tf.newaxis]
+  # Finally move the basis vector dimension to the end so we have shape [B1,
+  # ..., Bk, N, D].
+  return distribution_util.move_dimension(basis_tensor, 0, -2)

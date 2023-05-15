@@ -40,7 +40,6 @@ multi_substrate_py_library(
         ":preconditioned_hmc",
     ],
     substrates_omit_deps = [
-        ":elliptical_slice_sampler",
         ":kernel_builder",
         ":kernel_outputs",
         ":nuts_autobatching",
@@ -393,7 +392,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "elliptical_slice_sampler",
     srcs = ["elliptical_slice_sampler.py"],
     deps = [
@@ -405,7 +404,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "elliptical_slice_sampler_test",
     size = "large",
     timeout = "long",
@@ -968,6 +967,7 @@ multi_substrate_py_library(
     deps = [
         ":reducer",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:loop_util",
         "//tensorflow_probability/python/mcmc/internal:util",
     ],
 )

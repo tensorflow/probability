@@ -2019,6 +2019,10 @@ def _serialize_function(func):
   if not hasattr(pickler, 'dispatch_table'):
     pickler.dispatch_table = {}
   pickler.dispatch_table[tf.Tensor] = _reduce_tensor
+  if hasattr(tf.__internal__, 'SymbolicTensor'):
+    pickler.dispatch_table[tf.__internal__.SymbolicTensor] = (  # pylint: disable=protected-access
+        _reduce_tensor
+    )
 
   pickler.dump(func)
   return codecs.encode(buffer.getvalue(), 'base64').decode('ascii')

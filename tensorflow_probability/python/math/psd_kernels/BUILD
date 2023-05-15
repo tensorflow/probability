@@ -292,6 +292,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/bijectors:softplus",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
         "//tensorflow_probability/python/util",
     ],
@@ -342,6 +343,7 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
         "//tensorflow_probability/python/math/psd_kernels/internal:test_util",
     ],
 )

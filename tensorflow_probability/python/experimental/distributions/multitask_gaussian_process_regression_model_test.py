@@ -226,8 +226,6 @@ class MultiTaskGaussianProcessRegressionModelTest(
         -20., 20., 9 * num_tasks).reshape(9, num_tasks).astype(np.float32)
 
     test_points = np.random.uniform(-1., 1., [10, 2]).astype(np.float32)
-    test_observations = np.random.uniform(
-        -20., 20., [10, num_tasks]).astype(np.float32)
 
     mtgp = mtgprm_lib.MultiTaskGaussianProcessRegressionModel(
         multi_task_kernel,
@@ -236,6 +234,7 @@ class MultiTaskGaussianProcessRegressionModelTest(
         observations=observations,
         observation_noise_variance=observation_noise_variance,
         validate_args=True)
+    test_observations = self.evaluate(mtgp.sample(seed=test_util.test_seed()))
 
     # For the single task GP, we move the task dimension to the front of the
     # batch shape.

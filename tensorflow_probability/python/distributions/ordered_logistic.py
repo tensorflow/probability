@@ -35,7 +35,9 @@ from tensorflow_probability.python.math import generic
 # QuantizedDistribution.
 
 
-class OrderedLogistic(distribution.AutoCompositeTensorDistribution):
+class OrderedLogistic(
+    distribution.DiscreteDistributionMixin,
+    distribution.AutoCompositeTensorDistribution):
   """Ordered logistic distribution.
 
   The OrderedLogistic distribution is parameterized by a location and a set of
@@ -252,7 +254,8 @@ class OrderedLogistic(distribution.AutoCompositeTensorDistribution):
 
   def _sample_n(self, n, seed=None):
     return categorical.Categorical(
-        logits=self.categorical_log_probs()).sample(n, seed)
+        logits=self.categorical_log_probs(),
+        dtype=self.dtype).sample(n, seed)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -262,7 +265,9 @@ class OrderedLogistic(distribution.AutoCompositeTensorDistribution):
 
   def _log_prob(self, x):
     num_categories = self._num_categories()
-    x_safe = tf.where((x > num_categories - 1) | (x < 0), 0, x)
+    num_categories = tf.cast(num_categories, x.dtype)
+    zero = dtype_util.as_numpy_dtype(x.dtype)(0.)
+    x_safe = tf.where((x > num_categories - 1) | (x < 0), zero, x)
     log_probs = categorical.Categorical(
         logits=self.categorical_log_probs()).log_prob(x_safe)
     neg_inf = dtype_util.as_numpy_dtype(log_probs.dtype)(-np.inf)
@@ -277,7 +282,7 @@ class OrderedLogistic(distribution.AutoCompositeTensorDistribution):
 
   def _mode(self):
     log_probs = self.categorical_log_probs()
-    mode = tf.argmax(log_probs, axis=-1, output_type=self.dtype)
+    mode = tf.cast(tf.argmax(log_probs, axis=-1), self.dtype)
     tensorshape_util.set_shape(mode, log_probs.shape[:-1])
     return mode
 

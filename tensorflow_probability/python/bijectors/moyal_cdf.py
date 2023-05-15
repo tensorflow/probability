@@ -33,7 +33,9 @@ __all__ = [
 ]
 
 
-class MoyalCDF(bijector.AutoCompositeTensorBijector):
+class MoyalCDF(
+    bijector.CoordinatewiseBijectorMixin,
+    bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = erfc(exp(- 1/2 * (X - loc) / scale) / sqrt(2))`.
 
   This bijector maps inputs from `[-inf, inf]` to `[0, 1]`. The inverse of the

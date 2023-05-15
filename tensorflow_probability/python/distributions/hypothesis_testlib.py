@@ -344,8 +344,14 @@ CONSTRAINTS = {
         tf.math.tanh,
     'NormalInverseGaussian':
         fix_normal_inverse_gaussian,
+    'OrderedLogistic':
+        lambda d: dict(d, dtype=tf.float32),
+    'OnehotCategorical':
+        lambda d: dict(d, dtype=tf.float32),
     'PERT':
         fix_pert,
+    'StoppingRatioLogistic':
+        lambda d: dict(d, dtype=tf.float32),
     'Triangular':
         fix_triangular,
     'TruncatedCauchy':
@@ -1475,7 +1481,10 @@ def mixtures(draw,
   # the weird edge case gets fixed.
   def nested_eligibility_filter(dist_name):
     # TODO(b/204209547): Re-enable Categorical.
-    if dist_name in ['Categorical', 'MixtureSameFamily']:
+    if dist_name in ['Categorical',
+                     'OrderedLogistic',
+                     'StoppingRatioLogistic',
+                     'MixtureSameFamily']:
       return False
     return eligibility_filter(dist_name)
 

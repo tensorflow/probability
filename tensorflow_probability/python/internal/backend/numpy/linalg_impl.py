@@ -41,6 +41,7 @@ __all__ = [
     'eye',
     'inv',
     'logdet',
+    'lstsq',
     'lu',
     'matmul',
     'matvec',
@@ -53,17 +54,16 @@ __all__ = [
     'slogdet',
     'solve',
     'svd',
+    'tensor_diag',
     'tensordot',
     'trace',
     'triangular_solve',
-    # 'cross',
+    'cross',
     # 'expm',
     # 'global_norm',
     # 'logm',
-    # 'lstsq',
     # 'l2_normalize'
     # 'sqrtm',
-    # 'tensor_diag',
     # 'tensor_diag_part',
     # 'tridiagonal_solve',
 ]
@@ -350,6 +350,22 @@ def _lu(input, output_idx_type=np.int32, name=None):  # pylint: disable=redefine
   return Lu(flat_lu.reshape(*input.shape), flat_piv.reshape(*input.shape[:-1]))
 
 
+def _lstsq(matrix, rhs, l2_regularizer=0.0, fast=True, name=None):
+  """JAX/NumPy variant of tf.linalg.lstsq."""
+  del l2_regularizer, name
+  if fast:
+    raise ValueError('`fast=True` is not supported')
+  if matrix.ndim > 2:
+    if JAX_MODE:
+      import jax  # pylint: disable=g-import-not-at-top
+      return jax.vmap(functools.partial(_lstsq, fast=False))(matrix, rhs)
+    return np.array([_lstsq(mat, r, fast=False) for mat, r in zip(matrix, rhs)])
+  rcond = None
+  if JAX_MODE and matrix.dtype == np.float32:
+    rcond = 0.  # https://github.com/google/jax/issues/15591
+  return np.linalg.lstsq(matrix, rhs, rcond=rcond)[0]
+
+
 def _matrix_transpose(a, name='matrix_transpose', conjugate=False):  # pylint: disable=unused-argument
   a = np.array(a)
   if a.ndim < 2:
@@ -478,6 +494,24 @@ def _tensordot(a, b, axes, name=None):  # pylint: disable=redefined-outer-name
   return np.tensordot(a, b, axes=axes)
 
 
+def _tensor_diag(diagonal, name=None):  # pylint: disable=redefined-outer-name
+  """tf.linalg.tensor_diag reimpl."""
+  del name
+  if diagonal.ndim == 0:
+    return diagonal
+  out = np.zeros((diagonal.shape[0], diagonal.shape[0]) +
+                 diagonal.shape[1:] + diagonal.shape[1:],
+                 dtype=diagonal.dtype)
+  for i in range(diagonal.shape[0]):
+    if JAX_MODE:
+      out = out.at[i, i].set(_tensor_diag(diagonal[i]))
+    else:
+      out[i, i] = _tensor_diag(diagonal[i])
+  axes = ([0] + list(range(2, diagonal.ndim + 1)) +
+          [1] + list(range(diagonal.ndim + 1, diagonal.ndim * 2)))
+  return np.transpose(out, axes)
+
+
 def _trace(x, name=None):
   del name
   return np.trace(x, axis1=-1, axis2=-2)
@@ -507,7 +541,7 @@ def _triangular_solve(matrix, rhs, lower=True, adjoint=False, name=None):  # pyl
   nbatch = int(np.prod(bcast_shp))
   flat_mat = matrix.reshape(nbatch, dim, dim)
   flat_rhs = rhs.reshape(nbatch, dim, rhs.shape[-1])
-  result = np.empty(flat_rhs.shape)
+  result = np.empty(flat_rhs.shape, dtype=flat_rhs.dtype)
   if np.size(result):
     # ValueError: On entry to STRTRS parameter number 7 had an illegal value.
     for i, (mat, rh) in enumerate(zip(flat_mat, flat_rhs)):
@@ -533,6 +567,10 @@ cholesky = utils.copy_docstring(
 cholesky_solve = utils.copy_docstring(
     'tf.linalg.cholesky_solve',
     _cholesky_solve)
+
+cross = utils.copy_docstring(
+    'tf.linalg.cross',
+    lambda a, b, name=None: np.cross(a, b))
 
 det = utils.copy_docstring(
     'tf.linalg.det',
@@ -579,6 +617,10 @@ lu = utils.copy_docstring(
     'tf.linalg.lu',
     _lu)
 
+lstsq = utils.copy_docstring(
+    'tf.linalg.lstsq',
+    _lstsq)
+
 matmul = utils.copy_docstring(
     'tf.linalg.matmul',
     _matmul)
@@ -624,6 +666,10 @@ svd = utils.copy_docstring(
 tensordot = utils.copy_docstring(
     'tf.linalg.tensordot',
     _tensordot)
+
+tensor_diag = utils.copy_docstring(
+    'tf.linalg.tensor_diag',
+    _tensor_diag)
 
 trace = utils.copy_docstring(
     'tf.linalg.trace',

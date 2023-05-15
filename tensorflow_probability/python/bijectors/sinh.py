@@ -24,7 +24,9 @@ __all__ = [
 ]
 
 
-class Sinh(bijector.AutoCompositeTensorBijector):
+class Sinh(
+    bijector.CoordinatewiseBijectorMixin,
+    bijector.AutoCompositeTensorBijector):
   """Bijector that computes `Y = sinh(X)`.
 
   #### Examples

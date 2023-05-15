@@ -43,6 +43,7 @@ multi_substrate_py_library(
     deps = [
         ":linear_operator_interpolated_psd_kernel",
         ":linear_operator_psd_kernel",
+        ":linear_operator_row_block",
         ":linear_operator_unitary",
         ":no_pivot_ldl",
         "//tensorflow_probability/python/internal:all_util",
@@ -105,6 +106,27 @@ py_test(
         "//tensorflow_probability/python/math/psd_kernels:exponentiated_quadratic",
         "//tensorflow_probability/python/math/psd_kernels:polynomial",
         # tensorflow/compiler/jit dep,
+    ],
+)
+
+multi_substrate_py_library(
+    name = "linear_operator_row_block",
+    srcs = ["linear_operator_row_block.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "linear_operator_row_block_test",
+    srcs = ["linear_operator_row_block_test.py"],
+    python_version = "PY3",
+    deps = [
+        ":linear_operator_row_block",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

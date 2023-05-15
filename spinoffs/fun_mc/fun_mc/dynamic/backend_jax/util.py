@@ -25,6 +25,7 @@ import jax.numpy as jnp
 __all__ = [
     'assert_same_shallow_tree',
     'block_until_ready',
+    'convert_to_tensor',
     'diff',
     'flatten_tree',
     'get_shallow_tree',
@@ -34,15 +35,18 @@ __all__ = [
     'map_tree_up_to',
     'move_axis',
     'named_call',
+    'new_dynamic_array',
     'random_categorical',
     'random_integer',
     'random_normal',
     'random_uniform',
     'repeat',
     'split_seed',
+    'stack_dynamic_array',
     'trace',
     'value_and_grad',
     'value_and_ldj',
+    'write_to_dynamic_array',
 ]
 
 
@@ -93,6 +97,8 @@ def make_tensor_seed(seed):
   """Converts a seed to a `Tensor` seed."""
   if seed is None:
     raise ValueError('seed must not be None when using JAX')
+  if isinstance(seed, jax.random.PRNGKeyArray):
+    return seed
   return jnp.asarray(seed, jnp.uint32)
 
 
@@ -339,3 +345,30 @@ def diff(x, prepend=None):
 def repeat(x, repeats, total_repeat_length=None):
   """Like jnp.repeat."""
   return jnp.repeat(x, repeats, total_repeat_length=total_repeat_length)
+
+
+def new_dynamic_array(shape, dtype, size):
+  """Creates a new dynamic array."""
+  return jnp.zeros((size,) + tuple(shape), dtype)
+
+
+def write_to_dynamic_array(array, index, element):
+  """Writes to the dynamic array."""
+  return array.at[index].set(element)
+
+
+def stack_dynamic_array(array):
+  """Stacks the dynamic array."""
+  return jnp.asarray(array)
+
+
+def eval_shape(fn, *args):
+  """Evaluates the shape/dtypes of fn statically."""
+  return jax.eval_shape(fn, *args)
+
+
+def convert_to_tensor(x):
+  """A looser convert_to_tensor."""
+  if x is None:
+    return x
+  return jnp.asarray(x)

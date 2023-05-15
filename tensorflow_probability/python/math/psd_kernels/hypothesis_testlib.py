@@ -209,7 +209,7 @@ def kernel_input(
     example_dim = draw(hps.integers(min_value=2, max_value=4))
 
   if feature_ndims is None:
-    feature_ndims = draw(hps.integers(min_value=1, max_value=2))
+    feature_ndims = draw(hps.integers(min_value=0, max_value=2))
   if feature_dim is None:
     feature_dim = draw(hps.integers(min_value=2, max_value=4))
 

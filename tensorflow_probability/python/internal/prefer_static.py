@@ -27,7 +27,7 @@ from tensorflow_probability.python.internal.backend import numpy as nptf
 
 from tensorflow.python.framework import ops  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.framework import tensor_util  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.ops import control_flow_ops  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.ops import control_flow_case  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 JAX_MODE = False
@@ -286,8 +286,13 @@ def case(pred_fn_pairs, default=None, exclusive=False, name='smart_case'):
         return pred
       return p
     pred_fn_pairs = [(maybe_static(pred), fn) for pred, fn in pred_fn_pairs]
-  return control_flow_ops._case_helper(  # pylint: disable=protected-access
-      cond, pred_fn_pairs, default, exclusive, name, allow_python_preds=True)
+  return control_flow_case._case_helper(  # pylint: disable=protected-access
+      cond,
+      pred_fn_pairs,
+      default,
+      exclusive,
+      name,
+      allow_python_preds=True)
 
 
 def size0(x, name=None):
@@ -410,7 +415,16 @@ def _size(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-bui
 size = _copy_docstring(tf.size, _size)
 
 
-def _shape(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-builtin,missing-docstring
+def _get_shape_out_type():
+  # Historically, tf.int32 is the default for out_type.  Support limited cases
+  # where tf.int64 is the default.
+  # TODO(b/282720125) Long-term, if tf.int64 becomes the default for out_type,
+  # only handle this case (i.e. delete _get_shape_out_type and use
+  # `out_type=tf.int64` in _shape's signature.)
+  return tf_inspect.getfullargspec(tf.shape).defaults[0]
+
+
+def _shape(input, out_type=_get_shape_out_type(), name=None):  # pylint: disable=redefined-builtin,missing-docstring
   if not hasattr(input, 'shape'):
     x = np.array(input)
     input = tf.convert_to_tensor(input) if x.dtype is np.object_ else x

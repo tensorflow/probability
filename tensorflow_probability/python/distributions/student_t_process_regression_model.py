@@ -21,16 +21,15 @@ from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import cholesky_util
 from tensorflow_probability.python.distributions import student_t_process
-from tensorflow_probability.python.internal import batch_shape_lib
-from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.distributions.internal import stochastic_process_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.math.psd_kernels import schur_complement as schur_complement_lib
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -38,75 +37,14 @@ __all__ = [
 ]
 
 
-def _is_empty_observation_data(
-    feature_ndims, observation_index_points, observations):
-  """Returns `True` if given observation data is empty.
-
-  Emptiness means either
-    1. Both `observation_index_points` and `observations` are `None`, or
-    2. the "number of observations" shape is 0. The shape of
-    `observation_index_points` (or each of its components, if nested) is
-    `[..., N, f1, ..., fF]`, where `N` is the number of observations and the
-    `f`s are feature dims. Thus, we look at the shape element just to the
-    left of the leftmost feature dim. If that shape is zero, we consider the
-    data empty.
-
-  We don't check the shape of observations; validations are checked elsewhere in
-  the calling code, to ensure these shapes are consistent.
-
-  Args:
-    feature_ndims: the number of feature dims, as reported by the StP kernel.
-    observation_index_points: the observation data locations in the index set.
-    observations: the observation data.
-
-  Returns:
-    is_empty: True if the data were deemed to be empty.
-  """
-  # If both input locations and observations are `None`, we consider this
-  # "empty" observation data.
-  if observation_index_points is None and observations is None:
-    return True
-  num_obs = tf.nest.map_structure(
-      lambda t, nd: tf.compat.dimension_value(t.shape[-(nd + 1)]),
-      observation_index_points, feature_ndims)
-  if all(n is not None and n == 0 for n in tf.nest.flatten(num_obs)):
-    return True
-  return False
-
-
-def _validate_observation_data(
-    kernel, observation_index_points, observations):
-  """Ensure that observation data and locations have consistent shapes.
-
-  This basically means that the batch shapes are broadcastable. We can only
-  ensure this when those shapes are fully statically defined.
-
-  Args:
-    kernel: The StP kernel.
-    observation_index_points: the observation data locations in the index set.
-    observations: the observation data.
-
-  Raises:
-    ValueError: if the observations' batch shapes are not broadcastable.
-  """
-  # Check that observation index points and observation counts broadcast.
-  ndims = kernel.feature_ndims
-
-  def _validate(t, nd):
-    if (tensorshape_util.is_fully_defined(t.shape[:-nd])
-        and tensorshape_util.is_fully_defined(observations.shape)):
-      index_point_count = t.shape[:-nd]
-      observation_count = observations.shape
-      try:
-        tf.broadcast_static_shape(index_point_count, observation_count)
-      except ValueError:
-        # Re-raise with our own more contextual error message.
-        raise ValueError(
-            'Observation index point and observation counts are not '
-            'broadcastable: {} and {}, respectively.'.format(
-                index_point_count, observation_count))
-
-  tf.nest.map_structure(_validate, observation_index_points, ndims)
+_ALWAYS_YIELD_MVST_DEPRECATION_WARNING = (
+    '`always_yield_multivariate_student_t` is deprecated. After 2023-07-01, '
+    'this arg will be ignored, and behavior will be as though '
+    '`always_yield_multivariate_student_t=True`. This means that a '
+    '`StudentTProcessRegressionModel` evaluated at a single index point will '
+    'have event shape `[1]`. To reproduce the behavior of '
+    '`always_yield_multivariate_student_t=False` squeeze the rightmost '
+    'singleton dimension from the output of `mean`, `sample`, etc.')
 
 
 class DampedSchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
@@ -126,23 +64,30 @@ class DampedSchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
                df,
                schur_complement,
                fixed_inputs_observations,
+               observations_is_missing=None,
                validate_args=False,
                name='DampedSchurComplement'):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       if tf.nest.is_nested(schur_complement.feature_ndims):
         dtype = dtype_util.common_dtype(
-            [df, fixed_inputs_observations], tf.float32)
+            [df, fixed_inputs_observations],
+            tf.float32)
         kernel_dtype = schur_complement.dtype
       else:
         # If the index points are not nested, we assume they are of the same
         # dtype as the STPRM.
         dtype = dtype_util.common_dtype([
-            schur_complement, fixed_inputs_observations, df], tf.float32)
+            schur_complement,
+            fixed_inputs_observations,
+            df], tf.float32)
         kernel_dtype = dtype
       self._schur_complement = schur_complement
       self._df = tensor_util.convert_nonref_to_tensor(
           df, name='df', dtype=dtype)
+      self._observations_is_missing = tensor_util.convert_nonref_to_tensor(
+          observations_is_missing,
+          name='observations_is_missing', dtype=tf.bool)
       self._fixed_inputs_observations = tensor_util.convert_nonref_to_tensor(
           fixed_inputs_observations,
           name='fixed_inputs_observations', dtype=dtype)
@@ -161,6 +106,9 @@ class DampedSchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
                 lambda: softplus_bijector.Softplus(  # pylint:disable=g-long-lambda
                     low=dtype_util.as_numpy_dtype(dtype)(2.)))),
         schur_complement=parameter_properties.BatchedComponentProperties(),
+        observations_is_missing=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED),
         fixed_inputs_observations=parameter_properties.ParameterProperties(
             event_ndims=1,
             shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED))
@@ -177,24 +125,47 @@ class DampedSchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
   def fixed_inputs_observations(self):
     return self._fixed_inputs_observations
 
+  @property
+  def observations_is_missing(self):
+    return self._observations_is_missing
+
   def divisor_matrix_cholesky(self, **kwargs):
     return self.schur_complement.divisor_matrix_cholesky(**kwargs)
 
+  def _compute_scaling(self):
+    if (self.fixed_inputs_observations is None or
+        self.schur_complement._is_fixed_inputs_empty()):  # pylint:disable=protected-access
+      return dtype_util.as_numpy_dtype(self.df.dtype)(1.)
+
+    df = tf.convert_to_tensor(self.df)
+    numerator = df - 2.
+    denominator = df - 2.
+
+    fixed_inputs_observations = tf.convert_to_tensor(
+        self.fixed_inputs_observations)
+    if self.observations_is_missing is not None:
+      fixed_inputs_observations = tf.where(
+          self.observations_is_missing,
+          tf.zeros([], df.dtype),
+          fixed_inputs_observations)
+
+    b = tf.linalg.LinearOperatorLowerTriangular(
+        self.divisor_matrix_cholesky()).solvevec(
+            fixed_inputs_observations)
+    b = tf.reduce_sum(b**2, axis=-1)
+    numerator = numerator + b
+    n = tf.cast(ps.shape(fixed_inputs_observations)[-1], b.dtype)
+    denominator = denominator + n
+    if self.observations_is_missing is not None:
+      denominator = denominator - tf.cast(
+          tf.math.count_nonzero(
+              self.observations_is_missing, axis=-1), self.dtype)
+
+    return numerator / denominator
+
   def _apply(self, x1, x2, example_ndims):
     undamped = self.schur_complement.apply(x1, x2, example_ndims=example_ndims)
-    numerator = self.df - 2.
-    denominator = self.df - 2.
-    if (self.fixed_inputs_observations is not None and
-        not self.schur_complement._is_fixed_inputs_empty()):  # pylint:disable=protected-access
-      b = tf.linalg.LinearOperatorLowerTriangular(
-          self.divisor_matrix_cholesky()).solvevec(
-              self.fixed_inputs_observations)
-      b = tf.reduce_sum(b**2, axis=-1)
-      numerator = numerator + b
-      n = tf.cast(ps.shape(self.fixed_inputs_observations)[-1], b.dtype)
-      denominator = denominator + n
-
-    scaling_factor = numerator / denominator
+    scaling_factor = self._compute_scaling()
     scaling_factor = tf.reshape(
         scaling_factor,
         ps.concat([ps.shape(scaling_factor), [1] * example_ndims], axis=0))
@@ -203,18 +174,8 @@ class DampedSchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
 
   def _matrix(self, x1, x2):
     undamped = self.schur_complement.matrix(x1, x2)
-    numerator = self.df - 2.
-    denominator = self.df - 2.
-    if (self.fixed_inputs_observations is not None and
-        not self.schur_complement._is_fixed_inputs_empty()):  # pylint:disable=protected-access
-      b = tf.linalg.LinearOperatorLowerTriangular(
-          self.divisor_matrix_cholesky()).solvevec(
-              self.fixed_inputs_observations)
-      b = tf.reduce_sum(b**2, axis=-1)
-      numerator = numerator + b
-      n = tf.cast(ps.shape(self.fixed_inputs_observations)[-1], b.dtype)
-      denominator = denominator + n
-    return (numerator / denominator)[..., tf.newaxis, tf.newaxis] * undamped
+    scaling_factor = self._compute_scaling()
+    return scaling_factor[..., tf.newaxis, tf.newaxis] * undamped
 
 
 class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
@@ -274,6 +235,10 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
   """
   # pylint:disable=invalid-name
 
+  @deprecation.deprecated_arg_values(
+      '2023-07-01',
+      _ALWAYS_YIELD_MVST_DEPRECATION_WARNING,
+      always_yield_multivariate_student_t=False)
   def __init__(
       self,
       df,
@@ -286,6 +251,7 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
       mean_fn=None,
       cholesky_fn=None,
       marginal_fn=None,
+      always_yield_multivariate_student_t=False,
       validate_args=False,
       allow_nan_stats=False,
       name='StudentTProcessRegressionModel',
@@ -353,6 +319,11 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
         returns a multivariate Student-T subclass of `tfd.Distribution`.
         Default value: `None`, in which case a Cholesky-factorizing function
         is created using `make_cholesky_with_jitter_fn`.
+      always_yield_multivariate_student_t: Deprecated. If `False` (the default),
+        we produce a scalar `StudentT` distribution when the number of
+        `index_points` is statically known to be `1`. If `True`, we avoid this
+        behavior, ensuring that the event shape will retain the `1` from
+        `index_points`.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -415,12 +386,7 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
                 observations, observation_index_points))
       # Default to a constant zero function, borrowing the dtype from
       # index_points to ensure consistency.
-      if mean_fn is None:
-        mean_fn = lambda x: tf.zeros([1], dtype=dtype)
-      else:
-        if not callable(mean_fn):
-          raise ValueError('`mean_fn` must be a Python callable')
-
+      mean_fn = stochastic_process_util.maybe_create_mean_fn(mean_fn, dtype)
       if cholesky_fn is None:
         cholesky_fn = cholesky_util.make_cholesky_with_jitter_fn()
 
@@ -436,20 +402,21 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
               schur_complement=schur_complement_lib.SchurComplement(
                   base_kernel=kernel,
                   fixed_inputs=self._observation_index_points,
+                  cholesky_fn=cholesky_fn,
                   diag_shift=observation_noise_variance),
               fixed_inputs_observations=self._observations,
               validate_args=validate_args)
 
         # Special logic for mean_fn only; SchurComplement already handles the
         # case of empty observations (ie, falls back to base_kernel).
-        if _is_empty_observation_data(
+        if stochastic_process_util.is_empty_observation_data(
             feature_ndims=kernel.feature_ndims,
             observation_index_points=observation_index_points,
             observations=observations):
           if _conditional_mean_fn is None:
             _conditional_mean_fn = mean_fn
         else:
-          _validate_observation_data(
+          stochastic_process_util.validate_observation_data(
               kernel=kernel,
               observation_index_points=observation_index_points,
               observations=observations)
@@ -489,21 +456,29 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
             cholesky_fn=cholesky_fn,
             index_points=index_points,
             observation_noise_variance=predictive_noise_variance,
+            always_yield_multivariate_student_t=(
+                always_yield_multivariate_student_t),
             validate_args=validate_args,
             allow_nan_stats=allow_nan_stats, name=name)
         self._parameters = parameters
 
   @staticmethod
+  @deprecation.deprecated_arg_values(
+      '2023-07-01',
+      _ALWAYS_YIELD_MVST_DEPRECATION_WARNING,
+      always_yield_multivariate_student_t=False)
   def precompute_regression_model(
       df,
       kernel,
       observation_index_points,
       observations,
+      observations_is_missing=None,
       index_points=None,
       observation_noise_variance=0.,
       predictive_noise_variance=None,
       mean_fn=None,
       cholesky_fn=None,
+      always_yield_multivariate_student_t=False,
       validate_args=False,
       allow_nan_stats=False,
       name='PrecomputedStudentTProcessRegressionModel',
@@ -560,6 +535,11 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
         `None`, which corresponds to the empty set of observations, and simply
         results in the prior predictive model (a StP with noise of variance
         `predictive_noise_variance`).
+      observations_is_missing:  `bool` `Tensor` of shape `[..., e]`,
+        representing a batch of boolean masks.  When `observations_is_missing`
+        is not `None`, the returned distribution is conditioned only on the
+        observations for which the corresponding elements of
+        `observations_is_missing` are `True`.
       index_points: (Nested) `float` `Tensor` representing finite collection, or
         batch of collections, of points in the index set over which the StP is
         defined.  Shape (or shape of each nested component) has the form
@@ -591,6 +571,11 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
         returns a Cholesky-like lower triangular factor.  Default value: `None`,
         in which case `make_cholesky_with_jitter_fn` is used with the `jitter`
         parameter.
+      always_yield_multivariate_student_t: Deprecated. If `False` (the default),
+        we produce a scalar `StudentT` distribution when the number of
+        `index_points` is statically known to be `1`. If `True`, we avoid this
+        behavior, ensuring that the event shape will retain the `1` from
+        `index_points`.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -637,6 +622,9 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
           observation_noise_variance, dtype=dtype)
       observations = tf.convert_to_tensor(observations, dtype=dtype)
 
+      if observations_is_missing is not None:
+        observations_is_missing = tf.convert_to_tensor(observations_is_missing)
+
       if cholesky_fn is None:
         cholesky_fn = cholesky_util.make_cholesky_with_jitter_fn()
 
@@ -645,44 +633,34 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
           schur_complement=schur_complement_lib.SchurComplement.with_precomputed_divisor(
               base_kernel=kernel,
               fixed_inputs=observation_index_points,
+              fixed_inputs_is_missing=observations_is_missing,
               diag_shift=observation_noise_variance,
+              cholesky_fn=cholesky_fn,
               _precomputed_divisor_matrix_cholesky=(
                   _precomputed_divisor_matrix_cholesky)),
           fixed_inputs_observations=observations,
+          observations_is_missing=observations_is_missing,
           validate_args=validate_args)
 
-      if mean_fn is None:
-        mean_fn = lambda x: tf.zeros([1], dtype=dtype)
-      else:
-        if not callable(mean_fn):
-          raise ValueError('`mean_fn` must be a Python callable')
+      mean_fn = stochastic_process_util.maybe_create_mean_fn(mean_fn, dtype)
 
       solve_on_observation = _precomputed_solve_on_observation
       if solve_on_observation is None:
-        observation_cholesky = kernel.matrix(
-            observation_index_points, observation_index_points)
-
-        broadcast_shape = distribution_util.get_broadcast_shape(
-            observation_cholesky,
-            observation_noise_variance[..., tf.newaxis, tf.newaxis])
-
-        observation_cholesky = tf.broadcast_to(
-            observation_cholesky, broadcast_shape)
-
-        observation_cholesky = tf.linalg.set_diag(
-            observation_cholesky,
-            tf.linalg.diag_part(observation_cholesky) +
-            observation_noise_variance[..., tf.newaxis])
-        observation_cholesky = cholesky_fn(observation_cholesky)
         observation_cholesky_operator = tf.linalg.LinearOperatorLowerTriangular(
-            observation_cholesky)
-
+            conditional_kernel.divisor_matrix_cholesky())
         diff = observations - mean_fn(observation_index_points)
+        if observations_is_missing is not None:
+          diff = tf.where(
+              observations_is_missing, tf.zeros([], dtype=diff.dtype), diff)
         solve_on_observation = observation_cholesky_operator.solvevec(
             observation_cholesky_operator.solvevec(diff), adjoint=True)
 
       def conditional_mean_fn(x):
         k_x_obs = kernel.matrix(x, observation_index_points)
+        if observations_is_missing is not None:
+          k_x_obs = tf.where(observations_is_missing[..., tf.newaxis, :],
+                             tf.zeros([], dtype=k_x_obs.dtype),
+                             k_x_obs)
         return mean_fn(x) + tf.linalg.matvec(k_x_obs, solve_on_observation)
 
       stprm = StudentTProcessRegressionModel(
@@ -694,6 +672,8 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
           observation_noise_variance=observation_noise_variance,
           predictive_noise_variance=predictive_noise_variance,
           cholesky_fn=cholesky_fn,
+          always_yield_multivariate_student_t=(
+              always_yield_multivariate_student_t),
           _conditional_kernel=conditional_kernel,
           _conditional_mean_fn=conditional_mean_fn,
           validate_args=validate_args,
@@ -729,6 +709,10 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
             event_ndims=_event_ndims_fn,
             shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
         ),
+        observations_is_missing=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
+        ),
         kernel=parameter_properties.BatchedComponentProperties(),
         observation_noise_variance=parameter_properties.ParameterProperties(
             event_ndims=0,
@@ -756,9 +740,3 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
   @property
   def predictive_noise_variance(self):
     return self._predictive_noise_variance
-
-  def _batch_shape_tensor(self, index_points=None):
-    kwargs = {}
-    if index_points is not None:
-      kwargs = {'index_points': index_points}
-    return batch_shape_lib.inferred_batch_shape_tensor(self, **kwargs)

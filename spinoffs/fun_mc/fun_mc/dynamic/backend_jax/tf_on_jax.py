@@ -17,6 +17,7 @@
 import contextlib
 import functools
 import types
+from typing import Any
 
 import jax
 from jax import lax
@@ -152,6 +153,10 @@ def _get_static_value(value):
     return np.array(value)
   except TypeError:
     return None
+
+
+tf.TensorSpec = Any
+tf.DType = Any
 
 
 _impl(name='add_n')(sum)

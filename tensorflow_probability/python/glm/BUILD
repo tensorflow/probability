@@ -15,6 +15,12 @@
 # Description:
 #   Generalized Linear Model specification, fitting, and related utilities.
 
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_library",
+    "multi_substrate_py_test",
+)
+
 package(
     # default_applicable_licenses
     default_visibility = [
@@ -24,9 +30,10 @@ package(
 
 licenses(["notice"])
 
-py_library(
+multi_substrate_py_library(
     name = "glm",
     srcs = ["__init__.py"],
+    substrates_omit_deps = [":proximal_hessian"],
     deps = [
         ":family",
         ":fisher_scoring",
@@ -35,7 +42,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "fisher_scoring",
     srcs = ["fisher_scoring.py"],
     deps = [
@@ -48,7 +55,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "fisher_scoring_test",
     size = "small",
     srcs = ["fisher_scoring_test.py"],
@@ -96,7 +103,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "family",
     srcs = ["family.py"],
     deps = [
@@ -116,10 +123,11 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "family_test",
     size = "small",
     srcs = ["family_test.py"],
+    disabled_substrates = ["numpy"],  # The test uses CustomExponentialFamily, which uses gradients.
     deps = [
         ":family",
         # numpy dep,

@@ -42,11 +42,34 @@ def _add_diagonal_shift(matrix, shift):
       matrix, tf.linalg.diag_part(matrix) + shift, name='add_diagonal_shift')
 
 
+def _maybe_mask_fixed_inputs(
+    fixed_inputs,
+    feature_ndims,
+    fixed_inputs_is_missing=None):
+  """Mask fixed inputs to zero when missing."""
+  if fixed_inputs_is_missing is None:
+    return fixed_inputs
+  pad_shapes = lambda nd: util.pad_shape_with_ones(  # pylint:disable=g-long-lambda
+      fixed_inputs_is_missing, nd, start=-1)
+  fixed_inputs_is_missing = tf.nest.map_structure(pad_shapes, feature_ndims)
+  # TODO(b/276969724): Mask out missing index points to something in the
+  # support of the kernel.
+  mask = lambda m, x: tf.where(m, dtype_util.as_numpy_dtype(x.dtype)(0), x)
+  fixed_inputs = tf.nest.map_structure(
+      mask, fixed_inputs_is_missing, fixed_inputs)
+  return fixed_inputs
+
+
 def _compute_divisor_matrix(
     base_kernel,
     diag_shift,
-    fixed_inputs):
+    fixed_inputs,
+    fixed_inputs_is_missing=None):
   """Compute the modified kernel with respect to the fixed inputs."""
+  # Mask out inputs before computing with the kernel to ensure non-NaN
+  # gradients.
+  fixed_inputs = _maybe_mask_fixed_inputs(
+      fixed_inputs, base_kernel.feature_ndims, fixed_inputs_is_missing)
   divisor_matrix = base_kernel.matrix(fixed_inputs, fixed_inputs)
   if diag_shift is not None:
     diag_shift = tf.convert_to_tensor(diag_shift)
@@ -55,7 +78,7 @@ def _compute_divisor_matrix(
     divisor_matrix = tf.broadcast_to(divisor_matrix, broadcast_shape)
     divisor_matrix = _add_diagonal_shift(
         divisor_matrix, diag_shift[..., tf.newaxis])
-  return divisor_matrix
+  return util.mask_matrix(divisor_matrix, is_missing=fixed_inputs_is_missing)
 
 
 class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
@@ -370,11 +393,12 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
     if divisor_matrix_cholesky is None:
       # TODO(b/196219597): Add a check to ensure that we have a `base_kernel`
       # that is explicitly concretized.
-      divisor_matrix_cholesky = cholesky_fn(util.mask_matrix(
-          _compute_divisor_matrix(base_kernel,
-                                  diag_shift=diag_shift,
-                                  fixed_inputs=fixed_inputs),
-          is_missing=fixed_inputs_is_missing))
+      divisor_matrix_cholesky = cholesky_fn(
+          _compute_divisor_matrix(
+              base_kernel,
+              diag_shift=diag_shift,
+              fixed_inputs=fixed_inputs,
+              fixed_inputs_is_missing=fixed_inputs_is_missing))
 
     schur_complement = SchurComplement(
         base_kernel=base_kernel,
@@ -425,6 +449,8 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
         self._fixed_inputs, dtype_hint=self.dtype, allow_packing=True)
     fixed_inputs_is_missing = self._get_fixed_inputs_is_missing()
     if fixed_inputs_is_missing is not None:
+      fixed_inputs = _maybe_mask_fixed_inputs(
+          fixed_inputs, self.base_kernel.feature_ndims, fixed_inputs_is_missing)
       fixed_inputs_is_missing = util.pad_shape_with_ones(
           fixed_inputs_is_missing, example_ndims, -2)
 
@@ -443,8 +469,7 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
       k2z = tf.where(fixed_inputs_is_missing, tf.zeros([], k2z.dtype), k2z)
 
     # Shape: bc(Bz, Bk) + [ez, ez]
-    div_mat_chol = self._divisor_matrix_cholesky(
-        fixed_inputs=fixed_inputs)
+    div_mat_chol = self._divisor_matrix_cholesky(fixed_inputs=fixed_inputs)
 
     # Shape: bc(Bz, Bk) + [1, ..., 1] + [ez, ez]
     #                      `--------'
@@ -474,6 +499,8 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
         self._fixed_inputs, dtype_hint=self.dtype, allow_packing=True)
     fixed_inputs_is_missing = self._get_fixed_inputs_is_missing()
     if fixed_inputs_is_missing is not None:
+      fixed_inputs = _maybe_mask_fixed_inputs(
+          fixed_inputs, self.base_kernel.feature_ndims, fixed_inputs_is_missing)
       fixed_inputs_is_missing = fixed_inputs_is_missing[..., tf.newaxis, :]
 
     # Shape: bc(Bk, B1, Bz) + [e1] + [ez]
@@ -487,8 +514,7 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
       k2z = tf.where(fixed_inputs_is_missing, tf.zeros([], k2z.dtype), k2z)
 
     # Shape: bc(Bz, Bk) + [ez, ez]
-    div_mat_chol = self._divisor_matrix_cholesky(
-        fixed_inputs=fixed_inputs)
+    div_mat_chol = self._divisor_matrix_cholesky(fixed_inputs=fixed_inputs)
 
     div_mat_chol_linop = tf.linalg.LinearOperatorLowerTriangular(div_mat_chol)
 
@@ -546,11 +572,11 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
     # NOTE: Replacing masked-out rows/columns of the divisor matrix with
     # rows/columns from the identity matrix is equivalent to using a divisor
     # matrix in which those rows and columns have been dropped.
-    return util.mask_matrix(
-        _compute_divisor_matrix(self._base_kernel,
-                                diag_shift=self._diag_shift,
-                                fixed_inputs=fixed_inputs),
-        is_missing=fixed_inputs_is_missing)
+    return _compute_divisor_matrix(
+        self._base_kernel,
+        diag_shift=self._diag_shift,
+        fixed_inputs=fixed_inputs,
+        fixed_inputs_is_missing=fixed_inputs_is_missing)
 
   def divisor_matrix(self):
     return self._divisor_matrix()

@@ -54,7 +54,9 @@ else:
     return y, grad_fn
 
 
-class Softplus(bijector.AutoCompositeTensorBijector):
+class Softplus(
+    bijector.CoordinatewiseBijectorMixin,
+    bijector.AutoCompositeTensorBijector):
   """Bijector which computes `Y = g(X) = Log[1 + exp(X)]`.
 
   The softplus `Bijector` has the following two useful properties:

@@ -37,7 +37,9 @@ __all__ = [
 ]
 
 
-class SoftClip(bijector.AutoCompositeTensorBijector):
+class SoftClip(
+    bijector.CoordinatewiseBijectorMixin,
+    bijector.AutoCompositeTensorBijector):
   """Bijector that approximates clipping as a continuous, differentiable map.
 
   The `forward` method takes unconstrained scalar `x` to a value `y` in

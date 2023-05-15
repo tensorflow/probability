@@ -14,11 +14,11 @@
 # ============================================================================
 """Tests for adaptive_malt."""
 
-from absl.testing import absltest
 from absl.testing import parameterized
 import jax
 import jax.numpy as jnp
 from discussion.adaptive_malt import adaptive_malt
+from absl.testing import absltest
 
 
 class AdaptiveMALTTest(parameterized.TestCase):

@@ -139,7 +139,10 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
   _is_on_jax = BACKEND == 'backend_jax'
 
   def _make_seed(self, seed):
-    return util.make_tensor_seed([seed, 0])
+    if self._is_on_jax:
+      return jax.random.PRNGKey(seed)
+    else:
+      return util.make_tensor_seed([seed, 0])
 
   @property
   def _dtype(self):
@@ -233,6 +236,42 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     self.assertAllEqual(3, x)
     self.assertAllEqual(4, trace_1)
     self.assertAllEqual(6, trace_2)
+
+  def testInterruptibleTrace(self):
+    def fun(x, y):
+      x = x + 1.0
+      y = y + 2.0
+      return (x, y), (x, y)
+
+    state, _ = fun_mc.trace(
+        state=fun_mc.interruptible_trace_init((0.0, 0.0), fn=fun, num_steps=5),
+        fn=functools.partial(fun_mc.interruptible_trace_step, fn=fun),
+        num_steps=4,
+    )
+
+    x_trace, y_trace = state.trace()
+
+    self.assertAllEqual([1.0, 2.0, 3.0, 4.0], x_trace)
+    self.assertAllEqual([2.0, 4.0, 6.0, 8.0], y_trace)
+
+  def testInterruptibleTraceMask(self):
+    def fun(x, y):
+      x = x + 1.0
+      y = y + 2.0
+      return (x, y), (x, y)
+
+    state, _ = fun_mc.trace(
+        state=fun_mc.interruptible_trace_init(
+            (0.0, 0.0), fn=fun, num_steps=5, trace_mask=(True, False)
+        ),
+        fn=functools.partial(fun_mc.interruptible_trace_step, fn=fun),
+        num_steps=4,
+    )
+
+    x_trace, y = state.trace()
+
+    self.assertAllEqual([1.0, 2.0, 3.0, 4.0], x_trace)
+    self.assertAllEqual(8.0, y)
 
   def testCallFn(self):
     sum_fn = lambda *args: sum(args)

@@ -19,6 +19,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.math.psd_kernels.internal import util
@@ -157,6 +158,41 @@ class Polynomial(psd_kernel.AutoCompositeTensorPsdKernel):
   def exponent(self):
     """Exponent of the polynomial term."""
     return self._exponent
+
+  def _matrix(self, x1, x2):
+    if self.feature_ndims > 1:
+      x1 = tf.reshape(x1, ps.concat(
+          [ps.shape(x1)[:-self.feature_ndims], [-1]], axis=-1))
+      x2 = tf.reshape(x2, ps.concat(
+          [ps.shape(x2)[:-self.feature_ndims], [-1]], axis=-1))
+    if self.shift is not None:
+      if self.feature_ndims > 0:
+        shift = self.shift[..., tf.newaxis, tf.newaxis]
+      else:
+        shift = self.shift[..., tf.newaxis]
+      x1 = x1 - shift
+      x2 = x2 - shift
+    if self.feature_ndims > 0:
+      dot_prod = tf.linalg.matmul(x1, x2, transpose_b=True)
+    else:
+      dot_prod = tf.linalg.einsum('...i,...j->...ij', x1, x2)
+
+    if self.exponent is not None:
+      exponent = tf.convert_to_tensor(self.exponent)[
+          ..., tf.newaxis, tf.newaxis]
+      dot_prod = dot_prod ** exponent
+
+    if self.slope_amplitude is not None:
+      slope_amplitude = tf.convert_to_tensor(self.slope_amplitude)[
+          ..., tf.newaxis, tf.newaxis]
+      dot_prod = dot_prod * slope_amplitude**2.
+
+    if self.bias_amplitude is not None:
+      bias_amplitude = tf.convert_to_tensor(self.bias_amplitude)[
+          ..., tf.newaxis, tf.newaxis]
+      dot_prod = dot_prod + bias_amplitude**2.
+
+    return dot_prod
 
   def _apply(self, x1, x2, example_ndims=0):
     if self.shift is None:

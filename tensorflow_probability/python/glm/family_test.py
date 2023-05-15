@@ -101,7 +101,8 @@ class _GLMTestHarness(object):
     actual_mean = self.expected.linear_model_to_mean_fn(
         predicted_linear_response)
     distribution = self.expected.distribution_fn(actual_mean)
-    response = tf.cast(distribution.sample(seed=42), self.dtype)
+    response = tf.cast(distribution.sample(seed=test_util.test_seed()),
+                       self.dtype)
     response = tf.identity(response, name='response')  # Disable bijector cache.
     expected_log_prob = distribution.log_prob(
         response, name='expected_log_prob')
@@ -126,7 +127,7 @@ class BernoulliTest(test_util.TestCase, _GLMTestHarness):
     self.dtype = np.float32
     self.model = family.Bernoulli()
     self.expected = family.CustomExponentialFamily(
-        lambda mean: bernoulli.Bernoulli(probs=mean), tf.nn.sigmoid)
+        lambda mean: bernoulli.Bernoulli(probs=mean), tf.math.sigmoid)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -139,8 +140,8 @@ class BernoulliNormalCDFTest(test_util.TestCase, _GLMTestHarness):
     def normal_cdf(r):
       r = tf.convert_to_tensor(value=r, name='r')
       n = normal.Normal(
-          loc=tf.zeros([], r.dtype.base_dtype),
-          scale=tf.ones([], r.dtype.base_dtype))
+          loc=tf.zeros([], r.dtype),
+          scale=tf.ones([], r.dtype))
       return n.cdf(r)
 
     self.expected = family.CustomExponentialFamily(
@@ -157,7 +158,7 @@ class BinomialTest(test_util.TestCase, _GLMTestHarness):
     self.model = family.Binomial(n)
     self.expected = family.CustomExponentialFamily(
         lambda mu: binomial.Binomial(n, probs=mu / n),
-        lambda r: n * tf.nn.sigmoid(r))
+        lambda r: n * tf.math.sigmoid(r))
 
 
 @test_util.test_all_tf_execution_regimes

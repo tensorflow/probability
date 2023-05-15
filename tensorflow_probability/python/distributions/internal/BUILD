@@ -64,6 +64,19 @@ multi_substrate_py_test(
     ],
 )
 
+multi_substrate_py_library(
+    name = "stochastic_process_util",
+    srcs = ["stochastic_process_util.py"],
+    deps = [
+        ":init",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/math/psd_kernels/internal:util",
+    ],
+)
+
 py_library(
     name = "correlation_matrix_volumes_lib",
 #     testonly = 1,  # DisableOnExport

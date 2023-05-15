@@ -26,6 +26,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import cholesky_util
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
 from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic
 from tensorflow_probability.python.math.psd_kernels import schur_complement
 from tensorflow_probability.python.math.psd_kernels.internal import test_util as psd_kernel_test_util
@@ -121,6 +122,7 @@ class SchurComplementTest(test_util.TestCase):
       expected = k_x_y - cov_dec
       self.assertAllClose(expected, self.evaluate(k.apply(x, y)))
 
+  @test_util.numpy_disable_gradient_test
   def testMasking(self):
     seed1, seed2, seed3 = samplers.split_seed(test_util.test_seed(), n=3)
     base_kernel = exponentiated_quadratic.ExponentiatedQuadratic(
@@ -157,6 +159,11 @@ class SchurComplementTest(test_util.TestCase):
           k_i.apply(x, x), k_x_x[i], atol=1e-5, rtol=1e-5)
       self.assertAllClose(
           k_i.apply(y, y), k_y_y[:, i:i+1], atol=1e-5, rtol=1e-5)
+
+    def _grad(x):
+      return gradient.value_and_gradient(
+          lambda u: tf.reduce_sum(k.apply(u, u, example_ndims=1)), x)[1]
+    self.assertAllNotNan(_grad(x))
 
   def testApplyShapesAreCorrect(self):
     for example_ndims in range(0, 4):

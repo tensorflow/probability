@@ -46,7 +46,9 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/experimental/util:composite_tensor",
     ],
     deps = [
+#         "//tensorflow_probability/google/tfp_google",  # DisableOnExport
         "//tensorflow_probability/python/experimental/auto_batching",
+        "//tensorflow_probability/python/experimental/bayesopt",
         "//tensorflow_probability/python/experimental/bijectors",
         "//tensorflow_probability/python/experimental/distribute",
         "//tensorflow_probability/python/experimental/distributions",

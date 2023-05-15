@@ -21,6 +21,7 @@ load(
     "multi_substrate_py_test",
 )
 # [internal] load pytype.bzl (pytype_strict_test)
+# [internal] load strict.bzl
 
 licenses(["notice"])
 
@@ -63,8 +64,8 @@ py_test(
         ":auto_composite_tensor",
         ":tensor_util",
         ":test_util",
-        # absl/flags dep,
         # absl/testing:absltest dep,
+        # absl/flags dep,
         # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:bijector",
@@ -388,6 +389,7 @@ multi_substrate_py_test(
         ":auto_composite_tensor",
         ":loop_util",
         ":prefer_static",
+        ":samplers",
         ":tensorshape_util",
         ":test_util",
         # tensorflow dep,
@@ -492,6 +494,21 @@ multi_substrate_py_test(
     name = "prefer_static_test",
     size = "small",
     srcs = ["prefer_static_test.py"],
+    deps = [
+        ":prefer_static",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+# py_strict
+py_test(
+    name = "prefer_static_shape64_test",
+    size = "small",
+    srcs = ["prefer_static_shape64_test.py"],
+    env = {"TF_FLAG_TF_SHAPE_DEFAULT_INT64": "true"},
     deps = [
         ":prefer_static",
         # absl/testing:parameterized dep,
@@ -753,6 +770,7 @@ multi_substrate_py_library(
         ":dtype_util",
         ":samplers",
         ":test_combinations",
+        # absl/testing:absltest dep,
         # absl/flags dep,
         # hypothesis dep,
         # numpy dep,

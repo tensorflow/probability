@@ -75,8 +75,8 @@ class UtilTest(test_util.TestCase):
     expanded = util.pad_shape_with_ones(x, 3)
     self.assertAllEqual([3, 1, 1, 1], self.evaluate(expanded).shape)
 
-  @test_util.jax_disable_test_missing_functionality(
-      'Graphs do not exist in Jax.')
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True, reason='Graphs only exist in TF.')
   def testPadShapeRightWithOnesCanBeGraphNoop(self):
     # First ensure graph actually *is* changed when we use non-trivial ndims.
     # Use an explicitly created graph, to make sure no whacky test fixture graph
@@ -126,6 +126,7 @@ class UtilTest(test_util.TestCase):
         self.evaluate(tf.sqrt(xs)),
         self.evaluate(util.sqrt_with_finite_grads(xs)))
 
+  @test_util.numpy_disable_gradient_test
   def testSqrtWithFiniteGradsHasCorrectGradients(self):
     self.assertTrue(np.isnan(self.evaluate(util.sqrt_with_finite_grads(-1.))))
     xs = tf.constant(np.linspace(1e-10, 10., 100))
@@ -140,6 +141,7 @@ class UtilTest(test_util.TestCase):
         util.sqrt_with_finite_grads, zero)
     self.assertNotEqual(*self.evaluate([grad_tf_sqrt, grad_safe_sqrt]))
 
+  @test_util.numpy_disable_gradient_test
   def testSqrtWithFiniteGradsBackpropsCorrectly(self):
     # Part of implementing a tf.custom_gradient is correctly handling the
     # `grad_ys` value that is propagating back from downstream ops. This test
@@ -163,6 +165,7 @@ class UtilTest(test_util.TestCase):
     self.assertAllClose(*self.evaluate([grad_tf_sqrt, grad_safe_sqrt]),
                         rtol=1e-10)
 
+  @test_util.numpy_disable_gradient_test
   def testSqrtWithFiniteGradsWithDynamicShape(self):
     x = tf1.placeholder_with_default([1.], shape=[None])
     _, grad_tf_sqrt = value_and_gradient(tf.sqrt, x)
@@ -171,6 +174,7 @@ class UtilTest(test_util.TestCase):
     self.assertAllEqual(*self.evaluate([grad_tf_sqrt, grad_safe_sqrt]))
 
   @parameterized.parameters(
+      {'feature_ndims': 0, 'dims': 3},
       {'feature_ndims': 1, 'dims': 3},
       {'feature_ndims': 1, 'dims': 4},
       {'feature_ndims': 2, 'dims': 2},

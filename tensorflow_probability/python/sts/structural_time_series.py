@@ -21,7 +21,6 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import joint_distribution_auto_batched
 from tensorflow_probability.python.distributions import sample
-from tensorflow_probability.python.experimental import util as tfe_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
@@ -367,6 +366,8 @@ class StructuralTimeSeries(object):
           experimental_parallelize=experimental_parallelize)
       # Looping LGSSM methods are really expensive in eager mode; wrap them
       # to keep this from slowing things down in interactive use.
+      # (Local import to break circular dependency.)
+      from tensorflow_probability.python.experimental import util as tfe_util  # pylint:disable=g-import-not-at-top
       ssm = tfe_util.JitPublicMethods(ssm, trace_only=True)
       if distribution_util.shape_may_be_nontrivial(trajectories_shape):
         return sample.Sample(ssm, sample_shape=trajectories_shape)

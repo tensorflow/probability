@@ -181,7 +181,7 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["forecast_test.py"],
     numpy_tags = ["notap"],
-    shard_count = 6,
+    shard_count = 10,
     deps = [
         ":fitting",
         ":forecast",

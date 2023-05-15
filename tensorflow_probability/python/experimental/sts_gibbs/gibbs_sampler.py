@@ -94,6 +94,16 @@ from tensorflow_probability.python.sts.internal import util as sts_util
 
 JAX_MODE = False
 
+
+__all__ = [
+    'GibbsSamplerState',
+    'get_seasonal_latents_shape',
+    'build_model_for_gibbs_fitting',
+    'fit_with_gibbs_sampling',
+    'one_step_predictive',
+]
+
+
 # The sampler state stores current values for each model parameter,
 # and auxiliary quantities such as the latent level.
 GibbsSamplerState = collections.namedtuple(  # pylint: disable=unexpected-keyword-arg
