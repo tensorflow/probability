@@ -415,7 +415,16 @@ def _size(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-bui
 size = _copy_docstring(tf.size, _size)
 
 
-def _shape(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-builtin,missing-docstring
+def _get_shape_out_type():
+  # Historically, tf.int32 is the default for out_type.  Support limited cases
+  # where tf.int64 is the default.
+  # TODO(b/282720125) Long-term, if tf.int64 becomes the default for out_type,
+  # only handle this case (i.e. delete _get_shape_out_type and use
+  # `out_type=tf.int64` in _shape's signature.)
+  return tf_inspect.getfullargspec(tf.shape).defaults[0]
+
+
+def _shape(input, out_type=_get_shape_out_type(), name=None):  # pylint: disable=redefined-builtin,missing-docstring
   if not hasattr(input, 'shape'):
     x = np.array(input)
     input = tf.convert_to_tensor(input) if x.dtype is np.object_ else x

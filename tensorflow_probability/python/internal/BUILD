@@ -21,6 +21,7 @@ load(
     "multi_substrate_py_test",
 )
 # [internal] load pytype.bzl (pytype_strict_test)
+# [internal] load strict.bzl
 
 licenses(["notice"])
 
@@ -493,6 +494,21 @@ multi_substrate_py_test(
     name = "prefer_static_test",
     size = "small",
     srcs = ["prefer_static_test.py"],
+    deps = [
+        ":prefer_static",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+# py_strict
+py_test(
+    name = "prefer_static_shape64_test",
+    size = "small",
+    srcs = ["prefer_static_shape64_test.py"],
+    env = {"TF_FLAG_TF_SHAPE_DEFAULT_INT64": "true"},
     deps = [
         ":prefer_static",
         # absl/testing:parameterized dep,
