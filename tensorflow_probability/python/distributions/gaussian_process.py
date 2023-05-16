@@ -340,9 +340,14 @@ class GaussianProcess(
     with tf.name_scope(name) as name:
       if tf.nest.is_nested(kernel.feature_ndims):
         input_dtype = dtype_util.common_dtype(
-            [kernel, index_points],
+            dict(
+                kernel=kernel,
+                index_points=index_points,
+            ),
             dtype_hint=nest_util.broadcast_structure(
-                kernel.feature_ndims, tf.float32))
+                kernel.feature_ndims, tf.float32
+            ),
+        )
         dtype = dtype_util.common_dtype(
             [observation_noise_variance, jitter], tf.float32)
       else:

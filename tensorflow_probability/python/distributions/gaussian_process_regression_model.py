@@ -683,19 +683,38 @@ class GaussianProcessRegressionModel(
     with tf.name_scope(name) as name:
       if tf.nest.is_nested(kernel.feature_ndims):
         input_dtype = dtype_util.common_dtype(
-            [kernel, index_points, observation_index_points],
+            dict(
+                kernel=kernel,
+                index_points=index_points,
+                observation_index_points=observation_index_points,
+            ),
             dtype_hint=nest_util.broadcast_structure(
-                kernel.feature_ndims, tf.float32))
+                kernel.feature_ndims, tf.float32
+            ),
+        )
         dtype = dtype_util.common_dtype(
-            [observations, observation_noise_variance,
-             predictive_noise_variance, jitter], tf.float32)
+            dict(
+                observations=observations,
+                observation_noise_variance=observation_noise_variance,
+                predictive_noise_variance=predictive_noise_variance,
+                jitter=jitter,
+            ),
+            tf.float32,
+        )
       else:
         # If the index points are not nested, we assume they are of the same
         # dtype as the GPRM.
-        dtype = dtype_util.common_dtype([
-            index_points, observation_index_points, observations,
-            observation_noise_variance, predictive_noise_variance, jitter
-        ], tf.float32)
+        dtype = dtype_util.common_dtype(
+            dict(
+                index_points=index_points,
+                observation_index_points=observation_index_points,
+                observations=observations,
+                observation_noise_variance=observation_noise_variance,
+                predictive_noise_variance=predictive_noise_variance,
+                jitter=jitter,
+            ),
+            tf.float32,
+        )
         input_dtype = dtype
 
       # Convert-to-tensor arguments that are expected to not be Variables / not
