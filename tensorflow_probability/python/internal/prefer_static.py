@@ -407,7 +407,7 @@ setdiff1d = _copy_docstring(
 def _size(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-builtin
   if not hasattr(input, 'shape'):
     x = np.array(input)
-    input = tf.convert_to_tensor(input) if x.dtype is np.object_ else x
+    input = tf.convert_to_tensor(input) if x.dtype == np.object_ else x
   n = tensorshape_util.num_elements(tf.TensorShape(input.shape))
   if n is None:
     return tf.size(input, out_type=out_type, name=name)
@@ -427,7 +427,7 @@ def _get_shape_out_type():
 def _shape(input, out_type=_get_shape_out_type(), name=None):  # pylint: disable=redefined-builtin,missing-docstring
   if not hasattr(input, 'shape'):
     x = np.array(input)
-    input = tf.convert_to_tensor(input) if x.dtype is np.object_ else x
+    input = tf.convert_to_tensor(input) if x.dtype == np.object_ else x
   if tensorshape_util.is_fully_defined(input.shape):
     return np.array(tensorshape_util.as_list(input.shape)).astype(
         _numpy_dtype(out_type))

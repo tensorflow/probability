@@ -1340,10 +1340,15 @@ class _DefaultJointBijector(composition.Composition):
     with tf.name_scope('default_joint_bijector') as name:
       if bijector_fn is None:
         bijector_fn = lambda d: d.experimental_default_event_space_bijector()
+      self._jd = jd
+      self._bijector_fn = bijector_fn
       bijectors = tuple(bijector_fn(d)
                         for d in jd._get_single_sample_distributions())
       i_min_event_ndims = tf.nest.map_structure(
-          ps.size, jd.event_shape)
+          tensorshape_util.rank, jd.event_shape)
+      if any(x is None for x in tf.nest.flatten(i_min_event_ndims)):
+        i_min_event_ndims = tf.nest.map_structure(
+            ps.rank_from_shape, jd.event_shape_tensor(), jd.event_shape)
       f_min_event_ndims = jd._model_unflatten([
           b.inverse_event_ndims(nd) for b, nd in
           zip(bijectors, jd._model_flatten(i_min_event_ndims))])
@@ -1354,8 +1359,6 @@ class _DefaultJointBijector(composition.Composition):
           validate_args=jd.validate_args,
           parameters=parameters,
           name=name)
-      self._jd = jd
-      self._bijector_fn = bijector_fn
 
   def _conditioned_bijectors(self, samples, constrained=False):
     if samples is None:
