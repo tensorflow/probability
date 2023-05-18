@@ -425,6 +425,11 @@ def _get_shape_out_type():
 
 
 def _shape(input, out_type=_get_shape_out_type(), name=None):  # pylint: disable=redefined-builtin,missing-docstring
+  if out_type is None:
+    # Only Tensorflow has a flag to control the default ouput of tf.shape and
+    # uses out_type=None in the signature. For Jax and numpy, out_type is never
+    # None.
+    out_type = tf.shape([]).dtype
   if not hasattr(input, 'shape'):
     x = np.array(input)
     input = tf.convert_to_tensor(input) if x.dtype == np.object_ else x
