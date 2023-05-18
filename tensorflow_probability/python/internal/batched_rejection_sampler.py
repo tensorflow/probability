@@ -100,8 +100,8 @@ def batched_las_vegas_algorithm(
       return values, good_values_mask, num_iters + 1, new_seed
 
     (values, final_successes, num_iters, _) = tf.while_loop(
-        cond, body, (values, good_values_mask, num_iters, loop_seed),
-        back_prop=False)
+        cond, body, (values, good_values_mask, num_iters, loop_seed))
+    values = tf.nest.map_structure(tf.stop_gradient, values)
     return values, final_successes, num_iters
 
 
