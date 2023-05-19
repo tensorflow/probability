@@ -227,7 +227,7 @@ def _one_hot(  # pylint: disable=unused-argument
   return y_out
 
 
-def _ones_like(input, dtype=None, name=None, layout=None):  # pylint: disable=redefined-builtin,unused-argument
+def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin,unused-argument
   return np.ones_like(ops.convert_to_tensor(input),
                       dtype=utils.numpy_dtype(dtype))
 
@@ -395,7 +395,7 @@ def _where(condition, x=None, y=None, name='where'):  # pylint: disable=unused-a
   return np.where(condition, x, y)
 
 
-def _zeros_like(input, dtype=None, name=None, layout=None):  # pylint: disable=redefined-builtin,unused-argument
+def _zeros_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin,unused-argument
   return np.zeros_like(input, dtype=utils.numpy_dtype(dtype))
 
 
@@ -413,11 +413,7 @@ expand_dims = utils.copy_docstring(
 
 fill = utils.copy_docstring(
     'tf.fill',
-    lambda dims, value, name=None, layout=None: np.full(  # pylint: disable=g-long-lambda
-        dims,
-        ops.convert_to_tensor(value),
-    ),
-)
+    lambda dims, value, name=None: np.full(dims, ops.convert_to_tensor(value)))
 
 gather = utils.copy_docstring(
     'tf.gather',
@@ -447,15 +443,12 @@ one_hot = utils.copy_docstring(
 
 ones = utils.copy_docstring(
     'tf.ones',
-    lambda shape, dtype=np.float32, name=None, layout=None: np.ones(  # pylint: disable=g-long-lambda
-        shape, utils.numpy_dtype(dtype)
-    ),
-)
+    lambda shape, dtype=np.float32, name=None: np.ones(  # pylint: disable=g-long-lambda
+        shape, utils.numpy_dtype(dtype)))
 
 ones_like = utils.copy_docstring(
     'tf.ones_like',
-    _ones_like,
-)
+    _ones_like)
 
 pad = utils.copy_docstring(
     'tf.pad',
@@ -529,12 +522,9 @@ where = utils.copy_docstring(
 
 zeros = utils.copy_docstring(
     'tf.zeros',
-    lambda shape, dtype=np.float32, name=None, layout=None: np.zeros(  # pylint: disable=g-long-lambda
-        shape, utils.numpy_dtype(dtype)
-    ),
-)
+    lambda shape, dtype=np.float32, name=None: np.zeros(  # pylint: disable=g-long-lambda
+        shape, utils.numpy_dtype(dtype)))
 
 zeros_like = utils.copy_docstring(
     'tf.zeros_like',
-    _zeros_like,
-)
+    _zeros_like)

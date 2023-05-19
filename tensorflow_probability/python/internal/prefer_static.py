@@ -50,11 +50,11 @@ nptf.register_tensor_conversion_function(
     tf.TensorShape, nptf.ops._convert_tensorshape_to_tensor)  # pylint: disable=protected-access
 
 
-def _prefer_static(original_fn, static_fn, disable_spec_check=False):
+def _prefer_static(original_fn, static_fn):
   """Wraps original_fn, preferring to call static_fn when inputs are static."""
   original_spec = tf_inspect.getfullargspec(original_fn)
   static_spec = tf_inspect.getfullargspec(static_fn)
-  if not disable_spec_check and original_spec != static_spec:
+  if original_spec != static_spec:
     raise ValueError(
         'Arg specs do not match: original={}, static={}, fn={}'.format(
             original_spec, static_spec, original_fn))
@@ -76,11 +76,11 @@ def _prefer_static(original_fn, static_fn, disable_spec_check=False):
   return wrap(original_fn)
 
 
-def _copy_docstring(original_fn, new_fn, disable_spec_check=False):
+def _copy_docstring(original_fn, new_fn):
   """Wraps new_fn with the doc of original_fn."""
   original_spec = tf_inspect.getfullargspec(original_fn)
   new_spec = tf_inspect.getfullargspec(new_fn)
-  if not disable_spec_check and original_spec != new_spec:
+  if original_spec != new_spec:
     raise ValueError(
         'Arg specs do not match: original={}, new={}, fn={}'.format(
             original_spec, new_spec, original_fn))
@@ -357,16 +357,13 @@ def shape_slice(x, slice_):
   return x_shape[slice_]
 
 
-def _ones_like(input, dtype=None, name=None, layout=None):  # pylint: disable=redefined-builtin
-  del layout
+def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin
   s = _shape(input)
   s_ = tf.get_static_value(s)
   if s_ is not None:
     return np.ones(s_, dtype_util.as_numpy_dtype(dtype or input.dtype))
   return tf.ones(s, dtype or input.dtype, name)
-
-
-ones_like = _copy_docstring(tf.ones_like, _ones_like, disable_spec_check=True)
+ones_like = _copy_docstring(tf.ones_like, _ones_like)
 
 
 def _rank(input, name=None):  # pylint: disable=redefined-builtin,unused-argument
@@ -445,18 +442,13 @@ def _shape(input, out_type=_get_shape_out_type(), name=None):  # pylint: disable
 shape = _copy_docstring(tf.shape, _shape)
 
 
-def _zeros_like(input, dtype=None, name=None, layout=None):  # pylint: disable=redefined-builtin
-  del layout
+def _zeros_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin
   s = _shape(input)
   s_ = tf.get_static_value(s)
   if s_ is not None:
     return np.zeros(s, _numpy_dtype(dtype or input.dtype))
   return tf.zeros(s, dtype or s.dtype, name)
-
-
-zeros_like = _copy_docstring(
-    tf.zeros_like, _zeros_like, disable_spec_check=True
-)
+zeros_like = _copy_docstring(tf.zeros_like, _zeros_like)
 
 
 def non_negative_axis(axis, rank, name=None):  # pylint:disable=redefined-outer-name
@@ -509,7 +501,7 @@ equal = _prefer_static(tf.equal, nptf.equal)
 not_equal = _prefer_static(tf.not_equal, nptf.not_equal)
 expm1 = _prefer_static(tf.math.expm1, nptf.math.expm1)
 floor = _prefer_static(tf.math.floor, nptf.math.floor)
-fill = _prefer_static(tf.fill, nptf.fill, disable_spec_check=True)
+fill = _prefer_static(tf.fill, nptf.fill)
 gather = _prefer_static(tf.gather, nptf.gather)
 greater = _prefer_static(tf.greater, nptf.greater)
 identity = _prefer_static(tf.identity, nptf.identity)
@@ -529,7 +521,7 @@ maximum = _prefer_static(tf.maximum, nptf.maximum)
 minimum = _prefer_static(tf.minimum, nptf.minimum)
 nextafter = _prefer_static(tf.math.nextafter, nptf.math.nextafter)
 one_hot = _prefer_static(tf.one_hot, nptf.one_hot)
-ones = _prefer_static(tf.ones, nptf.ones, disable_spec_check=True)
+ones = _prefer_static(tf.ones, nptf.ones)
 pad = _prefer_static(tf.pad, nptf.pad)
 pow = _prefer_static(tf.math.pow, nptf.pow)  # pylint: disable=redefined-builtin
 range = _prefer_static(tf.range, nptf.range)  # pylint: disable=redefined-builtin
@@ -560,4 +552,4 @@ top_k = _prefer_static(tf.math.top_k, nptf.math.top_k)
 unique = _prefer_static(tf.unique, nptf.unique)
 unstack = _prefer_static(tf.unstack, nptf.unstack)
 where = _prefer_static(tf.where, nptf.where)
-zeros = _prefer_static(tf.zeros, nptf.zeros, disable_spec_check=True)
+zeros = _prefer_static(tf.zeros, nptf.zeros)
