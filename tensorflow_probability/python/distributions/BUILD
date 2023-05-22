@@ -2394,6 +2394,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math:linalg",
         "//tensorflow_probability/python/math/psd_kernels:positive_semidefinite_kernel",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
         "//tensorflow_probability/python/util",

@@ -408,5 +408,58 @@ class VariationalGaussianProcessTest(test_util.TestCase):
         log_likelihood_fn=log_likelihood_fn,
         quadrature_size=20)
 
+  def testWhiteningTransformationMatches(self):
+    kernel = tfpk.ExponentiatedQuadratic()
+    num_predictive_points = 10
+    num_inducing_points = 5
+
+    index_points = np.random.uniform(size=(num_predictive_points, 3))
+    inducing_index_points = np.random.uniform(size=(num_inducing_points, 3))
+    variational_loc = np.random.uniform(size=(num_inducing_points,))
+    # Positive random triangular matrix.
+    variational_scale = np.tril(
+        np.random.uniform(size=(num_inducing_points, num_inducing_points)))**2
+    observation_noise_variance = np.float64(1e-5)
+
+    vgp1 = variational_gaussian_process.VariationalGaussianProcess(
+        kernel=kernel,
+        index_points=index_points,
+        inducing_index_points=inducing_index_points,
+        variational_inducing_observations_loc=variational_loc,
+        variational_inducing_observations_scale=variational_scale,
+        observation_noise_variance=observation_noise_variance)
+
+    chol_kzz = tf.linalg.cholesky(
+        kernel.matrix(inducing_index_points, inducing_index_points))
+    chol_kzz_linop = tf.linalg.LinearOperatorLowerTriangular(
+        chol_kzz)
+
+    vgp2 = variational_gaussian_process.VariationalGaussianProcess(
+        kernel=kernel,
+        index_points=index_points,
+        inducing_index_points=inducing_index_points,
+        # NOTE: When using whitening, one does not need to do this
+        # transformation. This is purely for checking comparable numerics
+        # when whitening is on and off.
+        variational_inducing_observations_loc=chol_kzz_linop.solvevec(
+            variational_loc),
+        variational_inducing_observations_scale=chol_kzz_linop.solve(
+            variational_scale),
+        observation_noise_variance=observation_noise_variance,
+        use_whitening_transform=True)
+
+    mean_vgp1, mean_vgp2 = self.evaluate([vgp1.mean(), vgp2.mean()])
+    self.assertAllClose(mean_vgp1, mean_vgp2, rtol=3e-5)
+
+    stddev_vgp1, stddev_vgp2 = self.evaluate([vgp1.stddev(), vgp2.stddev()])
+    self.assertAllClose(stddev_vgp1, stddev_vgp2, rtol=3e-5)
+
+    loss_vgp1, loss_vgp2 = self.evaluate([
+        vgp1.surrogate_posterior_kl_divergence_prior(),
+        vgp2.surrogate_posterior_kl_divergence_prior()])
+
+    self.assertAllClose(loss_vgp1, loss_vgp2, rtol=7e-5)
+
+
 if __name__ == '__main__':
   test_util.main()
