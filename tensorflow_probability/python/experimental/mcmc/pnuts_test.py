@@ -40,7 +40,6 @@ from tensorflow_probability.python.distributions import sample as sample_dist_li
 from tensorflow_probability.python.distributions import student_t
 from tensorflow_probability.python.distributions import wishart
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
-from tensorflow_probability.python.experimental import util
 from tensorflow_probability.python.experimental.distributions import mvn_precision_factor_linop as mvnpflo
 from tensorflow_probability.python.experimental.mcmc import preconditioned_nuts
 from tensorflow_probability.python.internal import assert_util
@@ -855,8 +854,6 @@ class PreconditionedNUTSTest(test_util.TestCase):
     else:
       momentum_distribution = normal.Normal(0.,
                                             tf.constant(.5, dtype=tf.float64))
-      if not JAX_MODE:
-        momentum_distribution = util.as_composite(momentum_distribution)
     kernel = preconditioned_nuts.PreconditionedNoUTurnSampler(
         lambda x: -x**2,
         step_size=.5,
@@ -877,8 +874,9 @@ class PreconditionedNUTSTest(test_util.TestCase):
     if use_default:
       momentum_distribution = None
     else:
-      momentum_distribution = util.as_composite(
-          normal.Normal(0., tf.constant(.5, dtype=tf.float64)))
+      momentum_distribution = normal.Normal(
+          0.0, tf.constant(0.5, dtype=tf.float64)
+      )
     kernel = preconditioned_nuts.PreconditionedNoUTurnSampler(
         lambda x: -x**2,
         step_size=.5,

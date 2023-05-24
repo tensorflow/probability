@@ -21,7 +21,6 @@ from tensorflow_probability.python.distributions import inflated
 from tensorflow_probability.python.distributions import lognormal
 from tensorflow_probability.python.distributions import negative_binomial
 from tensorflow_probability.python.distributions import normal
-from tensorflow_probability.python.experimental import util
 from tensorflow_probability.python.experimental.util import trainable
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import gradient
@@ -106,16 +105,6 @@ class DistributionsTest(test_util.TestCase):
 
     samples = init_dist.sample(seed=test_util.test_seed())
     self.assertEqual((5,), samples.shape)
-
-  @test_util.disable_test_for_backend(
-      disable_jax=True,
-      disable_numpy=True,
-      reason='Only TF has composite tensors')
-  def test_zinb_as_composite_tensor(self):
-    zinb = inflated.ZeroInflatedNegativeBinomial(
-        0.1, total_count=10.0, probs=0.4)
-    comp_zinb = util.as_composite(zinb)
-    unused_as_tensors = tf.nest.flatten(comp_zinb)
 
   @test_util.disable_test_for_backend(
       disable_numpy=True,

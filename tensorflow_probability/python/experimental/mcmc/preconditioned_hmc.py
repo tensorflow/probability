@@ -187,9 +187,8 @@ class PreconditionedHamiltonianMonteCarlo(hmc.HamiltonianMonteCarlo):
         `one_step` and `bootstrap_results`. This allows wrapper kernels to
         adjust those parameters on the fly. In case this is `True`, the
         `momentum_distribution` must be a `CompositeTensor`. See
-        `tfp.experimental.as_composite` and `tfp.experimental.auto_composite`.
-        This is incompatible with `step_size_update_fn`, which must be set to
-        `None`.
+        `tfp.experimental.auto_composite`. This is incompatible with
+        `step_size_update_fn`, which must be set to `None`.
       experimental_shard_axis_names: A structure of string names indicating how
         members of the state are sharded.
       name: Python `str` name prefixed to Ops created by this function.
