@@ -164,10 +164,11 @@ multi_substrate_py_library(
     srcs = ["batched_rejection_sampler.py"],
     deps = [
         ":broadcast_util",
+        ":prefer_static",
         ":samplers",
+        ":tensorshape_util",
         # numpy dep,  # For np.nan
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
