@@ -43,7 +43,6 @@ py_library(
         ":linalg",
         ":misc",
         ":nest",
-        ":nested_structure_coder",
         ":nn",
         ":numpy_array",
         ":numpy_keras",
@@ -223,11 +222,6 @@ py_library(
         # tree dep,
         # wrapt dep,
     ],
-)
-
-py_library(
-    name = "nested_structure_coder",
-    srcs = ["nested_structure_coder.py"],
 )
 
 py_library(
