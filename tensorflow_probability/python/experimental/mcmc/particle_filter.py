@@ -60,7 +60,7 @@ def _no_rejuvenation(state,
 
 def _default_kernel(state):
   mean, variance = tf.nn.moments(state.particles[0], axes=[0])
-  proposed_parameters = normal.Normal(loc=mean, scale=tf.sqrt(variance)).sample(20)
+  proposed_parameters = normal.Normal(loc=mean, scale=tf.sqrt(variance)).sample(ps.size0(state.particles[0]))
   return proposed_parameters
 
 
@@ -69,9 +69,9 @@ def _acceptance_prob(weights_from, weights_to):
 
 
 def where_fn(accept, a, b):
-    is_scalar = tf.rank(a).numpy() == 0
+    is_scalar = tf.rank(a) == tf.constant(0)
     is_nan = tf.math.is_nan(tf.cast(a, tf.float32))
-    is_all_nan = tf.reduce_all(is_nan).numpy()
+    is_all_nan = tf.reduce_all(is_nan)
     if is_scalar and is_all_nan:
         return a
     elif a.shape == 2 and b.shape == 2:
@@ -82,7 +82,6 @@ def where_fn(accept, a, b):
         return tf.where(accept, a, b)
     elif len(a.shape) == 2 and len(b.shape) == 2:
         # Both tensors have shape [outer_particles, inner_particles]
-        # Assuming accept has shape [outer_particles], we need to expand its dimensions to match the tensors
         expanded_accept = tf.expand_dims(accept, axis=-1)
         return tf.where(expanded_accept, a, b)
     elif a.shape == () and b.shape == ():
@@ -449,7 +448,7 @@ def smc_squared(
         parameter_proposal_kernel=_default_kernel,
         inner_proposal_fn=None,
         inner_initial_state_proposal=None,
-        inner_rejuvenation_criterion_fn=lambda *_: False,
+        inner_rejuvenation_criterion_fn=lambda *_: True,
         outer_rejuvenation_criterion_fn=lambda *_: True,
         trace_fn=_default_trace_fn,  # TODO: eventually control on both
         trace_criterion_fn=None,
@@ -654,43 +653,41 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
 
             rej_parameters_weights = rej_filter_results.incremental_log_marginal_likelihood
 
-            def loop_body(i, rej_parameters_weights, outside_parameters, updated_log_weights, inner_weighted_particles,
-                          filter_results):
-                # The loop body code
-                rej_inner_weighted_particles, rej_filter_results = kernel.one_step(rej_inner_weighted_particles,
-                                                                                   rej_filter_results)
+            def condition(i, rej_inner_weighted_particles, rej_filter_results, rej_parameters_weights):
+                return tf.less(i, state.extra[0])
+
+            def body(i, rej_inner_weighted_particles, rej_filter_results, rej_parameters_weights):
+                rej_inner_weighted_particles, rej_filter_results = kernel.one_step(
+                    rej_inner_weighted_particles, rej_filter_results
+                )
                 rej_parameters_weights += filter_results.incremental_log_marginal_likelihood
+                return i + 1, rej_inner_weighted_particles, rej_filter_results, rej_parameters_weights
 
-                # Perform metropolis hastings
-                acceptance_probs = _acceptance_prob(log_weights, rej_parameters_weights)
-                random_numbers = tf.random.uniform([num_outer_particles])
+            _, rej_inner_weighted_particles, rej_filter_results, rej_parameters_weights = tf.while_loop(
+                condition,
+                body,
+                loop_vars=[0, rej_inner_weighted_particles, rej_filter_results, rej_parameters_weights]
+            )
 
-                # Determine if the proposed particle should be accepted or reject
-                accept = random_numbers < acceptance_probs
+            # Perform metropolis hastings
+            acceptance_probs = _acceptance_prob(log_weights, rej_parameters_weights)
 
-                # Update the chosen particles based on the acceptance step
-                outside_parameters = tf.where(accept, outside_parameters, proposed_parameters)
-                updated_log_weights = tf.where(accept, log_weights, rej_parameters_weights)
-                inner_weighted_particles = tf.nest.map_structure(lambda a, b: where_fn(accept, a, b),
-                                                                 inner_weighted_particles, rej_inner_weighted_particles)
-                filter_results = tf.nest.map_structure(lambda a, b: where_fn(accept, a, b), filter_results,
-                                                       rej_filter_results)
+            random_numbers = tf.random.uniform([num_outer_particles])
 
-                return i + 1, rej_parameters_weights, outside_parameters, updated_log_weights, inner_weighted_particles, filter_results
+            # # Determine if the proposed particle should be accepted or reject
+            accept = random_numbers < acceptance_probs
 
-            i = tf.constant(0)
+            # Update the chosen particles and filter restults based on the acceptance step
+            outside_parameters = tf.where(accept, outside_parameters, proposed_parameters)
+            updated_log_weights = tf.where(accept, log_weights, rej_parameters_weights)
 
-            # Define the loop condition
-            def condition(i, rej_parameters_weights, outside_parameters, updated_log_weights, inner_weighted_particles,
-                          filter_results):
-                return i < state.particles[2].steps
+            inner_weighted_particles = tf.nest.map_structure(
+                lambda a, b: where_fn(accept, a, b),
+                inner_weighted_particles,
+                rej_inner_weighted_particles)
 
-            # Call the while loop
-            i, rej_parameters_weights, outside_parameters, updated_log_weights, inner_weighted_particles, filter_results = tf.while_loop(
-                condition, loop_body,
-                [i, rej_parameters_weights, outside_parameters, updated_log_weights, inner_weighted_particles,
-                 filter_results])
-
+            filter_results = tf.nest.map_structure(
+                lambda a, b: where_fn(accept, a, b), filter_results, rej_filter_results)
 
         return smc_kernel.WeightedParticles(
             particles=(outside_parameters,
@@ -851,7 +848,6 @@ def _particle_filter_initial_weighted_particles(observations,
           particles_dim,
           num_particles
       )
-      # TODO: The following is wrong, what is the correct one so that I can generalize to other initial_state
       initial_log_weights = ps.zeros_like(initial_state)
 
   else:
