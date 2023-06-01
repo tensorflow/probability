@@ -1831,7 +1831,7 @@ def linear_gaussian_update(
   #  P* = P - K * H * P
   # but this is prone to numerical issues because it subtracts a
   # value from a PSD matrix.  We choose instead to use the more
-  # expensive Jordan form update
+  # expensive Joseph form update
   #  P* = (I - K H) * P * (I - K H)' + K R K'
   # which always produces a PSD result. This uses
   #  tmp_term = (I - K * H)'
