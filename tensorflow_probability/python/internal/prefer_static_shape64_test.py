@@ -23,7 +23,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
 
 
-class ShapeTestInt64(test_util.TestCase):
+class SizeShapeTestInt64(test_util.TestCase):
 
   def test_shape(self):
     vector_value = [0., 1.]
@@ -43,6 +43,14 @@ class ShapeTestInt64(test_util.TestCase):
     # TF_FLAG_TF_SHAPE_DEFAULT_INT64=true which is set by an environment
     # variable when this test is run.)
     self.assertEqual(ps.shape(tf.constant(vector_value)).dtype, tf.int64)
+
+  def test_size(self):
+    t = tf.TensorShape([2, 1, 4])
+    self.assertEqual(3, ps.size(t))
+    # TF_FLAG_TF_SHAPE_DEFAULT_INT64=true is set by an environment
+    # variable when this test is run.
+    self.assertEqual(ps.size(t).dtype, tf.size(t).dtype)
+
 
 if __name__ == '__main__':
   test_util.main()

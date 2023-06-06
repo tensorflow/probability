@@ -404,7 +404,21 @@ setdiff1d = _copy_docstring(
     _setdiff1d)
 
 
-def _size(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-builtin
+def _get_size_out_type():
+  # Historically, tf.int32 is the default for out_type for tf.size.
+  # Support limited cases where tf.int64 is the default.
+  # TODO(b/282720125) Long-term, if tf.int64 becomes the default for out_type,
+  # only handle this case (i.e. delete _get_size_out_type and use
+  # `out_type=tf.int64` in _size's signature.)
+  return tf_inspect.getfullargspec(tf.size).defaults[0]
+
+
+def _size(input, out_type=_get_size_out_type(), name=None):  # pylint: disable=redefined-builtin,missing-docstring
+  if out_type is None:
+    # Only Tensorflow has a flag to control the default ouput of tf.size and
+    # uses out_type=None in the signature. For Jax and numpy, out_type is never
+    # None.
+    out_type = tf.size([]).dtype
   if not hasattr(input, 'shape'):
     x = np.array(input)
     input = tf.convert_to_tensor(input) if x.dtype == np.object_ else x
@@ -416,8 +430,8 @@ size = _copy_docstring(tf.size, _size)
 
 
 def _get_shape_out_type():
-  # Historically, tf.int32 is the default for out_type.  Support limited cases
-  # where tf.int64 is the default.
+  # Historically, tf.int32 is the default for out_type for tf.shape.
+  # Support limited cases where tf.int64 is the default.
   # TODO(b/282720125) Long-term, if tf.int64 becomes the default for out_type,
   # only handle this case (i.e. delete _get_shape_out_type and use
   # `out_type=tf.int64` in _shape's signature.)
