@@ -1119,7 +1119,7 @@ def _compute_numerical_jacobian(f, xs, i, scale=1e-3):
   """Compute the numerical jacobian of `f`."""
   dtype_i = xs[i].dtype
   shape_i = xs[i].shape
-  size_i = np.product(shape_i, dtype=np.int32)
+  size_i = np.prod(shape_i, dtype=np.int32)
   def grad_i(d):
     return (f(*(xs[:i] + [xs[i] + d * scale] + xs[i+1:]))
             - f(*(xs[:i] + [xs[i] - d * scale] + xs[i+1:]))) / (2. * scale)
