@@ -20,6 +20,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.experimental.mcmc import weighted_resampling
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.mcmc.internal.util import choose
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 
 __all__ = [
@@ -117,12 +118,12 @@ def _dummy_indices_like(indices):
       indices_shape)
 
 
-def ess_below_threshold(weighted_particles, threshold=0.5):
+def ess_below_threshold(weighted_particles, particles_dim=0, threshold=0.5):
   """Determines if the effective sample size is much less than num_particles."""
   with tf.name_scope('ess_below_threshold'):
     num_particles = ps.size0(weighted_particles.log_weights)
-    log_weights = tf.math.log_softmax(weighted_particles.log_weights, axis=0)
-    log_ess = -tf.math.reduce_logsumexp(2 * log_weights, axis=0)
+    log_weights = tf.math.log_softmax(weighted_particles.log_weights, axis=particles_dim)
+    log_ess = -tf.math.reduce_logsumexp(2 * log_weights, axis=particles_dim)
     return log_ess < (ps.log(num_particles) +
                       ps.log(threshold))
 
@@ -325,8 +326,7 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
                 tf.gather(state.log_weights, 0, axis=self._particles_dim) -
                 tf.gather(normalized_log_weights, 0, axis=self._particles_dim))
 
-
-        do_resample = self.resample_criterion_fn(state)
+        do_resample = self.resample_criterion_fn(state, self._particles_dim)
         # Some batch elements may require resampling and others not, so
         # we first do the resampling for all elements, then select whether to
         # use the resampled values for each batch element according to
@@ -335,9 +335,6 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
         # needed---but we're ultimately interested in adaptive resampling
         # for statistical (not computational) purposes, so this isn't a
         # dealbreaker.
-        # if self._particles_dim == 0:
-        #     print('particles',state.particles)
-        #     print('weights', state.log_weights)
         [
             new_particles,
             new_indices,
@@ -358,7 +355,7 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
         (new_particles,
          new_indices,
          log_weights) = tf.nest.map_structure(
-            lambda r, p: tf.where(do_resample, r, p),
+            lambda r, p: choose(do_resample, r, p),
             (new_particles, new_indices, new_weights),
             (state.particles, _dummy_indices_like(new_indices),
             normalized_log_weights))
