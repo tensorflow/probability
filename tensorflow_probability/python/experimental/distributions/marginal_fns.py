@@ -127,16 +127,14 @@ def make_eigh_marginal_fn(tol=1e-6,
   return eigh_marginal_fn
 
 
-def _retrying_cholesky_fwd(matrix, jitter, max_iters):
+def _retrying_cholesky_fwd(matrix, jitter, max_iters, unroll):
   """Forward method for `retrying_cholesky`."""
+  if unroll < 1:
+    raise ValueError(f'Must unroll >=1 iterations. Got {unroll}.')
   matrix = tf.convert_to_tensor(matrix)
   jitter = tf.convert_to_tensor(jitter, dtype=matrix.dtype)
 
-  n = tf.compat.dimension_value(matrix.shape[-1])
-  if n is None:
-    n = tf.shape(matrix)[-1]
-
-  one = tf.convert_to_tensor(1., dtype=matrix.dtype)
+  one = tf.ones([], dtype=matrix.dtype)
   ten = tf.convert_to_tensor(10., dtype=matrix.dtype)
 
   def cond(i, _, triangular_factor):
@@ -144,18 +142,19 @@ def _retrying_cholesky_fwd(matrix, jitter, max_iters):
             & tf.reduce_any(tf.math.is_nan(triangular_factor[..., 0, 0])))
 
   def body(i, shift, triangular_factor):
-    triangular_factor = tf.linalg.cholesky(
-        tf.linalg.set_diag(matrix, tf.linalg.diag_part(matrix) + shift))
-    shift = shift * tf.where(
-        tf.math.is_nan(triangular_factor[..., :1, 0]), ten, one)
-    return [i + 1, shift, triangular_factor]
+    for _ in range(unroll):
+      triangular_factor = tf.linalg.cholesky(
+          tf.linalg.set_diag(matrix, tf.linalg.diag_part(matrix) + shift))
+      shift = shift * tf.where(
+          tf.math.is_nan(triangular_factor[..., :1, 0]), ten, one)
+    return [i + unroll, shift, triangular_factor]
 
   triangular_factor = tf.linalg.cholesky(matrix)
   shift = tf.where(tf.math.is_nan(triangular_factor[..., :1, 0]), jitter, 0.)
   _, shift, triangular_factor = tf.while_loop(
       cond, body,
       loop_vars=[tf.convert_to_tensor(0), shift, triangular_factor],
-      maximum_iterations=max_iters)
+      maximum_iterations=(max_iters + unroll - 1) // unroll)
   shift = tf.stop_gradient(shift)
   return (triangular_factor, shift[..., 0]), (
       triangular_factor,
@@ -167,9 +166,9 @@ def _retrying_cholesky_fwd(matrix, jitter, max_iters):
 # Gradient implementation comes from https://arxiv.org/pdf/1602.07527.pdf
 
 
-def _retrying_cholesky_bwd(max_iters, aux, g):
+def _retrying_cholesky_bwd(max_iters, unroll, aux, g):
   """Reverse mode impl for retrying_cholesky."""
-  del max_iters
+  del max_iters, unroll
   _, matrix, _, shift = aux
 
   # Recompute triangular factor so we can take gradients of gradients.
@@ -194,12 +193,13 @@ def _retrying_cholesky_bwd(max_iters, aux, g):
   return 0.5 * grad, None
 
 
-def _retrying_cholesky_jvp(max_iters, primals, tangents):
+def _retrying_cholesky_jvp(max_iters, unroll, primals, tangents):
   """JVP for retrying_cholesky."""
   matrix, jitter = primals
   gmatrix, _ = tangents
   gmatrix = 0.5 * (gmatrix + tf.linalg.adjoint(gmatrix))
-  output, shift = _retrying_cholesky_custom_gradient(matrix, jitter, max_iters)
+  output, shift = _retrying_cholesky_custom_gradient(
+      matrix, jitter, max_iters, unroll)
   triangular_linop = tf.linalg.LinearOperatorLowerTriangular(output)
   middle = triangular_linop.solve(gmatrix, adjoint_arg=True)
   middle = triangular_linop.solve(middle, adjoint_arg=True)
@@ -213,13 +213,13 @@ def _retrying_cholesky_jvp(max_iters, primals, tangents):
     vjp_fwd=_retrying_cholesky_fwd,
     vjp_bwd=_retrying_cholesky_bwd,
     jvp_fn=_retrying_cholesky_jvp,
-    nondiff_argnums=(2,))
-def _retrying_cholesky_custom_gradient(matrix, jitter, max_iters):
-  return _retrying_cholesky_fwd(matrix, jitter, max_iters)[0]
+    nondiff_argnums=(2, 3))
+def _retrying_cholesky_custom_gradient(matrix, jitter, max_iters, unroll):
+  return _retrying_cholesky_fwd(matrix, jitter, max_iters, unroll)[0]
 
 
 def retrying_cholesky(
-    matrix, jitter=None, max_iters=5, name='retrying_cholesky'):
+    matrix, jitter=None, max_iters=5, unroll=1, name='retrying_cholesky'):
   """Computes a modified Cholesky decomposition for a batch of square matrices.
 
   Given a symmetric matrix `A`, this function attempts to give a factorization
@@ -255,6 +255,8 @@ def retrying_cholesky(
       `matrix.dtype` is float64, in which case the default is 1e-10.
     max_iters: Maximum number of times to retry the Cholesky decomposition
       with larger diagonal jitter.  Default: 5.
+    unroll: If specified, unroll >1 iterations per while_loop step. This can be
+      advantageous on GPU, to avoid host roundtripping.
     name: Python `str` name prefixed to Ops created by this function.
       Default value: 'retrying_cholesky'.
 
@@ -271,4 +273,4 @@ def retrying_cholesky(
     if jitter is None:
       jitter = 1e-10 if matrix.dtype == tf.float64 else 1e-6
     jitter = tf.convert_to_tensor(jitter, dtype=matrix.dtype)
-    return _retrying_cholesky_custom_gradient(matrix, jitter, max_iters)
+    return _retrying_cholesky_custom_gradient(matrix, jitter, max_iters, unroll)
