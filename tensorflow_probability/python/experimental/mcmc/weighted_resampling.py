@@ -79,21 +79,11 @@ def resample(particles, log_weights, resample_fn, target_log_weights=None, parti
     resampled_indices = resample_fn(log_probs, num_particles, (),
                                     particles_dim=particles_dim, seed=seed)
 
-    def gather_ancestors(x):
-        try:
-            return mcmc_util.index_remapping_gather(x, resampled_indices,
-                                                    axis=particles_dim,
-                                                    indices_axis=particles_dim)
-        except ValueError as e:
-            if 'Rank of params' in str(e) or 'rank(params)' in str(e):
-                return x
-            else:
-                raise e
-        except tf.errors.InvalidArgumentError:
-            return x
-
-    gather_ancestors = gather_ancestors
-
+    gather_ancestors = lambda x: (  # pylint: disable=g-long-lambda
+        mcmc_util.index_remapping_gather(x,
+                                         resampled_indices,
+                                         axis=particles_dim,
+                                         indices_axis=particles_dim))
     resampled_particles = tf.nest.map_structure(gather_ancestors, particles)
 
     if target_log_weights is None:
