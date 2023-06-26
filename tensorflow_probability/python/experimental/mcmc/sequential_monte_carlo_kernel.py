@@ -124,24 +124,11 @@ def ess_below_threshold(weighted_particles, particles_dim=0, threshold=0.5):
     num_particles = ps.size0(weighted_particles.log_weights)
     log_weights = tf.math.log_softmax(weighted_particles.log_weights, axis=particles_dim)
     log_ess = -tf.math.reduce_logsumexp(2 * log_weights, axis=particles_dim)
-    return log_ess < (ps.log(num_particles) +
-                      ps.log(threshold))
+    return tf.expand_dims(log_ess < (ps.log(num_particles) +
+                      ps.log(threshold)), axis=particles_dim)
 
 
-def rejuvenation_criterion_fn(weighted_particles):
-  return False
-
-
-def rejuvenation_fn(state,
-                    particles,
-                    indices,
-                    log_weights,
-                    extra,
-                    step):
-  return (particles, indices, log_weights, extra)
-
-
-def propose_extra(step,
+def _default_extra_fn(step,
                   state,
                   particles,
                   indices,
@@ -170,9 +157,7 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
                propose_and_update_log_weights_fn,
                resample_fn=weighted_resampling.resample_systematic,
                resample_criterion_fn=ess_below_threshold,
-               rejuvenation_fn=rejuvenation_fn,
-               rejuvenation_criterion_fn=rejuvenation_criterion_fn,
-               propose_extra=propose_extra,
+               extra_fn=_default_extra_fn,
                particles_dim=0,
                unbiased_gradients=True,
                name=None):
@@ -220,8 +205,6 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
         correct for gradient bias introduced by the discrete resampling step.
         This will generally increase the variance of stochastic gradients.
         Default value: `True`.
-      rejuvenation_fn: optional Python `callable` with signature
-        'state' and 'step;. Return rejuvenated particles
       name: Python `str` name for ops created by this kernel.
 
     #### References
@@ -233,9 +216,7 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
     self._propose_and_update_log_weights_fn = propose_and_update_log_weights_fn
     self._resample_fn = resample_fn
     self._resample_criterion_fn = resample_criterion_fn
-    self._rejuvenation_fn = rejuvenation_fn
-    self._rejuvenation_criterion_fn = rejuvenation_criterion_fn
-    self._propose_extra = propose_extra
+    self._extra_fn = extra_fn
     self._particles_dim = particles_dim
     self._unbiased_gradients = unbiased_gradients
     self._name = name or 'SequentialMonteCarlo'
@@ -257,16 +238,8 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
     return self._resample_criterion_fn
 
   @property
-  def rejuvenation_fn(self):
-    return self._rejuvenation_fn
-
-  @property
-  def rejuvenation_criterion_fn(self):
-    return self._rejuvationan_criterion_fn
-
-  @property
-  def propose_extra(self):
-    return self._propose_extra
+  def extra_fn(self):
+    return self._extra_fn
 
   @property
   def unbiased_gradients(self):
@@ -360,35 +333,13 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
             (state.particles, _dummy_indices_like(new_indices),
             normalized_log_weights))
 
-        do_rejuvenation = self._rejuvenation_criterion_fn(state)
-        (new_particles,
-         new_indices,
-         log_weights,
-         extra) = tf.cond(
-            tf.constant(do_rejuvenation),
-            lambda: self._rejuvenation_fn(state,
-                                          new_particles,
-                                          new_indices,
-                                          log_weights,
-                                          state.extra,
-                                          ps.maximum(0, kernel_results.steps - 1)
-                                          ),
-            lambda: identity(state,
-                             new_particles,
-                             new_indices,
-                             log_weights,
-                             state.extra,
-                             ps.maximum(0, kernel_results.steps - 1)
-                             )
-        )
-
-        proposed_extra = self.propose_extra(
-            ps.maximum(0, kernel_results.steps - 1),
+        proposed_extra = self.extra_fn(
+            kernel_results.steps,
             state,
             new_particles,
             new_indices,
             log_weights,
-            extra,
+            state.extra,
             seed=proposal_seed,
         )
 
