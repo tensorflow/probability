@@ -332,7 +332,7 @@ class _ParticleFilterTest(test_util.TestCase):
                      observation_matrix, state),
                  scale_tril=observation_noise.scale_tril),
              num_particles=1024,
-             seed=1))
+             seed=test_util.test_seed()))
     # pylint: enable=g-long-lambda
 
     particle_means = np.sum(
