@@ -695,7 +695,7 @@ class _ParticleFilterTest(test_util.TestCase):
             s.particles[3]
         ),
         num_transitions_per_observation=100,
-        seed=2)
+        seed=test_util.test_seed())
     )
 
     self.assertAllEqual(ps.shape(particles['position']), tf.constant([102, 1, 1024]))
