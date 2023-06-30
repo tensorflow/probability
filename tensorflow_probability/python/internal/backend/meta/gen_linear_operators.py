@@ -121,6 +121,11 @@ def gen_module(module_name):
       'from tensorflow_probability.python.internal.backend.numpy '
       'import composite_tensor')
   code = code.replace(
+      'from tensorflow.python.framework import '
+      'composite_tensor_gradient',
+      'from tensorflow_probability.python.internal.backend.numpy '
+      'import composite_tensor_gradient')
+  code = code.replace(
       'from tensorflow.python.ops import '
       'resource_variable_ops',
       'from tensorflow_probability.python.internal.backend.numpy '

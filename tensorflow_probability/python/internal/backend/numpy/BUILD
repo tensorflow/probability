@@ -32,6 +32,7 @@ py_library(
         ":bitwise",
         ":compat",
         ":composite_tensor",
+        ":composite_tensor_gradient",
         ":config",
         ":control_flow",
         ":data_structures",
@@ -97,6 +98,11 @@ py_library(
 py_library(
     name = "composite_tensor",
     srcs = ["composite_tensor.py"],
+)
+
+py_library(
+    name = "composite_tensor_gradient",
+    srcs = ["composite_tensor_gradient.py"],
 )
 
 py_library(

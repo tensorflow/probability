@@ -29,6 +29,7 @@ FILENAMES = [
     "bitwise",
     "compat",
     "composite_tensor",
+    "composite_tensor_gradient",
     "config",
     "control_flow",
     "data_structures",
