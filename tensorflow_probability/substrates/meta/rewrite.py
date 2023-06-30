@@ -70,9 +70,9 @@ TF_REPLACEMENTS = {
     'from tensorflow.python.ops import parallel_for':
         'from tensorflow_probability.python.internal.backend.numpy '
         'import functional_ops as parallel_for',
-    'from tensorflow.python.ops import control_flow_case':
+    'from tensorflow.python.ops import control_flow_ops':
         'from tensorflow_probability.python.internal.backend.numpy '
-        'import control_flow as control_flow_case',
+        'import control_flow as control_flow_ops',
     ('from tensorflow.python.saved_model '
      'import nested_structure_coder'):
         ('from tensorflow_probability.python.internal.backend.numpy '
