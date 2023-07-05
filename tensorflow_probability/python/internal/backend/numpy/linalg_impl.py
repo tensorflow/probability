@@ -589,7 +589,7 @@ eig = utils.copy_docstring('tf.linalg.eig', _eig)
 
 eigh = utils.copy_docstring(
     'tf.linalg.eigh',
-    lambda tensor, name=None: np.linalg.eigh(tensor))
+    lambda tensor, name=None: tuple(np.linalg.eigh(tensor)))
 
 eigvals = utils.copy_docstring('tf.linalg.eigvals', _eigvals)
 
