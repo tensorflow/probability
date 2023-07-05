@@ -948,9 +948,8 @@ NUMPY_TEST_CASES = [
         'linalg.eig', [pd_matrices()],
         post_processor=_eig_post_process,
         xla_disabled=True),
-    # b/289386104
-    # TestCase('linalg.eigh', [pd_matrices()],
-    #          post_processor=_eig_post_process),
+    TestCase('linalg.eigh', [pd_matrices()],
+             post_processor=_eig_post_process),
     TestCase(
         'linalg.eigvals', [pd_matrices()],
         post_processor=_eig_post_process,
