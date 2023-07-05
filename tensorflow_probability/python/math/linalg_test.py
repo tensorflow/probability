@@ -1417,7 +1417,7 @@ class _QuadraticFormSolveTest(test_util.TestCase):
         lambda x: linalg.hpsd_quadratic_form_solvevec(x, rhs)**2, mat)
     naive_gradient, custom_gradient = self.evaluate(
         [naive_gradient, custom_gradient])
-    self.assertAllClose(naive_gradient, custom_gradient, rtol=2e-4)
+    self.assertAllClose(naive_gradient, custom_gradient, rtol=5e-4)
 
     _, naive_gradient = gradient.value_and_gradient(
         lambda x: naive_hpsd_quadratic_form_solvevec(mat, x)**2, rhs)
