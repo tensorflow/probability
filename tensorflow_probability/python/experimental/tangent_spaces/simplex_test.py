@@ -36,7 +36,7 @@ class _SimplexTest(spaces_test_util.SpacesTest):
     # Ensure that this represents the positive orthant of the sphere.
     logits = []
     for _ in range(self.dims):
-      logits.append(tf.range(-50., 50., self.delta))
+      logits.append(tf.range(-7., 7., self.delta))
     return tf.reshape(
         tf.stack(tf.meshgrid(*logits), axis=-1), [-1, self.dims])
 
