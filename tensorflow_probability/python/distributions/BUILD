@@ -4485,6 +4485,7 @@ multi_substrate_py_test(
     name = "student_t_process_test",
     srcs = ["student_t_process_test.py"],
     jax_size = "medium",
+    shard_count = 2,
     deps = [
         ":multivariate_student_t",
         ":student_t",
