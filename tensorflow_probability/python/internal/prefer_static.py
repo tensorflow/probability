@@ -25,7 +25,6 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal.backend import numpy as nptf
 
-from tensorflow.python.framework import ops  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.framework import tensor_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import control_flow_case  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
@@ -107,9 +106,9 @@ def _get_static_value(pred):
   if tf.is_tensor(pred):
     pred_value = tf.get_static_value(tf.convert_to_tensor(pred))
 
-    # Explicitly check for ops.Tensor, to avoid an AttributeError
+    # Explicitly check for tf.Tensor, to avoid an AttributeError
     # when requesting `KerasTensor.graph`.
-    if pred_value is None and isinstance(pred, ops.Tensor):
+    if pred_value is None and isinstance(pred, tf.Tensor):
       pred_value = tensor_util.try_evaluate_constant(pred)
     return pred_value
   return pred
