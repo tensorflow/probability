@@ -613,6 +613,31 @@ class _ParticleFilterTest(test_util.TestCase):
     self.assertAllAssertsNested(self.assertNotAllZero, grads)
 
 
+  def test_extra(self):
+    def step_hundred(step,
+                    state,
+                    particles,
+                    indices,
+                    log_weights,
+                    extra,
+                    seed
+                    ):
+      return step + 100
+
+    results = self.evaluate(
+        particle_filter.particle_filter(
+            observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
+            initial_state_prior=normal.Normal(1., 0.2),
+            transition_fn=lambda _, state: normal.Normal(state + 2, 0.5),
+            observation_fn=lambda _, state: normal.Normal(state, 0.5),
+            num_particles=64,
+            extra_fn=step_hundred,
+            trace_fn=lambda s, r: s.extra,
+            seed=test_util.test_seed())
+    )
+
+    self.assertAllEqual(results, [100, 101, 102, 103, 104])
+
 # TODO(b/186068104): add tests with dynamic shapes.
 class ParticleFilterTestFloat32(_ParticleFilterTest):
   dtype = np.float32
