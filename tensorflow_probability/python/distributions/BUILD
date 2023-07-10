@@ -4504,7 +4504,7 @@ multi_substrate_py_test(
     name = "student_t_process_regression_model_test",
     srcs = ["student_t_process_regression_model_test.py"],
     jax_size = "medium",
-    shard_count = 2,
+    shard_count = 3,
     deps = [
         ":gaussian_process_regression_model",
         ":student_t_process",
