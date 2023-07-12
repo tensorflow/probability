@@ -3304,6 +3304,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "independent_test_gpu",
+    size = "medium",
     srcs = ["independent_test.py"],
     disabled_substrates = ["numpy"],
     jax_size = "medium",
@@ -4372,6 +4373,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "sample_test_gpu",
+    size = "medium",
     srcs = ["sample_test.py"],
     disabled_substrates = ["numpy"],
     jax_size = "medium",
