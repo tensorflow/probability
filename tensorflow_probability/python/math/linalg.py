@@ -294,8 +294,8 @@ def pivoted_cholesky(matrix,
     diag_rtol: Scalar floating point `Tensor` (same dtype as `matrix`). If the
       errors of all diagonal elements of `lr @ lr.T` are each lower than
       `element * diag_rtol`, iteration is permitted to terminate early.
-    return_pivoting_order: If `True`, return an `int` `Tensor` indicating the pivoting 
-      order used to produce `lr` in addition to `lr` (defaults to `False`).
+    return_pivoting_order: If `True`, return an `int` `Tensor` indicating the 
+      pivoting order used to produce `lr` (in addition to `lr`).
     name: Optional name for the op.
 
   Returns:
@@ -412,7 +412,7 @@ def pivoted_cholesky(matrix,
     pchol = tf.linalg.matrix_transpose(pchol)
     tensorshape_util.set_shape(
         pchol, tensorshape_util.concatenate(matrix_diag.shape, [None]))
-    
+
     if return_pivoting_order:
       return pchol, perm
     else:
