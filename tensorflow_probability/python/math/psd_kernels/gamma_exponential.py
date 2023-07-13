@@ -35,7 +35,7 @@ class GammaExponential(psd_kernel.AutoCompositeTensorPsdKernel):
 
     ```none
     k(x, y) = amplitude**2 * exp(
-        -||x - y||**(2 * power) / (2 * length_scale**2))
+        -(||x - y||**2 / (2 * length_scale**2))**power)
     ```
 
   where the double-bars represent vector length (ie, Euclidean, or L2 norm).
@@ -150,19 +150,20 @@ class GammaExponential(psd_kernel.AutoCompositeTensorPsdKernel):
   def _apply_with_distance(
       self, x1, x2, pairwise_square_distance, example_ndims=0):
 
-    if self.power is not None:
-      power = tf.convert_to_tensor(self.power)
-      power = util.pad_shape_with_ones(power, example_ndims)
-      pairwise_pow_distance = pairwise_square_distance ** power
-    else:
-      pairwise_pow_distance = pairwise_square_distance
-
-    exponent = -0.5 * pairwise_pow_distance
+    exponent = 0.5 * pairwise_square_distance
     inverse_length_scale = self._inverse_length_scale_parameter()
     if inverse_length_scale is not None:
       inverse_length_scale = util.pad_shape_with_ones(
           inverse_length_scale, example_ndims)
       exponent = exponent * tf.math.square(inverse_length_scale)
+
+    if self.power is not None:
+      power = tf.convert_to_tensor(self.power)
+      power = util.pad_shape_with_ones(power, example_ndims)
+      exponent = exponent ** power
+    else:
+      exponent = pairwise_square_distance
+    exponent = -1. * exponent
 
     if self.amplitude is not None:
       amplitude = tf.convert_to_tensor(self.amplitude)

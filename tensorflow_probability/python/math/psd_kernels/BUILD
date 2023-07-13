@@ -189,6 +189,7 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["gamma_exponential_test.py"],
     deps = [
+        ":exponentiated_quadratic",
         ":gamma_exponential",
         # absl/testing:parameterized dep,
         # numpy dep,
