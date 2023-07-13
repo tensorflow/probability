@@ -20,6 +20,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic
 from tensorflow_probability.python.math.psd_kernels import gamma_exponential
 
 
@@ -58,13 +59,23 @@ class GammaExponentialTest(test_util.TestCase):
       y = np.random.uniform(-1, 1, size=shape).astype(np.float32)
       self.assertAllClose(
           amplitude ** 2 * np.exp(
-              -np.float32(.5) * np.sum((x - y)**2)**gamma / length_scale**2),
+              -(np.sum((x - y)**2) /
+                (np.float32(2.) * length_scale**2))**gamma),
           self.evaluate(k.apply(x, y)))
 
   def testNoneShapes(self):
     k = gamma_exponential.GammaExponential(
         amplitude=np.reshape(np.arange(12.), [2, 3, 2]))
     self.assertAllEqual((2, 3, 2), k.batch_shape)
+
+  def testEqualsExponentiatedQuadratic(self):
+    np.random.seed(42)
+    ge = gamma_exponential.GammaExponential(
+        amplitude=3., length_scale=0.5, power=1., feature_ndims=0)
+    eq = exponentiated_quadratic.ExponentiatedQuadratic(
+        amplitude=3., length_scale=0.5, feature_ndims=0)
+    t1, t2 = np.random.rand(2, 10)
+    self.assertAllClose(ge.apply(t1, t2), eq.apply(t1, t2))
 
   def testShapesAreCorrect(self):
     k = gamma_exponential.GammaExponential(
