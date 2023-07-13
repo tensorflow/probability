@@ -265,7 +265,11 @@ def _invert_permutation(perm):  # TODO(b/130217510): Remove this function.
   return tf.cast(tf.argsort(perm, axis=-1), perm.dtype)
 
 
-def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
+def pivoted_cholesky(matrix,
+                     max_rank,
+                     diag_rtol=1e-3,
+                     return_pivoting_order=False,
+                     name=None):
   """Computes the (partial) pivoted cholesky decomposition of `matrix`.
 
   The pivoted Cholesky is a low rank approximation of the Cholesky decomposition
@@ -290,10 +294,13 @@ def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
     diag_rtol: Scalar floating point `Tensor` (same dtype as `matrix`). If the
       errors of all diagonal elements of `lr @ lr.T` are each lower than
       `element * diag_rtol`, iteration is permitted to terminate early.
+    return_pivoting_order: If `True`, return an `int` `Tensor` indicating the pivoting 
+      order used to produce `lr` in addition to `lr` (defaults to `False`).
     name: Optional name for the op.
 
   Returns:
     lr: Low rank pivoted Cholesky approximation of `matrix`.
+    perm: (Optional) pivoting order used to produce `lr`.
 
   #### References
 
@@ -405,7 +412,11 @@ def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
     pchol = tf.linalg.matrix_transpose(pchol)
     tensorshape_util.set_shape(
         pchol, tensorshape_util.concatenate(matrix_diag.shape, [None]))
-    return pchol
+    
+    if return_pivoting_order:
+      return pchol, perm
+    else:
+      return pchol
 
 
 def low_rank_cholesky(matrix, max_rank, trace_atol=0, trace_rtol=0, name=None):
