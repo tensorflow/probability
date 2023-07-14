@@ -689,6 +689,25 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
     self.assertAllClose(d.log_prob(y_obs), d2.log_prob(y_obs))
     self.assertEqual(mock_cholesky_fn.call_count, 2)
 
+  def test_batch_slice_precomputed_gprm(self):
+    base_kernel = exponentiated_quadratic.ExponentiatedQuadratic(
+        length_scale=tf.linspace(tf.ones([]), 2., 64), feature_ndims=0)
+    x = tf.linspace(tf.zeros([]), 1., 126)
+    y = tf.linspace(tf.zeros([]), 1.5, 162)
+    d = gprm.GaussianProcessRegressionModel.precompute_regression_model(
+        base_kernel,
+        index_points=y,
+        observation_index_points=x,
+        observations=tf.math.sin(x),
+        observation_noise_variance=1e-3)
+    self.assertEqual((64,), d.batch_shape)
+    self.assertEqual((162,), d.event_shape)
+    self.assertEqual((64, 162,), d.sample(seed=test_util.test_seed()).shape)
+
+    self.assertEqual((), d[2].batch_shape)
+    self.assertEqual((162,), d[2].event_shape)
+    self.assertEqual((162,), d[2].sample(seed=test_util.test_seed()).shape)
+
 
 class GaussianProcessRegressionModelStaticTest(
     _GaussianProcessRegressionModelTest):
