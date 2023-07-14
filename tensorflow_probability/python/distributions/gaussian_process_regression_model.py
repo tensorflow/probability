@@ -25,6 +25,7 @@ from tensorflow_probability.python.distributions.internal import stochastic_proc
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import parameter_properties
+from tensorflow_probability.python.internal import slicing
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.psd_kernels import schur_complement
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
@@ -819,6 +820,7 @@ class GaussianProcessRegressionModel(
             shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
         ),
         kernel=parameter_properties.BatchedComponentProperties(),
+        _conditional_kernel=parameter_properties.BatchedComponentProperties(),
         observation_noise_variance=parameter_properties.ParameterProperties(
             event_ndims=0,
             shape_fn=lambda sample_shape: sample_shape[:-1],
@@ -829,3 +831,8 @@ class GaussianProcessRegressionModel(
             shape_fn=lambda sample_shape: sample_shape[:-1],
             default_constraining_bijector_fn=(
                 lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
+
+  def __getitem__(self, slices) -> 'GaussianProcessRegressionModel':
+    # _conditional_mean_fn is a closure over possibly-sliced values, but will
+    # be rebuilt by the constructor.
+    return slicing.batch_slice(self, dict(_conditional_mean_fn=None), slices)
