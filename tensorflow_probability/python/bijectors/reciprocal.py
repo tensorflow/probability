@@ -23,7 +23,9 @@ from tensorflow_probability.python.internal import dtype_util
 __all__ = ['Reciprocal']
 
 
-class Reciprocal(bijector.AutoCompositeTensorBijector):
+class Reciprocal(
+    bijector.CoordinatewiseBijectorMixin,
+    bijector.AutoCompositeTensorBijector):
   """A `Bijector` that computes the reciprocal `b(x) = 1. / x` entrywise.
 
   This bijector accepts any non-zero values for both `forward` and `inverse`.

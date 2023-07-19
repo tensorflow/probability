@@ -105,7 +105,7 @@ class ImportanceResample(distribution_lib.Distribution):
   # Calling `self_normalized_expectation` allows for a much lower `sample_size`
   # because it uses the full set of `importance_sample_size` proposal samples to
   # approximate the expectation at each of the `sample_size` Monte Carlo
-  # evaluations.
+  # evaluations. This is formalized in Eq. 9 of [3].
   posterior_mean_efficient = approximate_posterior.self_normalized_expectation(
     lambda x: x, sample_size=10)
   posterior_variance_efficient = (
@@ -183,7 +183,9 @@ class ImportanceResample(distribution_lib.Distribution):
   [2] Chris Cremer, Quaid Morris, and David Duvenaud. Reinterpreting
       Importance-Weighted Autoencoders. In _International Conference on Learning
       Representations_, Workshop track, 2017. https://arxiv.org/abs/1704.02916
-
+  [3] Justin Domke, Daniel Sheldon. Importance Weighting and Variational
+      Inference. In _Neural Information Processing Systems (NIPS)_, 2018.
+      https://arxiv.org/abs/1808.09034
   """
 
   def __init__(self,
@@ -422,12 +424,20 @@ would recover the true (log-)density.""",
       x_sample_ndims = (
           ps.rank(x_log_weight) -
           ps.rank_from_shape(_get_joint_batch_shape(self.batch_shape_tensor())))
+      # There's a tradeoff here between compute and variance. For now we will
+      # hard-code the selection here, but if desirable we could expose this as
+      # a __init__ arg.
+      independent_log_prob_per_event = True
+      if independent_log_prob_per_event:
+        cross_sample_shape = ps.shape(x_log_weight)[:x_sample_ndims]
+      else:
+        cross_sample_shape = ps.ones([x_sample_ndims], dtype=tf.int32)
       _, log_weights_of_proposals_not_chosen = self._propose_with_log_weights(
           sample_shape=ps.concat(
               [
                   [sample_size],
                   [importance_sample_size - 1],
-                  ps.ones([x_sample_ndims], dtype=tf.int32),
+                  cross_sample_shape,
               ], axis=0),
           seed=seed)
       log_total_weight_not_chosen = tf.reduce_logsumexp(

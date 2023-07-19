@@ -16,6 +16,7 @@
 # [internal] load strict.bzl
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//visibility:public",
     ],

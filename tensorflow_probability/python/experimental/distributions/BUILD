@@ -21,6 +21,7 @@ load(
 )
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -160,6 +161,8 @@ multi_substrate_py_library(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:mvn_linear_operator",
+        "//tensorflow_probability/python/internal:custom_gradient",
+        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
@@ -184,9 +187,11 @@ multi_substrate_py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:cholesky_util",
+        "//tensorflow_probability/python/distributions/internal:stochastic_process_util",
         "//tensorflow_probability/python/experimental/linalg:linear_operator_unitary",
         "//tensorflow_probability/python/experimental/psd_kernels:multitask_kernel",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:nest_util",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
     ],
@@ -207,6 +212,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/experimental/psd_kernels:multitask_kernel",
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math/psd_kernels:exponentiated_quadratic",
+        "//tensorflow_probability/python/math/psd_kernels/internal:test_util",
     ],
 )
 
@@ -218,7 +224,10 @@ multi_substrate_py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:cholesky_util",
+        "//tensorflow_probability/python/distributions/internal:stochastic_process_util",
+        "//tensorflow_probability/python/experimental/linalg:linear_operator_unitary",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:nest_util",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
@@ -241,6 +250,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math/psd_kernels:exponentiated_quadratic",
+        "//tensorflow_probability/python/math/psd_kernels/internal:test_util",
     ],
 )
 

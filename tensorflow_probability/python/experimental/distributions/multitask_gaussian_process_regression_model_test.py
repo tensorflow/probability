@@ -14,10 +14,7 @@
 # ============================================================================
 """Tests for MultiTaskGaussianProcessRegressionModel."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
+from unittest import mock
 # Dependency imports
 
 from absl.testing import parameterized
@@ -32,6 +29,7 @@ from tensorflow_probability.python.experimental.psd_kernels import multitask_ker
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic
+from tensorflow_probability.python.math.psd_kernels.internal import test_util as psd_kernel_test_util
 
 
 @test_util.test_all_tf_execution_regimes
@@ -228,8 +226,6 @@ class MultiTaskGaussianProcessRegressionModelTest(
         -20., 20., 9 * num_tasks).reshape(9, num_tasks).astype(np.float32)
 
     test_points = np.random.uniform(-1., 1., [10, 2]).astype(np.float32)
-    test_observations = np.random.uniform(
-        -20., 20., [10, num_tasks]).astype(np.float32)
 
     mtgp = mtgprm_lib.MultiTaskGaussianProcessRegressionModel(
         multi_task_kernel,
@@ -238,6 +234,7 @@ class MultiTaskGaussianProcessRegressionModelTest(
         observations=observations,
         observation_noise_variance=observation_noise_variance,
         validate_args=True)
+    test_observations = self.evaluate(mtgp.sample(seed=test_util.test_seed()))
 
     # For the single task GP, we move the task dimension to the front of the
     # batch shape.
@@ -431,7 +428,8 @@ class MultiTaskGaussianProcessRegressionModelTest(
         kernel.base_kernel[..., tf.newaxis],
         observation_index_points=index_points[:, tf.newaxis],
         observations=tf.linalg.matrix_transpose(observations),
-        observations_mask=~tf.linalg.matrix_transpose(observations_is_missing),
+        observations_is_missing=tf.linalg.matrix_transpose(
+            observations_is_missing),
         index_points=test_points[:, tf.newaxis],
         predictive_noise_variance=0.05,
         mean_fn=lambda x: tf.linalg.matrix_transpose(mean_fn(x[:, 0])),
@@ -445,6 +443,36 @@ class MultiTaskGaussianProcessRegressionModelTest(
 
     self.assertAllNotNan(mtgp.mean())
     self.assertAllClose(tf.linalg.matrix_transpose(gp.mean()), mtgp.mean())
+
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, reason='Numpy has no jitting functionality')
+  def testMeanVarianceJit(self):
+    num_tasks = 3
+    amplitude = np.array([1., 2.], np.float64).reshape([2, 1])
+    length_scale = np.array([.1, .2, .3], np.float64).reshape([1, 3])
+    observation_noise_variance = np.array([1e-9], np.float64)
+
+    observation_index_points = (
+        np.random.uniform(-1., 1., (1, 1, 7, 2)).astype(np.float64))
+    observations = np.linspace(
+        -20., 20., 7 * num_tasks).reshape(7, num_tasks).astype(np.float64)
+
+    index_points = np.random.uniform(-1., 1., (6, 2)).astype(np.float64)
+
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(
+        amplitude, length_scale)
+    multi_task_kernel = multitask_kernel.Independent(
+        num_tasks=num_tasks, base_kernel=kernel)
+    mtgprm = mtgprm_lib.MultiTaskGaussianProcessRegressionModel(
+        kernel=multi_task_kernel,
+        index_points=index_points,
+        observation_index_points=observation_index_points,
+        observations=observations,
+        observation_noise_variance=observation_noise_variance,
+        validate_args=True)
+    # Check that Jit compiling mean and variance doesn't raise an error.
+    tf.function(jit_compile=True)(mtgprm.mean)()
+    tf.function(jit_compile=True)(mtgprm.variance)()
 
   def testMeanVarianceAndCovariancePrecomputed(self):
     num_tasks = 3
@@ -479,9 +507,28 @@ class MultiTaskGaussianProcessRegressionModelTest(
         observation_noise_variance=observation_noise_variance,
         validate_args=True)
 
+    mock_cholesky_fn = mock.Mock(return_value=None)
+    rebuilt_precomputed_mtgprm = mtgprm_lib.MultiTaskGaussianProcessRegressionModel.precompute_regression_model(
+        kernel=multi_task_kernel,
+        index_points=index_points,
+        observation_index_points=observation_index_points,
+        observations=observations,
+        observation_noise_variance=observation_noise_variance,
+        _precomputed_divisor_matrix_cholesky=precomputed_mtgprm._precomputed_divisor_matrix_cholesky,
+        _precomputed_solve_on_observation=precomputed_mtgprm._precomputed_solve_on_observation,
+        cholesky_fn=mock_cholesky_fn,
+        validate_args=True)
+    mock_cholesky_fn.assert_not_called()
+
+    rebuilt_precomputed_mtgprm = rebuilt_precomputed_mtgprm.copy(
+        cholesky_fn=None)
     self.assertAllClose(self.evaluate(precomputed_mtgprm.variance()),
                         self.evaluate(mtgprm.variance()))
     self.assertAllClose(self.evaluate(precomputed_mtgprm.mean()),
+                        self.evaluate(mtgprm.mean()))
+    self.assertAllClose(self.evaluate(rebuilt_precomputed_mtgprm.variance()),
+                        self.evaluate(mtgprm.variance()))
+    self.assertAllClose(self.evaluate(rebuilt_precomputed_mtgprm.mean()),
                         self.evaluate(mtgprm.mean()))
 
   def testPrecomputedWithMasking(self):
@@ -509,8 +556,15 @@ class MultiTaskGaussianProcessRegressionModelTest(
 
     kernel = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude, length_scale)
-    multi_task_kernel = multitask_kernel.Independent(
-        num_tasks=num_tasks, base_kernel=kernel)
+    task_kernel_matrix = np.array([[6., 2.],
+                                   [2., 7.]],
+                                  dtype=np.float64)
+    task_kernel_matrix_linop = tf.linalg.LinearOperatorFullMatrix(
+        task_kernel_matrix)
+    multi_task_kernel = multitask_kernel.Separable(
+        num_tasks=num_tasks,
+        task_kernel_matrix_linop=task_kernel_matrix_linop,
+        base_kernel=kernel)
     mtgprm = mtgprm_lib.MultiTaskGaussianProcessRegressionModel.precompute_regression_model(
         kernel=multi_task_kernel,
         index_points=index_points,
@@ -520,12 +574,30 @@ class MultiTaskGaussianProcessRegressionModelTest(
         observation_noise_variance=observation_noise_variance,
         validate_args=True)
 
+    mock_cholesky_fn = mock.Mock(return_value=None)
+    rebuilt_mtgprm = mtgprm_lib.MultiTaskGaussianProcessRegressionModel.precompute_regression_model(
+        kernel=multi_task_kernel,
+        index_points=index_points,
+        observation_index_points=observation_index_points,
+        observations=observations,
+        observation_noise_variance=observation_noise_variance,
+        _precomputed_divisor_matrix_cholesky=mtgprm._precomputed_divisor_matrix_cholesky,
+        _precomputed_solve_on_observation=mtgprm._precomputed_solve_on_observation,
+        cholesky_fn=mock_cholesky_fn,
+        validate_args=True)
+    mock_cholesky_fn.assert_not_called()
+
+    rebuilt_mtgprm = rebuilt_mtgprm.copy(cholesky_fn=None)
     self.assertAllNotNan(mtgprm.mean())
     self.assertAllNotNan(mtgprm.variance())
+    self.assertAllClose(self.evaluate(mtgprm.variance()),
+                        self.evaluate(rebuilt_mtgprm.variance()))
+    self.assertAllClose(self.evaluate(mtgprm.mean()),
+                        self.evaluate(rebuilt_mtgprm.mean()))
 
   @test_util.disable_test_for_backend(
-      disable_numpy=True, disable_jax=True,
-      reason='Numpy and JAX have no notion of CompositeTensor/saved_model')
+      disable_numpy=True,
+      reason='Numpy has no notion of CompositeTensor/Pytree/saved_model')
   def testPrecomputedCompositeTensor(self):
     num_tasks = 3
     amplitude = np.array([1., 2.], np.float64).reshape([2, 1])
@@ -564,6 +636,61 @@ class MultiTaskGaussianProcessRegressionModelTest(
     self.assertIs(precomputed_mtgprm._observation_scale.operators[0]._tril,  # pylint:disable=protected-access
                   unflat._observation_scale.operators[0]._tril)  # pylint:disable=protected-access
 
+  def testStructuredIndexPoints(self):
+    num_tasks = 3
+    observation_index_points = np.random.uniform(
+        -1, 1, (12, 8)).astype(np.float32)
+    observations = np.random.uniform(-1, 1, (12, num_tasks)).astype(np.float32)
+    index_points = np.random.uniform(-1, 1, (6, 8)).astype(np.float32)
+    base_kernel = exponentiated_quadratic.ExponentiatedQuadratic()
+    base_mtk = multitask_kernel.Independent(
+        num_tasks=num_tasks, base_kernel=base_kernel)
+    base_mtgp = mtgprm_lib.MultiTaskGaussianProcessRegressionModel(
+        base_mtk,
+        index_points=index_points,
+        observation_index_points=observation_index_points,
+        observations=observations)
+
+    structured_kernel = psd_kernel_test_util.MultipartTestKernel(base_kernel)
+    structured_mtk = multitask_kernel.Independent(
+        num_tasks=num_tasks, base_kernel=structured_kernel)
+    structured_obs_index_points = dict(
+        zip(('foo', 'bar'),
+            tf.split(observation_index_points, [5, 3], axis=-1)))
+    structured_index_points = dict(
+        zip(('foo', 'bar'), tf.split(index_points, [5, 3], axis=-1)))
+    structured_mtgp = mtgprm_lib.MultiTaskGaussianProcessRegressionModel(
+        structured_mtk,
+        index_points=structured_index_points,
+        observation_index_points=structured_obs_index_points,
+        observations=observations)
+
+    s = structured_mtgp.sample(3, seed=test_util.test_seed())
+    self.assertAllClose(base_mtgp.log_prob(s), structured_mtgp.log_prob(s))
+    self.assertAllClose(base_mtgp.mean(), structured_mtgp.mean())
+    self.assertAllClose(base_mtgp.variance(), structured_mtgp.variance())
+    self.assertAllEqual(base_mtgp.event_shape, structured_mtgp.event_shape)
+    self.assertAllEqual(base_mtgp.event_shape_tensor(),
+                        structured_mtgp.event_shape_tensor())
+    self.assertAllEqual(base_mtgp.batch_shape, structured_mtgp.batch_shape)
+    self.assertAllEqual(base_mtgp.batch_shape_tensor(),
+                        structured_mtgp.batch_shape_tensor())
+
+    # Iterable index points should be interpreted as single Tensors if the
+    # kernel is not structured.
+    index_points_list = tf.unstack(index_points)
+    obs_index_points_nested_list = tf.nest.map_structure(
+        tf.unstack, tf.unstack(observation_index_points))
+    mtgp_with_lists = mtgprm_lib.MultiTaskGaussianProcessRegressionModel(
+        base_mtk,
+        index_points=index_points_list,
+        observation_index_points=obs_index_points_nested_list,
+        observations=observations)
+    self.assertAllEqual(base_mtgp.event_shape_tensor(),
+                        mtgp_with_lists.event_shape_tensor())
+    self.assertAllEqual(base_mtgp.batch_shape_tensor(),
+                        mtgp_with_lists.batch_shape_tensor())
+    self.assertAllClose(base_mtgp.log_prob(s), mtgp_with_lists.log_prob(s))
 
 if __name__ == '__main__':
   test_util.main()

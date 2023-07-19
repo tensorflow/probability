@@ -29,7 +29,9 @@ __all__ = [
 ]
 
 
-class WeibullCDF(bijector.AutoCompositeTensorBijector):
+class WeibullCDF(
+    bijector.CoordinatewiseBijectorMixin,
+    bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = 1 - exp( -( X / scale) ** concentration), X >= 0`.
 
   This bijector maps inputs from `[0, inf]` to `[0, 1]`. The inverse of the

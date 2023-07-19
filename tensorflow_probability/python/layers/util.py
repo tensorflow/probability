@@ -14,9 +14,12 @@
 # ============================================================================
 """Utilities for probabilistic layers."""
 
+import binascii
+import codecs
+import marshal
+import os
 import types
 # Dependency imports
-from keras.utils import generic_utils
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
@@ -252,10 +255,10 @@ def deserialize_function(serial, function_type):
   """
   if function_type == 'function':
     # Simple lookup in custom objects
-    function = tf.keras.utils.deserialize_keras_object(serial)
+    function = tf.keras.utils.legacy.deserialize_keras_object(serial)
   elif function_type == 'lambda':
     # Unsafe deserialization from bytecode
-    function = generic_utils.func_load(serial)
+    function = _func_load(serial)
   else:
     raise TypeError('Unknown function type:', function_type)
   return function
@@ -281,5 +284,76 @@ def serialize_function(func):
     function type.
   """
   if isinstance(func, types.LambdaType):
-    return generic_utils.func_dump(func), 'lambda'
+    return _func_dump(func), 'lambda'
   return func.__name__, 'function'
+
+
+def _func_dump(func):
+  """Serializes a user defined function.
+
+  Args:
+    func: the function to serialize.
+
+  Returns:
+    A tuple `(code, defaults, closure)`.
+  """
+  if os.name == 'nt':
+    raw_code = marshal.dumps(func.__code__).replace(b'\\', b'/')
+    code = codecs.encode(raw_code, 'base64').decode('ascii')
+  else:
+    raw_code = marshal.dumps(func.__code__)
+    code = codecs.encode(raw_code, 'base64').decode('ascii')
+  defaults = func.__defaults__
+  if func.__closure__:
+    closure = tuple(c.cell_contents for c in func.__closure__)
+  else:
+    closure = None
+  return code, defaults, closure
+
+
+def _func_load(code, defaults=None, closure=None, globs=None):
+  """Deserializes a user defined function.
+
+  Args:
+    code: bytecode of the function.
+    defaults: defaults of the function.
+    closure: closure of the function.
+    globs: dictionary of global objects.
+
+  Returns:
+    A function object.
+  """
+  if isinstance(code, (tuple, list)):  # unpack previous dump
+    code, defaults, closure = code
+    if isinstance(defaults, list):
+      defaults = tuple(defaults)
+
+  def ensure_value_to_cell(value):
+    """Ensures that a value is converted to a python cell object.
+
+    Args:
+      value: Any value that needs to be casted to the cell type
+
+    Returns:
+      A value wrapped as a cell object (see function `_func_load`)
+    """
+
+    def dummy_fn():
+      value  # just access it so it gets captured in .__closure__  # pylint:disable=pointless-statement
+
+    cell_value = dummy_fn.__closure__[0]
+    if not isinstance(value, type(cell_value)):
+      return cell_value
+    return value
+
+  if closure is not None:
+    closure = tuple(ensure_value_to_cell(_) for _ in closure)
+  try:
+    raw_code = codecs.decode(code.encode('ascii'), 'base64')
+  except (UnicodeEncodeError, binascii.Error):
+    raw_code = code.encode('raw_unicode_escape')
+  code = marshal.loads(raw_code)
+  if globs is None:
+    globs = globals()
+  return types.FunctionType(
+      code, globs, name=code.co_name, argdefs=defaults, closure=closure)

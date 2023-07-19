@@ -561,3 +561,8 @@ class RelaxedOneHotCategorical(
   def _default_event_space_bijector(self):
     return softmax_centered_bijector.SoftmaxCentered(
         validate_args=self.validate_args)
+
+  def _experimental_tangent_space(self, x):
+    from tensorflow_probability.python.experimental.tangent_spaces import simplex  # pylint:disable=g-import-not-at-top
+    return simplex.ProbabilitySimplexSpace()
+

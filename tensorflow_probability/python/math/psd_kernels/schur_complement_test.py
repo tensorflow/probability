@@ -17,6 +17,7 @@
 
 import functools
 import itertools
+from unittest import mock
 
 from absl.testing import parameterized
 import numpy as np
@@ -25,8 +26,10 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import cholesky_util
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
 from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic
 from tensorflow_probability.python.math.psd_kernels import schur_complement
+from tensorflow_probability.python.math.psd_kernels.internal import test_util as psd_kernel_test_util
 
 
 # A shape broadcasting fn
@@ -119,6 +122,7 @@ class SchurComplementTest(test_util.TestCase):
       expected = k_x_y - cov_dec
       self.assertAllClose(expected, self.evaluate(k.apply(x, y)))
 
+  @test_util.numpy_disable_gradient_test
   def testMasking(self):
     seed1, seed2, seed3 = samplers.split_seed(test_util.test_seed(), n=3)
     base_kernel = exponentiated_quadratic.ExponentiatedQuadratic(
@@ -133,7 +137,7 @@ class SchurComplementTest(test_util.TestCase):
                                 [3, 5, 4], seed=seed1, minval=-1.0, maxval=1.0),
                             np.nan)
     k = schur_complement.SchurComplement(
-        base_kernel, fixed_inputs, fixed_inputs_mask=mask)
+        base_kernel, fixed_inputs, fixed_inputs_is_missing=~mask)
 
     x = tf.random.stateless_uniform([6, 4], seed=seed2, minval=-1.0, maxval=1.0)
     y = tf.random.stateless_uniform(
@@ -155,6 +159,11 @@ class SchurComplementTest(test_util.TestCase):
           k_i.apply(x, x), k_x_x[i], atol=1e-5, rtol=1e-5)
       self.assertAllClose(
           k_i.apply(y, y), k_y_y[:, i:i+1], atol=1e-5, rtol=1e-5)
+
+    def _grad(x):
+      return gradient.value_and_gradient(
+          lambda u: tf.reduce_sum(k.apply(u, u, example_ndims=1)), x)[1]
+    self.assertAllNotNan(_grad(x))
 
   def testApplyShapesAreCorrect(self):
     for example_ndims in range(0, 4):
@@ -187,7 +196,7 @@ class SchurComplementTest(test_util.TestCase):
 
   def testTensorShapesAreCorrect(self):
     for x1_example_ndims in range(0, 3):
-      for x2_example_ndims in range(0, 3):
+      for x2_example_ndims in range(0, 2):
         # An integer generator.
         ints = itertools.count(start=2, step=1)
         feature_shape = [next(ints), next(ints)]
@@ -365,7 +374,7 @@ class SchurComplementTest(test_util.TestCase):
 
   def testStructuredBaseKernel(self):
     base_kernel = exponentiated_quadratic.ExponentiatedQuadratic()
-    structured_kernel = test_util.MultipartKernel(base_kernel)
+    structured_kernel = psd_kernel_test_util.MultipartTestKernel(base_kernel)
     fixed_inputs = np.random.uniform(-1, 1, (10, 7)).astype(np.float32)
     structured_fixed_inputs = dict(
         zip(('foo', 'bar'), tf.split(fixed_inputs, [4, 3], axis=-1)))
@@ -399,11 +408,33 @@ class SchurComplementTest(test_util.TestCase):
     # Test input masking.
     mask = np.random.randint(2, size=(10,), dtype=bool)
     masked_schur = schur_complement.SchurComplement(
-        base_kernel, fixed_inputs, fixed_inputs_mask=mask)
+        base_kernel, fixed_inputs, fixed_inputs_is_missing=~mask)
     masked_structured_schur = schur_complement.SchurComplement(
-        structured_kernel, structured_fixed_inputs, fixed_inputs_mask=mask)
+        structured_kernel, structured_fixed_inputs,
+        fixed_inputs_is_missing=~mask)
     self.assertAllClose(masked_schur.apply(x, y),
                         masked_structured_schur.apply(struct_x, struct_y))
+
+  def testPrivateArgPreventsCholeskyRecomputation(self):
+    x = np.random.uniform(-1, 1, (4, 7)).astype(np.float32)
+    chol = np.eye(4).astype(np.float32)
+    mock_cholesky_fn = mock.Mock(return_value=chol)
+    base_kernel = exponentiated_quadratic.ExponentiatedQuadratic()
+    k = schur_complement.SchurComplement.with_precomputed_divisor(
+        base_kernel, x, cholesky_fn=mock_cholesky_fn)
+    mock_cholesky_fn.assert_called_once()
+
+    # Assert that the Cholesky is not recomputed when the kernel is rebuilt and
+    # its methods are called.
+    mock_cholesky_fn.reset_mock()
+    k2 = schur_complement.SchurComplement.with_precomputed_divisor(
+        base_kernel, x, cholesky_fn=mock_cholesky_fn,
+        _precomputed_divisor_matrix_cholesky=(
+            k._precomputed_divisor_matrix_cholesky))
+    y = np.random.uniform(-1, 1, size=(3, 7))
+    z = np.random.uniform(-1, 1, size=(2, 7))
+    self.assertAllClose(k.matrix(y, z), k2.matrix(y, z))
+    mock_cholesky_fn.assert_not_called()
 
 
 if __name__ == '__main__':

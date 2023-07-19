@@ -43,26 +43,31 @@ JAX_MODE = False
 
 
 _SHALLOW_TREE_HAS_INVALID_KEYS = (
-    'The shallow_tree\'s keys are not a subset of the input_tree\'s keys. The '
-    'shallow_tree has the following keys that are not in the input_tree: {}.')
+    "The shallow_tree's keys are not a subset of the input_tree's keys. The "
+    'shallow_tree has the following keys that are not in the input_tree: {}.'
+)
 
 _STRUCTURES_HAVE_MISMATCHING_TYPES = (
-    'The two structures don\'t have the same sequence type. Input structure '
-    'has type {input_type}, while shallow structure has type {shallow_type}.')
+    "The two structures don't have the same sequence type. Input structure "
+    'has type {input_type}, while shallow structure has type {shallow_type}.'
+)
 
 _STRUCTURES_HAVE_MISMATCHING_LENGTHS = (
-    'The two structures don\'t have the same sequence length. Input '
+    "The two structures don't have the same sequence length. Input "
     'structure has length {input_length}, while shallow structure has length '
-    '{shallow_length}.')
+    '{shallow_length}.'
+)
 
 _INPUT_TREE_SMALLER_THAN_SHALLOW_TREE = (
     'The input_tree has fewer elements than the shallow_tree. Input structure '
     'has length {input_size}, while shallow structure has length '
-    '{shallow_size}.')
+    '{shallow_size}.'
+)
 
 _IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ = (
     'If shallow structure is a sequence, input must also be a sequence. '
-    'Input has type: {}.')
+    'Input has type: {}.'
+)
 
 
 assert_same_structure = dm_tree.assert_same_structure
@@ -124,8 +129,9 @@ def assert_shallow_structure(shallow_tree, input_tree, check_types=True):
   """
   if is_nested(shallow_tree):
     if not is_nested(input_tree):
-      raise TypeError(_IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ.format(
-          type(input_tree)))
+      raise TypeError(
+          _IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ.format(type(input_tree))
+      )
 
     if isinstance(shallow_tree, ObjectProxy):
       shallow_type = type(shallow_tree.__wrapped__)
@@ -140,26 +146,32 @@ def assert_shallow_structure(shallow_tree, input_tree, check_types=True):
       if shallow_is_namedtuple and input_is_namedtuple:
         # pylint: disable=protected-access
         if type(shallow_tree) is not type(input_tree):
-          raise TypeError(_STRUCTURES_HAVE_MISMATCHING_TYPES.format(
-              input_type=type(input_tree),
-              shallow_type=shallow_type))
+          raise TypeError(
+              _STRUCTURES_HAVE_MISMATCHING_TYPES.format(
+                  input_type=type(input_tree), shallow_type=shallow_type
+              )
+          )
         # pylint: enable=protected-access
       elif not (isinstance(shallow_tree, collections_abc.Mapping)
                 and isinstance(input_tree, collections_abc.Mapping)):
-        raise TypeError(_STRUCTURES_HAVE_MISMATCHING_TYPES.format(
-            input_type=type(input_tree),
-            shallow_type=shallow_type))
+        raise TypeError(
+            _STRUCTURES_HAVE_MISMATCHING_TYPES.format(
+                input_type=type(input_tree), shallow_type=shallow_type
+            )
+        )
 
     if len(input_tree) != len(shallow_tree):
       raise ValueError(
           _STRUCTURES_HAVE_MISMATCHING_LENGTHS.format(
-              input_length=len(input_tree),
-              shallow_length=len(shallow_tree)))
+              input_length=len(input_tree), shallow_length=len(shallow_tree)
+          )
+      )
     elif len(input_tree) < len(shallow_tree):
       raise ValueError(
           _INPUT_TREE_SMALLER_THAN_SHALLOW_TREE.format(
-              input_size=len(input_tree),
-              shallow_size=len(shallow_tree)))
+              input_size=len(input_tree), shallow_size=len(shallow_tree)
+          )
+      )
 
     shallow_iter = _yield_sorted_items(shallow_tree)
     input_iter = _yield_sorted_items(input_tree)

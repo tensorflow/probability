@@ -25,7 +25,6 @@ import unittest
 
 from absl import flags
 from absl import logging
-from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
 
@@ -36,15 +35,13 @@ from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import empirical_statistical_testing
-from tensorflow_probability.python.internal import parameter_properties
-from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_combinations
-from tensorflow_probability.python.math import psd_kernels
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 from tensorflow_probability.python.util.deferred_tensor import TransformedVariable
 from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
+from absl.testing import absltest
 
 
 __all__ = [
@@ -62,8 +59,6 @@ __all__ = [
     'test_seed_stream',
     'floats_near',
     'DiscreteScalarDistributionTestHelpers',
-    'NonCompositeTensorExp',
-    'NonCompositeTensorScale',
     'TestCase',
     'VectorDistributionTestHelpers',
 ]
@@ -162,11 +157,14 @@ class TestCase(*_TEST_BASE_CLASSES):
     if TF_MODE:
       return super(TestCase, self).evaluate(x)
 
+    if JAX_MODE:
+      import jax  # pylint: disable=g-import-not-at-top
+
     def _evaluate(x):
       if x is None:
         return x
       # TODO(b/223267515): Improve handling of JAX PRNGKeyArray objects.
-      if type(x).__name__ == 'PRNGKeyArray':
+      if JAX_MODE and isinstance(x, jax.random.PRNGKeyArray):
         return x
       return np.array(x)
     return tf.nest.map_structure(_evaluate, x, expand_composites=True)
@@ -177,6 +175,14 @@ class TestCase(*_TEST_BASE_CLASSES):
     return np.array(a)
 
   def _evaluateTensors(self, a, b):
+    if JAX_MODE:
+      import jax  # pylint: disable=g-import-not-at-top
+      # HACK: In assertions (like self.assertAllClose), convert PRNGKeyArrays
+      # to "normal" arrays so they can be compared with our existing machinery.
+      if isinstance(a, jax.random.PRNGKeyArray):
+        a = jax.random.key_data(a)
+      if isinstance(b, jax.random.PRNGKeyArray):
+        b = jax.random.key_data(b)
     if tf.is_tensor(a) and tf.is_tensor(b):
       (a, b) = self.evaluate([a, b])
     elif tf.is_tensor(a) and not tf.is_tensor(b):
@@ -566,22 +572,6 @@ class TestCase(*_TEST_BASE_CLASSES):
             type(exception).__name__, exception)
       # Drop the final two newlines.
       raise AssertionError(final_msg[:-2])
-
-  def assertSeedsEqual(self, x, y, msg=None):
-    """Asserts that two PRNG seeds are equal."""
-    self.assertAllEqual(
-        tf.nest.flatten(x, expand_composites=True),
-        tf.nest.flatten(y, expand_composites=True),
-        msg=msg)
-
-  def assertSeedsNotEqual(self, x, y, msg=None):
-    """Asserts that two PRNG seeds are not equal."""
-    self.assertFalse(
-        np.all(
-            np.equal(
-                tf.nest.flatten(x, expand_composites=True),
-                tf.nest.flatten(y, expand_composites=True))),
-        msg=msg)
 
   def assertAllInRange(self,
                        target,
@@ -1129,7 +1119,7 @@ def _compute_numerical_jacobian(f, xs, i, scale=1e-3):
   """Compute the numerical jacobian of `f`."""
   dtype_i = xs[i].dtype
   shape_i = xs[i].shape
-  size_i = np.product(shape_i, dtype=np.int32)
+  size_i = np.prod(shape_i, dtype=np.int32)
   def grad_i(d):
     return (f(*(xs[:i] + [xs[i] + d * scale] + xs[i+1:]))
             - f(*(xs[:i] + [xs[i] - d * scale] + xs[i+1:]))) / (2. * scale)
@@ -2041,86 +2031,3 @@ def main(jax_mode=JAX_MODE):
       from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
       test_util.InstallStackTraceHandler()
     absltest.main(testLoader=_TestLoader())
-
-
-# TODO(b/182603117): Add other bijector methods for use in future tests.
-class NonCompositeTensorScale(bijector.Bijector):
-  """`Scale` bijector that is not a `CompositeTensor`."""
-
-  def __init__(self, scale):
-    parameters = dict(locals())
-    self.scale = scale
-    super(NonCompositeTensorScale, self).__init__(
-        validate_args=True,
-        forward_min_event_ndims=0.,
-        parameters=parameters,
-        name='non_composite_scale')
-
-  def _forward(self, x):
-    return x * self.scale
-
-  def _inverse(self, y):
-    return y / self.scale
-
-
-class NonCompositeTensorExp(bijector.Bijector):
-  """`Exp` bijector that is not a `CompositeTensor`."""
-
-  def __init__(self):
-    parameters = dict(locals())
-    super(NonCompositeTensorExp, self).__init__(
-        validate_args=True,
-        forward_min_event_ndims=0.,
-        parameters=parameters,
-        name='non_composite_exp')
-
-  def _forward(self, x):
-    return tf.math.exp(x)
-
-  def _inverse(self, y):
-    return tf.math.log(y)
-
-  @classmethod
-  def _parameter_properties(cls, dtype):
-    return dict()
-
-
-class MultipartKernel(psd_kernels.AutoCompositeTensorPsdKernel):
-  """A kernel that takes nested structures as inputs.
-
-  The inputs are flattened and concatenated, and then passed to the base kernel.
-  """
-
-  def __init__(self, kernel, feature_ndims=None):
-    parameters = dict(locals())
-    self._kernel = kernel
-    if feature_ndims is None:
-      feature_ndims = {'foo': kernel.feature_ndims, 'bar': kernel.feature_ndims}
-    super(MultipartKernel, self).__init__(
-        feature_ndims=feature_ndims,
-        dtype={'foo': tf.float32, 'bar': tf.float32},
-        parameters=parameters,
-        validate_args=kernel.validate_args)
-
-  @classmethod
-  def _parameter_properties(cls, dtype):
-    return dict(kernel=parameter_properties.BatchedComponentProperties())
-
-  @property
-  def kernel(self):
-    return self._kernel
-
-  def _apply(self, x1, x2, example_ndims=0):
-    def _flatten_and_concat(x):
-      flat = tf.nest.flatten(
-          tf.nest.map_structure(
-              lambda t, nd: tf.reshape(  # pylint: disable=g-long-lambda
-                  t, ps.concat([ps.shape(t)[:-nd], [-1]], axis=0)),
-              x, self.feature_ndims))
-      # Broadcast shapes of flattened components together.
-      broadcasted_flat = [flat[0] + tf.zeros_like(flat[1][..., :1]),
-                          flat[1] + tf.zeros_like(flat[0][..., :1])]
-      return tf.concat(broadcasted_flat, axis=-1)
-    x1 = _flatten_and_concat(x1)
-    x2 = _flatten_and_concat(x2)
-    return self.kernel._apply(x1, x2, example_ndims=example_ndims)  # pylint: disable=protected-access

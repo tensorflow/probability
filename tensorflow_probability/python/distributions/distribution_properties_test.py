@@ -70,6 +70,20 @@ INSTANTIABLE_BUT_NOT_SLICABLE = (
 )
 
 
+TF1_GRAPH_MODE_BROKEN = (
+    # TODO(b/197680518): ForwardAccumulator does not work under tf1.Graph.
+    'Dirichlet',
+    # TODO(b/197680518): ForwardAccumulator does not work under tf1.Graph.
+    'PowerSpherical',
+    # TODO(b/197680518): ForwardAccumulator does not work under tf1.Graph.
+    'RelaxedOneHotCategorical',
+    # TODO(b/197680518): ForwardAccumulator does not work under tf1.Graph.
+    'SphericalUniform',
+    # TODO(b/197680518): ForwardAccumulator does not work under tf1.Graph.
+    'VonMisesFisher',
+)
+
+
 EVENT_SPACE_BIJECTOR_IS_BROKEN = [
     'InverseGamma',  # TODO(b/143090143): Enable this when the bug is fixed.
                      # (Reciprocal(Softplus(x)) -> inf for small x)
@@ -476,13 +490,19 @@ class ParameterPropertiesTest(test_util.TestCase):
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}
       for dname in sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys()) +
-                          list(dhps.INSTANTIABLE_META_DISTS)))
+                          list(dhps.INSTANTIABLE_META_DISTS))
+      if dname not in TF1_GRAPH_MODE_BROKEN)
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testInferredBatchShapeMatchesTrueBatchShape(self, dist_name, data):
     with tfp_hps.no_cholesky_decomposition_errors():
+      def eligibility_filter(name):
+        return name not in TF1_GRAPH_MODE_BROKEN
       dist = data.draw(
-          dhps.distributions(dist_name=dist_name, validate_args=False))
+          dhps.distributions(
+              dist_name=dist_name,
+              eligibility_filter=eligibility_filter,
+              validate_args=False))
       with tfp_hps.no_tf_rank_errors():
         lp = dist.log_prob(dist.sample(seed=test_util.test_seed()))
 
@@ -645,7 +665,8 @@ class DistributionSlicingTest(test_util.TestCase):
   @tfp_hps.tfp_hp_settings()
   def testDistributions(self, dist_name, data):
     def ok(name):
-      return name not in INSTANTIABLE_BUT_NOT_SLICABLE
+      return ((name not in INSTANTIABLE_BUT_NOT_SLICABLE) and
+              (name not in TF1_GRAPH_MODE_BROKEN))
 
     dist = data.draw(dhps.distributions(dist_name=dist_name,
                                         enable_vars=False,

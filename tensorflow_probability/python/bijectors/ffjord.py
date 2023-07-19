@@ -18,9 +18,12 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import cache_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
 from tensorflow_probability.python.math.ode import dormand_prince
+
+
+JAX_MODE = False
 
 
 # TODO(b/144156734) Consider moving trace estimators to stand alone module.
@@ -73,27 +76,37 @@ def trace_jacobian_hutchinson(
   """
 
   random_samples = sample_fn(
-      prefer_static.concat([[num_samples], state_shape], axis=0),
+      ps.concat([[num_samples], state_shape], axis=0),
       dtype=dtype, seed=seed)
 
   def augmented_ode_fn(time, state_log_det_jac, **kwargs):
     """Computes both time derivative and trace of the jacobian."""
     state, _ = state_log_det_jac
-    with tf.GradientTape(persistent=True,
-                         watch_accessed_variables=False) as tape:
-      tape.watch(state)
-      state_time_derivative = ode_fn(time, state, **kwargs)
 
-    def estimate_trace(random_sample):
-      """Computes stochastic trace estimate based on a single random_sample."""
-      #  We use first use gradient with `output_gradients` to compute the
-      #  jacobian-value-product and then take a dot product with the random
-      #  sample to obtain the trace estimate as formula above.
-      jvp = tape.gradient(state_time_derivative, state, random_sample)
-      return random_sample * jvp
+    if JAX_MODE:
+      import jax  # pylint:disable=g-import-not-at-top
+      state_time_derivative, f_vjp = jax.vjp(
+          lambda s: ode_fn(time, s, **kwargs), state)
 
-    # TODO(dkochkov) switch to vectorized_map once more features are supported.
-    results = tf.map_fn(estimate_trace, random_samples)
+      def estimate_trace(random_sample):
+        jvp, = f_vjp(random_sample)
+        return random_sample * jvp
+
+    else:
+      with tf.GradientTape(persistent=True,
+                           watch_accessed_variables=False) as tape:
+        tape.watch(state)
+        state_time_derivative = ode_fn(time, state, **kwargs)
+
+      def estimate_trace(random_sample):
+        """Computes stochastic trace estimate based on a single sample."""
+        #  We use first use gradient with `output_gradients` to compute the
+        #  jacobian-value-product and then take a dot product with the random
+        #  sample to obtain the trace estimate as formula above.
+        jvp = tape.gradient(state_time_derivative, state, random_sample)
+        return random_sample * jvp
+
+    results = tf.vectorized_map(estimate_trace, random_samples)
     trace_estimates = tf.reduce_mean(results, axis=0)
     return state_time_derivative, trace_estimates
 
@@ -123,7 +136,7 @@ def trace_jacobian_exact(ode_fn, state_shape, dtype):
     """Computes both time derivative and trace of the jacobian."""
     state, _ = state_log_det_jac
     ode_fn_with_time = lambda x: ode_fn(time, x, **kwargs)
-    batch_shape = [prefer_static.size0(state)]
+    batch_shape = [ps.size0(state)]
     state_time_derivative, diag_jac = diag_jacobian(
         xs=state, fn=ode_fn_with_time, sample_shape=batch_shape)
     # tfp_math.diag_jacobian returns lists
@@ -357,7 +370,7 @@ class FFJORD(bijector.Bijector):
   def _augmented_forward(self, x, **condition_kwargs):
     """Computes forward and forward_log_det_jacobian transformations."""
     augmented_ode_fn = self._trace_augmentation_fn(
-        self._state_time_derivative_fn, prefer_static.shape(x), x.dtype)
+        self._state_time_derivative_fn, ps.shape(x), x.dtype)
     augmented_x = (x, tf.zeros_like(x))
     if condition_kwargs:
       y, fldj = self._solve_ode(augmented_ode_fn, augmented_x,
@@ -369,7 +382,7 @@ class FFJORD(bijector.Bijector):
   def _augmented_inverse(self, y, **condition_kwargs):
     """Computes inverse and inverse_log_det_jacobian transformations."""
     augmented_inv_ode_fn = self._trace_augmentation_fn(
-        self._inv_state_time_derivative_fn, prefer_static.shape(y), y.dtype)
+        self._inv_state_time_derivative_fn, ps.shape(y), y.dtype)
     augmented_y = (y, tf.zeros_like(y))
     if condition_kwargs:
       x, ildj = self._solve_ode(augmented_inv_ode_fn, augmented_y,

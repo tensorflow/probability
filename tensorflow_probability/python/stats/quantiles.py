@@ -388,7 +388,7 @@ def histogram(x,
 
       if weights is not None:
         weights_ndims = _get_static_ndims(
-            x, expect_static=True, expect_ndims_at_least=1)
+            weights, expect_static=True, expect_ndims_at_least=1)
         if x_ndims != weights_ndims:
           raise ValueError('Number of dimensions of `x` and `weights` must '
                            'coincide. Found: x has {}, weights has {}'.format(

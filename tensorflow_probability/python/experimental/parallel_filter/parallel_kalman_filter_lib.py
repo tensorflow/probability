@@ -23,6 +23,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.math import linalg
 from tensorflow_probability.python.math.scan_associative import scan_associative
 
 
@@ -322,14 +323,15 @@ def init_element(observation_matrix,
                  y):
   """Represents the message from an observed value at the initial timestep."""
   with tf.name_scope('init_element'):
-    chol_pushforward_cov = (
-        tf.linalg.cholesky(
-            _propagate_cov(matrix=observation_matrix,
-                           cov=initial_cov,
-                           added_cov=observation_cov)))
+    pushforward_cov = _propagate_cov(matrix=observation_matrix,
+                                     cov=initial_cov,
+                                     added_cov=observation_cov)
+    chol_pushforward_cov = tf.linalg.cholesky(pushforward_cov)
     obs_matrix_initial_cov = tf.linalg.matmul(observation_matrix, initial_cov)
-    k_transpose = tf.linalg.cholesky_solve(chol_pushforward_cov,
-                                           obs_matrix_initial_cov)
+    k_transpose = linalg.hpsd_solve(
+        pushforward_cov,
+        obs_matrix_initial_cov,
+        cholesky_matrix=chol_pushforward_cov)
 
     return FilterElements(
         posterior_link_matrix=tf.zeros_like(initial_cov),
@@ -339,19 +341,15 @@ def init_element(observation_matrix,
                                             mean=initial_mean,
                                             added_mean=observation_mean),
                                         transpose_a=True) + initial_mean,
-        posterior_cov=initial_cov - tf.linalg.matmul(obs_matrix_initial_cov,
-                                                     k_transpose,
-                                                     transpose_a=True),
-        marginal_likelihood_meanprec=tf.linalg.matvec(observation_matrix,
-                                                      _cholsolve_vec(
-                                                          chol_pushforward_cov,
-                                                          y - observation_mean),
-                                                      transpose_a=True),
-        marginal_likelihood_prec=tf.linalg.matmul(observation_matrix,
-                                                  tf.linalg.cholesky_solve(
-                                                      chol_pushforward_cov,
-                                                      observation_matrix),
-                                                  transpose_a=True))
+        posterior_cov=initial_cov - tf.linalg.matmul(
+            obs_matrix_initial_cov, k_transpose, transpose_a=True),
+        marginal_likelihood_meanprec=tf.linalg.matvec(
+            observation_matrix, linalg.hpsd_solvevec(
+                pushforward_cov, y - observation_mean,
+                cholesky_matrix=chol_pushforward_cov), transpose_a=True),
+        marginal_likelihood_prec=linalg.hpsd_quadratic_form_solve(
+            pushforward_cov, observation_matrix,
+            cholesky_matrix=chol_pushforward_cov))
 
 
 def init_element_masked(initial_mean, initial_cov):
@@ -373,25 +371,29 @@ def mid_elements(transition_matrix, transition_cov,
   # p.4 of Temporal Parallelization of Bayesian Smoothers
   # https://arxiv.org/abs/1905.13002
   with tf.name_scope('mid_elements'):
-    chol_pushforward_cov = tf.linalg.cholesky(
-        _propagate_cov(matrix=observation_matrix,
-                       cov=transition_cov,
-                       added_cov=observation_cov))
-    inv_pushforward_cov_yhat = _cholsolve_vec(
-        chol_pushforward_cov,
+    pushforward_cov = _propagate_cov(matrix=observation_matrix,
+                                     cov=transition_cov,
+                                     added_cov=observation_cov)
+    chol_pushforward_cov = tf.linalg.cholesky(pushforward_cov)
+    inv_pushforward_cov_yhat = linalg.hpsd_solvevec(
+        pushforward_cov,
         y - (_propagate_mean(matrix=observation_matrix,
                              mean=transition_mean,
-                             added_mean=observation_mean)))
+                             added_mean=observation_mean)),
+        cholesky_matrix=chol_pushforward_cov)
+    conjugated_pushforward_cov = linalg.hpsd_quadratic_form_solve(
+        pushforward_cov,
+        observation_matrix,
+        cholesky_matrix=chol_pushforward_cov)
+
+    tmp = _add_identity_to_diagonal(
+        -tf.linalg.matmul(transition_cov, conjugated_pushforward_cov))
+    obs_matrix_trans_matrix = tf.linalg.matmul(observation_matrix,
+                                               transition_matrix)
+
     transition_cov_obs_matrix_transpose = tf.linalg.matmul(transition_cov,
                                                            observation_matrix,
                                                            transpose_b=True)
-    tmp = (
-        _add_identity_to_diagonal(
-            -tf.linalg.matmul(transition_cov_obs_matrix_transpose,
-                              tf.linalg.cholesky_solve(chol_pushforward_cov,
-                                                       observation_matrix))))
-    obs_matrix_trans_matrix = tf.linalg.matmul(observation_matrix,
-                                               transition_matrix)
 
     return FilterElements(
         posterior_link_matrix=tf.linalg.matmul(tmp, transition_matrix),
@@ -402,11 +404,9 @@ def mid_elements(transition_matrix, transition_cov,
         marginal_likelihood_meanprec=tf.linalg.matvec(obs_matrix_trans_matrix,
                                                       inv_pushforward_cov_yhat,
                                                       transpose_a=True),
-        marginal_likelihood_prec=tf.linalg.matmul(obs_matrix_trans_matrix,
-                                                  tf.linalg.cholesky_solve(
-                                                      chol_pushforward_cov,
-                                                      obs_matrix_trans_matrix),
-                                                  transpose_a=True))
+        marginal_likelihood_prec=linalg.hpsd_quadratic_form_solve(
+            pushforward_cov, obs_matrix_trans_matrix,
+            cholesky_matrix=chol_pushforward_cov))
 
 
 def mid_elements_masked(transition_matrix, transition_cov, transition_mean):
@@ -625,6 +625,7 @@ def kalman_filter(transition_matrix,
                                                       axis=0),
                                         added_cov=time_dep.observation_cov)
 
+      # TODO(srvasude): The JVP for this can be implemented more efficiently.
       log_likelihoods = mvn_tril.MultivariateNormalTriL(
           loc=observation_means,
           scale_tril=tf.linalg.cholesky(observation_covs)).log_prob(
@@ -691,10 +692,6 @@ def _broadcast_to_full_batch_shape_helper(data,
 
 def _add_identity_to_diagonal(x):
   return tf.linalg.set_diag(x, tf.linalg.diag_part(x) + 1.)
-
-
-def _cholsolve_vec(chol, rhs):
-  return tf.linalg.cholesky_solve(chol, rhs[..., tf.newaxis])[..., 0]
 
 
 def _propagate_mean(matrix, mean, added_mean):

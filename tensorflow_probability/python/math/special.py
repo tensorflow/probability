@@ -1895,7 +1895,7 @@ def log_gamma_correction(x, name=None):
         -0.165322962780713e-02,
     ], dtype=dtype)
 
-    inverse_x = 1 / x
+    inverse_x = tf.math.reciprocal(x)
     inverse_x_squared = inverse_x * inverse_x
     accum = minimax_coeff[5]
     for i in reversed(range(5)):
@@ -1923,7 +1923,12 @@ def _log_gamma_difference_big_y(x, y):
     lgamma_diff: Floating-point Tensor, the difference lgamma(y) - lgamma(x+y),
       computed elementwise.
   """
-  cancelled_stirling = (-1 * (x + y - 0.5) * tf.math.log1p(x / y)
+  dtype = dtype_util.common_dtype([x, y], tf.float32)
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  half = numpy_dtype(0.5)
+  one = numpy_dtype(1.)
+
+  cancelled_stirling = (-one * (x + y - half) * tf.math.log1p(x / y)
                         - x * tf.math.log(y) + x)
   correction = log_gamma_correction(y) - log_gamma_correction(x + y)
   return correction + cancelled_stirling
@@ -2011,16 +2016,20 @@ def _lbeta_naive_gradient(x, y):
   """Computes log(Beta(x, y)) with autodiff gradients only."""
   # Flip args if needed so y >= x.  Beta is mathematically symmetric but our
   # method for computing it is not.
+  dtype = dtype_util.common_dtype([x, y], tf.float32)
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  half = numpy_dtype(0.5)
+
   x, y = tf.minimum(x, y), tf.maximum(x, y)
 
   log2pi = tf.constant(np.log(2 * np.pi), dtype=x.dtype)
   # Two large arguments case: y >= x >= 8.
-  log_beta_two_large = (0.5 * log2pi
-                        - 0.5 * tf.math.log(y)
+  log_beta_two_large = (half * log2pi
+                        - half * tf.math.log(y)
                         + log_gamma_correction(x)
                         + log_gamma_correction(y)
                         - log_gamma_correction(x + y)
-                        + (x - 0.5) * tf.math.log(x / (x + y))
+                        + (x - half) * tf.math.log(x / (x + y))
                         - y * tf.math.log1p(x / y))
 
   # One large argument case: x < 8, y >= 8.

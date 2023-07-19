@@ -73,7 +73,7 @@ class KernelPropertiesTest(test_util.TestCase):
           hp.HealthCheck.data_too_large])
   def testKernelGradient(self, kernel_name, data):
     event_dim = data.draw(hps.integers(min_value=2, max_value=3))
-    feature_ndims = data.draw(hps.integers(min_value=1, max_value=2))
+    feature_ndims = data.draw(hps.integers(min_value=0, max_value=2))
     feature_dim = data.draw(hps.integers(min_value=2, max_value=4))
     batch_shape = data.draw(tfp_hps.shapes(max_ndims=2))
 
@@ -229,7 +229,7 @@ class PSDKernelSlicingTest(test_util.TestCase):
   @tfp_hps.tfp_hp_settings()
   def testKernels(self, kernel_name, data):
     event_dim = data.draw(hps.integers(min_value=2, max_value=3))
-    feature_ndims = data.draw(hps.integers(min_value=1, max_value=2))
+    feature_ndims = data.draw(hps.integers(min_value=0, max_value=2))
     feature_dim = data.draw(hps.integers(min_value=2, max_value=4))
 
     kernel, _ = data.draw(

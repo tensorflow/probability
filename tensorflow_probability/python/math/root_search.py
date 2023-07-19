@@ -66,7 +66,9 @@ def find_root_secant(objective_fn,
   The [secant method](https://en.wikipedia.org/wiki/Secant_method) is a
   root-finding algorithm that uses a succession of roots of secant lines to
   better approximate a root of a function. The secant method can be thought of
-  as a finite-difference approximation of Newton's method.
+  as a finite-difference approximation of Newton's method. If the objective
+  function's value becomes NaN in a position, NaN is returned in that position
+  as the estimated root.
 
   Args:
     objective_fn: Python callable for which roots are searched. It must be a
@@ -205,6 +207,8 @@ def find_root_secant(objective_fn,
       name='value_at_position',
       dtype=dtype_util.base_dtype(position.dtype))
 
+  numpy_dtype = dtype_util.as_numpy_dtype(position.dtype)
+
   zero = tf.zeros_like(position)
   position_tolerance = tf.convert_to_tensor(
       position_tolerance, name='position_tolerance', dtype=position.dtype)
@@ -224,7 +228,8 @@ def find_root_secant(objective_fn,
   else:
     step = next_position - initial_position
 
-  finished = tf.zeros(ps.shape(position), dtype=tf.bool)
+  nan_mask = tf.math.is_nan(value_at_position)
+  finished = nan_mask | tf.zeros(ps.shape(position), dtype=tf.bool)
 
   # Negate `stopping_condition` to determine if the search should continue.
   # This means, in particular, that tf.reduce_*all* will return only when the
@@ -253,6 +258,7 @@ def find_root_secant(objective_fn,
   # (1) A root has been found
   # (2) f(position) == f(position + step)
   # (3) The maximum number of iterations has been reached
+  # (4) f(position) is NaN
   # In case (2), the search may be stopped both before the desired tolerance is
   # achieved (or even a root is found), and the maximum number of iterations is
   # reached.
@@ -282,12 +288,15 @@ def find_root_secant(objective_fn,
     value_at_next_position = tf.where(was_finished, value_at_position,
                                       objective_fn(next_position))
 
-    # True if the search was already finished, or (2) just became true.
-    is_finished = tf.equal(value_at_position, value_at_next_position)
+    nan_mask = tf.math.is_nan(value_at_next_position)
+
+    # True if the search was already finished, or (2) or (4) just became true.
+    is_finished = nan_mask | tf.equal(value_at_position, value_at_next_position)
 
     # Use the mid-point between the last two positions if (2) just became true.
     next_position = tf.where(is_finished & ~was_finished,
                              (position + next_position) * 0.5, next_position)
+    next_position = tf.where(nan_mask, numpy_dtype(np.nan), next_position)
 
     # Once finished, stop updating the iteration index and set the step to zero.
     num_iterations = tf.where(is_finished, num_iterations, num_iterations + 1)
@@ -321,6 +330,8 @@ def find_root_secant(objective_fn,
           loop_vars=(
               position, value_at_position, num_iterations, step, finished
           ))
+
+      root = tf.where(nan_mask, numpy_dtype(np.nan), root)
 
   return RootSearchResults(
       estimated_root=root,

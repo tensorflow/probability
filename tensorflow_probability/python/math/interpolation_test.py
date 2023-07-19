@@ -286,6 +286,24 @@ class InterpRegular1DGridTest(test_util.TestCase):
       dy_dx_ = self.evaluate(tf.gradients(ys=y, xs=x)[0])
       self.assertAllClose([2., 2., 0., 2., 2.], dy_dx_)
 
+  def test_unknown_shape(self):
+    # Showed up in a user problem.
+    if tf.executing_eagerly():
+      self.skipTest('Graph-mode only')
+
+    x = tf1.placeholder_with_default(tf.zeros((2,)), shape=[None])
+
+    # Used to result in (None, None) shape, should be (None, 1).
+    y_ref = tf1.placeholder_with_default(tf.zeros((2, 1)), shape=[None, 1])
+    y = interpolation.interp_regular_1d_grid(
+        x=x, x_ref_min=-1., x_ref_max=1., y_ref=y_ref, axis=0)
+    self.assertEqual([None, 1], y.shape)
+
+    y_ref = tf1.placeholder_with_default(tf.zeros((2, 2)), shape=[None, 2])
+    y = interpolation.interp_regular_1d_grid(
+        x=x, x_ref_min=-1., x_ref_max=1., y_ref=y_ref, axis=0)
+    self.assertEqual([None, 2], y.shape)
+
 
 @test_util.test_all_tf_execution_regimes
 class BatchInterpRegular1DGridTest(test_util.TestCase):
@@ -544,6 +562,24 @@ class BatchInterpRegular1DGridTest(test_util.TestCase):
     if not tf.executing_eagerly():
       dy_dx_ = self.evaluate(tf.gradients(ys=y, xs=x)[0])
       self.assertAllClose([2., 2., 0., 2., 2.], dy_dx_)
+
+  def test_unknown_shape(self):
+    # Showed up in a user problem.
+    if tf.executing_eagerly():
+      self.skipTest('Graph-mode only')
+
+    x = tf1.placeholder_with_default(tf.zeros((2,)), shape=[None])
+
+    # Used to result in (None, None) shape, should be (None, 1).
+    y_ref = tf1.placeholder_with_default(tf.zeros((2, 1)), shape=[None, 1])
+    y = interpolation.batch_interp_regular_1d_grid(
+        x=x, x_ref_min=-1., x_ref_max=1., y_ref=y_ref, axis=0)
+    self.assertEqual([None, 1], y.shape)
+
+    y_ref = tf1.placeholder_with_default(tf.zeros((2, 2)), shape=[None, 2])
+    y = interpolation.interp_regular_1d_grid(
+        x=x, x_ref_min=-1., x_ref_max=1., y_ref=y_ref, axis=0)
+    self.assertEqual([None, 2], y.shape)
 
 
 class BaseBatchInterpNDGridTest:

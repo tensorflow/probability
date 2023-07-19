@@ -22,6 +22,7 @@ from tensorflow_probability.python.distributions import linear_gaussian_ssm
 from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.math import linalg
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
@@ -305,7 +306,8 @@ def extended_kalman_filter_one_step(
       gain_transpose = tmp_obs_cov / residual_covariance
     else:
       chol_residual_cov = tf.linalg.cholesky(residual_covariance)
-      gain_transpose = tf.linalg.cholesky_solve(chol_residual_cov, tmp_obs_cov)
+      gain_transpose = linalg.hpsd_solve(
+          residual_covariance, tmp_obs_cov, cholesky_matrix=chol_residual_cov)
 
     filtered_mean = predicted_mean + tf.matmul(
         gain_transpose,

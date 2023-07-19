@@ -30,6 +30,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import variadic_reduce
 from tensorflow_probability.python.math.scan_associative import scan_associative
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -89,6 +90,9 @@ def log_combinations(n, counts, name='log_combinations'):
 
 # TODO(b/154562929): Remove this once the built-in op supports XLA.
 # TODO(b/156297366): Derivatives of this function may not always be correct.
+@deprecation.deprecated('2023-03-01',
+                        '`log_cumsum_exp` is deprecated; '
+                        ' Use `tf.math.cumulative_logsumexp` instead.')
 def log_cumsum_exp(x, axis=-1, name=None):
   """Computes log(cumsum(exp(x))).
 
@@ -254,6 +258,7 @@ def reduce_logmeanexp(input_tensor,
     log_mean_exp: The reduced tensor.
   """
   with tf.name_scope(name or 'reduce_logmeanexp'):
+    input_tensor = tf.convert_to_tensor(input_tensor)
     named_axes = distribute_lib.canonicalize_named_axis(experimental_named_axis)
     lse = distribute_lib.reduce_logsumexp(
         input_tensor,

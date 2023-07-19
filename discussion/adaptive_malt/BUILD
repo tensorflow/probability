@@ -16,7 +16,10 @@
 
 # [internal] load pytype.bzl (pytype_strict_binary, pytype_strict_library)
 
-package(default_visibility = ["//visibility:public"])
+package(
+    # default_applicable_licenses
+    default_visibility = ["//visibility:public"],
+)
 
 licenses(["notice"])
 

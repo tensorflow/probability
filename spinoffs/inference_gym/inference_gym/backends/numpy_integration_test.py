@@ -14,8 +14,8 @@
 # ============================================================================
 """Integration test for the NumPy backend."""
 
-from absl.testing import absltest
 from inference_gym import using_numpy as gym
+from absl.testing import absltest
 
 
 class NumPyIntegrationTest(absltest.TestCase):

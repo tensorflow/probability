@@ -105,7 +105,8 @@ class TransitionKernel(object):
     """
     raise NotImplementedError()
 
-  @abc.abstractproperty
+  @property
+  @abc.abstractmethod
   def is_calibrated(self):
     """Returns `True` if Markov chain converges to specified distribution.
 

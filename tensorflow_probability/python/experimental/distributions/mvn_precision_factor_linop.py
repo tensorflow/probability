@@ -270,6 +270,8 @@ class MultivariateNormalPrecisionFactorLinearOperator(
     else:
       precision = self._precision
     variance = precision.inverse().diag_part()
+    if self.loc is None:
+      return variance
     return tf.broadcast_to(
         variance,
         ps.broadcast_shape(ps.shape(variance),

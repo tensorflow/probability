@@ -202,8 +202,8 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     # Properties `event_shape` and `batch_shape` should be defined
     # even before any sampling calls have occurred.
-    self.assertAllEqual(joint.event_shape, [[], [], [20], [20]])
-    self.assertAllEqual(joint.batch_shape, [[], [], [], []])
+    self.assertAllEqualNested(list(joint.event_shape), [[], [], [20], [20]])
+    self.assertAllEqualNested(list(joint.batch_shape), [[], [], [], []])
 
     ds, _ = joint.sample_distributions(seed=test_util.test_seed())
     self.assertLen(ds, 4)
@@ -999,12 +999,12 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     # test event shapes
     event_shapes = [[2, None], [2], [4]]
-    self.assertAllEqual(
+    self.assertAllEqualNested(
         [shape.as_list()
          for shape in joint_bijector.forward_event_shape(event_shapes)],
         [bijectors[i].forward_event_shape(event_shapes[i]).as_list()
          for i in range(3)])
-    self.assertAllEqual(
+    self.assertAllEqualNested(
         [shape.as_list()
          for shape in joint_bijector.inverse_event_shape(event_shapes)],
         [bijectors[i].inverse_event_shape(event_shapes[i]).as_list()

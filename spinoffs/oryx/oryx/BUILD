@@ -16,7 +16,10 @@
 
 licenses(["notice"])
 
-package(default_visibility = ["//visibility:public"])
+package(
+    # default_applicable_licenses
+    default_visibility = ["//visibility:public"],
+)
 
 # pytype_strict
 py_library(

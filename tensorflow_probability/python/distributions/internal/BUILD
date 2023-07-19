@@ -24,6 +24,7 @@ load(
 licenses(["notice"])
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -60,6 +61,19 @@ multi_substrate_py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "stochastic_process_util",
+    srcs = ["stochastic_process_util.py"],
+    deps = [
+        ":init",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/math/psd_kernels/internal:util",
     ],
 )
 

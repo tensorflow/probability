@@ -282,13 +282,12 @@ class DynamicLinearRegression(StructuralTimeSeries):
 
       # Heuristic default priors. Overriding these may dramatically
       # change inference performance and results.
+      if observed_time_series is None:
+        observed_stddev = tf.constant(1.0, dtype=dtype)
+      else:
+        _, observed_stddev, _ = sts_util.empirical_statistics(
+            observed_time_series)
       if drift_scale_prior is None:
-        if observed_time_series is None:
-          observed_stddev = tf.constant(1.0, dtype=dtype)
-        else:
-          _, observed_stddev, _ = sts_util.empirical_statistics(
-              observed_time_series)
-
         drift_scale_prior = lognormal.LogNormal(
             loc=tf.math.log(.05 * observed_stddev),
             scale=3.,

@@ -53,6 +53,8 @@ MODULE_MAPPINGS = {
 COMMENT_OUT = [
     'from tensorflow.python.util import dispatch',
     'from tensorflow.python.util.tf_export',
+    'from tensorflow.python.framework import ' +
+    'tensor_conversion',
     'from tensorflow.python.framework import tensor_util',
     '@tf_export',
     '@dispatch',
@@ -119,6 +121,11 @@ def gen_module(module_name):
       'from tensorflow_probability.python.internal.backend.numpy '
       'import composite_tensor')
   code = code.replace(
+      'from tensorflow.python.framework import '
+      'composite_tensor_gradient',
+      'from tensorflow_probability.python.internal.backend.numpy '
+      'import composite_tensor_gradient')
+  code = code.replace(
       'from tensorflow.python.ops import '
       'resource_variable_ops',
       'from tensorflow_probability.python.internal.backend.numpy '
@@ -132,6 +139,11 @@ def gen_module(module_name):
       'from tensorflow_probability.python.internal.backend.numpy '
       'import type_spec')
   code = code.replace(
+      'from tensorflow.python.framework '
+      'import type_spec_registry',
+      'from tensorflow_probability.python.internal.backend.numpy '
+      'import type_spec_registry')
+  code = code.replace(
       'from tensorflow.python.ops import variables',
       'from tensorflow_probability.python.internal.backend.numpy '
       'import variables')
@@ -141,14 +153,14 @@ def gen_module(module_name):
       'from tensorflow_probability.python.internal.backend.numpy '
       'import data_structures')
   code = code.replace(
-      'from tensorflow.python.training.tracking '
+      'from tensorflow.python.trackable '
       'import data_structures',
       'from tensorflow_probability.python.internal.backend.numpy '
       'import data_structures')
   code = re.sub(
       r'from tensorflow\.python\.linalg import (\w+)',
-      'from tensorflow_probability.python.internal.backend.numpy.gen import \\1 '
-      'as \\1', code)
+      'from tensorflow_probability.python.internal.backend.numpy.gen '
+      'import \\1 as \\1', code)
   code = code.replace(
       'from tensorflow.python.ops.linalg import ',
       '# from tensorflow.python.ops.linalg import ')
@@ -204,7 +216,7 @@ def gen_module(module_name):
   code = code.replace('math_ops.cast', '_ops.cast')
   code = code.replace('math_ops.matmul', '_linalg.matmul')
   code = code.replace('math_ops.range', 'array_ops.range')
-  code = code.replace('ops.convert_to_tensor_v2_with_dispatch(',
+  code = code.replace('tensor_conversion.convert_to_tensor_v2_with_dispatch(',
                       'ops.convert_to_tensor(')
   code = code.replace('ops.convert_to_tensor(dim_value)',
                       'np.array(dim_value, np.int32)')

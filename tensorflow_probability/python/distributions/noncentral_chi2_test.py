@@ -250,6 +250,20 @@ class NoncentralChi2Test(test_util.TestCase):
     self.assertEqual(quantile.shape, (batch_size, 13))
     self.assertAllClose(self.evaluate(quantile), expected_quantile)
 
+  def test_approx_quantile_close_to_boundary(self):
+    batch_size = 6
+    df = np.linspace(0.1, 20., batch_size).astype(np.float64)[..., np.newaxis]
+    nc = np.linspace(0., 20., batch_size).astype(np.float64)[..., np.newaxis]
+    x = np.linspace(0., 0.01, 10).astype(np.float64)
+    dist = noncentral_chi2.NoncentralChi2(
+        df=df, noncentrality=nc, validate_args=True)
+
+    expected_quantile = stats.ncx2.ppf(x, df, nc)
+
+    quantile = dist.quantile_approx(x)
+    self.assertEqual(quantile.shape, (batch_size, 10))
+    self.assertAllClose(self.evaluate(quantile), expected_quantile)
+
   @test_util.numpy_disable_gradient_test
   @parameterized.named_parameters(
       # Gradients are on the order of 1e2 to 1e3, so this corresponds to less

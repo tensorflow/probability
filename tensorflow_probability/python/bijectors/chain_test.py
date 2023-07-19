@@ -454,7 +454,7 @@ class ChainBijectorTest(test_util.TestCase):
 
   def testNonCompositeTensor(self):
     e = exp.Exp()
-    s = test_util.NonCompositeTensorScale(scale=tf.constant(3.))
+    s = bijector_test_util.NonCompositeTensorScale(scale=tf.constant(3.))
     bijector = chain.Chain(bijectors=[e, s])
     self.assertNotIsInstance(bijector, tf.__internal__.CompositeTensor)
     self.assertAllClose(bijector.forward([1.]), e.forward(s.forward([1.])))

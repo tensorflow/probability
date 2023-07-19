@@ -14,12 +14,12 @@
 # ============================================================================
 """Integration test TFP+JAX."""
 
-from absl.testing import absltest
-
 import jax
 import jax.numpy as np
 
 from tensorflow_probability.substrates import jax as tfp
+
+from absl.testing import absltest
 
 tfb = tfp.bijectors
 tfd = tfp.distributions

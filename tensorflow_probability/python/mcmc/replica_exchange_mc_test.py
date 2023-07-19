@@ -624,7 +624,7 @@ class REMCTest(test_util.TestCase):
     target = mixture_same_family.MixtureSameFamily(
         mixture_distribution=categorical.Categorical(probs=[0.5, 0.5]),
         components_distribution=mvn_diag.MultivariateNormalDiag(
-            loc=[[-1., -1], [1., 1.]], scale_identity_multiplier=0.3))
+            loc=[[-1., -1], [1., 1.]], scale_diag=0.3 * tf.ones((2, 2))))
 
     num_replica = 4
     inverse_temperatures = 10.**tf.linspace(start=0., stop=-1., num=num_replica)
@@ -849,9 +849,9 @@ class REMCTest(test_util.TestCase):
             [1., 0.5, 0.],  # loc of second batch
         ],
         dtype=np.float32)
-    scale_identity_multiplier = [0.5, 0.8]
+    scale_diag = np.array([[0.5, 0.5, 0.5], [0.8, 0.8, 0.8]], dtype=np.float32)
     target = mvn_diag.MultivariateNormalDiag(
-        loc=loc, scale_identity_multiplier=scale_identity_multiplier)
+        loc=loc, scale_diag=scale_diag)
 
     def make_kernel_fn(target_log_prob_fn):
       return tfp_transition_kernel(
@@ -934,8 +934,7 @@ class REMCTest(test_util.TestCase):
       elif inverse_temperatures.ndim == 2:
         temperature = 1 / inverse_temperatures[replica_idx, batch_idx]
 
-      expected_scale = (
-          scale_identity_multiplier[batch_idx] * np.sqrt(temperature))
+      expected_scale = scale_diag[batch_idx, 0] * np.sqrt(temperature)
 
       ess = np.min(ess_[replica_idx, batch_idx])  # Conservative estimate.
       self.assertGreater(ess, num_results * ess_scaling, msg='Bad sampling!')

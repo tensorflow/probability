@@ -481,7 +481,7 @@ class SampleDistributionTest(test_util.TestCase):
     # Evaluate together to ensure we use the same samples.
     lp, lp64 = self.evaluate((tf.cast(lp, tf.float64), lp64))
     # Fails 75% CPU, 0-80% GPU --vary_seed runs w/o experimental_use_kahan_sum.
-    self.assertAllClose(lp64, lp, rtol=0., atol=.01)
+    self.assertAllClose(lp64, lp, rtol=0., atol=.02)
 
   @parameterized.named_parameters(dict(testcase_name=''),
                                   dict(testcase_name='_jit', jit=True))

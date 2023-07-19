@@ -44,6 +44,8 @@ def custom_gradient(vjp_fwd=None, vjp_bwd=None, jvp_fn=None,
     jvp_fn: A function (*nondiff_args, primals, tangents) =>
       (primal_out, tangent_out).
     nondiff_argnums: Tuple of argument indices which are not differentiable.
+      These must integers or other non-Tensors. Tensors with no gradient should
+      be indicated with a None in the result of vjp_bwd.
 
   Returns:
     A decorator to be applied to a function f(*args) => output.

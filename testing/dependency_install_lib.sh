@@ -61,7 +61,7 @@ find_good_tf_nightly_version_str() {
   VERSION=$1
   curl -s "https://pypi.org/pypi/${VERSION}/json" \
     | python -c "$PYTHON_PARSE_PACKAGE_JSON" \
-        --bad_dates 20210519 20210619 20220727 20220809 20220811 20220902
+        --bad_dates 20220727 20220809 20220811 20220902 20230105
 }
 
 install_tensorflow() {
@@ -75,7 +75,9 @@ install_tensorflow() {
 install_jax() {
   # For the JAX backend.
   PIP_FLAGS=${1-}
-  python -m pip install $PIP_FLAGS jax jaxlib
+  python -m pip install $PIP_FLAGS \
+    jax \
+    jaxlib
 }
 
 install_common_packages() {
@@ -88,7 +90,18 @@ install_common_packages() {
 install_test_only_packages() {
   # The following unofficial dependencies are used only by tests.
   PIP_FLAGS=${1-}
-  python -m pip install $PIP_FLAGS hypothesis matplotlib mock mpmath scipy pandas optax holidays wrapt
+  python -m pip install $PIP_FLAGS \
+    hypothesis \
+    jax \
+    jaxlib \
+    optax \
+    matplotlib \
+    mock \
+    mpmath \
+    scipy \
+    pandas \
+    holidays \
+    wrapt
 }
 
 dump_versions() {

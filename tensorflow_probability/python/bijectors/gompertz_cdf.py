@@ -29,7 +29,9 @@ __all__ = [
 ]
 
 
-class GompertzCDF(bijector.AutoCompositeTensorBijector):
+class GompertzCDF(
+    bijector.CoordinatewiseBijectorMixin,
+    bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = 1 - exp(-c * (exp(rate * X) - 1)`, the Gompertz CDF.
 
   This bijector maps inputs from `[-inf, inf]` to `[0, inf]`. The inverse of the

@@ -19,6 +19,7 @@
 # [internal] load strict.bzl
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
         # tensorflow_probability/opensource/tools/inference_gym_ground_truth:__subpackages__ dep,

@@ -25,7 +25,9 @@ __all__ = [
 ]
 
 
-class AbsoluteValue(bijector.AutoCompositeTensorBijector):
+class AbsoluteValue(
+    bijector.CoordinatewiseBijectorMixin,
+    bijector.AutoCompositeTensorBijector):
   """Computes `Y = g(X) = Abs(X)`, element-wise.
 
   This non-injective bijector allows for transformations of scalar distributions

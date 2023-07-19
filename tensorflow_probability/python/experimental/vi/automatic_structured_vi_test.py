@@ -16,6 +16,7 @@
 
 # Dependency imports
 
+from absl.testing import parameterized
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import sigmoid
@@ -55,10 +56,8 @@ from tensorflow_probability.python.vi import optimization
 JAX_MODE = False
 
 
-@test_util.test_graph_and_eager_modes
-class _TrainableASVISurrogate(object):
+class _TrainableASVISurrogate(test_util.TestCase):
 
-  @test_util.jax_disable_variable_test
   def _expected_num_trainable_variables(self, prior_dist):
     """Infers the expected number of trainable variables for a non-nested JD."""
     prior_dists = prior_dist._get_single_sample_distributions()  # pylint: disable=protected-access
@@ -80,10 +79,14 @@ class _TrainableASVISurrogate(object):
           expected_num_trainable_variables += 2
     return expected_num_trainable_variables
 
+  @parameterized.named_parameters(
+      ('_32', tf.float32),
+      ('_64', tf.float64),
+  )
   @test_util.jax_disable_variable_test
-  def test_dims_and_gradients(self):
+  def test_dims_and_gradients(self, dtype):
 
-    prior_dist = self.make_prior_dist()
+    prior_dist = self.make_prior_dist(dtype)
 
     surrogate_posterior = automatic_structured_vi.build_asvi_surrogate_posterior(
         prior=prior_dist)
@@ -115,9 +118,13 @@ class _TrainableASVISurrogate(object):
                          surrogate_posterior.trainable_variables)
     self.assertTrue(all(g is not None for g in grad))
 
-  def test_dims_and_gradients_stateless(self):
+  @parameterized.named_parameters(
+      ('_32', tf.float32),
+      ('_64', tf.float64),
+  )
+  def test_dims_and_gradients_stateless(self, dtype):
 
-    prior_dist = self.make_prior_dist()
+    prior_dist = self.make_prior_dist(dtype)
 
     surrogate_init_fn, surrogate_apply_fn = (
         automatic_structured_vi.build_asvi_surrogate_posterior_stateless(
@@ -154,7 +161,7 @@ class _TrainableASVISurrogate(object):
 
   @test_util.jax_disable_variable_test
   def test_initialization_is_deterministic_following_seed(self):
-    prior_dist = self.make_prior_dist()
+    prior_dist = self.make_prior_dist(tf.float32)
     seed = test_util.test_seed(sampler_type='stateless')
     init_seed, sample_seed = samplers.split_seed(seed)
 
@@ -174,14 +181,13 @@ class _TrainableASVISurrogate(object):
 
 
 @test_util.test_all_tf_execution_regimes
-class ASVISurrogatePosteriorTestBrownianMotion(test_util.TestCase,
-                                               _TrainableASVISurrogate):
+class ASVISurrogatePosteriorTestBrownianMotion(_TrainableASVISurrogate):
 
-  def make_prior_dist(self):
+  def make_prior_dist(self, dtype):
 
     def _prior_model_fn():
-      innovation_noise = 0.1
-      prior_loc = 0.
+      innovation_noise = tf.constant(0.1, dtype)
+      prior_loc = tf.constant(0., dtype)
       new = yield normal.Normal(loc=prior_loc, scale=innovation_noise)
       for _ in range(4):
         new = yield normal.Normal(loc=new, scale=innovation_noise)
@@ -215,10 +221,14 @@ class ASVISurrogatePosteriorTestBrownianMotion(test_util.TestCase,
 
     return target_log_prob
 
+  @parameterized.named_parameters(
+      ('_32', tf.float32),
+      ('_64', tf.float64),
+  )
   @test_util.jax_disable_variable_test
-  def test_fitting_surrogate_posterior(self):
+  def test_fitting_surrogate_posterior(self, dtype):
 
-    prior_dist = self.make_prior_dist()
+    prior_dist = self.make_prior_dist(dtype)
     observations = self.get_observations(prior_dist)
     surrogate_posterior = automatic_structured_vi.build_asvi_surrogate_posterior(
         prior=prior_dist)
@@ -245,12 +255,16 @@ class ASVISurrogatePosteriorTestBrownianMotion(test_util.TestCase,
     _ = self.evaluate(posterior_mean)
     _ = self.evaluate(posterior_stddev)
 
-  def test_fitting_surrogate_posterior_stateless(self):
+  @parameterized.named_parameters(
+      ('_32', tf.float32),
+      ('_64', tf.float64),
+  )
+  def test_fitting_surrogate_posterior_stateless(self, dtype):
     if not JAX_MODE:
       self.skipTest('Requires optax.')
     import optax  # pylint: disable=g-import-not-at-top
 
-    prior_dist = self.make_prior_dist()
+    prior_dist = self.make_prior_dist(dtype)
     observations = self.get_observations(prior_dist)
     init_fn, build_surrogate_posterior_fn = (
         automatic_structured_vi.build_asvi_surrogate_posterior_stateless(
@@ -276,42 +290,44 @@ class ASVISurrogatePosteriorTestBrownianMotion(test_util.TestCase,
 
 
 @test_util.test_all_tf_execution_regimes
-class ASVISurrogatePosteriorTestEightSchools(test_util.TestCase,
-                                             _TrainableASVISurrogate):
+class ASVISurrogatePosteriorTestEightSchools(_TrainableASVISurrogate):
 
-  def make_prior_dist(self):
+  def make_prior_dist(self, dtype):
     treatment_effects = tf.constant([28, 8, -3, 7, -1, 1, 18, 12],
-                                    dtype=tf.float32)
+                                    dtype=dtype)
     num_schools = ps.shape(treatment_effects)[-1]
 
     return jdn.JointDistributionNamed({
         'avg_effect':
-            normal.Normal(loc=0., scale=10., name='avg_effect'),
+            normal.Normal(
+                loc=tf.constant(0., dtype), scale=10., name='avg_effect'),
         'log_stddev':
-            normal.Normal(loc=5., scale=1., name='log_stddev'),
+            normal.Normal(
+                loc=tf.constant(5., dtype), scale=1., name='log_stddev'),
         'school_effects':
             lambda log_stddev, avg_effect: (  # pylint: disable=g-long-lambda
                 independent.Independent(
                     normal.Normal(
-                        loc=avg_effect[..., None] * tf.ones(num_schools),
+                        loc=avg_effect[..., None] * tf.ones(num_schools, dtype),
                         scale=tf.exp(log_stddev[..., None]) * tf.ones(
-                            num_schools),
+                            num_schools, dtype),
                         name='school_effects'),
                     reinterpreted_batch_ndims=1))
     })
 
 
 @test_util.test_all_tf_execution_regimes
-class ASVISurrogatePosteriorTestEightSchoolsSample(test_util.TestCase,
-                                                   _TrainableASVISurrogate):
+class ASVISurrogatePosteriorTestEightSchoolsSample(_TrainableASVISurrogate):
 
-  def make_prior_dist(self):
+  def make_prior_dist(self, dtype):
 
     return jdn.JointDistributionNamed({
         'avg_effect':
-            normal.Normal(loc=0., scale=10., name='avg_effect'),
+            normal.Normal(
+                loc=tf.constant(0., dtype), scale=10., name='avg_effect'),
         'log_stddev':
-            normal.Normal(loc=5., scale=1., name='log_stddev'),
+            normal.Normal(
+                loc=tf.constant(5., dtype), scale=1., name='log_stddev'),
         'school_effects':
             lambda log_stddev, avg_effect: (  # pylint: disable=g-long-lambda
                 sample.Sample(
@@ -324,13 +340,12 @@ class ASVISurrogatePosteriorTestEightSchoolsSample(test_util.TestCase,
 
 
 @test_util.test_all_tf_execution_regimes
-class ASVISurrogatePosteriorTestHalfNormal(test_util.TestCase,
-                                           _TrainableASVISurrogate):
+class ASVISurrogatePosteriorTestHalfNormal(_TrainableASVISurrogate):
 
-  def make_prior_dist(self):
+  def make_prior_dist(self, dtype):
 
     def _prior_model_fn():
-      innovation_noise = 1.
+      innovation_noise = tf.constant(1., dtype)
       yield half_normal.HalfNormal(
           scale=innovation_noise, validate_args=True, allow_nan_stats=False)
 
@@ -338,72 +353,74 @@ class ASVISurrogatePosteriorTestHalfNormal(test_util.TestCase,
 
 
 @test_util.test_all_tf_execution_regimes
-class ASVISurrogatePosteriorTestDiscreteLatent(
-    test_util.TestCase, _TrainableASVISurrogate):
+class ASVISurrogatePosteriorTestDiscreteLatent(_TrainableASVISurrogate):
 
-  def make_prior_dist(self):
+  def make_prior_dist(self, dtype):
 
     def _prior_model_fn():
-      a = yield bernoulli.Bernoulli(logits=0.5, name='a')
+      a = yield bernoulli.Bernoulli(logits=tf.constant(0.5, dtype), name='a')
       yield normal.Normal(
-          loc=2. * tf.cast(a, tf.float32) - 1., scale=1., name='b')
+          loc=2. * tf.cast(a, dtype) - 1., scale=1., name='b')
 
     return jdab.JointDistributionCoroutineAutoBatched(_prior_model_fn)
 
 
 @test_util.test_all_tf_execution_regimes
-class ASVISurrogatePosteriorTestNesting(test_util.TestCase,
-                                        _TrainableASVISurrogate):
+class ASVISurrogatePosteriorTestNesting(_TrainableASVISurrogate):
 
   def _expected_num_trainable_variables(self, _):
     # Nested distributions have total of 10 params after Exponential->Gamma
     # substitution, multiplied by 2 variables per param.
     return 20
 
-  def make_prior_dist(self):
+  def make_prior_dist(self, dtype):
 
     def nested_model():
       a = yield sample.Sample(
-          sample.Sample(normal.Normal(0., 1.), sample_shape=4),
+          sample.Sample(
+              normal.Normal(tf.constant(0., dtype), 1.), sample_shape=4),
           sample_shape=[2],
           name='a')
       b = yield sigmoid.Sigmoid()(
           square.Square()(exponential.Exponential(rate=tf.exp(a))), name='b')
       # pylint: disable=g-long-lambda
-      yield jds.JointDistributionSequential([
-          laplace.Laplace(loc=a, scale=b), lambda c1: independent.Independent(
-              beta.Beta(concentration1=1., concentration0=tf.nn.softplus(c1)),
-              reinterpreted_batch_ndims=1),
-          lambda c1, c2: jdn.JointDistributionNamed(
-              {'x': gamma.Gamma(concentration=tf.nn.softplus(c1), rate=c2)})
-      ],
-                                            name='c')
+      yield jds.JointDistributionSequential(
+          [
+              laplace.Laplace(
+                  loc=a, scale=b), lambda c1: independent.Independent(
+                      beta.Beta(
+                          concentration1=1., concentration0=tf.nn.softplus(c1)),
+                      reinterpreted_batch_ndims=1),
+              lambda c1, c2: jdn.JointDistributionNamed(
+                  {'x': gamma.Gamma(concentration=tf.nn.softplus(c1), rate=c2)})
+          ],
+          name='c',
+      )
       # pylint: enable=g-long-lambda
 
     return jdab.JointDistributionCoroutineAutoBatched(nested_model)
 
 
 @test_util.test_all_tf_execution_regimes
-class ASVISurrogatePosteriorTestMarkovChain(test_util.TestCase,
-                                            _TrainableASVISurrogate):
+class ASVISurrogatePosteriorTestMarkovChain(_TrainableASVISurrogate):
 
   def _expected_num_trainable_variables(self, _):
     return 16
 
-  def make_prior_dist(self):
+  def make_prior_dist(self, dtype):
     num_timesteps = 10
     def stochastic_volatility_prior_fn():
       """Generative process for a stochastic volatility model."""
-      persistence_of_volatility = 0.9
+      persistence_of_volatility = tf.constant(0.9, dtype)
       mean_log_volatility = yield cauchy.Cauchy(
-          loc=0., scale=5., name='mean_log_volatility')
+          loc=tf.constant(0., dtype), scale=5., name='mean_log_volatility')
       white_noise_shock_scale = yield half_cauchy.HalfCauchy(
-          loc=0., scale=2., name='white_noise_shock_scale')
+          loc=tf.constant(0., dtype), scale=2., name='white_noise_shock_scale')
       _ = yield markov_chain.MarkovChain(
           initial_state_prior=normal.Normal(
               loc=mean_log_volatility,
               scale=white_noise_shock_scale /
-              tf.math.sqrt(tf.ones([]) - persistence_of_volatility**2)),
+              tf.math.sqrt(1. - persistence_of_volatility**2)),
           transition_fn=lambda _, x_t: normal.Normal(  # pylint: disable=g-long-lambda
               loc=persistence_of_volatility *
               (x_t - mean_log_volatility) + mean_log_volatility,
@@ -418,15 +435,21 @@ class ASVISurrogatePosteriorTestMarkovChain(test_util.TestCase,
 @test_util.test_all_tf_execution_regimes
 class TestASVISubstitutionAndSurrogateRules(test_util.TestCase):
 
-  def test_default_substitutes_trainable_families(self):
+  @parameterized.named_parameters(
+      ('_32', tf.float32),
+      ('_64', tf.float64),
+  )
+  def test_default_substitutes_trainable_families(self, dtype):
 
     @jdab.JointDistributionCoroutineAutoBatched
     def model():
       yield sample.Sample(
-          uniform.Uniform(low=-2., high=7.), sample_shape=[2], name='a')
-      yield half_normal.HalfNormal(1., name='b')
-      yield exponential.Exponential(rate=[1., 2.], name='c')
-      yield chi2.Chi2(df=3., name='d')
+          uniform.Uniform(low=tf.constant(-2., dtype), high=7.),
+          sample_shape=[2],
+          name='a')
+      yield half_normal.HalfNormal(tf.constant(1., dtype), name='b')
+      yield exponential.Exponential(rate=tf.constant([1., 2.], dtype), name='c')
+      yield chi2.Chi2(df=tf.constant(3., dtype), name='d')
 
     init_fn, apply_fn = (
         automatic_structured_vi.build_asvi_surrogate_posterior_stateless(model))
@@ -444,23 +467,31 @@ class TestASVISubstitutionAndSurrogateRules(test_util.TestCase):
     self.assertIsInstance(surrogate_dists.c, gamma.Gamma)
     self.assertIsInstance(surrogate_dists.d, gamma.Gamma)
 
-  def test_can_specify_custom_substitution(self):
+  @parameterized.named_parameters(
+      ('_32', tf.float32),
+      ('_64', tf.float64),
+  )
+  def test_can_specify_custom_substitution(self, dtype):
 
     @jdab.JointDistributionCoroutineAutoBatched
     def centered_horseshoe(ndims=100):
       global_scale = yield half_cauchy.HalfCauchy(
-          loc=0., scale=1., name='global_scale')
+          loc=tf.constant(0., dtype), scale=1., name='global_scale')
       local_scale = yield half_cauchy.HalfCauchy(
-          loc=0., scale=tf.ones([ndims]), name='local_scale')
+          loc=0.,
+          scale=tf.ones([ndims], dtype),
+          name='local_scale')
       yield normal.Normal(
-          loc=0., scale=tf.sqrt(global_scale * local_scale), name='weights')
+          loc=0.,
+          scale=tf.sqrt(global_scale * local_scale),
+          name='weights')
 
     init_fn, apply_fn = (
         automatic_structured_vi.build_asvi_surrogate_posterior_stateless(
             centered_horseshoe,
             prior_substitution_rules=tuple([(
                 half_cauchy.HalfCauchy,
-                lambda d: softplus.Softplus(1e-6)(  # pylint: disable=g-long-lambda
+                lambda d: softplus.Softplus(tf.constant(1e-6, dtype))(  # pylint: disable=g-long-lambda
                     normal.Normal(loc=d.loc, scale=d.scale)))]) +
             automatic_structured_vi.ASVI_DEFAULT_PRIOR_SUBSTITUTION_RULES))
 
@@ -480,10 +511,13 @@ class TestASVISubstitutionAndSurrogateRules(test_util.TestCase):
                           normal.Normal)
     self.assertIsInstance(surrogate_dists.weights, normal.Normal)
 
-  def test_can_specify_custom_surrogate(self):
+  @parameterized.named_parameters(
+      ('_32', tf.float32),
+      ('_64', tf.float64),
+  )
+  def test_can_specify_custom_surrogate(self, dtype):
 
-    def student_t_surrogate(
-        dist, build_nested_surrogate, sample_shape=None):
+    def student_t_surrogate(dist, build_nested_surrogate, sample_shape=None):
       del build_nested_surrogate  # Unused.
       del sample_shape  # Unused.
       return trainable.make_trainable_stateless(
@@ -491,12 +525,14 @@ class TestASVISubstitutionAndSurrogateRules(test_util.TestCase):
 
     init_fn, apply_fn = (
         automatic_structured_vi.build_asvi_surrogate_posterior_stateless(
-            normal.Normal(2., scale=[3., 1.]),
+            normal.Normal(tf.constant(2., dtype), scale=[3., 1.]),
             surrogate_rules=((normal.Normal, student_t_surrogate),) +
             automatic_structured_vi.ASVI_DEFAULT_SURROGATE_RULES))
     surrogate = apply_fn(init_fn(seed=test_util.test_seed()))
     self.assertIsInstance(surrogate, student_t.StudentT)
 
+
+del _TrainableASVISurrogate
 
 # TODO(kateslin): Add an ASVI surrogate posterior test for gamma distributions.
 # TODO(kateslin): Add an ASVI surrogate posterior test with for a model with

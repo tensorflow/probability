@@ -104,7 +104,7 @@ MUTEX_PARAMS = (
     set(['rate1', 'log_rate1']),
     set(['rate2', 'log_rate2']),
     set(['scale', 'log_scale']),
-    set(['scale', 'scale_tril', 'scale_diag', 'scale_identity_multiplier']),
+    set(['scale', 'scale_tril', 'scale_diag']),
 )
 
 
@@ -308,8 +308,6 @@ CONSTRAINTS = {
         tfp_hps.positive_definite,
     'scale_diag':
         tfp_hps.softplus_plus_eps(),
-    'scale_identity_multiplier':
-        tfp_hps.softplus_plus_eps(),
     'scale_tril':
         tfp_hps.lower_tril_positive_definite,
     'tailweight':
@@ -346,8 +344,14 @@ CONSTRAINTS = {
         tf.math.tanh,
     'NormalInverseGaussian':
         fix_normal_inverse_gaussian,
+    'OrderedLogistic':
+        lambda d: dict(d, dtype=tf.float32),
+    'OnehotCategorical':
+        lambda d: dict(d, dtype=tf.float32),
     'PERT':
         fix_pert,
+    'StoppingRatioLogistic':
+        lambda d: dict(d, dtype=tf.float32),
     'Triangular':
         fix_triangular,
     'TruncatedCauchy':
@@ -376,8 +380,10 @@ CONSTRAINTS = {
         tfp_hps.softplus_plus_eps(),
     'TwoPieceNormal.skewness':
         tfp_hps.softplus_plus_eps(),
+    'TwoPieceStudentT.skewness':
+        tfp_hps.softplus_plus_eps(),
     'NoncentralChi2.noncentrality':
-        tfp_hps.softplus_plus_eps()
+        tf.math.softplus,
 }
 
 
@@ -1475,7 +1481,10 @@ def mixtures(draw,
   # the weird edge case gets fixed.
   def nested_eligibility_filter(dist_name):
     # TODO(b/204209547): Re-enable Categorical.
-    if dist_name in ['Categorical', 'MixtureSameFamily']:
+    if dist_name in ['Categorical',
+                     'OrderedLogistic',
+                     'StoppingRatioLogistic',
+                     'MixtureSameFamily']:
       return False
     return eligibility_filter(dist_name)
 

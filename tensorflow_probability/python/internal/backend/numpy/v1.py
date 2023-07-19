@@ -14,6 +14,7 @@
 # ============================================================================
 """Experimental Numpy backend."""
 
+import collections
 import contextlib
 
 import numpy as np
@@ -35,6 +36,7 @@ __all__ = [
     'Dimension',
     'Module',
     'Session',
+    'SparseTensorValue',
     'TensorArray',
     'colocate_with',
     'control_flow_v2_enabled',
@@ -47,6 +49,7 @@ __all__ = [
     'matrix_solve',
     'name_scope',
     'placeholder_with_default',
+    'reset_default_graph',
     'set_random_seed',
     'variable_scope',
 ]
@@ -60,7 +63,7 @@ def _dummy_scope(*_, **__):  # pylint: disable=unused-argument
   yield
 
 
-def _get_variable(  # pylint: disable=unused-argument
+def _get_variable(  # pylint: disable=unused-argument,redefined-outer-name
     name, shape=None, dtype=None, initializer=None, regularizer=None,
     trainable=None, collections=None, caching_device=None, partitioner=None,
     validate_shape=True, use_resource=None, custom_getter=None, constraint=None,
@@ -132,6 +135,10 @@ global_variables_initializer = utils.copy_docstring(
     'tf1.global_variables_initializer',
     lambda: None)
 
+reset_default_graph = utils.copy_docstring(
+    'tf1.reset_default_graph',
+    lambda: None)
+
 set_random_seed = utils.copy_docstring(
     'tf1.set_random_seed',
     set_seed)
@@ -176,3 +183,7 @@ class variable_scope(object):  # pylint: disable=invalid-name
 
   def __exit__(self, *_, **__):
     pass
+
+
+SparseTensorValue = collections.namedtuple('SparseTensorValue',
+                                           ['indices', 'values', 'dense_shape'])

@@ -48,7 +48,8 @@ class _Inflated(mixture.Mixture):
   supports all of the methods of that class.
 
   ### Examples:
-   ```python
+
+  ```python
   zinb = Inflated(
            tfd.NegativeBinomial(5.0, probs=0.1), inflated_loc_prob=0.2)
   sample = zinb.sample(seed=jax.random.PRNGKey(0))

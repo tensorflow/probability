@@ -31,7 +31,6 @@ from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import wishart
-from tensorflow_probability.python.experimental import util
 from tensorflow_probability.python.experimental.distributions import mvn_precision_factor_linop as mvnpflo
 from tensorflow_probability.python.experimental.mcmc import preconditioned_hmc as phmc
 from tensorflow_probability.python.internal import auto_composite_tensor
@@ -97,12 +96,6 @@ def _make_composite_tensor(dist):
       p[k] = composite_linop(**p[k].parameters)
   ac_dist = composite_dist(**p)
   return ac_dist
-
-
-def as_composite(obj):
-  if JAX_MODE:
-    return obj
-  return util.as_composite(obj)
 
 
 @test_util.test_graph_and_eager_modes
@@ -467,8 +460,9 @@ class _PreconditionedHMCTest(test_util.TestCase):
     if self.use_default_momentum_distribution:
       momentum_distribution = None
     else:
-      momentum_distribution = as_composite(
-          normal.Normal(0., tf.constant(.5, dtype=tf.float64)))
+      momentum_distribution = normal.Normal(
+          0.0, tf.constant(0.5, dtype=tf.float64)
+      )
     kernel = phmc.PreconditionedHamiltonianMonteCarlo(
         lambda x: -x**2,
         step_size=.5,
@@ -489,8 +483,9 @@ class _PreconditionedHMCTest(test_util.TestCase):
     if self.use_default_momentum_distribution:
       momentum_distribution = None
     else:
-      momentum_distribution = as_composite(
-          normal.Normal(0., tf.constant(.5, dtype=tf.float64)))
+      momentum_distribution = normal.Normal(
+          0.0, tf.constant(0.5, dtype=tf.float64)
+      )
     kernel = phmc.PreconditionedHamiltonianMonteCarlo(
         lambda x: -x**2,
         step_size=.5,

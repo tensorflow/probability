@@ -41,6 +41,7 @@ from tensorflow_probability.python.version import __version__
 from tensorflow_probability.substrates.jax import bijectors
 from tensorflow_probability.substrates.jax import distributions
 from tensorflow_probability.substrates.jax import experimental
+from tensorflow_probability.substrates.jax import glm
 from tensorflow_probability.substrates.jax import internal
 from tensorflow_probability.substrates.jax import math
 from tensorflow_probability.substrates.jax import mcmc
@@ -53,3 +54,7 @@ from tensorflow_probability.substrates.jax import util
 from tensorflow_probability.substrates.jax import vi
 
 from tensorflow_probability.python.internal.backend import jax as tf2jax
+
+# from tensorflow_probability.substrates.jax.google import tfp_google  # DisableOnExport  # pylint:disable=line-too-long
+# tfp_google.bind(globals())  # DisableOnExport
+# del tfp_google  # DisableOnExport

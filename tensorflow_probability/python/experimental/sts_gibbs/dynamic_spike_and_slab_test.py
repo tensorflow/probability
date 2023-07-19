@@ -97,7 +97,7 @@ class SpikeAndSlabTest(test_util.TestCase):
         design_matrix,
         default_pseudo_observations=default_pseudo_observations)
     initial_state = sampler._initialize_sampler_state(
-        targets=targets, nonzeros=nonzeros, observation_noise_variance=1.)
+        targets=targets, nonzeros=nonzeros)
 
     # Compute the analytic posterior for the regression problem restricted to
     # only the selected features. Note that by slicing a submatrix of the
@@ -159,10 +159,8 @@ class SpikeAndSlabTest(test_util.TestCase):
         naive_posterior.concentration)
     self.assertAllClose(
         tight_slab_sampler._initialize_sampler_state(
-            targets=targets,
-            nonzeros=tf.ones([num_features], dtype=tf.bool),
-            observation_noise_variance=1.
-            ).observation_noise_variance_posterior_scale,
+            targets=targets, nonzeros=tf.ones([num_features], dtype=tf.bool)
+        ).observation_noise_variance_posterior_scale,
         naive_posterior.scale,
         atol=1e-2)
 
@@ -178,10 +176,8 @@ class SpikeAndSlabTest(test_util.TestCase):
         naive_posterior.concentration)
     self.assertAllClose(
         downweighted_slab_sampler._initialize_sampler_state(
-            targets=targets,
-            nonzeros=tf.zeros([num_features], dtype=tf.bool),
-            observation_noise_variance=1.
-            ).observation_noise_variance_posterior_scale,
+            targets=targets, nonzeros=tf.zeros([num_features], dtype=tf.bool)
+        ).observation_noise_variance_posterior_scale,
         naive_posterior.scale)
 
   @parameterized.parameters(
@@ -195,7 +191,7 @@ class SpikeAndSlabTest(test_util.TestCase):
 
     rng = test_util.test_np_rng()
     initial_nonzeros = rng.randint(
-        low=0, high=2, size=[num_features]).astype(np.bool)
+        low=0, high=2, size=[num_features]).astype(bool)
     flip_idxs = rng.choice(
         num_features, size=num_flips, replace=False).astype(np.int32)
     should_flip = np.array([True] * num_flips)
@@ -215,15 +211,14 @@ class SpikeAndSlabTest(test_util.TestCase):
     def _do_flips():
       state = sampler._initialize_sampler_state(
           targets=targets,
-          nonzeros=initial_nonzeros,
-          observation_noise_variance=1.)
+          nonzeros=initial_nonzeros)
       def _do_flip(state, i):
         new_state = sampler._flip_feature(state, tf.gather(flip_idxs, i))
         return mcmc_util.choose(tf.gather(should_flip, i), new_state, state)
       return tf.foldl(_do_flip, elems=tf.range(num_flips), initializer=state)
 
     self.assertAllCloseNested(
-        sampler._initialize_sampler_state(targets, nonzeros, 1.),
+        sampler._initialize_sampler_state(targets, nonzeros),
         _do_flips(),
         atol=1e-6, rtol=1e-6)
 
@@ -243,9 +238,7 @@ class SpikeAndSlabTest(test_util.TestCase):
         # Ensure the probability of keeping an irrelevant feature is tiny.
         nonzero_prior_prob=1e-6)
     initial_state = sampler._initialize_sampler_state(
-        targets=targets,
-        nonzeros=tf.convert_to_tensor([True, True, True]),
-        observation_noise_variance=1.)
+        targets=targets, nonzeros=tf.convert_to_tensor([True, True, True]))
     final_state = self.evaluate(
         sampler._resample_all_features(
             initial_state, seed=test_util.test_seed()))

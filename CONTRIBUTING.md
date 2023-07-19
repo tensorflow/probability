@@ -39,7 +39,9 @@ by adding a commit, rebasing etc.
 
 We test against TensorFlow nightly on Python 3.7. We shard our tests
 across several build jobs (identified by the `SHARD` environment variable).
-Lints are also done in a separate job.
+Lints are also done in a separate job. The scripts will attempt to only run the
+tests affected by your change, so don't be alarmed by relatively few tests
+running if you've changed a rarely used file.
 
 All pull-requests will need to pass the automated lint and unit-tests before
 being merged. As the tests can take a bit of time, see the following sections

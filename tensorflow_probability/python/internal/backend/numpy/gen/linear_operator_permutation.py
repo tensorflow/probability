@@ -37,6 +37,7 @@ import numpy as np
 
 from tensorflow_probability.python.internal.backend.numpy import dtype as dtypes
 from tensorflow_probability.python.internal.backend.numpy import ops
+# from tensorflow.python.framework import tensor_conversion
 from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.internal.backend.numpy import numpy_array as array_ops
 from tensorflow_probability.python.internal.backend.numpy import control_flow as control_flow_ops

@@ -26,12 +26,17 @@ import hypothesis as hp
 import hypothesis.extra.numpy as hnp
 import hypothesis.strategies as hps
 import mock
-import numpy as np  # Rewritten by script to import jax.numpy
-import numpy as onp  # pylint: disable=reimported
-import scipy.special as scipy_special
 import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
+
+# NOTE: As of Jan 4, 2022, TensorFlow must be imported before JAX to avoid
+# TensorFlow crashing when imported (when using tf-nightly).
+#
+# pylint: disable=g-bad-import-order
+import numpy as np  # Rewritten by script to import jax.numpy
+import numpy as onp  # pylint: disable=reimported
+import scipy.special as scipy_special
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
@@ -297,8 +302,9 @@ def matmul_compatible_pairs(draw,
                             elements=None):
   elements = elements or floats(dtype=dtype)
   x_strategy = x_strategy or single_arrays(
-      shape=shapes(min_dims=2, max_dims=5), dtype=dtype, elements=elements)
-  x = draw(x_strategy)
+      shape=shapes(min_dims=2, max_dims=5, min_side=0),
+      dtype=dtype, elements=elements)
+  x = draw(x_strategy).astype(dtype)
   x_shape = tuple(map(int, x.shape))
   y_shape = x_shape[:-2] + x_shape[-1:] + (draw(hps.integers(1, 10)),)
   y = draw(hnp.arrays(dtype, y_shape, elements=elements))
@@ -309,7 +315,7 @@ def matmul_compatible_pairs(draw,
 def pd_matrices(draw, eps=1.):
   x = draw(
       single_arrays(
-          shape=shapes(min_dims=2),
+          shape=shapes(min_dims=2, min_side=0),
           elements=floats(min_value=-1e3, max_value=1e3)))
   y = np.swapaxes(x, -1, -2)
   if x.shape[-1] < x.shape[-2]:  # Ensure resultant matrix not rank-deficient.
@@ -607,6 +613,15 @@ def top_k_params(draw):
   array = draw(single_arrays(dtype=np.float32, unique=True, shape=array_shape))
   k = draw(hps.integers(1, int(array.shape[-1])))
   return array, k
+
+
+@hps.composite
+def lstsq_params(draw):
+  matrix, rhs = draw(matmul_compatible_pairs(x_strategy=pd_matrices()))
+  return (matrix,
+          rhs,
+          0.,  # l2_regularization
+          False)  # fast=False
 
 
 @hps.composite
@@ -933,7 +948,8 @@ NUMPY_TEST_CASES = [
         'linalg.eig', [pd_matrices()],
         post_processor=_eig_post_process,
         xla_disabled=True),
-    TestCase('linalg.eigh', [pd_matrices()], post_processor=_eig_post_process),
+    TestCase('linalg.eigh', [pd_matrices()],
+             post_processor=_eig_post_process),
     TestCase(
         'linalg.eigvals', [pd_matrices()],
         post_processor=_eig_post_process,
@@ -1177,6 +1193,17 @@ NUMPY_TEST_CASES = [
             x_strategy=pd_matrices().map(np.linalg.cholesky))
     ]),
 
+    # ArgSpec(args=['matrix', 'rhs', 'adjoint', 'name'], varargs=None,
+    # keywords=None, defaults=(True, False, None))
+    TestCase('linalg.solve', [
+        matmul_compatible_pairs(x_strategy=pd_matrices())
+    ]),
+
+    TestCase('linalg.lstsq', [lstsq_params()],
+             xla_disabled=True),  # Missing kernel.
+
+    TestCase('linalg.tensor_diag', [single_arrays(shape=shapes(min_dims=1))]),
+
     # ArgSpec(args=['shape_x', 'shape_y'], varargs=None, keywords=None,
     #         defaults=None)
     TestCase('broadcast_dynamic_shape', []),
@@ -1202,6 +1229,16 @@ NUMPY_TEST_CASES = [
                 hps.booleans(),
                 hps.booleans()).map(lambda x: x[0] + (x[1], x[2]))
         ],
+        xla_const_args=(1, 2, 3)),
+    TestCase(
+        'math.cumulative_logsumexp', [
+            hps.tuples(
+                array_axis_tuples(
+                    elements=floats(min_value=-1e12, max_value=1e12)),
+                hps.booleans(),
+                hps.booleans()).map(lambda x: x[0] + (x[1], x[2]))
+        ],
+        rtol=6e-5,
         xla_const_args=(1, 2, 3)),
 ]
 
@@ -1268,7 +1305,8 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
              xla_atol=1e-4, xla_rtol=1e-4),
     TestCase('math.logical_not',
              [single_arrays(dtype=np.bool_, elements=hps.booleans())]),
-    TestCase('math.ndtri', [single_arrays(elements=floats(0., 1.))]),
+    TestCase('math.ndtri', [single_arrays(elements=floats(1e-7, 1. - 1e-7))],
+             xla_atol=1e-4, xla_rtol=4e-3),
     TestCase('math.negative', [single_arrays()]),
     TestCase('math.reciprocal', [single_arrays()]),
     TestCase('math.rint', [single_arrays()]),
@@ -1650,6 +1688,10 @@ class NumpyTest(test_util.TestCase):
                          [0., 1.],
                          [-2000. * state[0] * state[1] - 1.,
                           1000. * (1. - state[0]**2)]]).dtype)
+
+  def test_unstack_with_zero_dimension(self):
+    self.assertAllEqual([], nptf.unstack(nptf.zeros((5, 3, 0)), axis=-1))
+    self.assertAllEqual([], nptf.unstack(nptf.zeros((4, 0, 2)), axis=1))
 
   def test_concat_infers_dtype(self):
     self.assertEqual(np.int32, nptf.concat([[1], []], 0).dtype)

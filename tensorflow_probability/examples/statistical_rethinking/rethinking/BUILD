@@ -16,6 +16,7 @@
 #   Functions and boilerplate for the Statistical Rethinking notebooks
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability/examples:__subpackages__",
     ],

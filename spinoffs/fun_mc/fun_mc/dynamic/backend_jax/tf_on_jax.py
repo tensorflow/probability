@@ -17,6 +17,7 @@
 import contextlib
 import functools
 import types
+from typing import Any
 
 import jax
 from jax import lax
@@ -154,6 +155,10 @@ def _get_static_value(value):
     return None
 
 
+tf.TensorSpec = Any
+tf.DType = Any
+
+
 _impl(name='add_n')(sum)
 _impl(['nn'], name='softmax')(stax.softmax)
 _impl(name='custom_gradient')(jax.custom_gradient)
@@ -161,8 +166,10 @@ _impl(name='stop_gradient')(jax.lax.stop_gradient)
 
 tf.newaxis = None
 
+_impl_np()(jnp.cumsum)
 _impl_np()(jnp.exp)
 _impl_np()(jnp.einsum)
+_impl_np()(jnp.floor)
 _impl_np()(jnp.float32)
 _impl_np()(jnp.float64)
 _impl_np()(jnp.int32)
@@ -179,12 +186,15 @@ _impl_np()(jnp.zeros)
 _impl_np()(jnp.zeros_like)
 _impl_np()(jnp.transpose)
 _impl_np(name='fill')(jnp.full)
+_impl_np(['nn'])(jax.nn.softmax)
 _impl_np(['math'])(jnp.ceil)
 _impl_np(['math'])(jnp.log)
 _impl_np(['math'], name='mod')(jnp.mod)
 _impl_np(['math'])(jnp.sqrt)
 _impl_np(['math'], name='is_finite')(jnp.isfinite)
+_impl_np(['math'], name='is_nan')(jnp.isnan)
 _impl_np(['math'], name='pow')(jnp.power)
+_impl_np(['math'], name='reduce_all')(jnp.all)
 _impl_np(['math'], name='reduce_prod')(jnp.prod)
 _impl_np(['math'], name='reduce_variance')(jnp.var)
 _impl_np(name='abs')(jnp.abs)
@@ -192,7 +202,6 @@ _impl_np(name='Tensor')(jnp.ndarray)
 _impl_np(name='concat')(jnp.concatenate)
 _impl_np(name='constant')(jnp.array)
 _impl_np(name='expand_dims')(jnp.expand_dims)
-_impl_np(['math'], name='reduce_all')(jnp.all)
 _impl_np(name='reduce_max')(jnp.max)
 _impl_np(name='reduce_mean')(jnp.mean)
 _impl_np(name='reduce_sum')(jnp.sum)

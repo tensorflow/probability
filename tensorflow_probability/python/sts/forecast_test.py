@@ -207,7 +207,8 @@ class _ForecastTest(object):
         observed_time_series,
         num_results=num_results,
         num_warmup_steps=2,
-        num_variational_steps=2)
+        num_variational_steps=2,
+    )
 
     forecast_dist = forecast.forecast(
         model,

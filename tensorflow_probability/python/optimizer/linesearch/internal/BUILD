@@ -17,6 +17,7 @@
 load("//tensorflow_probability/python:build_defs.bzl", "multi_substrate_py_library", "multi_substrate_py_test")
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],

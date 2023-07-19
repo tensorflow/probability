@@ -85,7 +85,7 @@ class _Independent(distribution_lib.Distribution):
   ind = tfd.Independent(
       distribution=tfd.MultivariateNormalDiag(
           loc=[[-1., 1], [1, -1]],
-          scale_identity_multiplier=[1., 0.5]),
+          scale_diag=tf.tile([[1.], [0.5]], [1, 2]),
       reinterpreted_batch_ndims=1)
 
   # All batch dims have been 'absorbed' into event dims.
