@@ -308,10 +308,10 @@ class AdditiveStateSpaceModel(linear_gaussian_ssm.LinearGaussianStateSpaceModel
             dtype=dtype)
         def observation_noise_fn(t):
           return mvn_diag.MultivariateNormalDiag(
-              loc=(sum([
+              loc=(sum(
                   ssm.get_observation_noise_for_timestep(t).mean()
                   for ssm in component_ssms
-              ]) + offset_at_step(t)),
+              ) + offset_at_step(t)),
               scale_diag=observation_noise_scale[..., tf.newaxis])
       else:
         def observation_noise_fn(t):
@@ -480,7 +480,7 @@ class Sum(StructuralTimeSeries):
       super(Sum, self).__init__(
           parameters=parameters,
           latent_size=sum(
-              [component.latent_size for component in components]),
+              component.latent_size for component in components),
           init_parameters=init_parameters,
           name=name)
 

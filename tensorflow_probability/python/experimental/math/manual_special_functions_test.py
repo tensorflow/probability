@@ -69,8 +69,8 @@ class ManualSpecialFunctionsTest(test_util.TestCase):
       dict(
           testcase_name='_exp_pade_4_4',
           x=np.concatenate(
-              [np.linspace(-5., 5., 50), [-np.float('inf'),
-                                          np.float('inf')]],
+              [np.linspace(-5., 5., 50), [-float('inf'),
+                                          float('inf')]],
               axis=0),
           old_fn=tf.math.exp,
           new_fn=manual_special_functions.exp_pade_4_4,

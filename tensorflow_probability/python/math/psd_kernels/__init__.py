@@ -21,6 +21,7 @@ from tensorflow_probability.python.math.psd_kernels.exponential_curve import Exp
 from tensorflow_probability.python.math.psd_kernels.exponentiated_quadratic import ExponentiatedQuadratic
 from tensorflow_probability.python.math.psd_kernels.feature_scaled import FeatureScaled
 from tensorflow_probability.python.math.psd_kernels.feature_transformed import FeatureTransformed
+from tensorflow_probability.python.math.psd_kernels.gamma_exponential import GammaExponential
 from tensorflow_probability.python.math.psd_kernels.kumaraswamy_transformed import KumaraswamyTransformed
 from tensorflow_probability.python.math.psd_kernels.matern import GeneralizedMatern
 from tensorflow_probability.python.math.psd_kernels.matern import MaternFiveHalves
@@ -46,6 +47,7 @@ _allowed_symbols = [
     'ExpSinSquared',
     'FeatureScaled',
     'FeatureTransformed',
+    'GammaExponential',
     'GeneralizedMatern',
     'KumaraswamyTransformed',
     'Linear',

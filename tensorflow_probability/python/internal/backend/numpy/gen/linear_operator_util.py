@@ -37,6 +37,7 @@ import numpy as np
 
 from tensorflow_probability.python.internal.backend.numpy import dtype as dtypes
 from tensorflow_probability.python.internal.backend.numpy import ops
+# from tensorflow.python.framework import tensor_conversion
 from tensorflow_probability.python.internal.backend.numpy import ops as module
 from tensorflow_probability.python.internal.backend.numpy import numpy_array as array_ops
 from tensorflow_probability.python.internal.backend.numpy import debugging as check_ops
@@ -131,7 +132,8 @@ def convert_nonref_to_tensor(value, dtype=None, dtype_hint=None, name=None):
           f"Received: `{dtype_name(value_dtype_base)}`.")
     return value
   return ops.convert_to_tensor(
-      value, dtype=dtype, dtype_hint=dtype_hint, name=name)
+      value, dtype=dtype, dtype_hint=dtype_hint, name=name
+  )
 
 
 def base_dtype(dtype):
@@ -208,7 +210,9 @@ def assert_no_entries_with_modulus_zero(
     x = ops.convert_to_tensor(x, name="x")
     dtype = x.dtype
     should_be_nonzero = math_ops.abs(x)
-    zero = ops.convert_to_tensor(0, dtype=dtypes.real_dtype(dtype))
+    zero = ops.convert_to_tensor(
+        0, dtype=dtypes.real_dtype(dtype)
+    )
     return check_ops.assert_less(zero, should_be_nonzero, message=message)
 
 
@@ -230,7 +234,9 @@ def assert_zero_imag_part(x, message=None, name="assert_zero_imag_part"):
     if np.issubdtype(dtype, np.floating):
       return control_flow_ops.no_op()
 
-    zero = ops.convert_to_tensor(0, dtype=dtypes.real_dtype(dtype))
+    zero = ops.convert_to_tensor(
+        0, dtype=dtypes.real_dtype(dtype)
+    )
     return check_ops.assert_equal(zero, math_ops.imag(x), message=message)
 
 
@@ -277,7 +283,9 @@ def shape_tensor(shape, name=None):
     dtype = dtypes.int32
   else:
     dtype = None
-  return ops.convert_to_tensor(shape, dtype=dtype, name=name)
+  return ops.convert_to_tensor(
+      shape, dtype=dtype, name=name
+  )
 
 
 ################################################################################
@@ -339,7 +347,9 @@ def broadcast_matrix_batch_dims(batch_matrices, name=None):
     batch_matrices = list(batch_matrices)
 
     for i, mat in enumerate(batch_matrices):
-      batch_matrices[i] = ops.convert_to_tensor(mat)
+      batch_matrices[i] = ops.convert_to_tensor(
+          mat
+      )
       assert_is_batch_matrix(batch_matrices[i])
 
     if len(batch_matrices) < 2:
@@ -382,9 +392,12 @@ def broadcast_matrix_batch_dims(batch_matrices, name=None):
 def matrix_solve_with_broadcast(matrix, rhs, adjoint=False, name=None):
   """Solve systems of linear equations."""
   with ops.name_scope(name, "MatrixSolveWithBroadcast", [matrix, rhs]):
-    matrix = ops.convert_to_tensor(matrix, name="matrix")
+    matrix = ops.convert_to_tensor(
+        matrix, name="matrix"
+    )
     rhs = ops.convert_to_tensor(
-        rhs, name="rhs", dtype=matrix.dtype)
+        rhs, name="rhs", dtype=matrix.dtype
+    )
 
     # If either matrix/rhs has extra dims, we can reshape to get rid of them.
     matrix, rhs, reshape_inv, still_need_to_transpose = _reshape_for_efficiency(
@@ -498,6 +511,32 @@ def _reshape_for_efficiency(a,
 ################################################################################
 
 
+def is_adjoint_pair(x, y):
+  """True iff x and y are adjoints of each other (by id, not entries)."""
+  if x is y:  # Note that if x is y then all of their hints are the same!
+    if x.is_self_adjoint is False:  # pylint:disable=g-bool-id-comparison
+      return False
+    if x.is_self_adjoint:
+      return True
+  # Use the fact that if x = LinearOperatorAdjoint(y), then x.H is y.
+  return x.H is y or y.H is x
+
+
+def is_aat_form(operators):
+  """Returns True if operators is of the form A @ A.H, possibly recursively."""
+  operators = list(operators)
+  if not operators:
+    raise ValueError("AAT form is undefined for empty operators")
+
+  if len(operators) % 2:
+    return False
+
+  # Check for forms like (A1 @ A2) @ (A2.H @ A1.H)
+  return all(
+      is_adjoint_pair(operators[i], operators[-1 - i])
+      for i in range(len(operators) // 2))
+
+
 def use_operator_or_provided_hint_unless_contradicting(
     operator, hint_attr_name, provided_hint_value, message):
   """Get combined hint in the case where operator.hint should equal hint.
@@ -543,8 +582,12 @@ def arg_is_blockwise(block_dimensions, arg, arg_split_dim):
     if not any(nest.is_nested(x) for x in arg):
       return True
     else:
-      arg_dims = [ops.convert_to_tensor(
-          x).shape[arg_split_dim] for x in arg]
+      arg_dims = [
+          ops.convert_to_tensor(x).shape[
+              arg_split_dim
+          ]
+          for x in arg
+      ]
       self_dims = [dim.value for dim in block_dimensions]
 
       # If none of the operator dimensions are known, interpret the input as

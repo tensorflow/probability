@@ -22,6 +22,7 @@ load(
 )
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -155,34 +156,5 @@ py_library(
     name = "composite_tensor",
     srcs = ["composite_tensor.py"],
     deps = [
-        # tensorflow dep,
-    ],
-)
-
-py_test(
-    name = "composite_tensor_test",
-    srcs = ["composite_tensor_test.py"],
-    deps = [
-        ":composite_tensor",
-        # numpy dep,
-        # six dep,
-        # tensorflow:tensorflow_no_contrib dep,
-        "//tensorflow_probability/python/bijectors:bijector",
-        "//tensorflow_probability/python/bijectors:exp",
-        "//tensorflow_probability/python/bijectors:scale",
-        "//tensorflow_probability/python/bijectors:shift",
-        "//tensorflow_probability/python/bijectors:sigmoid",
-        "//tensorflow_probability/python/distributions:categorical",
-        "//tensorflow_probability/python/distributions:distribution",
-        "//tensorflow_probability/python/distributions:finite_discrete",
-        "//tensorflow_probability/python/distributions:independent",
-        "//tensorflow_probability/python/distributions:mixture_same_family",
-        "//tensorflow_probability/python/distributions:mvn_linear_operator",
-        "//tensorflow_probability/python/distributions:mvn_tril",
-        "//tensorflow_probability/python/distributions:normal",
-        "//tensorflow_probability/python/distributions:onehot_categorical",
-        "//tensorflow_probability/python/distributions:transformed_distribution",
-        "//tensorflow_probability/python/internal:test_util",
-        "//tensorflow_probability/python/layers:distribution_layer",
     ],
 )

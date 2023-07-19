@@ -18,6 +18,8 @@
 # [internal] load pytype.bzl (pytype_strict_library)
 load("//third_party/py/pytest:pytest_defs.bzl", "pytest_test")
 
+package(default_applicable_licenses = ["//tensorflow_probability:license"])
+
 licenses(["notice"])
 
 # pytype_strict

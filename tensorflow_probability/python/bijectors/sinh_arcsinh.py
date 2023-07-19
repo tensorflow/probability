@@ -30,7 +30,9 @@ __all__ = [
 ]
 
 
-class SinhArcsinh(bijector.AutoCompositeTensorBijector):
+class SinhArcsinh(
+    bijector.CoordinatewiseBijectorMixin,
+    bijector.AutoCompositeTensorBijector):
   """`Y = g(X) = Sinh( (Arcsinh(X) + skewness) * tailweight ) * multiplier`.
 
   For `skewness in (-inf, inf)` and `tailweight in (0, inf)`, this

@@ -635,8 +635,7 @@ def batch_interp_regular_nd_grid(x,
 
     def _batch_shape_of_zeros_with_rightmost_singletons(n_singletons):
       """Return Tensor of zeros with some singletons on the rightmost dims."""
-      ones = ps.ones(shape=[n_singletons], dtype=tf.int32)
-      return ps.concat([batch_shape, ones], axis=0)
+      return ps.concat([batch_shape, _int32ones(n_singletons)], axis=0)
 
     x = _broadcast_with(
         x, _batch_shape_of_zeros_with_rightmost_singletons(n_singletons=2))
@@ -840,8 +839,7 @@ def batch_interp_rectilinear_nd_grid(x,
 
     def _batch_shape_of_zeros_with_rightmost_singletons(n_singletons):
       """Return Tensor of zeros with some singletons on the rightmost dims."""
-      ones = ps.ones(shape=[n_singletons], dtype=tf.int32)
-      return ps.concat([batch_shape, ones], axis=0)
+      return ps.concat([batch_shape, _int32ones(n_singletons)], axis=0)
 
     x = _broadcast_with(
         x, _batch_shape_of_zeros_with_rightmost_singletons(n_singletons=2))
@@ -1106,28 +1104,25 @@ def _make_expand_x_fn_for_non_batch_interpolation(y_ref, axis):
   #   y_ref.shape[:axis] + x.shape + y_ref.shape[axis+1:]
 
   # Recall we made axis non-negative
-  y_ref_shape = ps.shape(y_ref)
-  y_ref_shape_left = y_ref_shape[:axis]
-  y_ref_shape_right = y_ref_shape[axis + 1:]
+  y_ref_shape_left = ps.shape_slice(y_ref, np.s_[:axis])
+  y_ref_shape_right = ps.shape_slice(y_ref, np.s_[axis + 1:])
 
   def expand_ends(x, broadcast=False):
     """Expand x so it can bcast w/ tensors of output shape."""
     # Assume out_shape = A + x.shape + B, and rank(A) = axis.
     # Expand with singletons with same rank as A, B.
-    expanded_shape = ps.pad(
-        tensor=ps.shape(x),
-        paddings=[[axis, ps.size(y_ref_shape_right)]],
-        constant_values=1)
+    expanded_shape = ps.concat(
+        [ps.shape(x), _int32ones(ps.size(y_ref_shape_right))], axis=0)
     x_expanded = tf.reshape(x, expanded_shape)
 
     if broadcast:
-      out_shape = ps.concat((
+      out_bcaster = ps.concat((
           y_ref_shape_left,
-          ps.shape(x),
+          _int32ones(ps.rank(x)),
           y_ref_shape_right,
       ),
-                            axis=0)
-      x_expanded = _broadcast_with(x_expanded, out_shape)
+                              axis=0)
+      x_expanded = _broadcast_with(x_expanded, out_bcaster)
     return x_expanded
 
   return expand_ends
@@ -1141,27 +1136,24 @@ def _make_expand_x_fn_for_batch_interpolation(y_ref, axis):
   #   x.shape[-1:] +  y_ref.shape[axis+1:]
 
   # Recall we made axis non-negative
-  y_ref_shape = ps.shape(y_ref)
-  y_ref_shape_left = y_ref_shape[:axis]
-  y_ref_shape_right = y_ref_shape[axis + 1:]
+  y_ref_shape_left = ps.shape_slice(y_ref, np.s_[:axis])
+  y_ref_shape_right = ps.shape_slice(y_ref, np.s_[axis + 1:])
 
   def expand_right_dims(x, broadcast=False):
     """Expand x so it can bcast w/ tensors of output shape."""
     x_shape_left = ps.shape_slice(x, np.s_[:-1])
     x_shape_right = ps.shape_slice(x, np.s_[-1:])
     expanded_shape_left = ps.broadcast_shape(
-        x_shape_left,
-        ps.ones([ps.size(y_ref_shape_left)], dtype=tf.int32))
-    expanded_shape = ps.concat(
-        (expanded_shape_left, x_shape_right,
-         ps.ones([ps.size(y_ref_shape_right)], dtype=tf.int32)),
-        axis=0)
+        x_shape_left, _int32ones(ps.size(y_ref_shape_left)))
+    expanded_shape = ps.concat((expanded_shape_left, x_shape_right,
+                                _int32ones(ps.size(y_ref_shape_right))),
+                               axis=0)
     x_expanded = tf.reshape(x, expanded_shape)
     if broadcast:
-      broadcast_shape_left = ps.broadcast_shape(
-          x_shape_left, y_ref_shape_left)
+      broadcast_shape_left = ps.broadcast_shape(x_shape_left, y_ref_shape_left)
+      ones_like_x_shape_right = _int32ones(1)
       broadcast_shape = ps.concat(
-          (broadcast_shape_left, x_shape_right, y_ref_shape_right),
+          (broadcast_shape_left, ones_like_x_shape_right, y_ref_shape_right),
           axis=0)
       x_expanded = _broadcast_with(x_expanded, broadcast_shape)
     return x_expanded
@@ -1188,12 +1180,10 @@ def _batch_gather_with_broadcast(params, indices, axis):
       ps.shape_slice(params, np.s_[:axis]), ps.shape_slice(indices, np.s_[:-1]))
   params = _broadcast_with(
       params,
-      ps.concat((leading_bcast_shape, ps.shape_slice(params, np.s_[axis:])),
+      ps.concat((leading_bcast_shape, _int32ones(ps.rank(params) - axis)),
                 axis=0))
   indices = _broadcast_with(
-      indices,
-      ps.concat((leading_bcast_shape, ps.shape_slice(indices, np.s_[-1:])),
-                axis=0))
+      indices, ps.concat((leading_bcast_shape, _int32ones(1)), axis=0))
   return tf.gather(
       params, indices, batch_dims=tensorshape_util.rank(indices.shape) - 1)
 
@@ -1214,3 +1204,7 @@ def _broadcast_with(tensor, shape):
       tf.broadcast_static_shape(tensor.shape,
                                 tf.TensorShape(tf.get_static_value(shape))))
   return res
+
+
+def _int32ones(n):
+  return ps.ones(n, dtype=tf.int32)

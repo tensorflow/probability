@@ -24,6 +24,7 @@ from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.glm import family
 from tensorflow_probability.python.glm import fisher_scoring
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_util
 
 
@@ -39,7 +40,7 @@ class FitTestFast(test_util.TestCase):
     model_coefficients = uniform.Uniform(
         low=np.array(-0.5, self.dtype), high=np.array(0.5, self.dtype)).sample(
             d, seed=seed())
-    radius = np.sqrt(2.)
+    radius = tf.cast(np.sqrt(2.), self.dtype)
     model_coefficients *= radius / tf.linalg.norm(tensor=model_coefficients)
     model_matrix = normal.Normal(
         loc=np.array(0, self.dtype),
@@ -69,12 +70,13 @@ class FitTestFast(test_util.TestCase):
         model_coefficients_true,
         linear_response_true,
     ] = self.make_dataset(n=int(1e4), d=3, link='probit')
-    model_coefficients, linear_response, is_converged, num_iter = fisher_scoring.fit(
-        model_matrix,
-        response,
-        family.BernoulliNormalCDF(),
-        fast_unsafe_numerics=self.fast,
-        maximum_iterations=10)
+    model_coefficients, linear_response, is_converged, num_iter = (
+        fisher_scoring.fit(
+            model_matrix,
+            response,
+            family.BernoulliNormalCDF(),
+            fast_unsafe_numerics=self.fast,
+            maximum_iterations=10))
     [
         model_coefficients_,
         linear_response_,
@@ -99,7 +101,7 @@ class FitTestFast(test_util.TestCase):
     # average.
     avg_response_diff = np.mean(linear_response_ - linear_response_true_)
 
-    self.assertTrue(num_iter_ < 10)
+    self.assertLess(num_iter_, 10)
     self.assertNear(0., avg_response_diff, err=4e-3)
     self.assertAllClose(0.8, accuracy, atol=0., rtol=0.03)
     self.assertAllClose(model_coefficients_true_, model_coefficients_,
@@ -113,12 +115,13 @@ class FitTestFast(test_util.TestCase):
         model_coefficients_true,
         linear_response_true,
     ] = self.make_dataset(n=int(1e4), d=3, link='linear')
-    model_coefficients, linear_response, is_converged, num_iter = fisher_scoring.fit(
-        model_matrix,
-        response,
-        family.Normal(),
-        fast_unsafe_numerics=self.fast,
-        maximum_iterations=10)
+    model_coefficients, linear_response, is_converged, num_iter = (
+        fisher_scoring.fit(
+            model_matrix,
+            response,
+            family.Normal(),
+            fast_unsafe_numerics=self.fast,
+            maximum_iterations=10))
     [
         model_coefficients_,
         linear_response_,
@@ -146,7 +149,7 @@ class FitTestFast(test_util.TestCase):
     # we're using a Newton-Raphson solver, we actually expect to obtain the
     # solution in one step. It takes two because the way we structure the while
     # loop means that the procedure can only terminate on the second iteration.
-    self.assertTrue(num_iter_ < 3)
+    self.assertLess(num_iter_, 3)
 
   def testBatchedOperationConverges(self):
     model_1 = self.make_dataset(n=10, d=3, link='linear')
@@ -211,7 +214,8 @@ class FitTestFast(test_util.TestCase):
         n=n, d=2, link='linear')
     # Really strong regularization should bring all regularized coefficients to
     # approximately 0.
-    l2_regularizer = np.array(1e9 * n, model_matrix.dtype.as_numpy_dtype)
+    l2_regularizer = np.array(1e9 * n,
+                              dtype_util.as_numpy_dtype(model_matrix.dtype))
 
     model_coefficients_uniform_penalty, _, is_converged_uniform_penalty, _ = (
         fisher_scoring.fit(
@@ -270,7 +274,8 @@ class FitTestSlow(FitTestFast):
         _,  # model_coefficients_true
         _,  # linear_response_true
     ] = self.make_dataset(n=n, d=3, link='probit')
-    l2_regularizer = np.array(0.07 * n, model_matrix.dtype.as_numpy_dtype)
+    l2_regularizer = np.array(0.07 * n,
+                              dtype_util.as_numpy_dtype(model_matrix.dtype))
     if not static_l2:
       l2_regularizer = tf1.placeholder_with_default(
           l2_regularizer, shape=[])

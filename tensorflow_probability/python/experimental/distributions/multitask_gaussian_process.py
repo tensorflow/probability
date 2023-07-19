@@ -14,9 +14,7 @@
 # ============================================================================
 """The MultiTaskGaussianProcess distribution class."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+import functools
 
 # Dependency imports
 import tensorflow.compat.v2 as tf
@@ -24,16 +22,19 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import cholesky_util
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import mvn_linear_operator
+from tensorflow_probability.python.distributions.internal import stochastic_process_util
 from tensorflow_probability.python.experimental.linalg import linear_operator_unitary
 from tensorflow_probability.python.experimental.psd_kernels import multitask_kernel
 from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
 def _vec(x):
@@ -69,13 +70,15 @@ def _compute_flattened_scale(
   Args:
     kernel: `MultiTaskKernel`-like instance representing the GP's covariance
       function.
-    index_points: `float` `Tensor` representing finite collection, or batch of
-      collections, of points in the index set over which the GP is defined.
-      Shape has the form `[b1, ..., bB, e, f1, ..., fF]` where `F` is the
-      number of feature dimensions and must equal `kernel.feature_ndims` and
-      `e` is the number (size) of index points in each batch. Ultimately this
-      distribution corresponds to an `e`-dimensional multivariate normal. The
-      batch shape must be broadcastable with `kernel.batch_shape`.
+    index_points: (Nested) `float` `Tensor` representing finite collection, or
+      batch of collections, of points in the index set over which the GP is
+      defined. Shape (or shape of each nested component) has the form
+      `[b1, ..., bB, e, f1, ..., fF]` where `F` is the number of feature
+      dimensions and must equal `kernel.feature_ndims` (or its corresponding
+      nested component) and `e` is the number (size) of index points in each
+      batch. Ultimately this distribution corresponds to an `e`-dimensional
+      multivariate normal. The batch shape must be broadcastable with
+      `kernel.batch_shape`.
     cholesky_fn: Callable which takes a single (batch) matrix argument and
       returns a Cholesky-like lower triangular factor.  Default value: `None`,
       in which case `make_cholesky_with_jitter_fn(1e-6)` is used.
@@ -140,10 +143,19 @@ def _compute_flattened_scale(
     kronecker_diags = []
     kronecker_orths = []
     for block in kernel_matrix.operators:
-      diag, orth = tf.linalg.eigh(block.to_dense())
-      kronecker_diags.append(tf.linalg.LinearOperatorDiag(diag))
-      kronecker_orths.append(
-          linear_operator_unitary.LinearOperatorUnitary(orth))
+      # No need to take an eigenvalue decomposition for diagonal operators since
+      # they are already in factored form.
+      if isinstance(block, (tf.linalg.LinearOperatorDiag,
+                            tf.linalg.LinearOperatorIdentity,
+                            tf.linalg.LinearOperatorScaledIdentity)):
+        kronecker_diags.append(block)
+        kronecker_orths.append(tf.linalg.LinearOperatorIdentity(
+            block.domain_dimension_tensor(), dtype=block.dtype))
+      else:
+        diag, orth = tf.linalg.eigh(block.to_dense())
+        kronecker_diags.append(tf.linalg.LinearOperatorDiag(diag))
+        kronecker_orths.append(
+            linear_operator_unitary.LinearOperatorUnitary(orth))
 
     full_diag = tf.linalg.LinearOperatorKronecker(kronecker_diags).diag_part()
     full_diag = full_diag + observation_noise_variance[..., tf.newaxis]
@@ -196,18 +208,20 @@ class MultiTaskGaussianProcess(distribution.AutoCompositeTensorDistribution):
     Args:
       kernel: `MultiTaskKernel`-like instance representing the
         GP's covariance function.
-      index_points: `float` `Tensor` representing finite collection, or batch of
-        collections, of points in the index set over which the GP is defined.
-        Shape has the form `[b1, ..., bB, e, f1, ..., fF]` where `F` is the
-        number of feature dimensions and must equal `kernel.feature_ndims` and
-        `e` is the number (size) of index points in each batch. Ultimately this
-        distribution corresponds to an `e`-dimensional multivariate normal. The
-        batch shape must be broadcastable with `kernel.batch_shape`.
+      index_points: (Nested) `float` `Tensor` representing finite collection, or
+        batch of collections, of points in the index set over which the GP is
+        defined. Shape (of shape of each nested component) has the form
+        `[b1, ..., bB, e, f1, ..., fF]` where `F` is the number of feature
+        dimensions and must equal `kernel.feature_ndims` (or its corresponding
+        nested component) and `e` is the number (size) of index points in each
+        batch. Ultimately this distribution corresponds to an `e`-dimensional
+        multivariate normal. The batch shape must be broadcastable with
+        `kernel.batch_shape`.
       mean_fn: Python `callable` that acts on `index_points` to produce a
-        (batch of) collection of mean values at `index_points`. Takes a `Tensor`
-        of shape `[b1, ..., bB, e, f1, ..., fF]` and returns a `Tensor` whose
-        shape is broadcastable with `[b1, ..., bB, e, t]`, where `t` is the
-        number of tasks.
+        (batch of) collection of mean values at `index_points`. Takes a (nested)
+        `Tensor` of shape `[b1, ..., bB, e, f1, ..., fF]` and returns a `Tensor`
+        whose shape is broadcastable with `[b1, ..., bB, e, t]`, where `t` is
+        the number of tasks.
       observation_noise_variance: `float` `Tensor` representing the variance
         of the noise in the Normal likelihood distribution of the model. May be
         batched, in which case the batch shape must be broadcastable with the
@@ -232,10 +246,24 @@ class MultiTaskGaussianProcess(distribution.AutoCompositeTensorDistribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      dtype = dtype_util.common_dtype(
-          [index_points, observation_noise_variance], tf.float32)
-      index_points = tensor_util.convert_nonref_to_tensor(
-          index_points, dtype=dtype, name='index_points')
+      if tf.nest.is_nested(kernel.feature_ndims):
+        input_dtype = dtype_util.common_dtype(
+            [kernel, index_points],
+            dtype_hint=nest_util.broadcast_structure(
+                kernel.feature_ndims, tf.float32))
+        dtype = dtype_util.common_dtype(
+            [observation_noise_variance], tf.float32)
+      else:
+        # If the index points are not nested, we assume they are of the same
+        # float dtype as the kernel.
+        dtype = dtype_util.common_dtype(
+            [kernel, index_points, observation_noise_variance], tf.float32)
+        input_dtype = dtype
+
+      if index_points is not None:
+        index_points = nest_util.convert_to_nested_tensor(
+            index_points, dtype=input_dtype, name='index_points',
+            convert_ref=False, allow_packing=True)
       observation_noise_variance = tensor_util.convert_nonref_to_tensor(
           observation_noise_variance,
           dtype=dtype,
@@ -246,17 +274,8 @@ class MultiTaskGaussianProcess(distribution.AutoCompositeTensorDistribution):
       self._kernel = kernel
       self._index_points = index_points
 
-      if mean_fn is None:
-        def _mean_fn(x):
-          # Shape B1 + [E, N], where E is the number of index points, and N is
-          # the number of tasks.
-          return tf.zeros(ps.concat(
-              [ps.shape(x)[:-self.kernel.feature_ndims],
-               [self.kernel.num_tasks]], axis=0), dtype=dtype)
-        mean_fn = _mean_fn
-      else:
-        if not callable(mean_fn):
-          raise ValueError('`mean_fn` must be a Python callable')
+      mean_fn = stochastic_process_util.maybe_create_multitask_mean_fn(
+          mean_fn, kernel, dtype)
       self._mean_fn = mean_fn
       # Scalar or vector the size of the number of tasks.
       self._observation_noise_variance = observation_noise_variance
@@ -309,14 +328,15 @@ class MultiTaskGaussianProcess(distribution.AutoCompositeTensorDistribution):
         `observations_is_missing` is not `None`, this distribution is
         conditioned only on the observations for which the
         corresponding elements of `observations_is_missing` are `False`.
-      predictive_index_points: `float` `Tensor` representing finite collection,
-        or batch of collections, of points in the index set over which the GP
-        is defined.
-        Shape has the form `[b1, ..., bB, e, f1, ..., fF]` where `F` is the
-        number of feature dimensions and must equal `kernel.feature_ndims` and
-        `e` is the number (size) of predictive index points in each batch.
-        The batch shape must be broadcastable with this distributions
-        `batch_shape`.
+      predictive_index_points: (Nested) `float` `Tensor` representing finite
+        collection, or batch of collections, of points in the index set over
+        which the GP is defined.
+        Shape (or shape of each nested component) has the form
+        `[b1, ..., bB, e, f1, ..., fF]` where `F` is the number of feature
+        dimensions and must equal `kernel.feature_ndims` (or its corresponding
+        nested component) and `e` is the number (size) of predictive index
+        points in each batch. The batch shape must be broadcastable with this
+        distributions `batch_shape`.
         Default value: `None`.
       **kwargs: Any other keyword arguments to pass / override.
 
@@ -372,8 +392,10 @@ class MultiTaskGaussianProcess(distribution.AutoCompositeTensorDistribution):
     from tensorflow_probability.python.bijectors import softplus as softplus_bijector  # pylint:disable=g-import-not-at-top
     return dict(
         index_points=parameter_properties.ParameterProperties(
-            event_ndims=lambda self: self.kernel.feature_ndims + 1,
-            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED),
+            event_ndims=lambda self: tf.nest.map_structure(  # pylint: disable=g-long-lambda
+                lambda nd: nd + 1, self.kernel.feature_ndims),
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
+        ),
         kernel=parameter_properties.BatchedComponentProperties(),
         observation_noise_variance=parameter_properties.ParameterProperties(
             event_ndims=0,
@@ -383,31 +405,25 @@ class MultiTaskGaussianProcess(distribution.AutoCompositeTensorDistribution):
 
   def _event_shape(self, index_points=None):
     index_points = self._get_index_points(index_points)
-    return tf.TensorShape([
-        index_points.shape[-(self.kernel.feature_ndims + 1)],
-        self.kernel.num_tasks])
+    return stochastic_process_util.multitask_event_shape(
+        self.kernel, index_points)
 
   def _event_shape_tensor(self, index_points=None):
     index_points = self._get_index_points(index_points)
-    return ps.concat([
-        [ps.shape(index_points)[-(self.kernel.feature_ndims + 1)]],
-        [self.kernel.num_tasks]], axis=0)
+    return stochastic_process_util.multitask_event_shape_tensor(
+        self.kernel, index_points)
 
   def _batch_shape(self, index_points=None):
     # TODO(b/249858459): Update `batch_shape_lib` so it can take override
     # parameters.
     result = batch_shape_lib.inferred_batch_shape(self)
     if index_points is not None:
-      return ps.broadcast_shape(
-          result,
-          index_points.shape[:-(self.kernel.feature_ndims + 1)])
+      shapes = tf.nest.map_structure(
+          lambda t, nd: t.shape[:-(nd + 1)],
+          index_points, self.kernel.feature_ndims)
+      flat_shapes = nest.flatten_up_to(self.kernel.feature_ndims, shapes)
+      return functools.reduce(ps.broadcast_shape, flat_shapes, result)
     return result
-
-  def _batch_shape_tensor(self, index_points=None):
-    kwargs = {}
-    if index_points is not None:
-      kwargs = {'index_points': index_points}
-    return batch_shape_lib.inferred_batch_shape_tensor(self, **kwargs)
 
   def _get_flattened_marginal_distribution(self, index_points=None):
     # This returns a MVN of event size [N * E], where N is the number of tasks
@@ -462,8 +478,9 @@ class MultiTaskGaussianProcess(distribution.AutoCompositeTensorDistribution):
           'which takes `index_points` as an argument and returns a `Normal` or '
           '`MultivariateNormalLinearOperator` instance, whose KL can be '
           'computed.')
-    return tf.convert_to_tensor(
-        index_points if index_points is not None else self._index_points)
+    return nest_util.convert_to_nested_tensor(
+        index_points if index_points is not None else self._index_points,
+        dtype_hint=self.kernel.dtype, allow_packing=True)
 
   def _check_observations_valid(self, observations, index_points):
     observation_rank = tensorshape_util.rank(observations.shape)
@@ -486,8 +503,16 @@ class MultiTaskGaussianProcess(distribution.AutoCompositeTensorDistribution):
     if observation_rank >= 2:
       num_index_points = tf.compat.dimension_value(observations.shape[-2])
 
-      expected_num_index_points = index_points.shape[
-          -(self.kernel.feature_ndims + 1)]
+      flat_shapes = tf.nest.flatten(
+          tf.nest.map_structure(lambda t, nd: t.shape[-(nd + 1):-nd],
+                                index_points, self.kernel.feature_ndims))
+      if None in flat_shapes:
+        expected_num_index_points = None
+      else:
+        dim = functools.reduce(
+            tf.broadcast_static_shape, flat_shapes, tf.TensorShape([]))
+        expected_num_index_points = tf.compat.dimension_value(dim)
+
       if (num_index_points is not None and
           expected_num_index_points is not None and
           num_index_points != 1 and

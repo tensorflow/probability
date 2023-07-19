@@ -800,14 +800,15 @@ class MixtureTest(test_util.TestCase):
                                 shape=tf.TensorShape(None))
     loc = tf.Variable(np.zeros((3, 5, 4)), dtype=tf.float32,
                       shape=tf.TensorShape(None))
-    scale = tf.Variable(1., dtype=tf.float32, shape=tf.TensorShape(None))
+    scale_diag = tf.Variable(
+        np.ones((3, 5, 4)), dtype=tf.float32, shape=tf.TensorShape(None))
 
     dist = mixture.Mixture(
         categorical.Categorical(logits=logits),
         components=[
             dirichlet.Dirichlet(concentration),
             mvn_diag.MultivariateNormalDiag(
-                loc=loc, scale_identity_multiplier=scale)
+                loc=loc, scale_diag=scale_diag)
         ],
         validate_args=True)
 

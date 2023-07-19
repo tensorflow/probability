@@ -390,7 +390,10 @@ def _sample_multinomial_as_iterated_binomial(
     def fn(i, num_trials, consumed_prob, accum):
       """Sample the counts for one class using binomial."""
       probs_here = tf.gather(probs, i, axis=-1)
-      binomial_probs = tf.clip_by_value(probs_here / (1. - consumed_prob), 0, 1)
+      binomial_probs = tf.clip_by_value(
+          # Divide without nan; we could have probs_here=0 and consumed_prob=1.
+          tf.math.divide_no_nan(probs_here, (1. - consumed_prob)),
+          0, 1)
       seed_here = tf.gather(seeds, i, axis=0)
       binom = binomial.Binomial(total_count=num_trials, probs=binomial_probs)
       # Not passing `num_samples` to `binom.sample`, as it's is already in

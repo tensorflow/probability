@@ -1248,8 +1248,9 @@ class MultipartBijectorsTest(test_util.TestCase):
     # Test that `.sample()` works and returns a result of the expected structure
     # and shape.
     y_sampled = transformed_dist.sample(sample_shape, seed=seed())
-    self.assertAllEqual(tf.nest.map_structure(lambda y: y.shape, y),
-                        tf.nest.map_structure(lambda y: y.shape, y_sampled))
+    self.assertAllEqualNested(
+        tf.nest.map_structure(lambda y: y.shape, y),
+        tf.nest.map_structure(lambda y: y.shape, y_sampled))
 
     # Test that a `Restructure` bijector applied to a `JointDistribution` works
     # as expected.

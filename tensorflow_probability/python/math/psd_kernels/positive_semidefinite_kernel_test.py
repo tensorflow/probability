@@ -26,6 +26,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
+from tensorflow_probability.python.math.psd_kernels.internal import test_util as psd_kernel_test_util
 from tensorflow_probability.python.math.psd_kernels.internal import util as kernels_util
 
 
@@ -171,7 +172,6 @@ class PositiveSemidefiniteKernelTest(test_util.TestCase):
   @parameterized.named_parameters(
       ('String feature_ndims', 'non-integer'),
       ('Float feature_ndims', 4.2),
-      ('Zero feature_ndims', 0),
       ('Negative feature_ndims', -3))
   def testFeatureNdimsExceptions(self, feature_ndims):
 
@@ -489,9 +489,11 @@ class PositiveSemidefiniteKernelTest(test_util.TestCase):
       {'foo': 3, 'bar': 2})
   def testMultipartKernelFeatureNdims(self, **feature_ndims):
     k0 = TestKernel(multiplier=3.)
-    mk0 = test_util.MultipartKernel(k0, feature_ndims=feature_ndims)
+    mk0 = psd_kernel_test_util.MultipartTestKernel(
+        k0, feature_ndims=feature_ndims)
     k1 = TestKernel(multiplier=2.)
-    mk1 = test_util.MultipartKernel(k1, feature_ndims=feature_ndims)
+    mk1 = psd_kernel_test_util.MultipartTestKernel(
+        k1, feature_ndims=feature_ndims)
 
     # Define inputs to the multipart kernel. `x` has batch shape, `y` does not.
     x = {'foo': np.random.normal(
@@ -518,7 +520,8 @@ class PositiveSemidefiniteKernelTest(test_util.TestCase):
 
   def testMultipartKernelBatchExampleShapesBroadcast(self):
     k = TestKernel(multiplier=3.)
-    mk = test_util.MultipartKernel(k, feature_ndims={'foo': 2, 'bar': 1})
+    mk = psd_kernel_test_util.MultipartTestKernel(
+        k, feature_ndims={'foo': 2, 'bar': 1})
 
     # x has broadcasted batch and example dims [2, 3, 4].
     x = {'foo': tf.ones([3, 4, 2, 2]), 'bar': tf.ones([2, 3, 1, 5])}

@@ -494,6 +494,10 @@ class VonMisesFisher(distribution.AutoCompositeTensorDistribution):
             validate_args=self.validate_args)
     ], validate_args=self.validate_args)
 
+  def _experimental_tangent_space(self, x):
+    from tensorflow_probability.python.experimental.tangent_spaces import spherical  # pylint:disable=g-import-not-at-top
+    return spherical.SphericalSpace()
+
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []

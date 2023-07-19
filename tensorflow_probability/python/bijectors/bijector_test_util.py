@@ -20,6 +20,7 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.bijectors import reshape as reshape_bijector
 from tensorflow_probability.python.distributions import uniform as uniform_distribution
 from tensorflow_probability.python.internal import dtype_util
@@ -324,3 +325,46 @@ def get_fldj_theoretical(bijector,
       f(x_unconstrained), event_ndims=inverse_event_ndims)
   return (log_det_jacobian + tf.cast(input_correction, log_det_jacobian.dtype) -
           tf.cast(output_correction, log_det_jacobian.dtype))
+
+
+# TODO(b/182603117): Add other bijector methods for use in future tests.
+class NonCompositeTensorScale(bijector_lib.Bijector):
+  """`Scale` bijector that is not a `CompositeTensor`."""
+
+  def __init__(self, scale):
+    parameters = dict(locals())
+    self.scale = scale
+    super(NonCompositeTensorScale, self).__init__(
+        validate_args=True,
+        forward_min_event_ndims=0.,
+        parameters=parameters,
+        name='non_composite_scale')
+
+  def _forward(self, x):
+    return x * self.scale
+
+  def _inverse(self, y):
+    return y / self.scale
+
+
+class NonCompositeTensorExp(bijector_lib.Bijector):
+  """`Exp` bijector that is not a `CompositeTensor`."""
+
+  def __init__(self):
+    parameters = dict(locals())
+    super(NonCompositeTensorExp, self).__init__(
+        validate_args=True,
+        forward_min_event_ndims=0.,
+        parameters=parameters,
+        name='non_composite_exp')
+
+  def _forward(self, x):
+    return tf.math.exp(x)
+
+  def _inverse(self, y):
+    return tf.math.log(y)
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+

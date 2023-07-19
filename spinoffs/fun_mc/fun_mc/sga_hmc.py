@@ -23,9 +23,10 @@ SGA-HMC is generalized version of ChEES-HMC described in [1]
      preparation.
 """
 
-from typing import Any, Callable, Iterable, Mapping, NamedTuple, Optional, Tuple  # pylint: disable=unused-import
+from collections.abc import Mapping
+from typing import Any, Callable, NamedTuple, Optional
 
-from immutabledict import immutabledict
+import immutabledict
 from fun_mc import backend
 from fun_mc import fun_mc_lib as fun_mc
 
@@ -52,22 +53,23 @@ __all__ = [
 
 
 class HamiltonianMonteCarloWithStateGradsExtra(NamedTuple):
-  """Extra outputs for 'hamiltonian_monte_carlo_with_state_grads_step'."""
-  hmc_extra: 'fun_mc.HamiltonianMonteCarloExtra'
-  num_integrator_steps: 'fun_mc.IntTensor'
-  proposed_state: 'fun_mc.State'
+  """Extra outputs for hamiltonian_monte_carlo_with_state_grads_step."""
+  hmc_extra: fun_mc.HamiltonianMonteCarloExtra
+  num_integrator_steps: fun_mc.IntTensor
+  proposed_state: fun_mc.State
 
 
 @util.named_call
 def hamiltonian_monte_carlo_with_state_grads_step(
-    hmc_state: 'fun_mc.HamiltonianMonteCarloState',
-    trajectory_length: 'fun_mc.FloatTensor',
-    scalar_step_size: 'fun_mc.FloatTensor',
-    step_size_scale: 'fun_mc.FloatNest' = 1.,
-    named_axis: 'Optional[fun_mc.StringNest]' = None,
-    **hmc_kwargs
-) -> ('Tuple[fun_mc.HamiltonianMonteCarloState, '
-      'HamiltonianMonteCarloWithStateGradsExtra]'):
+    hmc_state: fun_mc.HamiltonianMonteCarloState,
+    trajectory_length: fun_mc.FloatTensor,
+    scalar_step_size: fun_mc.FloatTensor,
+    step_size_scale: fun_mc.FloatNest = 1.0,
+    named_axis: Optional[fun_mc.StringNest] = None,
+    **hmc_kwargs,
+) -> tuple[
+    fun_mc.HamiltonianMonteCarloState, HamiltonianMonteCarloWithStateGradsExtra
+]:
   """Hamiltonian Monte Carlo (HMC) step with gradients for proposed state.
 
   This acts as a `fun_mc.hamiltonian_monte_carlo_step`, where the
@@ -100,9 +102,15 @@ def hamiltonian_monte_carlo_with_state_grads_step(
        for Setting Trajectory Lengths in Hamiltonian Monte Carlo.
        http://proceedings.mlr.press/v130/hoffman21a.html
   """
+  consts = scalar_step_size, hmc_state, step_size_scale
+  flat_consts = util.flatten_tree(consts)
 
   @tf.custom_gradient
-  def hmc(trajectory_length):
+  def hmc(*traj_and_flat_consts):
+    trajectory_length = traj_and_flat_consts[0]
+    scalar_step_size, hmc_state, step_size_scale = (
+        util.unflatten_tree(consts, traj_and_flat_consts[1:])
+    )
     trajectory_length = tf.convert_to_tensor(trajectory_length)
     num_integrator_steps = tf.cast(
         tf.math.ceil(trajectory_length / scalar_step_size), tf.int32)
@@ -153,27 +161,28 @@ def hamiltonian_monte_carlo_with_state_grads_step(
       else:
         named_axis_bc = named_axis
 
-      return sum(
+      traj_grad = sum(
           util.flatten_tree(
               util.map_tree_up_to(state_grads, do_sum, state_grads,
                                   named_axis_bc)))
+      return (traj_grad,) + (None,) * len(flat_consts)
 
     return res, grad
 
-  return hmc(trajectory_length)
+  return hmc(trajectory_length, *flat_consts)
 
 
 @util.named_call
 def chees_criterion(
-    previous_state: 'fun_mc.State',
-    proposed_state: 'fun_mc.State',
-    accept_prob: 'fun_mc.FloatTensor',
-    trajectory_length: 'Optional[fun_mc.FloatTensor]' = None,
-    state_mean: 'Optional[fun_mc.State]' = None,
-    state_mean_weight: 'fun_mc.FloatNest' = 0.,
-    named_axis: 'Optional[fun_mc.StringNest]' = None,
-    chain_named_axis: 'Optional[fun_mc.StringNest]' = None,
-) -> 'Tuple[fun_mc.FloatTensor, fun_mc.FloatTensor]':
+    previous_state: fun_mc.State,
+    proposed_state: fun_mc.State,
+    accept_prob: fun_mc.FloatTensor,
+    trajectory_length: Optional[fun_mc.FloatTensor] = None,
+    state_mean: Optional[fun_mc.State] = None,
+    state_mean_weight: fun_mc.FloatNest = 0.,
+    named_axis: Optional[fun_mc.StringNest] = None,
+    chain_named_axis: Optional[fun_mc.StringNest] = None,
+) -> tuple[fun_mc.FloatTensor, fun_mc.FloatTensor]:
   """The ChEES criterion from [1].
 
   ChEES stands for Change in the Estimator of the Expected Square.
@@ -268,7 +277,7 @@ def chees_criterion(
     # values.
     x_safe = tf.where(tf.math.is_finite(x), x, tf.zeros_like(x))
     # If all accept_prob's are zero, the x_center will have a nonsense value,
-    # but we'll set the overall criterion to zero in this case, so it's fine.
+    # but well set the overall criterion to zero in this case, so its fine.
     x_center = (
         distribute_lib.reduce_sum(
             expanded_accept_prob * x_safe,
@@ -321,23 +330,23 @@ def chees_criterion(
 
 
 class ChEESPerGradExtra(NamedTuple):
-  chees: 'fun_mc.FloatTensor'
-  per_chain_chees: 'fun_mc.FloatTensor'
-  per_chain_chees_per_grad: 'fun_mc.FloatTensor'
+  chees: fun_mc.FloatTensor
+  per_chain_chees: fun_mc.FloatTensor
+  per_chain_chees_per_grad: fun_mc.FloatTensor
 
 
 @util.named_call
 def chees_per_grad_criterion(
-    previous_state: 'fun_mc.State',
-    proposed_state: 'fun_mc.State',
-    accept_prob: 'fun_mc.FloatTensor',
-    trajectory_length: 'fun_mc.FloatTensor',
-    power: 'fun_mc.FloatTensor' = 1.,
-    state_mean: 'Optional[fun_mc.State]' = None,
-    state_mean_weight: 'fun_mc.FloatNest' = 0.,
-    named_axis: 'Optional[fun_mc.StringNest]' = None,
-    chain_named_axis: 'Optional[fun_mc.StringNest]' = None,
-) -> 'Tuple[fun_mc.FloatTensor, ChEESPerGradExtra]':
+    previous_state: fun_mc.State,
+    proposed_state: fun_mc.State,
+    accept_prob: fun_mc.FloatTensor,
+    trajectory_length: fun_mc.FloatTensor,
+    power: fun_mc.FloatTensor = 1.,
+    state_mean: Optional[fun_mc.State] = None,
+    state_mean_weight: fun_mc.FloatNest = 0.,
+    named_axis: Optional[fun_mc.StringNest] = None,
+    chain_named_axis: Optional[fun_mc.StringNest] = None,
+) -> tuple[fun_mc.FloatTensor, ChEESPerGradExtra]:
   """ChEES per gradient criterion.
 
   This criterion is computed as:
@@ -398,8 +407,8 @@ def chees_per_grad_criterion(
 
 
 @util.named_call
-def _halton(float_index: 'fun_mc.FloatTensor',
-            max_bits: 'fun_mc.FloatTensor' = 10) -> 'fun_mc.FloatTensor':
+def _halton(float_index: fun_mc.FloatTensor,
+            max_bits: fun_mc.FloatTensor = 10) -> fun_mc.FloatTensor:
   float_index = tf.convert_to_tensor(float_index)
   bit_masks = 2**tf.range(max_bits, dtype=float_index.dtype)
   return tf.einsum('i,i->', tf.math.mod((float_index + 1) // bit_masks, 2),
@@ -408,18 +417,18 @@ def _halton(float_index: 'fun_mc.FloatTensor',
 
 class DefaultTrajectoryLengthParams(NamedTuple):
   """Learnable trajectory length parameters."""
-  log_mean_trajectory_length: 'fun_mc.FloatTensor'
+  log_mean_trajectory_length: fun_mc.FloatTensor
 
   @util.named_call
-  def mean_trajectory_length(self) -> 'fun_mc.FloatTensor':
+  def mean_trajectory_length(self) -> fun_mc.FloatTensor:
     """Computes the mean trajectory length."""
     return tf.exp(self.log_mean_trajectory_length)
 
 
 @util.named_call
 def default_trajectory_length_sample(
-    trajectory_length_params: 'DefaultTrajectoryLengthParams',
-    step: 'fun_mc.IntTensor', seed: Any) -> 'fun_mc.FloatTensor':
+    trajectory_length_params: DefaultTrajectoryLengthParams,
+    step: fun_mc.IntTensor, seed: Any) -> fun_mc.FloatTensor:
   """Samples a trajectory length.
 
   The trajectory length is sampled from `[0, 2 * mean_trajectory_length]`. The
@@ -445,8 +454,8 @@ def default_trajectory_length_sample(
 
 @util.named_call
 def default_trajectory_length_constrain(
-    trajectory_length_params: 'DefaultTrajectoryLengthParams',
-    max_trajectory_length: 'fun_mc.FloatTensor' = 3.) -> 'fun_mc.FloatTensor':
+    trajectory_length_params: DefaultTrajectoryLengthParams,
+    max_trajectory_length: fun_mc.FloatTensor = 3.) -> fun_mc.FloatTensor:
   """Constrains the trajectory parameters.
 
   Args:
@@ -468,8 +477,8 @@ def default_trajectory_length_constrain(
 
 @util.named_call
 def default_trajectory_length_init(
-    init_trajectory_length: 'fun_mc.FloatTensor'
-) -> 'DefaultTrajectoryLengthParams':
+    init_trajectory_length: fun_mc.FloatTensor
+) -> DefaultTrajectoryLengthParams:
   """Initializes trajectory parameters.
 
   Args:
@@ -484,29 +493,29 @@ def default_trajectory_length_init(
 
 class StochasticGradientAscentHMCState(NamedTuple):
   """Stochastic Gradient Ascent Hamiltonian Monte Carlo state."""
-  hmc_state: 'fun_mc.HamiltonianMonteCarloState'
-  step: 'fun_mc.IntTensor'
-  trajectory_length_params_opt_state: 'fun_mc.AdamState'
-  trajectory_length_params_rmean_state: 'fun_mc.RunningMeanState'
+  hmc_state: fun_mc.HamiltonianMonteCarloState
+  step: fun_mc.IntTensor
+  trajectory_length_params_opt_state: fun_mc.AdamState
+  trajectory_length_params_rmean_state: fun_mc.RunningMeanState
 
 
 class StochasticGradientAscentHMCExtra(NamedTuple):
   """Stochastic Gradient Ascent Hamiltonian Monte Carlo extra."""
-  hmc_extra: 'fun_mc.HamiltonianMonteCarloExtra'
-  num_integrator_steps: 'fun_mc.IntTensor'
-  trajectory_length_params_opt_extra: 'fun_mc.AdamExtra'
-  trajectory_length_params: 'Any'
-  criterion: 'fun_mc.FloatTensor'
-  criterion_extra: 'Any'
+  hmc_extra: fun_mc.HamiltonianMonteCarloExtra
+  num_integrator_steps: fun_mc.IntTensor
+  trajectory_length_params_opt_extra: fun_mc.AdamExtra
+  trajectory_length_params: Any
+  criterion: fun_mc.FloatTensor
+  criterion_extra: Any
 
 
 @util.named_call
 def stochastic_gradient_ascent_hmc_init(
-    state: 'fun_mc.State',
-    target_log_prob_fn: 'fun_mc.PotentialFn',
-    init_trajectory_length: 'fun_mc.FloatTensor',
+    state: fun_mc.State,
+    target_log_prob_fn: fun_mc.PotentialFn,
+    init_trajectory_length: fun_mc.FloatTensor,
     trajectory_length_params_init_fn:
-    'Callable[[fun_mc.FloatTensor], Any]' = default_trajectory_length_init):
+    Callable[[fun_mc.FloatTensor], Any] = default_trajectory_length_init):
   """Initialize Stochastic Gradient Ascent HMC state.
 
   Args:
@@ -537,23 +546,26 @@ def stochastic_gradient_ascent_hmc_init(
 
 @util.named_call
 def stochastic_gradient_ascent_hmc_step(
-    sga_hmc_state: 'StochasticGradientAscentHMCState',
-    scalar_step_size: 'fun_mc.FloatNest',
-    criterion_fn: 'Callable[[fun_mc.State, fun_mc.State, fun_mc.FloatTensor, '
-    'fun_mc.FloatTensor], Tuple[fun_mc.FloatTensor, Any]]',
-    trajectory_length_adaptation_rate: 'fun_mc.FloatTensor' = 0.05,
-    trajectory_length_sample_fn: 'Callable[[Any, fun_mc.IntTensor, Any], '
-    'fun_mc.FloatTensor]' = (default_trajectory_length_sample),
-    trajectory_length_constrain_fn: 'Callable[[Any], Any]' = (
-        default_trajectory_length_constrain),
-    adam_kwargs: 'Mapping[str, Any]' = immutabledict({
-        'beta_1': 0.,
-        'beta_2': 0.5
-    }),
-    averaging_window_steps: 'fun_mc.IntTensor' = 100,
-    adapt: 'fun_mc.BooleanTensor' = True,
-    seed: 'Any' = None,
-    **hmc_kwargs: 'Mapping[str, Any]',
+    sga_hmc_state: StochasticGradientAscentHMCState,
+    scalar_step_size: fun_mc.FloatNest,
+    criterion_fn: Callable[
+        [fun_mc.State, fun_mc.State, fun_mc.FloatTensor, fun_mc.FloatTensor],
+        tuple[fun_mc.FloatTensor, Any],
+    ],
+    trajectory_length_adaptation_rate: fun_mc.FloatTensor = 0.05,
+    trajectory_length_sample_fn: Callable[
+        [Any, fun_mc.IntTensor, Any], fun_mc.FloatTensor
+    ] = (default_trajectory_length_sample),
+    trajectory_length_constrain_fn: Callable[[Any], Any] = (
+        default_trajectory_length_constrain
+    ),
+    adam_kwargs: Mapping[str, Any] = immutabledict.immutabledict(
+        {'beta_1': 0.0, 'beta_2': 0.5}
+    ),
+    averaging_window_steps: fun_mc.IntTensor = 100,
+    adapt: fun_mc.BooleanTensor = True,
+    seed: Any = None,
+    **hmc_kwargs: Mapping[str, Any],
 ):
   """Stochastic gradient ascent Hamiltonian Monte Carlo step.
 

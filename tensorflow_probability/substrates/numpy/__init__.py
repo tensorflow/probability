@@ -23,6 +23,7 @@ from tensorflow_probability.python.version import __version__
 from tensorflow_probability.substrates.numpy import bijectors
 from tensorflow_probability.substrates.numpy import distributions
 from tensorflow_probability.substrates.numpy import experimental
+from tensorflow_probability.substrates.numpy import glm
 from tensorflow_probability.substrates.numpy import internal
 from tensorflow_probability.substrates.numpy import math
 from tensorflow_probability.substrates.numpy import mcmc
@@ -35,3 +36,7 @@ from tensorflow_probability.substrates.numpy import util
 from tensorflow_probability.substrates.numpy import vi
 
 from tensorflow_probability.python.internal.backend import numpy as tf2numpy
+
+# from tensorflow_probability.substrates.numpy.google import tfp_google  # DisableOnExport  # pylint:disable=line-too-long
+# tfp_google.bind(globals())  # DisableOnExport
+# del tfp_google  # DisableOnExport

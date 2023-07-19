@@ -139,7 +139,7 @@ def ccipca(sample: jnp.ndarray, r: jnp.ndarray) -> jnp.ndarray:
   return (act[:, jnp.newaxis] * sample).mean(0)
 
 
-def snaper_criterion(
+def snaper_criterion(  # pytype: disable=annotation-type-mismatch  # jax-ndarray
     previous_state: jnp.ndarray,
     proposed_state: jnp.ndarray,
     accept_prob: jnp.ndarray,
@@ -467,7 +467,7 @@ def adaptive_mcmc_step(
       traj_factor = halton(amcmc_state.step.astype(jnp.float32)) * 2.
     elif jitter_style == 'exponential':
       traj_factor = tfd.Exponential(1.).sample(
-          seed=jax.random.PRNGKey(amcmc_state.step))
+          seed=jax.random.PRNGKey(amcmc_state.step))  # pytype: disable=wrong-arg-types  # jax-ndarray
     elif jitter_style == 'halton_exponential':
       traj_factor = -jnp.log(halton(amcmc_state.step.astype(jnp.float32)))
   elif method == 'malt':
@@ -1078,7 +1078,7 @@ def meads_step(meads_state: MeadsState,
   phmc_state = meads_state.phmc_state
 
   # Randomly refold the walkers.
-  perm = jax.random.permutation(jax.random.PRNGKey(step // 4), num_chains)
+  perm = jax.random.permutation(jax.random.PRNGKey(step // 4), num_chains)  # pytype: disable=wrong-arg-types  # jax-ndarray
   # TODO(mhoffman): This should really done with a scatter.
   unperm = jnp.eye(num_chains)[perm].argmax(0)
 
@@ -1154,7 +1154,7 @@ def meads_step(meads_state: MeadsState,
       step=step + 1,
   )
 
-  extra = MeadsExtra(
+  extra = MeadsExtra(  # pytype: disable=wrong-arg-types  # jax-ndarray
       phmc_extra=phmc_extra,
       scalar_step_size=scalar_step_size,
       vector_step_size=vector_step_size,
@@ -1332,7 +1332,7 @@ def run_adaptive_mcmc_on_target(
     mean = ground_truth['stats']['m1']['mean']
     if save_warmup:
       bias = {
-          'bias': compute_bias(trace['state'], ground_truth, mean, principal)
+          'bias': compute_bias(trace['state'], ground_truth, mean, principal)  # pytype: disable=wrong-arg-types  # jax-ndarray
       }
     else:
       bias = {}
@@ -1452,7 +1452,7 @@ def run_adaptive_nuts_on_target(
     mean = ground_truth['stats']['m1']['mean']
     if save_warmup:
       bias = {
-          'bias': compute_bias(trace['state'], ground_truth, mean, principal)
+          'bias': compute_bias(trace['state'], ground_truth, mean, principal)  # pytype: disable=wrong-arg-types  # jax-ndarray
       }
     else:
       bias = {}
@@ -1574,7 +1574,7 @@ def run_meads_on_target(
   else:
     principal = ground_truth['principal']
     mean = ground_truth['stats']['m1']['mean']
-    bias = {'bias': compute_bias(trace['state'], ground_truth, mean, principal)}
+    bias = {'bias': compute_bias(trace['state'], ground_truth, mean, principal)}  # pytype: disable=wrong-arg-types  # jax-ndarray
 
   final = {
       'stats':

@@ -14,9 +14,9 @@
 # ============================================================================
 """Integration test for the TensorFlow backend."""
 
-from absl.testing import absltest
 import tensorflow.compat.v2 as tf
 from inference_gym import using_tensorflow as gym
+from absl.testing import absltest
 
 tf.enable_v2_behavior()
 

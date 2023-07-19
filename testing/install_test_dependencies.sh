@@ -83,7 +83,11 @@ else
 fi
 
 has_tensorflow_packages() {
-  python -m pip list | grep -v tensorflow-metadata | grep tensorflow &> /dev/null
+  python -m pip list \
+    | grep -v tensorflow-metadata \
+    | grep -v tensorflow-io-gcs-filesystem \
+    | grep tensorflow \
+    &> /dev/null
 }
 
 has_tf_nightly_cpu_package() {

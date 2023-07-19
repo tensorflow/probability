@@ -42,7 +42,6 @@ jax_config.update('jax_enable_x64', True)
 
 TestNamedTuple = collections.namedtuple('TestNamedTuple', 'x, y')
 
-
 BACKEND = None  # Rewritten by backends/rewrite.py.
 
 if BACKEND == 'backend_jax':
@@ -59,13 +58,11 @@ def _no_compile(fn):
 
 
 def _fwd_mclachlan_optimal_4th_order_step(*args, **kwargs):
-  return fun_mc.mclachlan_optimal_4th_order_step(
-      *args, forward=True, **kwargs)
+  return fun_mc.mclachlan_optimal_4th_order_step(*args, forward=True, **kwargs)
 
 
 def _rev_mclachlan_optimal_4th_order_step(*args, **kwargs):
-  return fun_mc.mclachlan_optimal_4th_order_step(
-      *args, forward=False, **kwargs)
+  return fun_mc.mclachlan_optimal_4th_order_step(*args, forward=False, **kwargs)
 
 
 def _skip_on_jax(fn):
@@ -142,7 +139,10 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
   _is_on_jax = BACKEND == 'backend_jax'
 
   def _make_seed(self, seed):
-    return util.make_tensor_seed([seed, 0])
+    if self._is_on_jax:
+      return jax.random.PRNGKey(seed)
+    else:
+      return util.make_tensor_seed([seed, 0])
 
   @property
   def _dtype(self):
@@ -236,6 +236,42 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     self.assertAllEqual(3, x)
     self.assertAllEqual(4, trace_1)
     self.assertAllEqual(6, trace_2)
+
+  def testInterruptibleTrace(self):
+    def fun(x, y):
+      x = x + 1.0
+      y = y + 2.0
+      return (x, y), (x, y)
+
+    state, _ = fun_mc.trace(
+        state=fun_mc.interruptible_trace_init((0.0, 0.0), fn=fun, num_steps=5),
+        fn=functools.partial(fun_mc.interruptible_trace_step, fn=fun),
+        num_steps=4,
+    )
+
+    x_trace, y_trace = state.trace()
+
+    self.assertAllEqual([1.0, 2.0, 3.0, 4.0], x_trace)
+    self.assertAllEqual([2.0, 4.0, 6.0, 8.0], y_trace)
+
+  def testInterruptibleTraceMask(self):
+    def fun(x, y):
+      x = x + 1.0
+      y = y + 2.0
+      return (x, y), (x, y)
+
+    state, _ = fun_mc.trace(
+        state=fun_mc.interruptible_trace_init(
+            (0.0, 0.0), fn=fun, num_steps=5, trace_mask=(True, False)
+        ),
+        fn=functools.partial(fun_mc.interruptible_trace_step, fn=fun),
+        num_steps=4,
+    )
+
+    x_trace, y = state.trace()
+
+    self.assertAllEqual([1.0, 2.0, 3.0, 4.0], x_trace)
+    self.assertAllEqual(8.0, y)
 
   def testCallFn(self):
     sum_fn = lambda *args: sum(args)
@@ -417,10 +453,11 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
          })
 
     self.assertIsInstance(transformed_init_state, dict)
-    self.assertAllCloseNested({
-        'x': self._constant(1.),
-        'y': self._constant(1.),
-    }, transformed_init_state)
+    self.assertAllCloseNested(
+        {
+            'x': self._constant(1.),
+            'y': self._constant(1.),
+        }, transformed_init_state)
 
     tlp, (orig_space, _) = transformed_log_prob_fn(
         x=self._constant(1.), y=self._constant(1.))
@@ -846,8 +883,7 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
                 (hmc_state.state_extra[0], hmc_extra.log_accept_ratio))
 
       _, (chain, log_accept_ratio_trace) = fun_mc.trace(
-          state=(fun_mc.hamiltonian_monte_carlo_init(state,
-                                                     target_log_prob_fn),
+          state=(fun_mc.hamiltonian_monte_carlo_init(state, target_log_prob_fn),
                  fun_mc.adam_init(tf.math.log(step_size)), 0, seed),
           fn=kernel,
           num_steps=num_adapt_steps + num_steps,
@@ -1084,7 +1120,8 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
       return tf.square(x - 1.) + tf.square(y - 2.), []
 
     _, [(x, y), loss] = fun_mc.trace(
-        fun_mc.adam_init([self._constant(0.), self._constant(0.)]),
+        fun_mc.adam_init([self._constant(0.),
+                          self._constant(0.)]),
         lambda adam_state: fun_mc.adam_step(  # pylint: disable=g-long-lambda
             adam_state,
             loss_fn,
@@ -1102,7 +1139,8 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
       return tf.square(x - 1.) + tf.square(y - 2.), []
 
     _, [(x, y), loss] = fun_mc.trace(
-        fun_mc.GradientDescentState([self._constant(0.), self._constant(0.)]),
+        fun_mc.GradientDescentState([self._constant(0.),
+                                     self._constant(0.)]),
         lambda gd_state: fun_mc.gradient_descent_step(  # pylint: disable=g-long-lambda
             gd_state,
             loss_fn,
@@ -1159,8 +1197,7 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
         state_samples['x'][:, 1],
         lambda x: scipy.stats.norm.cdf(x, loc=1., scale=2.))
     _, p_val_y = scipy.stats.kstest(
-        state_samples['y'],
-        lambda x: scipy.stats.norm.cdf(x, loc=3., scale=2.))
+        state_samples['y'], lambda x: scipy.stats.norm.cdf(x, loc=3., scale=2.))
     self.assertGreater(p_val_x0, 1e-3)
     self.assertGreater(p_val_x1, 1e-3)
     self.assertGreater(p_val_y, 1e-3)
@@ -1428,8 +1465,7 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
             axis=0))
 
     def kernel(rms, idx):
-      rms, _ = fun_mc.running_mean_step(
-          rms, data[idx], window_size=window_size)
+      rms, _ = fun_mc.running_mean_step(rms, data[idx], window_size=window_size)
       return (rms, idx + 1), rms.mean
 
     _, mean = fun_mc.trace(
@@ -1466,8 +1502,7 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
       return (rvs, idx + 1), ()
 
     (rvs, _), _ = fun_mc.trace(
-        state=(fun_mc.running_variance_init(true_mean.shape,
-                                            data[0].dtype), 0),
+        state=(fun_mc.running_variance_init(true_mean.shape, data[0].dtype), 0),
         fn=kernel,
         num_steps=len(data),
         trace_fn=lambda *args: ())
@@ -1518,8 +1553,7 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     true_cov = _gen_cov(data, true_aggregation)
 
     def kernel(rcs, idx):
-      rcs, _ = fun_mc.running_covariance_step(
-          rcs, data[idx], axis=aggregation)
+      rcs, _ = fun_mc.running_covariance_step(rcs, data[idx], axis=aggregation)
       return (rcs, idx + 1), ()
 
     (rcs, _), _ = fun_mc.trace(
@@ -1667,14 +1701,21 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
   @parameterized.named_parameters(
       ('Positional1', 0.),
       ('Positional2', (0., 1.)),
-      ('Named1', {'a': 0.}),
-      ('Named2', {'a': 0., 'b': 1.}),
+      ('Named1', {
+          'a': 0.
+      }),
+      ('Named2', {
+          'a': 0.,
+          'b': 1.
+      }),
   )
   def testSurrogateLossFn(self, state):
+
     def grad_fn(*args, **kwargs):
       # This is uglier than user code due to the parameterized test...
       new_state = util.unflatten_tree(state, util.flatten_tree((args, kwargs)))
       return util.map_tree(lambda x: x + 1., new_state), new_state
+
     loss_fn = fun_mc.make_surrogate_loss_fn(grad_fn)
 
     # Mutate the state to make sure we didn't capture anything.
@@ -1687,6 +1728,7 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     self.assertAllCloseNested(state, extra)
 
   def testSurrogateLossFnDecorator(self):
+
     @fun_mc.make_surrogate_loss_fn(loss_value=1.)
     def loss_fn(_):
       return 3., 2.
@@ -1761,8 +1803,8 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     _, (pmh_is_accepted, pmh_accepted_state, rwm_is_accepted) = fun_mc.trace(
         (fun_mc.persistent_metropolis_hastings_init([], self._dtype),
          fun_mc.random_walk_metropolis_init(
-             self._constant(0.), target_log_prob_fn),
-         self._make_seed(_test_seed())), kernel, 1000)
+             self._constant(0.),
+             target_log_prob_fn), self._make_seed(_test_seed())), kernel, 1000)
 
     pmh_is_accepted = tf.cast(pmh_is_accepted, self._dtype)
     rwm_is_accepted = tf.cast(rwm_is_accepted, self._dtype)
@@ -1815,6 +1857,91 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
 
     self.assertAllCloseNested(value, fn(x))
     self.assertAllCloseNested(expected_grad, grad)
+
+  def testSystematicResample(self):
+    probs = self._constant([0., 0.5, 0.2, 0.3, 0.])
+    log_weights = tf.math.log(probs)
+    particles = tf.range(probs.shape[0])
+
+    @tf.function
+    def body(seed):
+      seed, resample_seed = util.split_seed(seed, 2)
+      (new_particles,
+       new_log_weights), _ = fun_mc.systematic_resample(particles, log_weights,
+                                                        resample_seed)
+      return seed, (new_particles, new_log_weights)
+
+    _, (new_particles, new_log_weights) = fun_mc.trace(
+        self._make_seed(_test_seed()), body, 1000, trace_mask=(True, False))
+
+    new_particles_probs = tf.reduce_mean(
+        tf.cast(new_particles[..., tf.newaxis] == particles, tf.float32),
+        (0, 1))
+
+    self.assertAllClose(new_particles_probs, probs, atol=0.05)
+    self.assertEqual(new_particles_probs[0], 0.)
+    self.assertEqual(new_particles_probs[-1], 0.)
+    self.assertAllClose(
+        new_log_weights,
+        tf.fill(probs.shape, tfp.math.reduce_logmeanexp(log_weights)))
+
+  def testAIS(self):
+
+    def tlp_1(x):
+      return -x**2 / 2., ()
+
+    def tlp_2(x):
+      return -(x - 2)**2 / 2 / 16., ()
+
+    @tf.function
+    def kernel(ais_state, seed):
+
+      hmc_seed, resample_seed, seed = util.split_seed(seed, 3)
+
+      ais_state, _ = fun_mc.annealed_importance_sampling_resample(
+          ais_state,
+          seed=resample_seed)
+
+      def transition_operator(state, stage, tlp_fn):
+        f = tf.cast(stage, state.dtype) / num_stages
+        hmc_state = fun_mc.hamiltonian_monte_carlo_init(state, tlp_fn)
+        hmc_state, _ = fun_mc.hamiltonian_monte_carlo_step(
+            hmc_state,
+            tlp_fn,
+            step_size=f * 4. + (1. - f) * 1.,
+            num_integrator_steps=1,
+            seed=hmc_seed)
+        return hmc_state.state, ()
+
+      ais_state, _ = fun_mc.annealed_importance_sampling_step(
+          ais_state, transition_operator,
+          functools.partial(
+              fun_mc.geometric_annealing_path,
+              num_stages=num_stages,
+              initial_target_log_prob_fn=tlp_1,
+              final_target_log_prob_fn=tlp_2,
+          ))
+
+      return (ais_state, seed), ()
+
+    num_stages = 100
+    num_particles = 400
+    init_seed, seed = util.split_seed(self._make_seed(_test_seed()), 2)
+    init_state = util.random_normal([num_particles], self._dtype, init_seed)
+
+    (ais_state, _), _ = fun_mc.trace(
+        (fun_mc.annealed_importance_sampling_init(init_state, tf.zeros(
+            [num_particles], self._dtype)), seed),
+        kernel,
+        num_stages,
+    )
+
+    weights = tf.exp(ais_state.log_weight)
+    self.assertAllClose(4., tf.reduce_mean(weights), atol=0.7)
+    self.assertAllClose(
+        2.,
+        tf.reduce_sum(tf.nn.softmax(ais_state.log_weight) * ais_state.state),
+        atol=0.8)
 
 
 @test_util.multi_backend_test(globals(), 'fun_mc_test')

@@ -26,6 +26,8 @@ tnp = tf.experimental.numpy
 __all__ = [
     'assert_same_shallow_tree',
     'block_until_ready',
+    'convert_to_tensor',
+    'diff',
     'flatten_tree',
     'get_shallow_tree',
     'inverse_fn',
@@ -34,13 +36,17 @@ __all__ = [
     'map_tree_up_to',
     'move_axis',
     'named_call',
+    'new_dynamic_array',
     'random_categorical',
     'random_integer',
     'random_normal',
     'random_uniform',
+    'repeat',
     'split_seed',
+    'stack_dynamic_array',
     'trace',
     'value_and_ldj',
+    'write_to_dynamic_array',
 ]
 
 
@@ -177,7 +183,9 @@ def trace(state, fn, num_steps, unroll, parallel_iterations=10):
     state, first_untraced, first_traced = fn(state)
     arrays = tf.nest.map_structure(
         lambda v: tf.TensorArray(  # pylint: disable=g-long-lambda
-            v.dtype, size=num_steps, element_shape=v.shape).write(0, v),
+            v.dtype,
+            size=num_steps,
+            element_shape=v.shape).write(0, v),
         first_traced)
     start_idx = 1
   else:
@@ -189,7 +197,10 @@ def trace(state, fn, num_steps, unroll, parallel_iterations=10):
 
     arrays = tf.nest.map_structure(
         lambda spec: tf.TensorArray(  # pylint: disable=g-long-lambda
-            spec.dtype, size=num_steps, element_shape=spec.shape), traced_spec)
+            spec.dtype,
+            size=num_steps,
+            element_shape=spec.shape),
+        traced_spec)
     first_untraced = tf.nest.map_structure(
         lambda spec: tf.zeros(spec.shape, spec.dtype), untraced_spec)
     start_idx = 0
@@ -266,7 +277,6 @@ def value_and_ldj(fn, args):
   assert y_extra == 3
   assert y_ldj == np.log(2)
   ```
-
   """
   value, (extra, ldj) = fn(args)
   return value, (extra, ldj), ldj
@@ -348,3 +358,50 @@ def named_call(f=None, name=None):
       return f(*args, **kwargs)
 
   return wrapped
+
+
+def diff(x, prepend=None):
+  """Like jnp.diff."""
+  if prepend is not None:
+    x = tf.concat([tf.convert_to_tensor(prepend, dtype=x.dtype)[tf.newaxis], x],
+                  0)
+  return x[1:] - x[:-1]
+
+
+def repeat(x, repeats, total_repeat_length=None):
+  """Like jnp.repeat."""
+  res = tf.repeat(x, repeats)
+  if total_repeat_length is not None:
+    res.set_shape([total_repeat_length] + [None] * (len(res.shape) - 1))
+  return res
+
+
+def new_dynamic_array(shape, dtype, size):
+  """Creates a new dynamic array."""
+  return tf.TensorArray(dtype, size=size, element_shape=shape)
+
+
+def write_to_dynamic_array(array, index, element):
+  """Writes to the dynamic array."""
+  return array.write(index, element)
+
+
+def stack_dynamic_array(array):
+  """Stacks the dynamic array."""
+  return array.stack()
+
+
+def eval_shape(fn, *args):
+  """Evaluates the shape/dtypes of fn statically."""
+  args = tf.nest.map_structure(tf.TensorSpec.from_tensor, args)
+  _, shape = _eval_shape(lambda args: fn(*args), args)
+  return shape
+
+
+def convert_to_tensor(x):
+  """A looser convert_to_tensor."""
+  if x is None:
+    return x
+  if isinstance(x, tf.TensorArray):
+    return x
+  return tf.convert_to_tensor(x)

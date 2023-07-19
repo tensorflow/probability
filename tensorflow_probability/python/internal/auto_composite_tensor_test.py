@@ -18,7 +18,6 @@ import functools
 import os
 
 from absl import flags
-from absl.testing import absltest
 from absl.testing import parameterized
 
 import tensorflow.compat.v2 as tf
@@ -35,6 +34,7 @@ from tensorflow_probability.python.experimental.distributions import mvn_precisi
 from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
+from absl.testing import absltest
 
 tf.enable_v2_behavior()
 

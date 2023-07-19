@@ -47,6 +47,13 @@ NUMPY_MODE = False
 SKIP_DTYPE_CHECKS = False
 
 
+_issubdtype = np.issubdtype
+if JAX_MODE:
+  # jnp.issubdtype handles custom JAX types like bfloat16
+  import jax.numpy as jnp  # pylint: disable=g-import-not-at-top
+  _issubdtype = jnp.issubdtype
+
+
 def is_numpy_compatible(dtype):
   """Returns if dtype has a corresponding NumPy dtype."""
   if JAX_MODE or NUMPY_MODE:
@@ -270,7 +277,7 @@ def is_complex(dtype):
   dtype = tf.as_dtype(dtype)
   if hasattr(dtype, 'is_complex'):
     return dtype.is_complex
-  return np.issubdtype(np.dtype(dtype), np.complexfloating)
+  return _issubdtype(np.dtype(dtype), np.complexfloating)
 
 
 def is_floating(dtype):
@@ -278,7 +285,7 @@ def is_floating(dtype):
   dtype = tf.as_dtype(dtype)
   if hasattr(dtype, 'is_floating'):
     return dtype.is_floating
-  return np.issubdtype(np.dtype(dtype), np.floating)
+  return _issubdtype(np.dtype(dtype), np.floating)
 
 
 def is_integer(dtype):
@@ -286,7 +293,7 @@ def is_integer(dtype):
   dtype = tf.as_dtype(dtype)
   if hasattr(dtype, 'is_integer') and not callable(dtype.is_integer):
     return dtype.is_integer
-  return np.issubdtype(np.dtype(dtype), np.integer)
+  return _issubdtype(np.dtype(dtype), np.integer)
 
 
 def max(dtype):  # pylint: disable=redefined-builtin

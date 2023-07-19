@@ -82,7 +82,7 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     gm = self._build_mvndiag_mixture(
         probs=[0.3, 0.7],
         loc=[[-1., 1], [1, -1]],
-        scale_identity_multiplier=[1., 0.5])
+        scale_diag=[[1., 1.], [0.5, 0.5]])
     x = gm.sample([4, 5], seed=test_util.test_seed())
     log_prob_x = gm.log_prob(x)
     self.assertAllEqual([4, 5, 2], self._shape(x))
@@ -92,7 +92,7 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     gm = self._build_mvndiag_mixture(
         probs=[0.3, 0.7],
         loc=[[[-1., 1], [1, -1]], [[0., 1], [1, 0]]],
-        scale_identity_multiplier=[1., 0.5])
+        scale_diag=np.ones((2, 2, 2)) * [[1.], [0.5]])
     x = gm.sample([4, 5], seed=test_util.test_seed())
     log_prob_x = gm.log_prob(x)
     self.assertAllEqual([4, 5, 2, 2], self._shape(x))
@@ -102,7 +102,7 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     gm = self._build_mvndiag_mixture(
         probs=[0.3, 0.7],
         loc=[[-1., 1], [1, -1]],
-        scale_identity_multiplier=[1., 0.5])
+        scale_diag=[[1., 1.], [0.5, 0.5]])
     # Ball centered at component0's mean.
     self.run_test_sample_consistent_log_prob(
         self.evaluate, gm, radius=1., center=[-1., 1], rtol=0.02)
@@ -132,21 +132,21 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     d = self._build_mvndiag_mixture(
         probs=[0.2, 0.3, 0.5],
         loc=np.zeros((2, 1, 5, 3, 4)),
-        scale_identity_multiplier=[1., 0.75, 0.5])
+        scale_diag=np.ones((2, 1, 5, 3, 4)) * [[1.], [.75], [0.5]])
     self.assertAllEqual((2, 1, 5, 4, 4), self.evaluate(d.covariance()).shape)
 
   def testSampleConsistentMeanCovariance(self):
     gm = self._build_mvndiag_mixture(
         probs=[0.3, 0.7],
         loc=[[-1., 1], [1, -1]],
-        scale_identity_multiplier=[1., 0.5])
+        scale_diag=[[1., 1.], [0.5, 0.5]])
     self.run_test_sample_consistent_mean_covariance(self.evaluate, gm)
 
   def testVarianceConsistentCovariance(self):
     gm = self._build_mvndiag_mixture(
         probs=[0.3, 0.7],
         loc=[[-1., 1], [1, -1]],
-        scale_identity_multiplier=[1., 0.5])
+        scale_diag=[[1., 1.], [0.5, 0.5]])
     cov_, var_ = self.evaluate([gm.covariance(), gm.variance()])
     self.assertAllClose(cov_.diagonal(), var_, atol=0.)
 
@@ -529,10 +529,10 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     else:
       return self.evaluate(tf.shape(x))
 
-  def _build_mvndiag_mixture(self, probs, loc, scale_identity_multiplier):
+  def _build_mvndiag_mixture(self, probs, loc, scale_diag):
     components_distribution = mvn_diag.MultivariateNormalDiag(
         loc=self._build_tensor(loc),
-        scale_identity_multiplier=self._build_tensor(scale_identity_multiplier))
+        scale_diag=self._build_tensor(scale_diag))
 
     # Use a no-op `Independent` wrapper to possibly create dynamic ndims.
     wrapped_components_distribution = independent.Independent(

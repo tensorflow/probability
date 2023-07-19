@@ -973,7 +973,7 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
   def make_weights_prior(self, dims, sigma):
     return mvn_diag.MultivariateNormalDiag(
         loc=tf.zeros([dims], dtype=sigma.dtype),
-        scale_identity_multiplier=sigma)
+        scale_diag=sigma * tf.ones([dims], dtype=sigma.dtype))
 
   def make_response_likelihood(self, w, x):
     if tensorshape_util.rank(w.shape) == 1:
@@ -1013,9 +1013,9 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
         tf.TensorSpec(shape=[], dtype=tf.float32),
     ])
     def mcem_iter(weights_chain_start, step_size):
-      prior = self.make_weights_prior(dims, sigma)
 
       def unnormalized_posterior_log_prob(w):
+        prior = self.make_weights_prior(dims, sigma)
         likelihood = self.make_response_likelihood(w, x)
         return (prior.log_prob(w) +
                 tf.reduce_sum(likelihood.log_prob(y), axis=-1))  # [m]
@@ -1158,18 +1158,11 @@ class ReproducibleFromSeedTest(test_util.TestCase):
         k.target_log_prob_fn(states[n - 1]),
         tr_nm1.accepted_results.target_log_prob)
 
-    def compare_fn(x, y):
-      # TODO(b/223267515): PRNGKeyArrays have no dtype.
-      if hasattr(x, 'dtype'):
-        self.assertAllClose(x, y)
-      else:
-        self.assertSeedsEqual(x, y)
-
     # Rerun the kernel with the seed that it reported it used
     state, kr = k.one_step(states[n - 1], tr_nm1, seed=tr_n.seed)
     # Check that the results are the same
     self.assertAllClose(state, states[n])
-    self.assertAllAssertsNested(compare_fn, kr, tr_n)
+    self.assertAllClose(kr, tr_n)
 
 
 @test_util.test_all_tf_execution_regimes

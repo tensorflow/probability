@@ -331,8 +331,6 @@ def plot_predictions(predictions,
                      'supported. Saw shape: {}.'.format(
                          predictions.observed_time_series.shape))
 
-  num_steps = len(predictions.times)
-  time_delta = predictions.times[1] - predictions.times[0]
   time_period_length = predictions.times[-1] - predictions.times[0]
   if view_date_begin is None:
     view_date_begin = predictions.times[0] - 0.04 * time_period_length

@@ -53,6 +53,7 @@ from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_car
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import sample_sequential_monte_carlo
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import simple_heuristic_tuning
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import ess_below_threshold
+from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import log_ess_from_log_weights
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import SequentialMonteCarlo
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import SequentialMonteCarloResults
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import WeightedParticles
@@ -110,6 +111,7 @@ __all__ = [
     'chees_criterion',
     'chees_rate_criterion',
     'default_make_hmc_kernel_fn',
+    'log_ess_from_log_weights',
     'ess_below_threshold',
     'gen_make_hmc_kernel_fn',
     'gen_make_transform_hmc_kernel_fn',

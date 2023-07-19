@@ -23,3 +23,5 @@ from tensorflow_probability import substrates
 from tensorflow_probability.python import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.version import __version__
 
+# tfp_google.bind(globals())  # DisableOnExport
+# del tfp_google  # DisableOnExport

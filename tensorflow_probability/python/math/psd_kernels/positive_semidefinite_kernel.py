@@ -210,7 +210,7 @@ class PositiveSemidefiniteKernel(tf.Module, metaclass=abc.ABCMeta):
 
     Raises:
       ValueError: if `feature_ndims` (or any element, if nested) is not an
-        integer greater than 0.
+        integer greater than or equal to 0.
 
     Inputs to PositiveSemidefiniteKernel methods (or each element, if nested)
     partition into 3 pieces:
@@ -227,11 +227,11 @@ class PositiveSemidefiniteKernel(tf.Module, metaclass=abc.ABCMeta):
     dimensions belong to the feature dimensions. This enables us to predict
     which shape dimensions will be 'reduced' away during kernel computation.
     """
-    if not all(isinstance(ndim, int) and ndim > 0
+    if not all(isinstance(ndim, int) and ndim >= 0
                for ndim in tf.nest.flatten(feature_ndims)):
       raise ValueError(
           '`feature_ndims` must contain only Python `integer`s greater than '
-          f'zero. Got: {feature_ndims}')
+          f'or equal to zero. Got: {feature_ndims}')
     self._feature_ndims = feature_ndims
 
     # If dtype is not provided, ensure that it has the same nested structure as
@@ -1337,15 +1337,15 @@ class _NonCompositeTensorSumKernel(PositiveSemidefiniteKernel):
     return self._kernels
 
   def _apply(self, x1, x2, example_ndims=0):
-    return sum([k.apply(x1, x2, example_ndims) for k in self.kernels])
+    return sum(k.apply(x1, x2, example_ndims) for k in self.kernels)
 
   def _matrix(self, x1, x2):
-    return sum([k.matrix(x1, x2) for k in self.kernels])
+    return sum(k.matrix(x1, x2) for k in self.kernels)
 
   def _tensor(self, x1, x2, x1_example_ndims, x2_example_ndims):
-    return sum([
+    return sum(
         k.tensor(
-            x1, x2, x1_example_ndims, x2_example_ndims) for k in self.kernels])
+            x1, x2, x1_example_ndims, x2_example_ndims) for k in self.kernels)
 
   def _batch_shape(self):
     return functools.reduce(tf.broadcast_static_shape,

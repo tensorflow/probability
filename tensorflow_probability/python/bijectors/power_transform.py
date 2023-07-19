@@ -26,7 +26,9 @@ __all__ = [
 ]
 
 
-class PowerTransform(bijector.AutoCompositeTensorBijector):
+class PowerTransform(
+    bijector.CoordinatewiseBijectorMixin,
+    bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = (1 + X * c)**(1 / c), X >= -1 / c`.
 
   The [power transform](https://en.wikipedia.org/wiki/Power_transform) maps

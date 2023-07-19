@@ -53,8 +53,13 @@ def _test_seed():
 
 class MALTTest(tfp_test_util.TestCase):
 
+  _is_on_jax = BACKEND == 'backend_jax'
+
   def _make_seed(self, seed):
-    return util.make_tensor_seed([seed, 0])
+    if self._is_on_jax:
+      return jax.random.PRNGKey(seed)
+    else:
+      return util.make_tensor_seed([seed, 0])
 
   @property
   def _dtype(self):
