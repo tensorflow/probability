@@ -20,20 +20,20 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.experimental.mcmc import weighted_resampling
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.mcmc.internal.util import choose
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 
 __all__ = [
     'SequentialMonteCarlo',
     'SequentialMonteCarloResults',
     'WeightedParticles',
-    'log_ess_from_log_weights',
     'ess_below_threshold',
 ]
 
 
 # SequentialMonteCarlo `state` structure.
 class WeightedParticles(collections.namedtuple(
-    'WeightedParticles', ['particles', 'log_weights'])):
+    'WeightedParticles', ['particles', 'log_weights', 'extra'])):
   """Particles with corresponding log weights.
 
   This structure serves as the `state` for the `SequentialMonteCarlo` transition
@@ -49,6 +49,9 @@ class WeightedParticles(collections.namedtuple(
       `exp(reduce_logsumexp(log_weights, axis=0)) == 1.`. These must be used in
       conjunction with `particles` to compute expectations under the target
       distribution.
+    extra: a (structure of) Tensor(s) each of shape
+      `concat([[num_particles, b1, ..., bN], event_shape])`, where `event_shape`
+      may differ across component `Tensor`s.
 
   In some contexts, particles may be stacked across multiple inference steps,
   in which case all `Tensor` shapes will be prefixed by an additional dimension
@@ -115,19 +118,29 @@ def _dummy_indices_like(indices):
       indices_shape)
 
 
-def log_ess_from_log_weights(log_weights):
-  """Computes log-ESS estimate from log-weights along axis=0."""
-  with tf.name_scope('ess_from_log_weights'):
-    log_weights = tf.math.log_softmax(log_weights, axis=0)
-    return -tf.math.reduce_logsumexp(2 * log_weights, axis=0)
-
-
-def ess_below_threshold(weighted_particles, threshold=0.5):
+def ess_below_threshold(weighted_particles, particles_dim=0, threshold=0.5):
   """Determines if the effective sample size is much less than num_particles."""
   with tf.name_scope('ess_below_threshold'):
     num_particles = ps.size0(weighted_particles.log_weights)
-    log_ess = log_ess_from_log_weights(weighted_particles.log_weights)
-    return log_ess < (ps.log(num_particles) + ps.log(threshold))
+    log_weights = tf.math.log_softmax(weighted_particles.log_weights, axis=particles_dim)
+    log_ess = -tf.math.reduce_logsumexp(2 * log_weights, axis=particles_dim)
+    return tf.expand_dims(log_ess < (ps.log(num_particles) +
+                      ps.log(threshold)), axis=particles_dim)
+
+
+def _default_extra_fn(step,
+                  state,
+                  particles,
+                  indices,
+                  log_weights,
+                  extra,
+                  seed
+                  ):
+  return extra
+
+
+def identity(state, new_particles, new_indices, log_weights, extra, step):
+    return new_particles, new_indices, log_weights, extra
 
 
 class SequentialMonteCarlo(kernel_base.TransitionKernel):
@@ -144,6 +157,8 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
                propose_and_update_log_weights_fn,
                resample_fn=weighted_resampling.resample_systematic,
                resample_criterion_fn=ess_below_threshold,
+               extra_fn=_default_extra_fn,
+               particles_dim=0,
                unbiased_gradients=True,
                name=None):
     """Initializes a sequential Monte Carlo transition kernel.
@@ -201,6 +216,8 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
     self._propose_and_update_log_weights_fn = propose_and_update_log_weights_fn
     self._resample_fn = resample_fn
     self._resample_criterion_fn = resample_criterion_fn
+    self._extra_fn = extra_fn
+    self._particles_dim = particles_dim
     self._unbiased_gradients = unbiased_gradients
     self._name = name or 'SequentialMonteCarlo'
 
@@ -219,6 +236,10 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
   @property
   def resample_criterion_fn(self):
     return self._resample_criterion_fn
+
+  @property
+  def extra_fn(self):
+    return self._extra_fn
 
   @property
   def unbiased_gradients(self):
@@ -269,15 +290,16 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
         state = tf.nest.map_structure(
             lambda a, b: tf.where(is_initial_step, a, b), state, proposed_state)
 
-        normalized_log_weights = tf.nn.log_softmax(state.log_weights, axis=0)
+        normalized_log_weights = tf.nn.log_softmax(state.log_weights, axis=self._particles_dim)
         # Every entry of `log_weights` differs from `normalized_log_weights`
         # by the same normalizing constant. We extract that constant by
         # examining an arbitrary entry.
-        incremental_log_marginal_likelihood = (state.log_weights[0] -
-                                               normalized_log_weights[0])
 
-        do_resample = self.resample_criterion_fn(state)
+        incremental_log_marginal_likelihood = (
+                tf.gather(state.log_weights, 0, axis=self._particles_dim) -
+                tf.gather(normalized_log_weights, 0, axis=self._particles_dim))
 
+        do_resample = self.resample_criterion_fn(state, self._particles_dim)
         # Some batch elements may require resampling and others not, so
         # we first do the resampling for all elements, then select whether to
         # use the resampled values for each batch element according to
@@ -300,17 +322,30 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
             resample_fn=self.resample_fn,
             target_log_weights=(normalized_log_weights
                                 if self.unbiased_gradients else None),
+            particles_dim=self._particles_dim,
             seed=resample_seed)
+
         (resampled_particles,
          resample_indices,
          log_weights) = tf.nest.map_structure(
-             lambda r, p: tf.where(do_resample, r, p),
+             lambda r, p: choose(do_resample, r, p),
              (resampled_particles, resample_indices, weights_after_resampling),
              (state.particles, _dummy_indices_like(resample_indices),
               normalized_log_weights))
 
+        proposed_extra = self.extra_fn(
+            kernel_results.steps,
+            state,
+            resampled_particles,
+            resample_indices,
+            log_weights,
+            state.extra,
+            seed=proposal_seed,
+        )
+
       return (WeightedParticles(particles=resampled_particles,
-                                log_weights=log_weights),
+                                log_weights=log_weights,
+                                extra=proposed_extra),
               SequentialMonteCarloResults(
                   steps=kernel_results.steps + 1,
                   parent_indices=resample_indices,
