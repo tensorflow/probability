@@ -21,6 +21,7 @@ from tensorflow_probability.python.distributions import exponential
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.math.generic import log_cumsum_exp
 from tensorflow_probability.python.math.gradient import value_and_gradient
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
@@ -33,7 +34,7 @@ __all__ = [
 ]
 
 
-def resample(particles, log_weights, resample_fn, target_log_weights=None,
+def resample(particles, log_weights, resample_fn, target_log_weights=None, particles_dim=0,
              seed=None):
   """Resamples the current particles according to provided weights.
 
@@ -69,15 +70,20 @@ def resample(particles, log_weights, resample_fn, target_log_weights=None,
       resampling are uniformly equal to `-log(num_particles)`.
   """
   with tf.name_scope('resample'):
-    num_particles = ps.size0(log_weights)
+    num_particles = ps.shape(log_weights)[particles_dim]
+
     log_num_particles = tf.math.log(tf.cast(num_particles, log_weights.dtype))
 
     # Normalize the weights and sample the ancestral indices.
-    log_probs = tf.math.log_softmax(log_weights, axis=0)
-    resampled_indices = resample_fn(log_probs, num_particles, (), seed=seed)
+    log_probs = tf.math.log_softmax(log_weights, axis=particles_dim)
+    resampled_indices = resample_fn(log_probs, num_particles, (),
+                                    particles_dim=particles_dim, seed=seed)
 
     gather_ancestors = lambda x: (  # pylint: disable=g-long-lambda
-        mcmc_util.index_remapping_gather(x, resampled_indices, axis=0))
+        mcmc_util.index_remapping_gather(x,
+                                         resampled_indices,
+                                         axis=particles_dim,
+                                         indices_axis=particles_dim))
     resampled_particles = tf.nest.map_structure(gather_ancestors, particles)
     if target_log_weights is None:
       log_weights_after_resampling = tf.fill(ps.shape(log_weights),
@@ -134,7 +140,7 @@ def _resample_using_log_points(log_probs, sample_shape, log_points, name=None):
          tf.zeros(points_shape, dtype=tf.int32)],
         axis=-1)
     log_marker_positions = tf.broadcast_to(
-        tf.math.cumulative_logsumexp(log_probs, axis=-1),
+        log_cumsum_exp(log_probs, axis=-1),
         markers_shape)
     log_markers_and_points = ps.concat(
         [log_marker_positions, log_points], axis=-1)
@@ -241,7 +247,7 @@ def resample_independent(log_probs, event_size, sample_shape,
 
 
 # TODO(b/153689734): rewrite so as not to use `move_dimension`.
-def resample_systematic(log_probs, event_size, sample_shape,
+def resample_systematic(log_probs, event_size, sample_shape, particles_dim=0,
                         seed=None, name=None):
   """A systematic resampler for sequential Monte Carlo.
 
@@ -293,7 +299,7 @@ def resample_systematic(log_probs, event_size, sample_shape,
   """
   with tf.name_scope(name or 'resample_systematic') as name:
     log_probs = tf.convert_to_tensor(log_probs, dtype_hint=tf.float32)
-    log_probs = dist_util.move_dimension(log_probs, source_idx=0, dest_idx=-1)
+    log_probs = dist_util.move_dimension(log_probs, source_idx=particles_dim, dest_idx=-1)
     working_shape = ps.concat([sample_shape,
                                ps.shape(log_probs)[:-1]], axis=0)
     points_shape = ps.concat([working_shape, [event_size]], axis=0)
@@ -310,7 +316,7 @@ def resample_systematic(log_probs, event_size, sample_shape,
     log_points = tf.broadcast_to(tf.math.log(even_spacing), points_shape)
 
     resampled = _resample_using_log_points(log_probs, sample_shape, log_points)
-    return dist_util.move_dimension(resampled, source_idx=-1, dest_idx=0)
+    return dist_util.move_dimension(resampled, source_idx=-1, dest_idx=particles_dim)
 
 
 # TODO(b/153689734): rewrite so as not to use `move_dimension`.
