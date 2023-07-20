@@ -928,7 +928,7 @@ def _particle_filter_initial_weighted_particles(observations,
           seed
       )
 
-      prior_sample = initial_state_prior.sample(num_inner_particles)
+      prior_sample = initial_state_prior.sample(num_inner_particles, seed=seed)
       initial_log_weights = dist_util.move_dimension(
           initial_state_prior.log_prob(prior_sample),
           source_idx=0,
