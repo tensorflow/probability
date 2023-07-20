@@ -42,7 +42,9 @@ class _SequentialMonteCarloTest(test_util.TestCase):
       return WeightedParticles(
           particles=proposed_particles,
           log_weights=weighted_particles.log_weights +
-          normal.Normal(loc=-2.6, scale=0.1).log_prob(proposed_particles))
+          normal.Normal(loc=-2.6, scale=0.1).log_prob(proposed_particles),
+          extra=tf.constant(np.nan)
+      )
 
     num_particles = 16
     initial_state = self.evaluate(
@@ -50,7 +52,9 @@ class _SequentialMonteCarloTest(test_util.TestCase):
             particles=tf.random.normal([num_particles],
                                        seed=test_util.test_seed()),
             log_weights=tf.fill([num_particles],
-                                -tf.math.log(float(num_particles)))))
+                                -tf.math.log(float(num_particles))),
+            extra=tf.constant(np.nan)
+    ))
 
     # Run a couple of steps.
     seeds = samplers.split_seed(
@@ -84,9 +88,16 @@ class _SequentialMonteCarloTest(test_util.TestCase):
         (tf.nest.map_structure(tf.convert_to_tensor, state2),
          tf.nest.map_structure(tf.convert_to_tensor, results2)))
 
+    def compare_fn(x, y):
+      # TODO(b/223267515): PRNGKeyArrays have no dtype.
+      if hasattr(x, 'dtype'):
+        self.assertAllClose(x, y)
+      else:
+        self.assertSeedsEqual(x, y)
+
     # Results should match.
     self.assertAllCloseNested(state, state2)
-    self.assertAllCloseNested(results, results2)
+    self.assertAllAssertsNested(compare_fn, results, results2)
 
   @test_util.numpy_disable_variable_test
   def testMarginalLikelihoodGradientIsDefined(self):
@@ -96,7 +107,9 @@ class _SequentialMonteCarloTest(test_util.TestCase):
         WeightedParticles(
             particles=samplers.normal([num_particles], seed=seeds[0]),
             log_weights=tf.fill([num_particles],
-                                -tf.math.log(float(num_particles)))))
+                                -tf.math.log(float(num_particles))),
+            extra=tf.constant(np.nan)
+        ))
 
     def propose_and_update_log_weights_fn(_,
                                           weighted_particles,
@@ -110,7 +123,9 @@ class _SequentialMonteCarloTest(test_util.TestCase):
           particles=proposed_particles,
           log_weights=(weighted_particles.log_weights +
                        transition_dist.log_prob(proposed_particles) -
-                       proposal_dist.log_prob(proposed_particles)))
+                       proposal_dist.log_prob(proposed_particles)),
+          extra=tf.constant(np.nan)
+      )
 
     def marginal_logprob(transition_scale):
       kernel = SequentialMonteCarlo(
