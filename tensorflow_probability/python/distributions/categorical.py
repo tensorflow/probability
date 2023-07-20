@@ -156,6 +156,7 @@ class Categorical(
       logits=None,
       probs=None,
       dtype=tf.int32,
+      force_probs_to_zero_outside_support=False,
       validate_args=False,
       allow_nan_stats=True,
       name='Categorical'):
@@ -173,6 +174,13 @@ class Categorical(
         represents a vector of probabilities for each class. Only one of
         `logits` or `probs` should be passed in.
       dtype: The type of the event samples (default: int32).
+      force_probs_to_zero_outside_support: Python `bool`. When `True`, negative
+        values, values greater than N, and non-integer values are evaluated
+        "strictly": `log_prob` returns `-inf`, `prob` returns `0`. When `False`,
+        the implementation is free to save computation by evaluating something
+        that matches the Categorical pmf at integer values in the support but
+        produces an unrestricted result on other inputs.
+        Default value: `False`.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -192,6 +200,9 @@ class Categorical(
           probs, dtype_hint=prob_logit_dtype, name='probs')
       self._logits = tensor_util.convert_nonref_to_tensor(
           logits, dtype_hint=prob_logit_dtype, name='logits')
+      self._force_probs_to_zero_outside_support = (
+          force_probs_to_zero_outside_support)
+
       super(Categorical, self).__init__(
           dtype=dtype,
           reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
@@ -226,6 +237,11 @@ class Categorical(
   def probs(self):
     """Input argument `probs`."""
     return self._probs
+
+  @property
+  def force_probs_to_zero_outside_support(self):
+    """Return 0 probabilities on non supported inputs."""
+    return self._force_probs_to_zero_outside_support
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -288,10 +304,23 @@ class Categorical(
     if self.validate_args:
       k = distribution_util.embed_check_integer_casting_closed(
           k, target_dtype=self.dtype)
-    k, logits = _broadcast_cat_event_and_params(
+    # This call both broadcasts and casts `k` to an integer dtype.
+    safe_k, logits = _broadcast_cat_event_and_params(
         k, logits, base_dtype=dtype_util.base_dtype(self.dtype))
-    return -tf.nn.sparse_softmax_cross_entropy_with_logits(
-        labels=k, logits=logits)
+
+    if not self.force_probs_to_zero_outside_support:
+      return -tf.nn.sparse_softmax_cross_entropy_with_logits(
+          labels=safe_k, logits=logits)
+
+    # Clip out of domain values back to {0, ..., N}
+    num_categories = tf.cast(self._num_categories(logits), dtype=safe_k.dtype)
+    safe_k = tf.clip_by_value(safe_k, 0, num_categories - 1)
+    log_prob = -tf.nn.sparse_softmax_cross_entropy_with_logits(
+        labels=safe_k, logits=logits)
+    # Set values back to -inf in case they were changed.
+    return tf.where(tf.equal(k, tf.cast(safe_k, k.dtype)),
+                    log_prob,
+                    -float('inf'))
 
   def _entropy(self):
     if self._logits is None:

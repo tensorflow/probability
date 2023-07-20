@@ -143,12 +143,12 @@ def plot_heldout_prediction(input_vals, probs,
 
     ax = fig.add_subplot(n, 3, 3*i + 2)
     for prob_sample in probs:
-      sns.barplot(np.arange(10), prob_sample[i, :], alpha=0.1, ax=ax)
+      sns.barplot(x=np.arange(10), y=prob_sample[i, :], alpha=0.1, ax=ax)
       ax.set_ylim([0, 1])
     ax.set_title('posterior samples')
 
     ax = fig.add_subplot(n, 3, 3*i + 3)
-    sns.barplot(np.arange(10), np.mean(probs[:, i, :], axis=0), ax=ax)
+    sns.barplot(x=np.arange(10), y=np.mean(probs[:, i, :], axis=0), ax=ax)
     ax.set_ylim([0, 1])
     ax.set_title('predictive probs')
   fig.suptitle(title)

@@ -21,11 +21,12 @@ from tensorflow_probability.python.bijectors import softplus as softplus_bijecto
 from tensorflow_probability.python.distributions import cholesky_util
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import gaussian_process
+from tensorflow_probability.python.distributions.internal import stochastic_process_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import parameter_properties
+from tensorflow_probability.python.internal import slicing
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.psd_kernels import schur_complement
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
@@ -35,76 +36,14 @@ __all__ = [
 ]
 
 
-def _is_empty_observation_data(
-    feature_ndims, observation_index_points, observations):
-  """Returns `True` if given observation data is empty.
-
-  Emptiness means either
-    1. Both `observation_index_points` and `observations` are `None`, or
-    2. the "number of observations" shape is 0. The shape of
-    `observation_index_points` (or each of its components, if nested) is
-    `[..., N, f1, ..., fF]`, where `N` is the number of observations and the
-    `f`s are feature dims. Thus, we look at the shape element just to the
-    left of the leftmost feature dim. If that shape is zero, we consider the
-    data empty.
-
-  We don't check the shape of observations; validations are checked elsewhere in
-  the calling code, to ensure these shapes are consistent.
-
-  Args:
-    feature_ndims: the number of feature dims, as reported by the GP kernel.
-    observation_index_points: the observation data locations in the index set.
-    observations: the observation data.
-
-  Returns:
-    is_empty: True if the data were deemed to be empty.
-  """
-  # If both input locations and observations are `None`, we consider this
-  # "empty" observation data.
-  if observation_index_points is None and observations is None:
-    return True
-  num_obs = tf.nest.map_structure(
-      lambda t, nd: tf.compat.dimension_value(t.shape[-(nd + 1)]),
-      observation_index_points, feature_ndims)
-  if all(n is not None and n == 0 for n in tf.nest.flatten(num_obs)):
-    return True
-  return False
-
-
-def _validate_observation_data(
-    kernel, observation_index_points, observations):
-  """Ensure that observation data and locations have consistent shapes.
-
-  This basically means that the batch shapes are broadcastable. We can only
-  ensure this when those shapes are fully statically defined.
-
-
-  Args:
-    kernel: The GP kernel.
-    observation_index_points: the observation data locations in the index set.
-    observations: the observation data.
-
-  Raises:
-    ValueError: if the observations' batch shapes are not broadcastable.
-  """
-  # Check that observation index points and observation counts broadcast.
-  ndims = kernel.feature_ndims
-
-  def _validate(t, nd):
-    if (tensorshape_util.is_fully_defined(t.shape[:-nd])
-        and tensorshape_util.is_fully_defined(observations.shape)):
-      index_point_count = t.shape[:-nd]
-      observation_count = observations.shape
-      try:
-        tf.broadcast_static_shape(index_point_count, observation_count)
-      except ValueError:
-        # Re-raise with our own more contextual error message.
-        raise ValueError(
-            'Observation index point and observation counts are not '
-            'broadcastable: {} and {}, respectively.'.format(
-                index_point_count, observation_count))
-
-  tf.nest.map_structure(_validate, observation_index_points, ndims)
+_ALWAYS_YIELD_MVN_DEPRECATION_WARNING = (
+    '`always_yield_multivariate_normal` is deprecated. This arg is now ignored'
+    'and will be removed after 2023-07-01. A `GaussianProcessRegressionModel`'
+    'evaluated at a single index point now always has event shape `[1]` (the'
+    'previous behavior for `always_yield_multivariate_normal=True`). To'
+    'reproduce the previous behavior of'
+    '`always_yield_multivariate_normal=False`, squeeze the rightmost singleton'
+    'dimension from the output of `mean`, `sample`, etc.')
 
 
 class GaussianProcessRegressionModel(
@@ -387,6 +326,10 @@ class GaussianProcessRegressionModel(
   """
   # pylint:disable=invalid-name
 
+  @deprecation.deprecated_args(
+      '2023-07-01',
+      _ALWAYS_YIELD_MVN_DEPRECATION_WARNING,
+      'always_yield_multivariate_normal')
   def __init__(self,
                kernel,
                index_points=None,
@@ -397,7 +340,7 @@ class GaussianProcessRegressionModel(
                mean_fn=None,
                cholesky_fn=None,
                jitter=1e-6,
-               always_yield_multivariate_normal=False,
+               always_yield_multivariate_normal=None,
                validate_args=False,
                allow_nan_stats=False,
                name='GaussianProcessRegressionModel',
@@ -466,10 +409,7 @@ class GaussianProcessRegressionModel(
         matrix to ensure positive definiteness of the covariance matrix.
         This argument is ignored if `cholesky_fn` is set.
         Default value: `1e-6`.
-      always_yield_multivariate_normal: If `False` (the default), we produce a
-        scalar `Normal` distribution when the number of `index_points` is
-        statically known to be `1`. If `True`, we avoid this behavior, ensuring
-        that the event shape will retain the `1` from `index_points`.
+      always_yield_multivariate_normal: Deprecated and ignored.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -539,12 +479,7 @@ class GaussianProcessRegressionModel(
                 observations, observation_index_points))
       # Default to a constant zero function, borrowing the dtype from
       # index_points to ensure consistency.
-      if mean_fn is None:
-        mean_fn = lambda x: tf.zeros([1], dtype=dtype)
-      else:
-        if not callable(mean_fn):
-          raise ValueError('`mean_fn` must be a Python callable')
-
+      mean_fn = stochastic_process_util.maybe_create_mean_fn(mean_fn, dtype)
       if cholesky_fn is None:
         cholesky_fn = cholesky_util.make_cholesky_with_jitter_fn(jitter)
 
@@ -565,14 +500,14 @@ class GaussianProcessRegressionModel(
               diag_shift=observation_noise_variance)
         # Special logic for mean_fn only; SchurComplement already handles the
         # case of empty observations (ie, falls back to base_kernel).
-        if _is_empty_observation_data(
+        if stochastic_process_util.is_empty_observation_data(
             feature_ndims=kernel.feature_ndims,
             observation_index_points=observation_index_points,
             observations=observations):
           if _conditional_mean_fn is None:
             _conditional_mean_fn = mean_fn
         else:
-          _validate_observation_data(
+          stochastic_process_util.validate_observation_data(
               kernel=kernel,
               observation_index_points=observation_index_points,
               observations=observations)
@@ -583,7 +518,7 @@ class GaussianProcessRegressionModel(
               """Conditional mean."""
               observations = tf.convert_to_tensor(self._observations)
               observation_index_points = nest_util.convert_to_nested_tensor(
-                  self._observation_index_points, dtype_hint=self.kernel.dtype,
+                  self._observation_index_points, dtype_hint=input_dtype,
                   allow_packing=True)
               k_x_obs_linop = tf.linalg.LinearOperatorFullMatrix(
                   kernel.matrix(x, observation_index_points))
@@ -618,15 +553,13 @@ class GaussianProcessRegressionModel(
 
   @staticmethod
   @deprecation.deprecated_args(
-      '2022-06-23',
-      ('The `observations_mask` flag is deprecated; instead use '
-       '`observations_is_missing` (with the opposite sense).'),
-      'observations_mask')
+      '2023-07-01',
+      _ALWAYS_YIELD_MVN_DEPRECATION_WARNING,
+      'always_yield_multivariate_normal')
   def precompute_regression_model(
       kernel,
       observation_index_points,
       observations,
-      observations_mask=None,
       observations_is_missing=None,
       index_points=None,
       observation_noise_variance=0.,
@@ -634,10 +567,12 @@ class GaussianProcessRegressionModel(
       mean_fn=None,
       cholesky_fn=None,
       jitter=1e-6,
-      always_yield_multivariate_normal=False,
+      always_yield_multivariate_normal=None,
       validate_args=False,
       allow_nan_stats=False,
-      name='PrecomputedGaussianProcessRegressionModel'):
+      name='PrecomputedGaussianProcessRegressionModel',
+      _precomputed_divisor_matrix_cholesky=None,
+      _precomputed_solve_on_observation=None):
     """Returns a GaussianProcessRegressionModel with precomputed quantities.
 
     This differs from the constructor by precomputing quantities associated with
@@ -687,11 +622,6 @@ class GaussianProcessRegressionModel(
         `None`, which corresponds to the empty set of observations, and simply
         results in the prior predictive model (a GP with noise of variance
         `predictive_noise_variance`).
-      observations_mask:  Deprecated. Prefer `observations_is_missing`.
-        `bool` `Tensor` of shape `[..., e]`, representing
-        a batch of boolean masks.  When `observation_masks` is not `None`,
-        the returned distribution is conditioned only on the observations for
-        which the corresponding elements of `observations_masks` are `True`.
       observations_is_missing:  `bool` `Tensor` of shape `[..., e]`,
         representing a batch of boolean masks.  When `observations_is_missing`
         is not `None`, the returned distribution is conditioned only on the
@@ -731,10 +661,7 @@ class GaussianProcessRegressionModel(
       jitter: `float` scalar `Tensor` added to the diagonal of the covariance
         matrix to ensure positive definiteness of the covariance matrix.
         Default value: `1e-6`.
-      always_yield_multivariate_normal: If `False` (the default), we produce a
-        scalar `Normal` distribution when the number of `index_points` is
-        statically known to be `1`. If `True`, we avoid this behavior, ensuring
-        that the event shape will retain the `1` from `index_points`.
+      always_yield_multivariate_normal: Deprecated and ignored.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -747,6 +674,8 @@ class GaussianProcessRegressionModel(
         Default value: `False`.
       name: Python `str` name prefixed to Ops created by this class.
         Default value: 'PrecomputedGaussianProcessRegressionModel'.
+      _precomputed_divisor_matrix_cholesky: Internal parameter -- do not use.
+      _precomputed_solve_on_observation: Internal parameter -- do not use.
     Returns
       An instance of `GaussianProcessRegressionModel` with precomputed
       quantities associated with observations.
@@ -755,19 +684,38 @@ class GaussianProcessRegressionModel(
     with tf.name_scope(name) as name:
       if tf.nest.is_nested(kernel.feature_ndims):
         input_dtype = dtype_util.common_dtype(
-            [kernel, index_points, observation_index_points],
+            dict(
+                kernel=kernel,
+                index_points=index_points,
+                observation_index_points=observation_index_points,
+            ),
             dtype_hint=nest_util.broadcast_structure(
-                kernel.feature_ndims, tf.float32))
+                kernel.feature_ndims, tf.float32
+            ),
+        )
         dtype = dtype_util.common_dtype(
-            [observations, observation_noise_variance,
-             predictive_noise_variance, jitter], tf.float32)
+            dict(
+                observations=observations,
+                observation_noise_variance=observation_noise_variance,
+                predictive_noise_variance=predictive_noise_variance,
+                jitter=jitter,
+            ),
+            tf.float32,
+        )
       else:
         # If the index points are not nested, we assume they are of the same
         # dtype as the GPRM.
-        dtype = dtype_util.common_dtype([
-            index_points, observation_index_points, observations,
-            observation_noise_variance, predictive_noise_variance, jitter
-        ], tf.float32)
+        dtype = dtype_util.common_dtype(
+            dict(
+                index_points=index_points,
+                observation_index_points=observation_index_points,
+                observations=observations,
+                observation_noise_variance=observation_noise_variance,
+                predictive_noise_variance=predictive_noise_variance,
+                jitter=jitter,
+            ),
+            tf.float32,
+        )
         input_dtype = dtype
 
       # Convert-to-tensor arguments that are expected to not be Variables / not
@@ -780,13 +728,6 @@ class GaussianProcessRegressionModel(
           observation_noise_variance, dtype=dtype)
       observations = tf.convert_to_tensor(observations, dtype=dtype)
 
-      if ((observations_is_missing is not None) and
-          (observations_mask is not None)):
-        raise ValueError('Expect only one of `observations_is_missing` and '
-                         '`observations_mask` to be set')
-
-      if observations_mask is not None:
-        observations_is_missing = ~tf.convert_to_tensor(observations_mask)
       if observations_is_missing is not None:
         observations_is_missing = tf.convert_to_tensor(observations_is_missing)
 
@@ -798,23 +739,22 @@ class GaussianProcessRegressionModel(
           fixed_inputs=observation_index_points,
           fixed_inputs_is_missing=observations_is_missing,
           cholesky_fn=cholesky_fn,
-          diag_shift=observation_noise_variance)
+          diag_shift=observation_noise_variance,
+          _precomputed_divisor_matrix_cholesky=(
+              _precomputed_divisor_matrix_cholesky))
 
-      observation_cholesky_operator = tf.linalg.LinearOperatorLowerTriangular(
-          conditional_kernel.divisor_matrix_cholesky())
+      mean_fn = stochastic_process_util.maybe_create_mean_fn(mean_fn, dtype)
 
-      if mean_fn is None:
-        mean_fn = lambda x: tf.zeros([1], dtype=dtype)
-      else:
-        if not callable(mean_fn):
-          raise ValueError('`mean_fn` must be a Python callable')
-
-      diff = observations - mean_fn(observation_index_points)
-      if observations_is_missing is not None:
-        diff = tf.where(
-            observations_is_missing, tf.zeros([], dtype=diff.dtype), diff)
-      solve_on_observation = observation_cholesky_operator.solvevec(
-          observation_cholesky_operator.solvevec(diff), adjoint=True)
+      solve_on_observation = _precomputed_solve_on_observation
+      if solve_on_observation is None:
+        observation_cholesky_operator = tf.linalg.LinearOperatorLowerTriangular(
+            conditional_kernel.divisor_matrix_cholesky())
+        diff = observations - mean_fn(observation_index_points)
+        if observations_is_missing is not None:
+          diff = tf.where(
+              observations_is_missing, tf.zeros([], dtype=diff.dtype), diff)
+        solve_on_observation = observation_cholesky_operator.solvevec(
+            observation_cholesky_operator.solvevec(diff), adjoint=True)
 
       def conditional_mean_fn(x):
         k_x_obs = kernel.matrix(x, observation_index_points)
@@ -839,6 +779,11 @@ class GaussianProcessRegressionModel(
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           name=name)
+      # pylint: disable=protected-access
+      gprm._precomputed_divisor_matrix_cholesky = (
+          conditional_kernel._precomputed_divisor_matrix_cholesky)
+      gprm._precomputed_solve_on_observation = solve_on_observation
+      # pylint: enable=protected-access
 
     return gprm
 
@@ -875,6 +820,7 @@ class GaussianProcessRegressionModel(
             shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
         ),
         kernel=parameter_properties.BatchedComponentProperties(),
+        _conditional_kernel=parameter_properties.BatchedComponentProperties(),
         observation_noise_variance=parameter_properties.ParameterProperties(
             event_ndims=0,
             shape_fn=lambda sample_shape: sample_shape[:-1],
@@ -885,3 +831,8 @@ class GaussianProcessRegressionModel(
             shape_fn=lambda sample_shape: sample_shape[:-1],
             default_constraining_bijector_fn=(
                 lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
+
+  def __getitem__(self, slices) -> 'GaussianProcessRegressionModel':
+    # _conditional_mean_fn is a closure over possibly-sliced values, but will
+    # be rebuilt by the constructor.
+    return slicing.batch_slice(self, dict(_conditional_mean_fn=None), slices)

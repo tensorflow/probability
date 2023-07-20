@@ -253,8 +253,9 @@ class MultivariateStudentTLinearOperator(
   def _log_normalization(self):
     df = tf.convert_to_tensor(self.df)
     num_dims = tf.cast(self.event_shape_tensor()[0], self.dtype)
+    log_pi = tf.cast(np.log(np.pi), self.dtype)
     return (special.log_gamma_difference(num_dims / 2., df / 2.) +
-            num_dims / 2. * (tf.math.log(df) + np.log(np.pi)) +
+            num_dims / 2. * (tf.math.log(df) + log_pi) +
             self.scale.log_abs_determinant())
 
   def _log_unnormalized_prob(self, value):

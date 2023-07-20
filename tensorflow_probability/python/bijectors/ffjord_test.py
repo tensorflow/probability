@@ -101,7 +101,7 @@ class FFJORDBijectorTest(test_util.TestCase):
 
   def testJacobianScaling(self, dtype):
     tf_dtype = tf.as_dtype(dtype)
-    scaling_by_two_exp = np.log(2.0)
+    scaling_by_two_exp = np.log(2.0).astype(dtype)
     scale_ode_fn = lambda t, z: scaling_by_two_exp * z
     trace_augmentation_fn = ffjord.trace_jacobian_exact
     bijector = ffjord.FFJORD(
@@ -159,12 +159,12 @@ class FFJORDBijectorTest(test_util.TestCase):
     )
 
   def testHutchinsonsNormalEstimator(self, dtype):
-    seed = 42
+    seed = test_util.test_seed()
     tf_dtype = tf.as_dtype(dtype)
     num_dims = 10
-    np.random.seed(seed=seed)
+    np.random.seed(seed=test_util.test_seed(sampler_type='integer'))
     matrix_diagonal = np.random.uniform(size=[num_dims]).astype(dtype)
-    scaling_matrix = np.diag(matrix_diagonal)
+    scaling_matrix = np.diag(matrix_diagonal).astype(dtype)
     one_time_scale_matrix = np.diag(np.exp(matrix_diagonal))
     scale_ode_fn = lambda t, z: tf.linalg.matvec(scaling_matrix, z)
 

@@ -551,20 +551,21 @@ class JointDistribution(distribution_lib.Distribution):
         value=value,
         sample_and_trace_fn=trace_distributions_and_values))
 
-  def log_prob_parts(self, value, name='log_prob_parts'):
+  @docstring_util.expand_docstring(
+      calling_convention_description=CALLING_CONVENTION_DESCRIPTION.format(
+          method='log_prob_parts', method_abbr='lp_parts'))
+  def log_prob_parts(self, *args, **kwargs):  # pylint: disable=g-doc-args
     """Log probability density/mass function.
 
-    Args:
-      value: `list` of `Tensor`s in `distribution_fn` order for which we compute
-        the `log_prob_parts` and to parameterize other ("downstream")
-        distributions.
-      name: name prepended to ops created by this function.
-        Default value: `"log_prob_parts"`.
+    ${calling_convention_description}
 
     Returns:
-      log_prob_parts: a `tuple` of `Tensor`s representing the `log_prob` for
-        each `distribution_fn` evaluated at each corresponding `value`.
+      log_prob_parts: a `self.dtype`-like structure of `Tensor`s representing
+        the `log_prob` for each component distribution evaluated at each
+        corresponding `value`.
     """
+    name = kwargs.pop('name', 'log_prob_parts')
+    value = self._resolve_value(*args, **kwargs)
     with self._name_and_control_scope(name):
       sum_fn = tf.reduce_sum
       if self._experimental_use_kahan_sum:
@@ -574,41 +575,42 @@ class JointDistribution(distribution_lib.Distribution):
               self._map_measure_over_dists('log_prob', value),
               sum_fn))
 
-  def prob_parts(self, value, name='prob_parts'):
+  @docstring_util.expand_docstring(
+      calling_convention_description=CALLING_CONVENTION_DESCRIPTION.format(
+          method='prob_parts', method_abbr='p_parts'))
+  def prob_parts(self, *args, **kwargs):  # pylint: disable=g-doc-args
     """Probability density/mass function.
 
-    Args:
-      value: `list` of `Tensor`s in `distribution_fn` order for which we compute
-        the `prob_parts` and to parameterize other ("downstream") distributions.
-      name: name prepended to ops created by this function.
-        Default value: `"prob_parts"`.
+    ${calling_convention_description}
 
     Returns:
-      prob_parts: a `tuple` of `Tensor`s representing the `prob` for
-        each `distribution_fn` evaluated at each corresponding `value`.
+      prob_parts: a `self.dtype`-like structure of `Tensor`s representing the
+        `prob` for each component distribution evaluated at each corresponding
+        `value`.
     """
+    name = kwargs.pop('name', 'prob_parts')
+    value = self._resolve_value(*args, **kwargs)
     with self._name_and_control_scope(name):
       return self._model_unflatten(
           self._reduce_measure_over_dists(
               self._map_measure_over_dists('prob', value),
               tf.reduce_prod))
 
-  def unnormalized_log_prob_parts(
-      self, value, name='unnormalized_log_prob_parts'):
+  @docstring_util.expand_docstring(
+      calling_convention_description=CALLING_CONVENTION_DESCRIPTION.format(
+          method='unnormalized_log_prob_parts', method_abbr='unnorm_lp_parts'))
+  def unnormalized_log_prob_parts(self, *args, **kwargs):  # pylint: disable=g-doc-args
     """Unnormalized log probability density/mass function.
 
-    Args:
-      value: `list` of `Tensor`s in `distribution_fn` order for which
-        we compute the `unnormalized_log_prob_parts` and to
-        parameterize other ("downstream") distributions.
-      name: name prepended to ops created by this function.
-        Default value: `"unnormalized_log_prob_parts"`.
+    ${calling_convention_description}
 
     Returns:
-      unnormalized_log_prob_parts: a `tuple` of `Tensor`s representing
-        the `unnormalized_log_prob` for each `distribution_fn`
+      unnormalized_log_prob_parts: a `self.dtype`-like structure of `Tensor`s
+        representing the `unnormalized_log_prob` for each component distribution
         evaluated at each corresponding `value`.
     """
+    name = kwargs.pop('name', 'unnormalized_log_prob_parts')
+    value = self._resolve_value(*args, **kwargs)
     with self._name_and_control_scope(name or 'unnormalized_log_prob_parts'):
       sum_fn = tf.reduce_sum
       if self._experimental_use_kahan_sum:
@@ -618,21 +620,21 @@ class JointDistribution(distribution_lib.Distribution):
               self._map_measure_over_dists('unnormalized_log_prob', value),
               sum_fn))
 
-  def unnormalized_prob_parts(self, value, name='unnormalized_prob_parts'):
+  @docstring_util.expand_docstring(
+      calling_convention_description=CALLING_CONVENTION_DESCRIPTION.format(
+          method='unnormalized_prob_parts', method_abbr='unnorm_prob_parts'))
+  def unnormalized_prob_parts(self, *args, **kwargs):  # pylint: disable=g-doc-args
     """Unnormalized probability density/mass function.
 
-    Args:
-      value: `list` of `Tensor`s in `distribution_fn` order for which
-        we compute the `unnormalized_prob_parts` and to parameterize
-        other ("downstream") distributions.
-      name: name prepended to ops created by this function.
-        Default value: `"unnormalized_prob_parts"`.
+    ${calling_convention_description}
 
     Returns:
-      unnormalized_prob_parts: a `tuple` of `Tensor`s representing the
-        `unnormalized_prob` for each `distribution_fn` evaluated at
-        each corresponding `value`.
+      unnormalized_prob_parts: a `self.dtype`-like structure of `Tensor`s
+        representing the `unnormalized_prob` for each component distribution
+        evaluated at each corresponding `value`.
     """
+    name = kwargs.pop('name', 'unnormalized_prob_parts')
+    value = self._resolve_value(*args, **kwargs)
     with self._name_and_control_scope(name):
       return self._model_unflatten(
           self._reduce_measure_over_dists(
@@ -1338,10 +1340,15 @@ class _DefaultJointBijector(composition.Composition):
     with tf.name_scope('default_joint_bijector') as name:
       if bijector_fn is None:
         bijector_fn = lambda d: d.experimental_default_event_space_bijector()
+      self._jd = jd
+      self._bijector_fn = bijector_fn
       bijectors = tuple(bijector_fn(d)
                         for d in jd._get_single_sample_distributions())
       i_min_event_ndims = tf.nest.map_structure(
-          ps.size, jd.event_shape)
+          tensorshape_util.rank, jd.event_shape)
+      if any(x is None for x in tf.nest.flatten(i_min_event_ndims)):
+        i_min_event_ndims = tf.nest.map_structure(
+            ps.rank_from_shape, jd.event_shape_tensor(), jd.event_shape)
       f_min_event_ndims = jd._model_unflatten([
           b.inverse_event_ndims(nd) for b, nd in
           zip(bijectors, jd._model_flatten(i_min_event_ndims))])
@@ -1352,8 +1359,6 @@ class _DefaultJointBijector(composition.Composition):
           validate_args=jd.validate_args,
           parameters=parameters,
           name=name)
-      self._jd = jd
-      self._bijector_fn = bijector_fn
 
   def _conditioned_bijectors(self, samples, constrained=False):
     if samples is None:

@@ -17,6 +17,7 @@
 licenses(["notice"])
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -28,6 +29,7 @@ FILENAMES = [
     "bitwise",
     "compat",
     "composite_tensor",
+    "composite_tensor_gradient",
     "config",
     "control_flow",
     "data_structures",
@@ -43,7 +45,6 @@ FILENAMES = [
     "linalg_impl",
     "misc",
     "nest",
-    "nested_structure_coder",
     "nn",
     "numpy_array",
     "numpy_logging",
@@ -63,6 +64,7 @@ FILENAMES = [
     "test_lib",
     "tf_inspect",
     "type_spec",
+    "type_spec_registry",
     "variable_utils",
     "variables",
     "v1",

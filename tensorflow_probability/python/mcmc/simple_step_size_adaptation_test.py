@@ -37,6 +37,8 @@ from tensorflow_probability.python.mcmc import sample
 from tensorflow_probability.python.mcmc import simple_step_size_adaptation as sssa
 
 JAX_MODE = False
+NUMPY_MODE = False
+TF_MODE = not (JAX_MODE or NUMPY_MODE)
 _RATE = 1.01
 
 
@@ -541,11 +543,15 @@ class DistributedSimpleStepSizeAdaptationTest(
   @parameterized.named_parameters(
       ('mean', reduce_mean),
       ('logmeanexp',
-       functools.partial(
-           generic.reduce_logmeanexp, experimental_allow_all_gather=True)))
+       functools.partial(generic.reduce_logmeanexp,
+                         experimental_allow_all_gather=True), True))
   @test_util.numpy_disable_test_missing_functionality(
       'NumPy backend does not support distributed computation.')
-  def test_kernel_can_shard_chains_across_devices(self, reduce_fn):
+  def test_kernel_can_shard_chains_across_devices(
+      self, reduce_fn, skip_on_eager=False,
+  ):
+    if skip_on_eager and (tf.executing_eagerly() and TF_MODE):
+      self.skipTest('Not supported in Eager.')
 
     def target_log_prob(a, b):
       return (normal.Normal(0., 1.).log_prob(a) +

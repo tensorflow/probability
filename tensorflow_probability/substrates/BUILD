@@ -16,6 +16,7 @@
 #   API-unstable code that is part of the TFP package.
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
         "//inference_gym:__subpackages__",
@@ -45,10 +46,12 @@ py_library(
     deps = [
 #         "//tensorflow_probability/google:google.jax",  # DisableOnExport
 #         "//tensorflow_probability/google/staging:staging.jax",  # DisableOnExport
+#         "//tensorflow_probability/google/tfp_google:tfp_google.jax",  # DisableOnExport
         "//tensorflow_probability/python:version",
         "//tensorflow_probability/python/bijectors:bijectors.jax",
         "//tensorflow_probability/python/distributions:distributions.jax",
         "//tensorflow_probability/python/experimental:experimental.jax",
+        "//tensorflow_probability/python/glm:glm.jax",
         "//tensorflow_probability/python/internal:internal.jax",
         "//tensorflow_probability/python/math:math.jax",
         "//tensorflow_probability/python/mcmc:mcmc.jax",
@@ -69,10 +72,12 @@ py_library(
     deps = [
 #         "//tensorflow_probability/google:google.numpy",  # DisableOnExport
 #         "//tensorflow_probability/google/staging:staging.numpy",  # DisableOnExport
+#         "//tensorflow_probability/google/tfp_google:tfp_google.numpy",  # DisableOnExport
         "//tensorflow_probability/python:version",
         "//tensorflow_probability/python/bijectors:bijectors.numpy",
         "//tensorflow_probability/python/distributions:distributions.numpy",
         "//tensorflow_probability/python/experimental:experimental.numpy",
+        "//tensorflow_probability/python/glm:glm.numpy",
         "//tensorflow_probability/python/internal:internal.numpy",
         "//tensorflow_probability/python/math:math.numpy",
         "//tensorflow_probability/python/mcmc:mcmc.numpy",

@@ -14,6 +14,9 @@
 # ============================================================================
 """Build defs for TF/NumPy/JAX-variadic libraries & tests."""
 
+# Placeholder: load py_test
+# Placeholder: load py_library
+
 NO_REWRITE_NEEDED = [
     "internal:all_util",
     "internal:docstring_util",
@@ -226,7 +229,7 @@ def multi_substrate_py_library(
                 REWRITER_TARGET,
                 ",".join(resolved_omit_deps_numpy),
             ),
-            exec_tools = [REWRITER_TARGET],
+            tools = [REWRITER_TARGET],
         )
     native.py_library(
         name = "{}.numpy.raw".format(name),
@@ -258,7 +261,7 @@ def multi_substrate_py_library(
                 REWRITER_TARGET,
                 ",".join(resolved_omit_deps_jax),
             ),
-            exec_tools = [REWRITER_TARGET],
+            tools = [REWRITER_TARGET],
         )
     native.py_library(
         name = "{}.jax.raw".format(name),
@@ -362,7 +365,7 @@ def multi_substrate_py_test(
                 srcs = srcs,
                 outs = numpy_srcs,
                 cmd = "$(location {}) $(SRCS) > $@".format(REWRITER_TARGET),
-                exec_tools = [REWRITER_TARGET],
+                tools = [REWRITER_TARGET],
             )
         native.py_test(
             name = "{}.numpy".format(name),
@@ -387,7 +390,7 @@ def multi_substrate_py_test(
                 srcs = srcs,
                 outs = jax_srcs,
                 cmd = "$(location {}) $(SRCS) --numpy_to_jax > $@".format(REWRITER_TARGET),
-                exec_tools = [REWRITER_TARGET],
+                tools = [REWRITER_TARGET],
             )
         jax_deps = _substrate_deps(trimmed_deps, "jax") + jax_extra_deps
         # [internal] Add JAX build dep

@@ -24,25 +24,23 @@ from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-
 
 JAX_MODE = False
 
+if JAX_MODE:
+  import jax  # pylint: disable=g-import-not-at-top
+
 
 __all__ = [
     'smart_for_loop',
+    'tensor_array_from_element',
     'trace_scan'
 ]
 
 
-def _initialize_arrays(initial_values,
-                       num_steps):
-  """Construct a structure of `TraceArray`s from initial values."""
-  trace_arrays = tf.nest.map_structure(
-      lambda t: tf.TensorArray(  # pylint: disable=g-long-lambda
-          dtype=t.dtype,
-          size=num_steps,  # Initial size.
-          clear_after_read=False,  # Allow reading->tiling final value.
-          element_shape=t.shape),
-      initial_values)
-  return tf.nest.map_structure(
-      lambda ta, t: ta.write(0, t), trace_arrays, initial_values)
+def _jax_batched_split(key, n):
+  """A version of jax.random.split` that works PRNG keys of any rank."""
+  split = lambda k: jax.random.split(k, n)
+  for _ in range(key.ndim):
+    split = jax.vmap(split, out_axes=1)
+  return split(key)
 
 
 def _convert_variables_to_tensors(values):
@@ -50,6 +48,22 @@ def _convert_variables_to_tensors(values):
   return tf.nest.map_structure(
       lambda x: tf.convert_to_tensor(x) if isinstance(x, tf.Variable) else x,
       values)
+
+
+def tensor_array_from_element(elem, size=None, **kwargs):
+  """Construct a tf.TensorArray of elements with the dtype + shape of `elem`."""
+  if JAX_MODE and isinstance(elem, jax.random.PRNGKeyArray):
+    # If `trace_elt` is a `PRNGKeyArray`, then then it is not possible to create
+    # a matching (i.e., with the same custom PRNG) instance/array inside
+    # `TensorArray.__init__` given just a `dtype`, `size`, and `shape`.
+    #
+    # So we cheat -- creating an array of similar keys here.
+    kwargs['data'] = _jax_batched_split(elem, size)
+  return tf.TensorArray(
+      elem.dtype,
+      size=size,
+      element_shape=elem.shape,
+      **kwargs)
 
 
 def smart_for_loop(loop_num_iter, body_fn, initial_loop_vars,
@@ -194,12 +208,8 @@ def trace_scan(loop_fn,
     flat_initial_trace = tf.nest.flatten(initial_trace, expand_composites=True)
     trace_arrays = []
     for trace_elt in flat_initial_trace:
-      trace_arrays.append(
-          tf.TensorArray(
-              trace_elt.dtype,
-              size=initial_size,
-              dynamic_size=dynamic_size,
-              element_shape=trace_elt.shape))
+      trace_arrays.append(tensor_array_from_element(
+          trace_elt, size=initial_size, dynamic_size=dynamic_size))
 
     # Helper for writing a (structured) state to (structured) arrays.
     def trace_one_step(num_steps_traced, trace_arrays, state):

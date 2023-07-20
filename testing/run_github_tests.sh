@@ -24,12 +24,12 @@ set -u  # fail and exit on any undefined variable reference
 DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
 
 # Make sure the environment variables are set.
-if [ -z "${SHARD}" ]; then
+if [ -z "${SHARD+x}" ]; then
   echo "SHARD is unset."
   exit -1
 fi
 
-if [ -z "${NUM_SHARDS}" ]; then
+if [ -z "${NUM_SHARDS+x}" ]; then
   echo "NUM_SHARDS is unset."
   exit -1
 fi
@@ -59,16 +59,27 @@ install_python_packages() {
 which bazel || install_bazel
 install_python_packages
 
-# You can alter this test_target to some smaller subset of TFP tests in case
-# you need to reproduce something on the CI workers.
-test_target="//tensorflow_probability/..."
-test_tags_to_skip="(gpu|requires-gpu-nvidia|notap|no-oss-ci|tfp_jax|tf2-broken|tf2-kokoro-broken)"
+changed_py_file_targets="$(${DIR}/get_github_changed_py_files.sh | \
+  sed -r 's#(.*)/([^/]+).py#//\1:\2.py#')"
+
+if [[ -n "${changed_py_file_targets}" ]]; then
+  test_targets=$(bazel query --universe_scope=//tensorflow_probability/... \
+    "tests(allrdeps(set(${changed_py_file_targets})))")
+else
+  # For pushes, test all targets.
+  test_targets=$(bazel query 'tests(//tensorflow_probability/...)')
+fi
+
+test_targets=$(echo "${test_targets}" | tr -s '\n' ' ')
+test_targets="$(echo "${test_targets}" | sed -r 's#(.*) #\1#')"
+test_tags_to_skip="(gpu|requires-gpu-nvidia|notap|no-oss-ci|tfp_jax|\
+tfp_numpy|tf2-broken|tf2-kokoro-broken)"
 
 # Given a test size (small, medium, large), a number of shards and a shard ID,
 # query and print a list of tests of the given size to run in the given shard.
 query_and_shard_tests_by_size() {
   size=$1
-  bazel_query="attr(size, ${size}, tests(${test_target})) \
+  bazel_query="attr(size, ${size}, set(${test_targets})) \
                except \
                attr(tags, \"${test_tags_to_skip}\", \
                     tests(//tensorflow_probability/...))"

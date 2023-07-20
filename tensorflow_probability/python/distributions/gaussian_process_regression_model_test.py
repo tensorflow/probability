@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+from unittest import mock
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
@@ -23,6 +24,7 @@ from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.psd_kernels import exp_sin_squared
 from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic
+from tensorflow_probability.python.math.psd_kernels.internal import test_util as psd_kernel_test_util
 
 
 def _np_kernel_matrix_fn(amp, len_scale, x, y):
@@ -199,7 +201,6 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
     length_scale = np.array([.1, .2, .3], np.float64).reshape([1, 3])
     observation_noise_variance = np.array([1e-9], np.float64)
 
-    jitter = np.float64(1e-6)
     observation_index_points = (
         np.random.uniform(-1., 1., (1, 1, 7, 2)).astype(np.float64))
     observations = np.random.uniform(-1., 1., (1, 1, 7)).astype(np.float64)
@@ -214,7 +215,6 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         observation_index_points=observation_index_points,
         observations=observations,
         observation_noise_variance=observation_noise_variance,
-        jitter=jitter,
         validate_args=True)
 
     precomputed_dist = gprm.GaussianProcessRegressionModel.precompute_regression_model(
@@ -223,7 +223,6 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         observation_index_points=observation_index_points,
         observations=observations,
         observation_noise_variance=observation_noise_variance,
-        jitter=jitter,
         validate_args=True)
 
     self.assertAllClose(
@@ -303,7 +302,6 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
     length_scale = np.array([.1, .2, .3], np.float64).reshape([1, 3])
     observation_noise_variance = np.array([1e-9], np.float64)
 
-    jitter = np.float64(1e-6)
     observation_index_points = (
         np.random.uniform(-1., 1., (1, 1, 7, 2)).astype(np.float64))
     observations = np.random.uniform(-1., 1., (1, 1, 7)).astype(np.float64)
@@ -319,7 +317,6 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         observation_index_points=observation_index_points,
         observations=observations,
         observation_noise_variance=observation_noise_variance,
-        jitter=jitter,
         validate_args=True)
 
     flat = tf.nest.flatten(precomputed_dist, expand_composites=True)
@@ -350,7 +347,6 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
   def testEmptyDataMatchesGPPrior(self):
     amp = np.float64(.5)
     len_scale = np.float64(.2)
-    jitter = np.float64(1e-4)
     index_points = np.random.uniform(-1., 1., (10, 1)).astype(np.float64)
 
     # k_xx - k_xn @ (k_nn + sigma^2) @ k_nx + sigma^2
@@ -361,14 +357,12 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         kernel,
         index_points,
         mean_fn=mean_fn,
-        jitter=jitter,
         validate_args=True)
 
     dist_nones = gprm.GaussianProcessRegressionModel(
         kernel,
         index_points,
         mean_fn=mean_fn,
-        jitter=jitter,
         validate_args=True)
 
     dist_zero_shapes = gprm.GaussianProcessRegressionModel(
@@ -377,7 +371,6 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         observation_index_points=tf.ones([0, 1], tf.float64),
         observations=tf.ones([0], tf.float64),
         mean_fn=mean_fn,
-        jitter=jitter,
         validate_args=True)
 
     for dist in [dist_nones, dist_zero_shapes]:
@@ -468,7 +461,6 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         observation_index_points=observation_index_points_1,
         observations=observations_1,
         mean_fn=mean_fn,
-        jitter=1e-5,
         validate_args=True)
     dist2 = dist1.copy(
         kernel=kernel_2,
@@ -483,7 +475,6 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
             observation_index_points=observation_index_points_1,
             observations=observations_1,
             mean_fn=mean_fn,
-            jitter=1e-5,
             validate_args=True))
     precomputed_dist2 = precomputed_dist1.copy(index_points=index_points_2)
     self.assertIs(precomputed_dist1.mean_fn, precomputed_dist2.mean_fn)
@@ -503,8 +494,6 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
       self.assertAllEqual(dist2.event_shape, event_shape_2)
       self.assertAllEqual(dist1.index_points, index_points_1)
       self.assertAllEqual(dist2.index_points, index_points_2)
-      self.assertAllEqual(
-          tf.get_static_value(dist1.jitter), tf.get_static_value(dist2.jitter))
     else:
       self.assertAllEqual(
           self.evaluate(dist1.batch_shape_tensor()),
@@ -513,7 +502,6 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
           self.evaluate(dist1.event_shape_tensor()), event_shape_1)
       self.assertAllEqual(
           self.evaluate(dist2.event_shape_tensor()), event_shape_2)
-      self.assertEqual(self.evaluate(dist1.jitter), self.evaluate(dist2.jitter))
       self.assertAllEqual(self.evaluate(dist1.index_points), index_points_1)
       self.assertAllEqual(self.evaluate(dist2.index_points), index_points_2)
 
@@ -630,7 +618,7 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         observation_index_points=observation_index_points,
         observations=observations)
 
-    structured_kernel = test_util.MultipartKernel(base_kernel)
+    structured_kernel = psd_kernel_test_util.MultipartTestKernel(base_kernel)
     structured_obs_index_points = dict(
         zip(('foo', 'bar'),
             tf.split(observation_index_points, [5, 3], axis=-1)))
@@ -652,6 +640,73 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
     self.assertAllEqual(base_gprm.batch_shape, structured_gprm.batch_shape)
     self.assertAllEqual(base_gprm.batch_shape_tensor(),
                         structured_gprm.batch_shape_tensor())
+
+    # Iterable index points should be interpreted as single Tensors if the
+    # kernel is not structured.
+    index_points_list = tf.unstack(index_points)
+    obs_index_points_nested_list = tf.nest.map_structure(
+        tf.unstack, tf.unstack(observation_index_points))
+    gprm_with_lists = gprm.GaussianProcessRegressionModel(
+        base_kernel,
+        index_points=index_points_list,
+        observation_index_points=obs_index_points_nested_list,
+        observations=observations)
+    self.assertAllEqual(base_gprm.event_shape_tensor(),
+                        gprm_with_lists.event_shape_tensor())
+    self.assertAllEqual(base_gprm.batch_shape_tensor(),
+                        gprm_with_lists.batch_shape_tensor())
+    self.assertAllClose(base_gprm.log_prob(s), gprm_with_lists.log_prob(s))
+
+  def testPrivateArgPreventsCholeskyRecomputation(self):
+    x = np.random.uniform(-1, 1, (4, 7)).astype(np.float32)
+    x_obs = np.random.uniform(-1, 1, (4, 7)).astype(np.float32)
+    y_obs = np.random.uniform(-1, 1, (4,)).astype(np.float32)
+    chol = np.eye(4).astype(np.float32)
+    mock_cholesky_fn = mock.Mock(return_value=chol)
+    base_kernel = exponentiated_quadratic.ExponentiatedQuadratic()
+    d = gprm.GaussianProcessRegressionModel.precompute_regression_model(
+        base_kernel,
+        index_points=x,
+        observation_index_points=x_obs,
+        observations=y_obs,
+        cholesky_fn=mock_cholesky_fn)
+    mock_cholesky_fn.assert_called_once()
+
+    mock_cholesky_fn.reset_mock()
+    d2 = gprm.GaussianProcessRegressionModel.precompute_regression_model(
+        base_kernel,
+        index_points=x,
+        observation_index_points=x_obs,
+        observations=y_obs,
+        cholesky_fn=mock_cholesky_fn,
+        _precomputed_divisor_matrix_cholesky=(
+            d._precomputed_divisor_matrix_cholesky),
+        _precomputed_solve_on_observation=d._precomputed_solve_on_observation)
+    mock_cholesky_fn.assert_not_called()
+
+    # The Cholesky is computed just once in each call to log_prob (on the
+    # index points kernel matrix).
+    self.assertAllClose(d.log_prob(y_obs), d2.log_prob(y_obs))
+    self.assertEqual(mock_cholesky_fn.call_count, 2)
+
+  def test_batch_slice_precomputed_gprm(self):
+    base_kernel = exponentiated_quadratic.ExponentiatedQuadratic(
+        length_scale=tf.linspace(tf.ones([]), 2., 64), feature_ndims=0)
+    x = tf.linspace(tf.zeros([]), 1., 126)
+    y = tf.linspace(tf.zeros([]), 1.5, 162)
+    d = gprm.GaussianProcessRegressionModel.precompute_regression_model(
+        base_kernel,
+        index_points=y,
+        observation_index_points=x,
+        observations=tf.math.sin(x),
+        observation_noise_variance=1e-3)
+    self.assertEqual((64,), d.batch_shape)
+    self.assertEqual((162,), d.event_shape)
+    self.assertEqual((64, 162,), d.sample(seed=test_util.test_seed()).shape)
+
+    self.assertEqual((), d[2].batch_shape)
+    self.assertEqual((162,), d[2].event_shape)
+    self.assertEqual((162,), d[2].sample(seed=test_util.test_seed()).shape)
 
 
 class GaussianProcessRegressionModelStaticTest(

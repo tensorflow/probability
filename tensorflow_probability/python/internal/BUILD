@@ -21,10 +21,12 @@ load(
     "multi_substrate_py_test",
 )
 # [internal] load pytype.bzl (pytype_strict_test)
+# [internal] load strict.bzl
 
 licenses(["notice"])
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
 #         "//tensorflow_probability/google:friends",  # DisableOnExport
@@ -62,8 +64,8 @@ py_test(
         ":auto_composite_tensor",
         ":tensor_util",
         ":test_util",
-        # absl/flags dep,
         # absl/testing:absltest dep,
+        # absl/flags dep,
         # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:bijector",
@@ -162,10 +164,11 @@ multi_substrate_py_library(
     srcs = ["batched_rejection_sampler.py"],
     deps = [
         ":broadcast_util",
+        ":prefer_static",
         ":samplers",
+        ":tensorshape_util",
         # numpy dep,  # For np.nan
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
@@ -387,6 +390,7 @@ multi_substrate_py_test(
         ":auto_composite_tensor",
         ":loop_util",
         ":prefer_static",
+        ":samplers",
         ":tensorshape_util",
         ":test_util",
         # tensorflow dep,
@@ -491,6 +495,21 @@ multi_substrate_py_test(
     name = "prefer_static_test",
     size = "small",
     srcs = ["prefer_static_test.py"],
+    deps = [
+        ":prefer_static",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+# py_strict
+py_test(
+    name = "prefer_static_shape64_test",
+    size = "small",
+    srcs = ["prefer_static_shape64_test.py"],
+    env = {"TF_FLAG_TF_SHAPE_DEFAULT_INT64": "true"},
     deps = [
         ":prefer_static",
         # absl/testing:parameterized dep,
@@ -750,10 +769,9 @@ multi_substrate_py_library(
     srcs = ["test_util.py"],
     deps = [
         ":dtype_util",
-        ":parameter_properties",
-        ":prefer_static",
         ":samplers",
         ":test_combinations",
+        # absl/testing:absltest dep,
         # absl/flags dep,
         # hypothesis dep,
         # numpy dep,
@@ -762,7 +780,6 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/bijectors:bijector",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:empirical_statistical_testing",
-        "//tensorflow_probability/python/math/psd_kernels",
         "//tensorflow_probability/python/util:deferred_tensor",
         "//tensorflow_probability/python/util:seed_stream",
     ],

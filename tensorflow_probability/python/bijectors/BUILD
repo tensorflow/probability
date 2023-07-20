@@ -25,6 +25,7 @@ load(
 licenses(["notice"])
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
 #         "//tensorflow_probability/google:friends",  # DisableOnExport
@@ -37,7 +38,6 @@ multi_substrate_py_library(
     substrates_omit_deps = [
         ":batch_normalization",
         ":discrete_cosine_transform",
-        ":ffjord",
         ":glow",
     ],
     deps = [
@@ -1041,6 +1041,7 @@ multi_substrate_py_library(
     testonly = 1,
     srcs = ["bijector_test_util.py"],
     deps = [
+        ":bijector",
         ":reshape",
         # numpy dep,
         # scipy dep,
@@ -1445,9 +1446,7 @@ multi_substrate_py_test(
     srcs = ["ffjord_test.py"],
     disabled_substrates = [
         "numpy",
-        "jax",
     ],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     shard_count = 3,
     deps = [

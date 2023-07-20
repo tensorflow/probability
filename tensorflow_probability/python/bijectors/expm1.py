@@ -25,7 +25,9 @@ __all__ = [
 ]
 
 
-class Expm1(bijector.AutoCompositeTensorBijector):
+class Expm1(
+    bijector.CoordinatewiseBijectorMixin,
+    bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = exp(X) - 1`.
 
     This `Bijector` is no different from Chain([Shift(-1), Exp()]).
@@ -86,7 +88,8 @@ class Expm1(bijector.AutoCompositeTensorBijector):
     return tf.identity(x)
 
 
-class Log1p(invert.Invert):
+class Log1p(
+    bijector.CoordinatewiseBijectorMixin, invert.Invert):
   """Compute `Y = log1p(X)`. This is `Invert(Expm1())`."""
 
   def __init__(self, validate_args=False, name='log1p'):

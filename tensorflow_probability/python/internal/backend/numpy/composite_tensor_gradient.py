@@ -1,4 +1,4 @@
-# Copyright 2021 The TensorFlow Probability Authors.
+# Copyright 2023 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Numpy stub for saved_model.nested_structure_coder."""
+"""Numpy stub for `composite_tensor_gradient`."""
+
+__all__ = ['CompositeTensorGradient']
 
 
-class _TypeSpecCodec(object):
-
-  TYPE_SPEC_CLASS_FROM_PROTO = {}
-  TYPE_SPEC_CLASS_TO_PROTO = {}
+class CompositeTensorGradient(object):
+  pass

@@ -126,7 +126,9 @@ class ShardTest(test_lib.DistributedTest):
         (test_util.test_seed(sampler_type='stateless'),),
         in_axes=None)
 
-    @tf.function(jit_compile=True)
+    # TODO(b/204228837): This used to work with jit_compile=True, but we had to
+    # disable it due to cross-device resource access errors.
+    @tf.function(autograph=False)
     def lp_grad(x):
       return gradient.value_and_gradient(model.log_prob, x)
 

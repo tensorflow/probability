@@ -35,6 +35,7 @@
 
 from tensorflow_probability.python.internal.backend.numpy import errors
 from tensorflow_probability.python.internal.backend.numpy import ops
+# from tensorflow.python.framework import tensor_conversion
 from tensorflow_probability.python.internal.backend.numpy import numpy_array as array_ops
 from tensorflow_probability.python.internal.backend.numpy import control_flow as control_flow_ops
 from tensorflow_probability.python.internal.backend.numpy import numpy_math as math_ops
@@ -222,7 +223,8 @@ class LinearOperatorHouseholder(linear_operator.LinearOperator):
     # Note that because this is a reflection, it lies in O(n) (for real vector
     # spaces) or U(n) (for complex vector spaces), and thus is its own adjoint.
     reflection_axis = ops.convert_to_tensor(
-        self.reflection_axis)
+        self.reflection_axis
+    )
     x = linalg.adjoint(x) if adjoint_arg else x
     normalized_axis = nn.l2_normalize(reflection_axis, axis=-1)
     mat = normalized_axis[..., _ops.newaxis]
@@ -253,7 +255,8 @@ class LinearOperatorHouseholder(linear_operator.LinearOperator):
 
   def _to_dense(self):
     reflection_axis = ops.convert_to_tensor(
-        self.reflection_axis)
+        self.reflection_axis
+    )
     normalized_axis = nn.l2_normalize(reflection_axis, axis=-1)
     mat = normalized_axis[..., _ops.newaxis]
     matrix = -2 * _linalg.matmul(mat, mat, adjoint_b=True)
@@ -262,7 +265,8 @@ class LinearOperatorHouseholder(linear_operator.LinearOperator):
 
   def _diag_part(self):
     reflection_axis = ops.convert_to_tensor(
-        self.reflection_axis)
+        self.reflection_axis
+    )
     normalized_axis = nn.l2_normalize(reflection_axis, axis=-1)
     return 1. - 2 * normalized_axis * math_ops.conj(normalized_axis)
 

@@ -1898,7 +1898,7 @@ class Distribution(_BaseDistribution):
     log_prob = self.log_prob(value, **kwargs)
     tangent_space = None
     if hasattr(self, '_experimental_tangent_space'):
-      tangent_space = self._experimental_tangent_space
+      tangent_space = self._experimental_tangent_space(value)
     elif backward_compat:
       # Import here rather than top-level to avoid circular import.
       # pylint: disable=g-import-not-at-top
@@ -2126,8 +2126,8 @@ class DiscreteDistributionMixin(object):
   ```
   """
 
-  @property
-  def _experimental_tangent_space(self):
+  def _experimental_tangent_space(self, x):
+    del x
     from tensorflow_probability.python.experimental import tangent_spaces  # pylint: disable=g-import-not-at-top
     return tangent_spaces.ZeroSpace()
 

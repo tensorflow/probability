@@ -16,6 +16,7 @@
 #   TensorFlow Probability examples.
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -54,6 +55,7 @@ py_test(
         "--num_monte_carlo=4",
     ],
     main = "bayesian_neural_network.py",
+    tags = ["not_run:arm"],
     deps = [
         ":bayesian_neural_network_lib",
     ],

@@ -14,11 +14,11 @@
 # ============================================================================
 """Integration test TFP+Numpy."""
 
-from absl.testing import absltest
-
 import numpy as np
 
 from tensorflow_probability.substrates import numpy as tfp
+
+from absl.testing import absltest
 
 tfb = tfp.bijectors
 tfd = tfp.distributions

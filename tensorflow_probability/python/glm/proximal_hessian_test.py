@@ -60,13 +60,13 @@ class _ProximalHessianTest(object):
         low=np.array(-1, dtype), high=np.array(1, dtype)).sample(
             batch_shape + [d], seed=seed())
 
-    radius = np.sqrt(2.)
+    radius = tf.cast(np.sqrt(2.), dtype)
     model_coefficients *= (
         radius /
         tf.linalg.norm(tensor=model_coefficients, axis=-1)[..., tf.newaxis])
 
     mask = bernoulli.Bernoulli(
-        probs=0.5, dtype=tf.bool).sample(batch_shape + [d])
+        probs=0.5, dtype=tf.bool).sample(batch_shape + [d], seed=seed())
     model_coefficients = tf.where(
         mask, model_coefficients, tf.zeros_like(model_coefficients))
     model_matrix = normal.Normal(

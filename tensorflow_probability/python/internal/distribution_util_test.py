@@ -233,7 +233,7 @@ class PadMixtureDimensionsTest(test_util.TestCase):
     gm = MixtureSameFamily(
         mixture_distribution=Categorical(probs=[0.3, 0.7]),
         components_distribution=MultivariateNormalDiag(
-            loc=[[-1., 1], [1, -1]], scale_identity_multiplier=[1.0, 0.5]))
+            loc=[[-1., 1], [1, -1]], scale_diag=[[1.0, 1.0], [0.5, 0.5]]))
 
     x = tf.constant([[1.0, 2.0], [3.0, 4.0]])
     x_pad = distribution_util.pad_mixture_dimensions(

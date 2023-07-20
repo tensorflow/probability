@@ -601,6 +601,28 @@ class CategoricalTest(test_util.TestCase):
 
 
 @test_util.test_all_tf_execution_regimes
+class ForceProbsToZeroOutsideSupportTest(test_util.TestCase):
+
+  def testPMFFloats(self):
+    logits = np.log(np.array([0.2, 0.8]))
+    dist = categorical.Categorical(logits=logits,
+                                   force_probs_to_zero_outside_support=True)
+    inputs = [0., 0.5, 1., 1.5]
+    # Should be 0 for non-integers.
+    expected_outputs = np.array([0.2, 0., 0.8, 0.])
+    self.assertAllClose(self.evaluate(dist.prob(inputs)), expected_outputs)
+
+  def testPMFOutOfBounds(self):
+    logits = np.log(np.array([0.2, 0.8]))
+    dist = categorical.Categorical(logits=logits,
+                                   force_probs_to_zero_outside_support=True)
+    inputs = [-2, -1, 0, 1, 2, 3]
+    # Should be 0 for out of bound inputs.
+    expected_outputs = np.array([0., 0., 0.2, 0.8, 0., 0.])
+    self.assertAllClose(self.evaluate(dist.prob(inputs)), expected_outputs)
+
+
+@test_util.test_all_tf_execution_regimes
 class CategoricalFromVariableTest(test_util.TestCase):
 
   @test_util.tf_tape_safety_test

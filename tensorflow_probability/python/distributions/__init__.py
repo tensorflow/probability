@@ -37,6 +37,7 @@ from tensorflow_probability.python.distributions.deterministic import Determinis
 from tensorflow_probability.python.distributions.deterministic import VectorDeterministic
 from tensorflow_probability.python.distributions.dirichlet import Dirichlet
 from tensorflow_probability.python.distributions.dirichlet_multinomial import DirichletMultinomial
+from tensorflow_probability.python.distributions.distribution import AutoCompositeTensorDistribution
 from tensorflow_probability.python.distributions.distribution import Distribution
 from tensorflow_probability.python.distributions.doublesided_maxwell import DoublesidedMaxwell
 from tensorflow_probability.python.distributions.dpp import DeterminantalPointProcess
@@ -130,6 +131,7 @@ from tensorflow_probability.python.distributions.triangular import Triangular
 from tensorflow_probability.python.distributions.truncated_cauchy import TruncatedCauchy
 from tensorflow_probability.python.distributions.truncated_normal import TruncatedNormal
 from tensorflow_probability.python.distributions.two_piece_normal import TwoPieceNormal
+from tensorflow_probability.python.distributions.two_piece_student_t import TwoPieceStudentT
 from tensorflow_probability.python.distributions.uniform import Uniform
 from tensorflow_probability.python.distributions.variational_gaussian_process import VariationalGaussianProcess
 from tensorflow_probability.python.distributions.von_mises import VonMises
@@ -167,6 +169,7 @@ del _sys
 
 __all__ = [
     'Autoregressive',
+    'AutoCompositeTensorDistribution',
     'BatchBroadcast',
     'BatchReshape',
     'Bates',
@@ -243,6 +246,7 @@ __all__ = [
     'Multinomial',
     'MultivariateNormalDiag',
     'MultivariateNormalDiagPlusLowRank',
+    'MultivariateNormalDiagPlusLowRankCovariance',
     'MultivariateNormalFullCovariance',
     'MultivariateNormalLinearOperator',
     'MultivariateNormalTriL',
@@ -286,6 +290,7 @@ __all__ = [
     'TruncatedCauchy',
     'TruncatedNormal',
     'TwoPieceNormal',
+    'TwoPieceStudentT',
     'Uniform',
     'VariationalGaussianProcess',
     'VectorDeterministic',

@@ -35,6 +35,7 @@
 
 from tensorflow_probability.python.internal.backend.numpy import dtype as dtypes
 from tensorflow_probability.python.internal.backend.numpy import ops
+# from tensorflow.python.framework import tensor_conversion
 from tensorflow_probability.python.internal.backend.numpy import numpy_array as array_ops
 from tensorflow_probability.python.internal.backend.numpy import numpy_math as math_ops
 from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator
@@ -182,7 +183,9 @@ class LinearOperatorFullMatrix(linear_operator.LinearOperator):
         dtypes.complex128,
     ]
 
-    matrix = ops.convert_to_tensor(matrix, name="matrix")
+    matrix = ops.convert_to_tensor(
+        matrix, name="matrix"
+    )
 
     dtype = matrix.dtype
     if dtype not in allowed_dtypes:

@@ -77,7 +77,7 @@ def brier_decomposition(labels, logits, name=None):
 
   Args:
     labels: Tensor, (n,), with tf.int32 or tf.int64 elements containing ground
-      truth class labels in the range [0,nlabels].
+      truth class labels in the range [0,nlabels-1].
     logits: Tensor, (n, nlabels), with logits for n instances and nlabels.
     name: Python `str` name prefixed to Ops created by this function.
 

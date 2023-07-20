@@ -55,10 +55,10 @@ def make_log_det_jacobian_fn(bijector, direction):
           'got {}.'.format(tf.nest.map_structure(lambda _: '.', dtype)))
     bijector = [bijector]
   def fn(state_parts, event_ndims):
-    return sum([
+    return sum(
         getattr(b, attr)(sp, event_ndims=e)
         for b, e, sp in zip(bijector, event_ndims, state_parts)
-    ])
+    )
   return fn
 
 

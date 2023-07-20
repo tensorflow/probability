@@ -408,6 +408,214 @@ if not JAX_MODE:
 del _PivotedCholesky
 
 
+class _LowRankCholesky(test_util.TestCase):
+
+  def _random_batch_psd(self, dim):
+    rng = test_util.test_np_rng()
+    matrix = rng.random_sample([2, dim, dim])
+    matrix = np.matmul(matrix, np.swapaxes(matrix, -2, -1))
+    matrix = (matrix + np.diag(np.arange(dim) * .1)).astype(self.dtype)
+    masked_shape = (
+        matrix.shape if self.use_static_shape else [None] * len(matrix.shape))
+    matrix = tf1.placeholder_with_default(matrix, shape=masked_shape)
+    return matrix
+
+  def testLowRankCholesky(self):
+    if not tf.executing_eagerly() and not self.use_static_shape:
+      return
+
+    # TODO(thomaswc): Jit this.
+    dim = 11
+    matrix = self._random_batch_psd(dim)
+    true_diag = tf.linalg.diag_part(matrix)
+
+    pchol, r, residual_diag = linalg.low_rank_cholesky(matrix, max_rank=1)
+    self.assertEqual(1, self.evaluate(r))
+    self.assertEqual((2, 11), residual_diag.shape)
+    mat = tf.matmul(pchol, pchol, transpose_b=True)
+    diag_diff_prev = self.evaluate(tf.abs(tf.linalg.diag_part(mat) - true_diag))
+    diff_norm_prev = self.evaluate(
+        tf.linalg.norm(mat - matrix, ord='fro', axis=[-1, -2]))
+    old_residual_trace = None
+    for rank in range(2, dim + 1):
+      # Specifying trace_rtol forces the full max_rank decomposition.
+      pchol, r, residual_diag = linalg.low_rank_cholesky(
+          matrix, max_rank=rank, trace_rtol=-1)
+      self.assertEqual(rank, self.evaluate(r))
+      residual_trace = tf.math.reduce_sum(residual_diag, axis=-1)
+      if old_residual_trace is not None:
+        self.assertTrue(self.evaluate(tf.reduce_all(
+            residual_trace < old_residual_trace)))
+      old_residual_trace = residual_trace
+      # Compared to pivot_cholesky, low_rank_cholesky will sometimes have
+      # approximate zeros like 7e-17 or -2.6e-7 where it "should" have a
+      # real zero.
+      zeros_per_col = tf.math.count_nonzero(
+          tf.math.less(tf.math.abs(pchol), 1e-6),
+          axis=-2)
+      mat = tf.matmul(pchol, pchol, transpose_b=True)
+      pchol_shp, diag_diff, diff_norm, zeros_per_col = self.evaluate([
+          tf.shape(pchol),
+          tf.abs(tf.linalg.diag_part(mat) - true_diag),
+          tf.linalg.norm(mat - matrix, ord='fro', axis=[-1, -2]), zeros_per_col
+      ])
+      self.assertAllEqual([2, dim, rank], pchol_shp)
+      self.assertAllEqual(
+          np.ones([2, rank], dtype=np.bool_), zeros_per_col >= np.arange(rank),
+          msg=f'For matrix {matrix}, low rank cholesky {pchol} with max_rank '
+              f'{rank} has zeros per column of {zeros_per_col}'
+      )
+      self.assertAllLessEqual(diag_diff - diag_diff_prev,
+                              2.0 * np.finfo(self.dtype).resolution)
+      self.assertAllLessEqual(diff_norm - diff_norm_prev,
+                              np.finfo(self.dtype).resolution)
+      diag_diff_prev, diff_norm_prev = diag_diff, diff_norm
+
+  @test_util.numpy_disable_gradient_test
+  def testGradient(self):
+    if not tf.executing_eagerly():
+      return
+
+    dim = 11
+
+    def fn(matrix):
+      chol, _, _ = linalg.low_rank_cholesky(matrix, max_rank=dim // 3)
+      return chol
+    def grad(matrix):
+      _, dmatrix = gradient.value_and_gradient(fn, matrix)
+      return dmatrix
+    if self.jit:
+      self.skip_if_no_xla()
+      grad = tf.function(grad, jit_compile=True)
+
+    matrix = self._random_batch_psd(dim)
+    _, dmatrix = grad(matrix)
+    self.assertIsNotNone(dmatrix)
+    self.assertAllGreater(tf.linalg.norm(dmatrix, ord='fro', axis=[-1, -2]), 0.)
+
+  @test_util.tf_tape_safety_test
+  def testGradientTapeCFv2(self):
+    if not tf1.control_flow_v2_enabled():
+      self.skipTest('Requires v2 control flow')
+    dim = 11
+
+    def grad(matrix):
+      with tf.GradientTape() as tape:
+        tape.watch(matrix)
+        pchol, _, _ = linalg.low_rank_cholesky(matrix, max_rank=dim // 3)
+      dmatrix = tape.gradient(
+          pchol, matrix, output_gradients=tf.ones_like(pchol) * .01)
+      return dmatrix
+    if self.jit:
+      self.skip_if_no_xla()
+      grad = tf.function(grad, jit_compile=True)
+
+    matrix = self._random_batch_psd(dim)
+    dmatrix = grad(matrix)
+    self.assertIsNotNone(dmatrix)
+    self.assertAllGreater(tf.linalg.norm(dmatrix, ord='fro', axis=[-1, -2]), 0.)
+
+  # pyformat: disable
+  @parameterized.parameters(
+      # Inputs are randomly shuffled arange->tril; outputs from gpytorch.
+      (
+          np.array([
+              [7., 0, 0, 0, 0, 0],
+              [9, 13, 0, 0, 0, 0],
+              [4, 10, 6, 0, 0, 0],
+              [18, 1, 2, 14, 0, 0],
+              [5, 11, 20, 3, 17, 0],
+              [19, 12, 16, 15, 8, 21]
+          ]),
+          np.array([
+              [3.4444, -1.3545, 4.084, 1.7674, -1.1789, 3.7562],
+              [8.4685, 1.2821, 3.1179, 12.9197, 0.0000, 0.0000],
+              [7.5621, 4.8603, 0.0634, 7.3942, 4.0637, 0.0000],
+              [15.435, -4.8864, 16.2137, 0.0000, 0.0000, 0.0000],
+              [18.8535, 22.103, 0.0000, 0.0000, 0.0000, 0.0000],
+              [38.6135, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000]
+          ])),
+      (
+          np.array([
+              [1, 0, 0],
+              [2, 3, 0],
+              [4, 5, 6.]
+          ]),
+          np.array([
+              [0.4558, 0.3252, 0.8285],
+              [2.6211, 2.4759, 0.0000],
+              [8.7750, 0.0000, 0.0000]
+          ])),
+      (
+          np.array([
+              [6, 0, 0],
+              [3, 2, 0],
+              [4, 1, 5.]
+          ]),
+          np.array([
+              [3.7033, 4.7208, 0.0000],
+              [2.1602, 2.1183, 1.9612],
+              [6.4807, 0.0000, 0.0000]
+          ])))
+  # pyformat: enable
+  def testOracleExamples(self, mat, oracle_pchol):
+    max_rank = mat.shape[-1] + 1
+    fns = [functools.partial(
+        linalg.low_rank_cholesky, max_rank=rank, trace_rtol=-1)
+           for rank in range(max_rank)]
+    if self.jit:
+      self.skip_if_no_xla()
+      fns = [tf.function(fn, jit_compile=True) for fn in fns]
+
+    mat = np.matmul(mat, mat.T)
+    for rank in range(1, max_rank):
+      lr_chol, r, _ = fns[rank](mat)
+      self.assertEqual(self.evaluate(r), rank)
+      self.assertAllClose(
+          oracle_pchol[..., :rank], lr_chol[..., :rank], atol=1e-4)
+
+  @test_util.disable_test_for_backend(
+      disable_jax=True,
+      disable_numpy=True,
+      reason='LinearOperatorPSDKernel not available in jax or numpy backends.')
+  def testLinopKernel(self):
+    if not tf.executing_eagerly() and not self.use_static_shape:
+      return
+    x = tf.random.uniform([10, 2], dtype=self.dtype, seed=test_util.test_seed())
+    masked_shape = x.shape if self.use_static_shape else [None] * len(x.shape)
+    x = tf1.placeholder_with_default(x, shape=masked_shape)
+    k = matern.MaternThreeHalves()
+    expected = linalg.low_rank_cholesky(k.matrix(x, x), max_rank=3)
+    actual = linalg.low_rank_cholesky(
+        experimental_linalg.LinearOperatorPSDKernel(k, x), max_rank=3)
+    expected, actual = self.evaluate([expected, actual])
+    self.assertAllClose(expected, actual)
+
+
+@test_util.test_all_tf_execution_regimes
+class LowRankCholesky32Static(_LowRankCholesky):
+  dtype = np.float32
+  use_static_shape = True
+  jit = False
+
+
+@test_util.test_all_tf_execution_regimes
+class LowRankCholesky64Dynamic(_LowRankCholesky):
+  dtype = np.float64
+  use_static_shape = False
+  jit = False
+
+
+@test_util.test_all_tf_execution_regimes
+class LowRankCholeskyJit(_LowRankCholesky):
+  dtype = np.float32
+  use_static_shape = True
+  jit = True
+
+
+del _LowRankCholesky
+
+
 def make_tensor_hiding_attributes(value, hide_shape, hide_value=True):
   if not hide_value:
     return tf.convert_to_tensor(value)
@@ -934,9 +1142,232 @@ class HPSDLogDet64Test(_HPSDLogDetTest):
 del _HPSDLogDetTest
 
 
+class _HPSDSolveTest(test_util.TestCase):
+
+  def testEqualsHPSDSolve(self):
+    rng = test_util.test_np_rng()
+    xs = rng.random_sample(7).astype(self.dtype)[:, tf.newaxis]
+    k = matern.MaternOneHalf()
+    mat = k.matrix(xs, xs)
+    y = rng.random_sample((7, 3)).astype(self.dtype)
+    self.assertAllClose(
+        self.evaluate(linalg.hpsd_solve(mat, y)),
+        self.evaluate(tf.linalg.solve(mat, y)),
+        rtol=6e-4)
+
+  def testEqualsHPSDSolvevec(self):
+    rng = test_util.test_np_rng()
+    xs = rng.random_sample(7).astype(self.dtype)[:, tf.newaxis]
+    k = matern.MaternOneHalf()
+    mat = k.matrix(xs, xs)
+    y = rng.random_sample((7)).astype(self.dtype)
+    self.assertAllClose(
+        self.evaluate(linalg.hpsd_solvevec(mat, y)),
+        self.evaluate(linalg.hpsd_solve(mat, y[..., tf.newaxis])[..., 0]),
+        rtol=6e-4)
+
+  def testUsesOverridenCholeskyFactor(self):
+    rng = test_util.test_np_rng()
+    xs = rng.random_sample(7).astype(self.dtype)[:, tf.newaxis]
+    k = matern.MaternOneHalf()
+    mat = k.matrix(xs, xs)
+    y = rng.random_sample((7, 3)).astype(self.dtype)
+    my_cholesky = tf.linalg.eye(num_rows=7, dtype=mat.dtype)
+    solve_ = self.evaluate(
+        linalg.hpsd_solve(
+            mat, y, cholesky_matrix=my_cholesky))
+    self.assertAllClose(solve_, y)
+
+  @test_util.numpy_disable_gradient_test
+  def testSolveGradient(self):
+    rng = test_util.test_np_rng()
+    # Test that this respects batch shapes.
+    xs = rng.random_sample((6, 10)).astype(self.dtype)[..., tf.newaxis]
+    k = matern.MaternThreeHalves()
+    mat = k.matrix(xs, xs)
+    # Ensure that the matrix is more well conditioned.
+    mat = tf.linalg.set_diag(mat, tf.linalg.diag_part(mat) + 2.)
+    rhs = tf.convert_to_tensor(
+        rng.random_sample((3, 1, 10, 2)).astype(self.dtype))
+
+    def naive_hpsd_solve(matrix, rhs):
+      cholesky_matrix = tf.linalg.cholesky(matrix)
+      chol_linop = tf.linalg.LinearOperatorLowerTriangular(cholesky_matrix)
+      return chol_linop.solve(chol_linop.solve(rhs), adjoint=True)
+
+    # Use the reduce_sum of hpsd_solve to test that the upstream
+    # gradients are properly incorporated.
+
+    _, naive_gradient = gradient.value_and_gradient(
+        lambda x: tf.reduce_sum(naive_hpsd_solve(x, rhs)), mat)
+    _, custom_gradient = gradient.value_and_gradient(
+        lambda x: tf.reduce_sum(linalg.hpsd_solve(x, rhs)), mat)
+    naive_gradient, custom_gradient = self.evaluate(
+        [naive_gradient, custom_gradient])
+    self.assertAllClose(naive_gradient, custom_gradient, rtol=2e-4)
+
+    _, naive_gradient = gradient.value_and_gradient(
+        lambda x: tf.reduce_sum(naive_hpsd_solve(mat, x)), rhs)
+    _, custom_gradient = gradient.value_and_gradient(
+        lambda x: tf.reduce_sum(linalg.hpsd_solve(mat, x)), rhs)
+    naive_gradient, custom_gradient = self.evaluate(
+        [naive_gradient, custom_gradient])
+    self.assertAllClose(naive_gradient, custom_gradient, rtol=3e-6)
+
+  @test_util.numpy_disable_gradient_test
+  def testSolveGradientWithCholesky(self):
+    rng = test_util.test_np_rng()
+    # Test that this respects batch shapes.
+    xs = rng.random_sample((6, 10)).astype(self.dtype)[..., tf.newaxis]
+    k = matern.MaternThreeHalves()
+    mat = k.matrix(xs, xs)
+    rhs = tf.convert_to_tensor(
+        rng.random_sample((3, 1, 10, 3)).astype(self.dtype))
+
+    identity = self.evaluate(
+        tf.eye(num_rows=10, batch_shape=[6], dtype=self.dtype))
+    cholesky_factor = (3. * identity).astype(self.dtype)
+    mat_for_factor = tf.convert_to_tensor((9. * identity).astype(self.dtype))
+
+    hpsd_solve = functools.partial(
+        linalg.hpsd_solve, cholesky_matrix=cholesky_factor)
+
+    _, [actual_mat_gradient, actual_rhs_gradient] = self.evaluate((
+        gradient.value_and_gradient(
+            lambda x, y: tf.reduce_sum(hpsd_solve(x, y)), mat, rhs)))
+
+    _, [expected_mat_gradient, expected_rhs_gradient] = self.evaluate((
+        gradient.value_and_gradient(
+            lambda x, y: tf.reduce_sum(linalg.hpsd_solve(x, y)),
+            mat_for_factor, rhs)))
+
+    self.assertAllClose(actual_mat_gradient, expected_mat_gradient)
+    self.assertAllClose(actual_rhs_gradient, expected_rhs_gradient)
+
+  def testNoJaxTracerLeak(self):
+    if not JAX_MODE:
+      return
+    import jax  # pylint:disable=g-import-not-at-top
+    import jax.numpy as jnp  # pylint:disable=g-import-not-at-top
+    def f(carry, x):
+      return (carry / 2 + linalg.hpsd_solve(jnp.eye(3), x,
+                                            cholesky_matrix=jnp.eye(3)),
+              ())
+
+    def g(t):
+      carry, _ = jax.lax.scan(f, jnp.zeros([3, 3]), xs=jnp.zeros([7, 3, 3]) + t)
+      return carry.sum()
+
+    with jax.checking_leaks():
+      jax.grad(g)(jnp.eye(3))
+
+
+@test_util.test_all_tf_execution_regimes
+class HPSDSolve32Test(_HPSDSolveTest):
+  dtype = np.float32
+
+
+@test_util.test_all_tf_execution_regimes
+class HPSDSolve64Test(_HPSDSolveTest):
+  dtype = np.float64
+
+
+del _HPSDSolveTest
+
+
 class _QuadraticFormSolveTest(test_util.TestCase):
 
   def testEqualsQuadraticFormSolve(self):
+    rng = test_util.test_np_rng()
+    xs = rng.random_sample(7).astype(self.dtype)[:, tf.newaxis]
+    k = matern.MaternOneHalf()
+    mat = k.matrix(xs, xs)
+    y = rng.random_sample((7, 3)).astype(self.dtype)
+    self.assertAllClose(
+        self.evaluate(linalg.hpsd_quadratic_form_solve(mat, y)),
+        self.evaluate(y.T  @ tf.linalg.solve(mat, y)),
+        rtol=6e-5)
+
+  def testUsesOverridenCholeskyFactor(self):
+    rng = test_util.test_np_rng()
+    xs = rng.random_sample(7).astype(self.dtype)[:, tf.newaxis]
+    k = matern.MaternOneHalf()
+    mat = k.matrix(xs, xs)
+    y = rng.random_sample((7, 3)).astype(self.dtype)
+    my_cholesky = tf.linalg.eye(num_rows=7, dtype=mat.dtype)
+    # Symmetric Solve should be just the norm squared.
+    symsolve_ = self.evaluate(
+        linalg.hpsd_quadratic_form_solve(
+            mat, y, cholesky_matrix=my_cholesky))
+    self.assertAllClose(symsolve_, y.T @ y)
+
+  @test_util.numpy_disable_gradient_test
+  def testQuadraticFormSolveGradient(self):
+    rng = test_util.test_np_rng()
+    # Test that this respects batch shapes.
+    xs = rng.random_sample((6, 10)).astype(self.dtype)[..., tf.newaxis]
+    k = matern.MaternThreeHalves()
+    mat = k.matrix(xs, xs)
+    # Ensure that the matrix is more well conditioned.
+    mat = tf.linalg.set_diag(mat, tf.linalg.diag_part(mat) + 1.)
+    rhs = tf.convert_to_tensor(
+        rng.random_sample((3, 1, 10, 2)).astype(self.dtype))
+
+    def naive_hpsd_quadratic_form_solve(matrix, rhs):
+      cholesky_matrix = tf.linalg.cholesky(matrix)
+      chol_linop = tf.linalg.LinearOperatorLowerTriangular(cholesky_matrix)
+      result = chol_linop.solve(rhs)
+      return tf.linalg.matmul(result, result, transpose_a=True)
+
+    # Use the square of hpsd_quadratic_form_solve to test that the upstream
+    # gradients are properly incorporated.
+    _, naive_gradient = gradient.value_and_gradient(
+        lambda x: tf.reduce_sum(naive_hpsd_quadratic_form_solve(x, rhs)), mat)
+    _, custom_gradient = gradient.value_and_gradient(
+        lambda x: tf.reduce_sum(linalg.hpsd_quadratic_form_solve(x, rhs)), mat)
+    naive_gradient, custom_gradient = self.evaluate(
+        [naive_gradient, custom_gradient])
+    self.assertAllClose(naive_gradient, custom_gradient, rtol=2e-4)
+
+    _, naive_gradient = gradient.value_and_gradient(
+        lambda x: tf.reduce_sum(naive_hpsd_quadratic_form_solve(x, rhs)), mat)
+    _, custom_gradient = gradient.value_and_gradient(
+        lambda x: tf.reduce_sum(linalg.hpsd_quadratic_form_solve(x, rhs)), mat)
+    naive_gradient, custom_gradient = self.evaluate(
+        [naive_gradient, custom_gradient])
+    self.assertAllClose(naive_gradient, custom_gradient, rtol=3e-6)
+
+  @test_util.numpy_disable_gradient_test
+  def testQuadraticFormSolveGradientWithCholesky(self):
+    rng = test_util.test_np_rng()
+    # Test that this respects batch shapes.
+    xs = rng.random_sample((6, 10)).astype(self.dtype)[..., tf.newaxis]
+    k = matern.MaternThreeHalves()
+    mat = k.matrix(xs, xs)
+    rhs = tf.convert_to_tensor(
+        rng.random_sample((3, 1, 10, 3)).astype(self.dtype))
+
+    identity = self.evaluate(
+        tf.eye(num_rows=10, batch_shape=[6], dtype=self.dtype))
+    cholesky_factor = (3. * identity).astype(self.dtype)
+    mat_for_factor = tf.convert_to_tensor((9. * identity).astype(self.dtype))
+
+    hpsd_quadratic_form_solve = functools.partial(
+        linalg.hpsd_quadratic_form_solve, cholesky_matrix=cholesky_factor)
+
+    _, [actual_mat_gradient, actual_rhs_gradient] = self.evaluate((
+        gradient.value_and_gradient(
+            lambda x, y: hpsd_quadratic_form_solve(x, y)**2, mat, rhs)))
+
+    _, [expected_mat_gradient, expected_rhs_gradient] = self.evaluate((
+        gradient.value_and_gradient(
+            lambda x, y: linalg.hpsd_quadratic_form_solve(x, y)**2,
+            mat_for_factor, rhs)))
+
+    self.assertAllClose(actual_mat_gradient, expected_mat_gradient)
+    self.assertAllClose(actual_rhs_gradient, expected_rhs_gradient)
+
+  def testEqualsQuadraticFormSolveVec(self):
     rng = test_util.test_np_rng()
     xs = rng.random_sample(7).astype(self.dtype)[:, tf.newaxis]
     k = matern.MaternOneHalf()
@@ -948,7 +1379,7 @@ class _QuadraticFormSolveTest(test_util.TestCase):
             tf.linalg.solve(mat, y[..., tf.newaxis]), axis=-1), axis=-1),
         rtol=5e-5)
 
-  def testUsesOverridenCholeskyFactor(self):
+  def testUsesOverridenCholeskyFactorSolveVec(self):
     rng = test_util.test_np_rng()
     xs = rng.random_sample(7).astype(self.dtype)[:, tf.newaxis]
     k = matern.MaternOneHalf()
@@ -962,7 +1393,7 @@ class _QuadraticFormSolveTest(test_util.TestCase):
     self.assertAllClose(symsolve_, np.linalg.norm(y)**2)
 
   @test_util.numpy_disable_gradient_test
-  def testQuadraticFormSolveGradient(self):
+  def testQuadraticFormSolveVecGradient(self):
     rng = test_util.test_np_rng()
     # Test that this respects batch shapes.
     xs = rng.random_sample((6, 10)).astype(self.dtype)[..., tf.newaxis]
@@ -986,7 +1417,7 @@ class _QuadraticFormSolveTest(test_util.TestCase):
         lambda x: linalg.hpsd_quadratic_form_solvevec(x, rhs)**2, mat)
     naive_gradient, custom_gradient = self.evaluate(
         [naive_gradient, custom_gradient])
-    self.assertAllClose(naive_gradient, custom_gradient, rtol=2e-4)
+    self.assertAllClose(naive_gradient, custom_gradient, rtol=5e-4)
 
     _, naive_gradient = gradient.value_and_gradient(
         lambda x: naive_hpsd_quadratic_form_solvevec(mat, x)**2, rhs)
@@ -997,7 +1428,7 @@ class _QuadraticFormSolveTest(test_util.TestCase):
     self.assertAllClose(naive_gradient, custom_gradient, rtol=3e-6)
 
   @test_util.numpy_disable_gradient_test
-  def testQuadraticFormSolveGradientWithCholesky(self):
+  def testQuadraticFormSolveVecGradientWithCholesky(self):
     rng = test_util.test_np_rng()
     # Test that this respects batch shapes.
     xs = rng.random_sample((6, 10)).astype(self.dtype)[..., tf.newaxis]
@@ -1024,6 +1455,22 @@ class _QuadraticFormSolveTest(test_util.TestCase):
 
     self.assertAllClose(actual_mat_gradient, expected_mat_gradient)
     self.assertAllClose(actual_rhs_gradient, expected_rhs_gradient)
+
+  def testNoJaxTracerLeak(self):
+    if not JAX_MODE:
+      return
+    import jax  # pylint:disable=g-import-not-at-top
+    import jax.numpy as jnp  # pylint:disable=g-import-not-at-top
+    def f(carry, x):
+      return (carry / 2 + linalg.hpsd_quadratic_form_solve(
+          jnp.eye(3), x, cholesky_matrix=jnp.eye(3)), ())
+
+    def g(t):
+      carry, _ = jax.lax.scan(f, jnp.zeros([3, 3]), xs=jnp.zeros([7, 3, 3]) + t)
+      return carry.sum()
+
+    with jax.checking_leaks():
+      jax.grad(g)(jnp.eye(3))
 
 
 @test_util.test_all_tf_execution_regimes

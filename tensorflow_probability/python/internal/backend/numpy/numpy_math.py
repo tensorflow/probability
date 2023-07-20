@@ -61,6 +61,7 @@ __all__ = [
     'count_nonzero',
     'cumprod',
     'cumsum',
+    'cumulative_logsumexp',
     'digamma',
     'divide',
     'divide_no_nan',
@@ -258,6 +259,23 @@ def _cumop(op, x, axis=0, exclusive=False, reverse=False, name=None,
 
 _cumprod = utils.partial(_cumop, np.cumprod, initial_value=1.)
 _cumsum = utils.partial(_cumop, np.cumsum, initial_value=0.)
+
+
+def _cumulative_logsumexp(x, axis=0, exclusive=False, reverse=False, name=None):
+  del name
+  axis = int(axis)
+  if axis < 0:
+    axis = axis + len(x.shape)
+  if JAX_MODE:
+    op = jax.lax.cumlogsumexp
+  else:
+    op = np.logaddexp.accumulate
+  return _cumop(
+      op, x,
+      axis=axis,
+      exclusive=exclusive,
+      reverse=reverse,
+      initial_value=-np.inf)
 
 
 def _equal(x, y, name=None):
@@ -559,6 +577,11 @@ cumprod = utils.copy_docstring(
 cumsum = utils.copy_docstring(
     'tf.math.cumsum',
     _cumsum)
+
+cumulative_logsumexp = utils.copy_docstring(
+    'tf.math.cumulative_logsumexp',
+    _cumulative_logsumexp)
+
 
 digamma = utils.copy_docstring(
     'tf.math.digamma',

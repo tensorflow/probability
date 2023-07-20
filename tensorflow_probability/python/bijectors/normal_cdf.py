@@ -29,7 +29,9 @@ __all__ = [
 ]
 
 
-class NormalCDF(bijector.AutoCompositeTensorBijector):
+class NormalCDF(
+    bijector.CoordinatewiseBijectorMixin,
+    bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = NormalCDF(x)`.
 
   This bijector maps inputs from `[-inf, inf]` to `[0, 1]`. The inverse of the

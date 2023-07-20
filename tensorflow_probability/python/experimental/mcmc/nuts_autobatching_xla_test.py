@@ -35,7 +35,7 @@ def run_nuts_chain(event_size, batch_size, num_steps):
   def f():
     def target_log_prob_fn(event):
       return mvn_diag.MultivariateNormalDiag(
-          tf.zeros(event_size), scale_identity_multiplier=1.).log_prob(event)
+          tf.zeros(event_size)).log_prob(event)
 
     state = tf.zeros([batch_size, event_size])
     chain_state, extra = sample.sample_chain(

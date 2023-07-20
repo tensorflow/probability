@@ -36,8 +36,10 @@
 from tensorflow_probability.python.internal.backend.numpy import ops as common_shapes
 from tensorflow_probability.python.internal.backend.numpy import dtype as dtypes
 from tensorflow_probability.python.internal.backend.numpy import ops
+# from tensorflow.python.framework import tensor_conversion
 from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shape
 from tensorflow_probability.python.internal.backend.numpy import numpy_array as array_ops
+from tensorflow_probability.python.internal.backend.numpy import numpy_array as array_ops_stack
 from tensorflow_probability.python.internal.backend.numpy import debugging as check_ops
 from tensorflow_probability.python.internal.backend.numpy import control_flow as control_flow_ops
 from tensorflow_probability.python.internal.backend.numpy import numpy_math as math_ops
@@ -401,11 +403,12 @@ class LinearOperatorBlockLowerTriangular(linear_operator.LinearOperator):
     # Avoid messy broadcasting if possible.
     if tensor_shape.TensorShape(self.shape).is_fully_defined():
       return ops.convert_to_tensor(
-          tensor_shape.TensorShape(self.shape).as_list(), dtype=dtypes.int32, name="shape")
+          tensor_shape.TensorShape(self.shape).as_list(), dtype=dtypes.int32, name="shape"
+      )
 
     domain_dimension = sum(self._block_domain_dimension_tensors())
     range_dimension = sum(self._block_range_dimension_tensors())
-    matrix_shape = array_ops.stack([domain_dimension, range_dimension])
+    matrix_shape = array_ops_stack.stack([domain_dimension, range_dimension])
 
     batch_shape = self.operators[0][0].batch_shape_tensor()
     for row in self.operators[1:]:
@@ -718,7 +721,9 @@ class LinearOperatorBlockLowerTriangular(linear_operator.LinearOperator):
           split_rhs = rhs
 
       else:
-        rhs = ops.convert_to_tensor(rhs, name="rhs")
+        rhs = ops.convert_to_tensor(
+            rhs, name="rhs"
+        )
         # self._check_input_dtype(rhs)
         op_dimension = (self.domain_dimension if adjoint
                         else self.range_dimension)
@@ -836,7 +841,9 @@ class LinearOperatorBlockLowerTriangular(linear_operator.LinearOperator):
         rhs_mat = [array_ops.expand_dims(block, axis=-1) for block in rhs]
         solution_mat = self.solve(rhs_mat, adjoint=adjoint)
         return [array_ops.squeeze(x, axis=-1) for x in solution_mat]
-      rhs = ops.convert_to_tensor(rhs, name="rhs")
+      rhs = ops.convert_to_tensor(
+          rhs, name="rhs"
+      )
       # self._check_input_dtype(rhs)
       op_dimension = (self.domain_dimension if adjoint
                       else self.range_dimension)

@@ -30,7 +30,9 @@ __all__ = [
 ]
 
 
-class GeneralizedPareto(bijector_lib.AutoCompositeTensorBijector):
+class GeneralizedPareto(
+    bijector_lib.CoordinatewiseBijectorMixin,
+    bijector_lib.AutoCompositeTensorBijector):
   """Bijector mapping R**n to non-negative reals.
 
   Forward computation maps R**n to the support of the `GeneralizedPareto`

@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.bijectors import scale
 from tensorflow_probability.python.bijectors import softplus
 from tensorflow_probability.python.distributions import bernoulli
@@ -107,15 +108,9 @@ class JointDistributionSequentialTest(test_util.TestCase):
         ],
         validate_args=True)
 
-    self.assertEqual(
-        (
-            ('e', ()),
-            ('scale', ('e',)),
-            ('loc', ()),
-            ('m', ('loc', 'scale')),
-            ('x', ('m',)),
-        ),
-        d.resolve_graph())
+    keys = ('e', 'scale', 'loc', 'm', 'x')
+    deps = ((), ('e',), (), ('loc', 'scale'), ('m',))
+    self.assertEqual(tuple(zip(keys, deps)), d.resolve_graph())
 
     xs = d.sample(seed=test_util.test_seed())
     self.assertLen(xs, 5)
@@ -148,9 +143,15 @@ class JointDistributionSequentialTest(test_util.TestCase):
       self.assertAllEqual(expected, actual_tensorshape)
       self.assertAllEqual(expected, actual_shapetensor)
 
-    expected_jlp = sum(d_.log_prob(x) for d_, x in zip(ds, xs))
+    expected_lp_parts = [d_.log_prob(x) for d_, x in zip(ds, xs)]
+    expected_jlp = sum(expected_lp_parts)
     actual_jlp = d.log_prob(xs)
     self.assertAllEqual(*self.evaluate([expected_jlp, actual_jlp]))
+    # Verify different log_prob_parts calling conventions.
+    self.assertAllCloseNested(expected_lp_parts, d.log_prob_parts(xs))
+    self.assertAllCloseNested(expected_lp_parts, d.log_prob_parts(*xs))
+    self.assertAllCloseNested(expected_lp_parts,
+                              d.log_prob_parts(**dict(zip(keys, xs))))
 
   def test_kl_divergence(self):
     d0 = jds.JointDistributionSequential([
@@ -705,12 +706,12 @@ class JointDistributionSequentialTest(test_util.TestCase):
 
     # test event shapes
     event_shapes = [[2, None], [2], [4]]
-    self.assertAllEqual(
+    self.assertAllEqualNested(
         [shape.as_list()
          for shape in joint_bijector.forward_event_shape(event_shapes)],
         [bijectors[i].forward_event_shape(event_shapes[i]).as_list()
          for i in range(3)])
-    self.assertAllEqual(
+    self.assertAllEqualNested(
         [shape.as_list()
          for shape in joint_bijector.inverse_event_shape(event_shapes)],
         [bijectors[i].inverse_event_shape(event_shapes[i]).as_list()
@@ -872,7 +873,8 @@ class JointDistributionSequentialTest(test_util.TestCase):
 
     non_ct_jd = jds.JointDistributionSequential([
         normal.Normal(loc=0., scale=1.),
-        test_util.NonCompositeTensorExp()(normal.Normal(loc=0., scale=1.)),
+        bijector_test_util.NonCompositeTensorExp()(
+            normal.Normal(loc=0., scale=1.)),
     ],
                                                 validate_args=True)
     self.assertNotIsInstance(non_ct_jd, tf.__internal__.CompositeTensor)

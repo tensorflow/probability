@@ -84,7 +84,7 @@ class _MixtureSameFamily(distribution.Distribution):
           loc=[[-1., 1],  # component 1
                [1, -1],  # component 2
                [1, 1]],  # component 3
-          scale_identity_multiplier=[.3, .6, .7]))
+          scale_diag=tf.tile([[.3], [.6], [.7]], [1, 2]))
 
   gm.components_distribution.batch_shape
   # ==> (3,)
@@ -124,7 +124,7 @@ class _MixtureSameFamily(distribution.Distribution):
     scales = tf.constant([.3, .6, .7])
     idx = yield tfd.Categorical(probs=[.2, .4, .4], name='idx')
     val = yield tfd.MultivariateNormalDiag(
-        loc=mus[idx], scale_identity_multiplier=scales[idx], name='val')
+        loc=mus[idx], scale_diag=tf.ones(2) * scales[idx], name='val')
 
   model.sample()
   # ==> StructTuple(

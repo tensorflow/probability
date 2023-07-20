@@ -26,7 +26,6 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.math import gradient as tfp_gradient
 from tensorflow_probability.python.math.ode import runge_kutta_util as rk_util
 from tensorflow_probability.python.math.ode import util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 # TODO(b/138303336): Support MATLAB-style events.
 
@@ -42,16 +41,10 @@ __all__ = [
 class Solver(object):
   """Base class for an ODE solver."""
 
-  @deprecation.deprecated_args(
-      '2021-11-01',
-      'use_pfor_to_compute_jacobian is deprecated, and does nothing.',
-      'use_pfor_to_compute_jacobian')
   def __init__(self,
                make_adjoint_solver_fn,
                validate_args,
-               name,
-               use_pfor_to_compute_jacobian=True):
-    del use_pfor_to_compute_jacobian
+               name):
     self._validate_args = validate_args
     self._name = name
     if make_adjoint_solver_fn is None:
@@ -544,7 +537,8 @@ class Results(
 class Diagnostics(object):
   """Diagnostics returned by a Solver."""
 
-  @abc.abstractproperty
+  @property
+  @abc.abstractmethod
   def num_ode_fn_evaluations(self):
     """Number of function evaluations.
 
@@ -554,7 +548,8 @@ class Diagnostics(object):
     """
     pass
 
-  @abc.abstractproperty
+  @property
+  @abc.abstractmethod
   def num_jacobian_evaluations(self):
     """Number of Jacobian evaluations.
 
@@ -564,7 +559,8 @@ class Diagnostics(object):
     """
     pass
 
-  @abc.abstractproperty
+  @property
+  @abc.abstractmethod
   def num_matrix_factorizations(self):
     """Number of matrix factorizations.
 
@@ -574,7 +570,8 @@ class Diagnostics(object):
     """
     pass
 
-  @abc.abstractproperty
+  @property
+  @abc.abstractmethod
   def status(self):
     """Completion status.
 

@@ -391,6 +391,7 @@ class MultivariateStudentTTestFloat32StaticShape(
     normalization = tf.exp(tf.reduce_logsumexp(
         log_probs)) * (spacings[1] - spacings[0])**2
     self.assertAllClose(1., self.evaluate(normalization), atol=1e-3)
+    self.assertDTypeEqual(log_probs, self.dtype)
 
     mode_log_prob = dist.log_prob(dist.mode())
     self.assertTrue(np.all(self.evaluate(mode_log_prob >= log_probs)))

@@ -119,7 +119,7 @@ class InvertBijectorTest(test_util.TestCase):
 
   def testNonCompositeTensorBijectorTfFunction(self):
     scale = tf.Variable(5.)
-    b = test_util.NonCompositeTensorScale(scale)
+    b = bijector_test_util.NonCompositeTensorScale(scale)
     inv_b = invert.Invert(b)
     x = tf.constant([3.])
 
@@ -139,7 +139,7 @@ class InvertBijectorTest(test_util.TestCase):
       def __init__(self, bijector):
         self.bijector = bijector
 
-    b = test_util.NonCompositeTensorScale(tf.Variable(3.))
+    b = bijector_test_util.NonCompositeTensorScale(tf.Variable(3.))
     inv_b = invert.Invert(b)
     bc = BijectorContainer(inv_b)
 

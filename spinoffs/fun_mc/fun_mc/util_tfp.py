@@ -16,7 +16,7 @@
 
 import functools
 
-from typing import Any, Optional, Tuple  # pylint: disable=unused-import
+from typing import Any, Optional
 from fun_mc import backend
 from fun_mc import fun_mc_lib
 
@@ -27,9 +27,9 @@ util = backend.util
 
 
 def bijector_to_transform_fn(
-    bijector: 'fun_mc_lib.BijectorNest',
-    state_structure: 'Any',
-    batch_ndims: 'fun_mc_lib.IntTensor' = 0) -> 'fun_mc_lib.TransitionOperator':
+    bijector: fun_mc_lib.BijectorNest,
+    state_structure: Any,
+    batch_ndims: fun_mc_lib.IntTensor = 0) -> fun_mc_lib.TransitionOperator:
   """Creates a TransitionOperator that transforms the state using a bijector.
 
   The returned operator has the following signature:
@@ -96,8 +96,8 @@ def bijector_to_transform_fn(
 
 
 def transition_kernel_wrapper(
-    current_state: 'fun_mc_lib.FloatNest', kernel_results: 'Optional[Any]',
-    kernel: 'tfp.mcmc.TransitionKernel') -> 'Tuple[fun_mc_lib.FloatNest, Any]':
+    current_state: fun_mc_lib.FloatNest, kernel_results: Optional[Any],
+    kernel: tfp.mcmc.TransitionKernel) -> tuple[fun_mc_lib.FloatNest, Any]:
   """Wraps a `tfp.mcmc.TransitionKernel` as a `TransitionOperator`.
 
   Args:

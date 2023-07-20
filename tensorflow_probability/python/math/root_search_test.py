@@ -179,6 +179,19 @@ class SecantRootSearchTest(test_util.TestCase):
         root_search.find_root_secant(
             f, initial_position).objective_at_estimated_root, [0., 0., 0.])
 
+  def test_secant_nan_objective(self):
+    # With this setup, the find_root_secant should short circuit on the
+    # first starting point immediately, and short circuit on the second
+    # iteration for the other two values.
+    f = lambda x: tf.where(tf.abs(x) < 1e-5, np.nan * tf.ones_like(x), x)
+    initial_position = tf1.placeholder_with_default([0., -1., 10.], shape=None)
+
+    search_result = root_search.find_root_secant(f, initial_position)
+
+    self.assertAllNan(search_result.objective_at_estimated_root)
+    self.assertAllNan(search_result.estimated_root)
+    self.assertAllEqual(search_result.num_iterations, tf.constant([0, 2, 2]))
+
 
 @test_util.test_all_tf_execution_regimes
 class ChandrupatlaRootSearchTest(test_util.TestCase):

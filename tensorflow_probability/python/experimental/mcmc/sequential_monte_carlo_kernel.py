@@ -27,6 +27,7 @@ __all__ = [
     'SequentialMonteCarlo',
     'SequentialMonteCarloResults',
     'WeightedParticles',
+    'log_ess_from_log_weights',
     'ess_below_threshold',
 ]
 
@@ -118,12 +119,18 @@ def _dummy_indices_like(indices):
       indices_shape)
 
 
+def log_ess_from_log_weights(log_weights, particles_dim=0):
+  """Computes log-ESS estimate from log-weights along axis=0."""
+  with tf.name_scope('ess_from_log_weights'):
+    log_weights = tf.math.log_softmax(log_weights, axis=particles_dim)
+    return -tf.math.reduce_logsumexp(2 * log_weights, axis=particles_dim)
+
+
 def ess_below_threshold(weighted_particles, particles_dim=0, threshold=0.5):
   """Determines if the effective sample size is much less than num_particles."""
   with tf.name_scope('ess_below_threshold'):
     num_particles = ps.size0(weighted_particles.log_weights)
-    log_weights = tf.math.log_softmax(weighted_particles.log_weights, axis=particles_dim)
-    log_ess = -tf.math.reduce_logsumexp(2 * log_weights, axis=particles_dim)
+    log_ess = log_ess_from_log_weights(weighted_particles.log_weights, particles_dim)
     return tf.expand_dims(log_ess < (ps.log(num_particles) +
                       ps.log(threshold)), axis=particles_dim)
 

@@ -27,7 +27,6 @@ from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.ode import base
 from tensorflow_probability.python.math.ode import bdf_util
 from tensorflow_probability.python.math.ode import util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'BDF',
@@ -82,10 +81,6 @@ class BDF(base.Solver):
        Journal on Scientific Computing_ 18(1):1-22, 1997.
   """
 
-  @deprecation.deprecated_args(
-      '2021-11-01',
-      'use_pfor_to_compute_jacobian is deprecated, and does nothing.',
-      'use_pfor_to_compute_jacobian')
   def __init__(
       self,
       rtol=1e-3,
@@ -101,7 +96,6 @@ class BDF(base.Solver):
       newton_step_size_factor=0.5,
       bdf_coefficients=(-0.1850, -1. / 9., -0.0823, -0.0415, 0.),
       evaluate_jacobian_lazily=False,
-      use_pfor_to_compute_jacobian=True,
       make_adjoint_solver_fn=None,
       validate_args=False,
       name='bdf',
@@ -163,10 +157,6 @@ class BDF(base.Solver):
       evaluate_jacobian_lazily: Optional boolean specifying whether the Jacobian
         should be evaluated at each point in time or as needed (i.e., lazily).
         Default value: `True`.
-      use_pfor_to_compute_jacobian: Boolean specifying whether or not to use
-        parallel for in computing the Jacobian when `jacobian_fn` is not
-        specified.
-        Default value: `True`.
       make_adjoint_solver_fn: Callable that takes no arguments that constructs a
         `Solver` instance. The created solver is used in the adjoint senstivity
         analysis to compute gradients (if they are requested).
@@ -178,7 +168,6 @@ class BDF(base.Solver):
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'bdf').
     """
-    del use_pfor_to_compute_jacobian
     super(BDF, self).__init__(
         make_adjoint_solver_fn=make_adjoint_solver_fn,
         validate_args=validate_args,

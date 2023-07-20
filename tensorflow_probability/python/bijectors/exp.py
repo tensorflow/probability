@@ -16,6 +16,7 @@
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.bijectors import power_transform
 
@@ -67,7 +68,7 @@ class Exp(power_transform.PowerTransform):
           name=name)
 
 
-class Log(invert.Invert):
+class Log(bijector_lib.CoordinatewiseBijectorMixin, invert.Invert):
   """Compute `Y = log(X)`. This is `Invert(Exp())`."""
 
   def __init__(self, validate_args=False, name='log'):

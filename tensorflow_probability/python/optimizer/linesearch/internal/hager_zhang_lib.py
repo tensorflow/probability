@@ -723,7 +723,7 @@ def _is_rising(val):
     rising: A Boolean Tensor giving whether this point is a suitable right
       end-point for an interval subject to secant subdivision.
   """
-  return tf.math.is_finite(val.f) & (val.df > 0)
+  return tf.math.is_finite(val.f) & (val.df >= 0.)
 
 
 def is_finite(val_1, val_2=None):

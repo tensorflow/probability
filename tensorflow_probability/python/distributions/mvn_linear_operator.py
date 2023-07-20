@@ -255,7 +255,9 @@ class MultivariateNormalLinearOperator(
     if self.loc is None:
       return tf.zeros(shape, self.dtype)
 
-    return tf.broadcast_to(self.loc, shape)
+    # In case loc is a DeferredTensor.
+    loc = tf.convert_to_tensor(self.loc)
+    return tf.broadcast_to(loc, shape)
 
   def _covariance(self):
     if distribution_util.is_diagonal_scale(self.scale):

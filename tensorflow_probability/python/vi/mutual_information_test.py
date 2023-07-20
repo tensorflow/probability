@@ -47,7 +47,7 @@ class MutualInformationTest(tfp_test_util.TestCase):
     stddev = tf.sqrt(1. - tf.square(rho))
     y = mean + stddev * eps
     conditional_dist = mvn_diag.MultivariateNormalDiag(
-        mean, scale_identity_multiplier=stddev)
+        mean, scale_diag=stddev * tf.ones((batch_size, dim)))
     marginal_dist = mvn_diag.MultivariateNormalDiag(tf.zeros(dim), tf.ones(dim))
 
     # The conditional_scores has its shape [y_batch_dim, distibution_batch_dim]

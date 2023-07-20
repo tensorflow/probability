@@ -22,6 +22,7 @@ load(
 )
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -303,7 +304,7 @@ multi_substrate_py_test(
     srcs = ["linalg_test.py"],
     jax_size = "medium",
     numpy_tags = ["notap"],
-    shard_count = 5,
+    shard_count = 6,
     tags = ["hypothesis"],
     deps = [
         ":gradient",

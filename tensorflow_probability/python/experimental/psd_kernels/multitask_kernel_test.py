@@ -62,6 +62,41 @@ class _MultiTaskKernelTest(object):
     self.assertAllEqual([5, 4, 3, 3, 2, 15, 20], self.evaluate(
         matrix_over_all_tasks.shape_tensor()))
 
+  def testSeparableScale(self):
+    amplitude = np.random.uniform(2, 3., size=[1, 2]).astype(self.dtype)
+    length_scale = np.random.uniform(2, 3., size=[3, 1]).astype(self.dtype)
+    base_kernel = exponentiated_quadratic.ExponentiatedQuadratic(
+        amplitude, length_scale)
+
+    task_kernel_matrix = np.random.randn(3, 1, 5, 5).astype(self.dtype)
+    task_kernel_matrix = np.matmul(
+        task_kernel_matrix, np.transpose(task_kernel_matrix, [0, 1, 3, 2]))
+    task_kernel_matrix = task_kernel_matrix + np.eye(5)
+    task_kernel_matrix = task_kernel_matrix.astype(self.dtype)
+    task_kernel_scale = np.linalg.cholesky(
+        task_kernel_matrix).astype(self.dtype)
+    task_kernel_matrix_linop = tf.linalg.LinearOperatorFullMatrix(
+        task_kernel_matrix)
+    task_kernel_scale_linop = tf.linalg.LinearOperatorFullMatrix(
+        task_kernel_scale)
+
+    kernel1 = multitask_kernel.Separable(
+        num_tasks=5,
+        base_kernel=base_kernel,
+        task_kernel_matrix_linop=task_kernel_matrix_linop)
+    kernel2 = multitask_kernel.Separable(
+        num_tasks=5,
+        base_kernel=base_kernel,
+        task_kernel_scale_linop=task_kernel_scale_linop)
+
+    x = np.random.randn(3, 2).astype(self.dtype)
+    y = np.random.randn(4, 2).astype(self.dtype)
+    matrix_over_all_tasks1 = kernel1.matrix_over_all_tasks(x, y)
+    matrix_over_all_tasks2 = kernel2.matrix_over_all_tasks(x, y)
+    matrix_over_all_tasks1, matrix_over_all_tasks2 = self.evaluate([
+        matrix_over_all_tasks1.to_dense(), matrix_over_all_tasks2.to_dense()])
+    self.assertAllClose(matrix_over_all_tasks1, matrix_over_all_tasks2)
+
 
 class MultiTaskKernelTestFloat32(test_util.TestCase, _MultiTaskKernelTest):
   dtype = np.float32

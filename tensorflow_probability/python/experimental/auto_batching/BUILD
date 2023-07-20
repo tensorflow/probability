@@ -16,6 +16,7 @@
 #   An auto-batching system that keeps track of an explicit program counter.
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],

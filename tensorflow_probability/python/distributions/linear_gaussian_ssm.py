@@ -26,7 +26,6 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.distributions import normal
-from tensorflow_probability.python.experimental.parallel_filter import parallel_kalman_filter_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
@@ -35,6 +34,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import linalg
 
 from tensorflow.python.ops import parallel_for  # pylint: disable=g-direct-tensorflow-import
 
@@ -723,7 +723,9 @@ class LinearGaussianStateSpaceModel(
 
   def _joint_sample_n(self, n, seed=None):
     if self.experimental_parallelize:
-      x, y = parallel_kalman_filter_lib.sample_walk(
+      # Local import to break circular dependency.
+      from tensorflow_probability.python.experimental.parallel_filter import parallel_kalman_filter_lib as pkf  # pylint:disable=g-import-not-at-top
+      x, y = pkf.sample_walk(
           seed=seed,
           **self._build_model_spec_kwargs_for_parallel_fns(sample_shape=[n]))
       return (distribution_util.move_dimension(x, 0, -2),
@@ -912,7 +914,9 @@ class LinearGaussianStateSpaceModel(
   def _forward_filter(self, x, mask=None, final_step_only=False):
     mask = self._get_mask(mask)
     if self.experimental_parallelize:
-      filter_results = parallel_kalman_filter_lib.kalman_filter(
+      # Local import to break circular dependency.
+      from tensorflow_probability.python.experimental.parallel_filter import parallel_kalman_filter_lib as pkf  # pylint:disable=g-import-not-at-top
+      filter_results = pkf.kalman_filter(
           y=distribution_util.move_dimension(x, -2, 0),
           mask=(None if mask is None else distribution_util.move_dimension(
               mask, -1, 0)),
@@ -1590,8 +1594,7 @@ def backward_smoothing_update(filtered_mean,
   if latent_size_is_static_and_scalar:
     gain_transpose = tmp_gain_cov / predicted_cov
   else:
-    gain_transpose = tf.linalg.cholesky_solve(
-        tf.linalg.cholesky(predicted_cov), tmp_gain_cov)
+    gain_transpose = linalg.hpsd_solve(predicted_cov, tmp_gain_cov)
 
   posterior_mean = (filtered_mean +
                     tf.linalg.matmul(gain_transpose,
@@ -1815,8 +1818,8 @@ def linear_gaussian_update(
     gain_transpose = tmp_obs_cov / predicted_obs_cov
   else:
     predicted_obs_cov_chol = tf.linalg.cholesky(predicted_obs_cov)
-    gain_transpose = tf.linalg.cholesky_solve(predicted_obs_cov_chol,
-                                              tmp_obs_cov)
+    gain_transpose = linalg.hpsd_solve(
+        predicted_obs_cov, tmp_obs_cov, cholesky_matrix=predicted_obs_cov_chol)
 
   # Compute the posterior mean, incorporating the observation.
   #  u* = u + K (x_observed - x_expected)

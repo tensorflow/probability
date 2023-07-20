@@ -209,7 +209,7 @@ def kernel_input(
     example_dim = draw(hps.integers(min_value=2, max_value=4))
 
   if feature_ndims is None:
-    feature_ndims = draw(hps.integers(min_value=1, max_value=2))
+    feature_ndims = draw(hps.integers(min_value=0, max_value=2))
   if feature_dim is None:
     feature_dim = draw(hps.integers(min_value=2, max_value=4))
 
@@ -1054,6 +1054,7 @@ CONSTRAINTS = {
     'constant': constrain_to_range(0.1, 0.5),
     'concentration0': constrain_to_range(1., 2.),
     'concentration1': constrain_to_range(1., 2.),
+    'power': constrain_to_range(0.01, 1.),
     'df': constrain_to_range(2., 5.),
     'scales': constrain_to_range(1., 2.),
     'slope_amplitude': constrain_to_range(0.1, 0.5),

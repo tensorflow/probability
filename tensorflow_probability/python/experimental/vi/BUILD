@@ -24,6 +24,7 @@ load(
 licenses(["notice"])
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -65,6 +66,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/distributions:uniform",
         "//tensorflow_probability/python/experimental/util",
         "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:trainable_state_util",
@@ -105,7 +107,7 @@ multi_substrate_py_test(
     size = "large",
     srcs = ["automatic_structured_vi_test.py"],
     numpy_tags = ["notap"],
-    shard_count = 6,
+    shard_count = 12,
     deps = [
         ":automatic_structured_vi",
         # absl/testing:parameterized dep,

@@ -219,9 +219,6 @@ class MultivariateNormalDiagPlusLowRank(
         indicate the result is undefined. When `False`, an exception is raised
         if one or more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
-
-    Raises:
-      ValueError: if at most `scale_identity_multiplier` is specified.
     """
     parameters = dict(locals())
     if all(x is None for x in [loc, scale_diag, scale_perturb_factor]):

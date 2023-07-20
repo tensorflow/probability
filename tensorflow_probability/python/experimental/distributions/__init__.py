@@ -28,6 +28,7 @@ from tensorflow_probability.python.experimental.distributions.mvn_precision_fact
 __all__ = [
     'inflated_factory',
     'log_prob_ratio',
+    'ImportanceResample',
     'IncrementLogProb',
     'JointDistributionPinned',
     'marginal_fns',

@@ -1669,6 +1669,14 @@ class Bijector(tf.Module, metaclass=abc.ABCMeta):
         `TangentSpace` has been called explicitly.
 
     """
+    return self._experimental_compute_density_correction(
+        x, tangent_space, backward_compat=backward_compat, **kwargs)
+
+  def _experimental_compute_density_correction(self,
+                                               x,
+                                               tangent_space,
+                                               backward_compat=False,
+                                               **kwargs):
     if backward_compat:
       return tangent_space.transform_dimension_preserving(x, self, **kwargs)
     else:
@@ -1945,6 +1953,23 @@ class Bijector(tf.Module, metaclass=abc.ABCMeta):
                 inverse_min_event_ndims=self.inverse_min_event_ndims,
                 dtype_x=_str_dtype(self.inverse_dtype()),
                 dtype_y=_str_dtype(self.forward_dtype())))
+
+
+class CoordinatewiseBijectorMixin(object):
+  """Mixin for Bijectors that operate coordinatewise.
+
+  This mixin identifies a `Bijector` as an coordinatewise bijector, which in
+  turn allows for potentially more efficient jacobian corrections when
+  transforming distributions over manifolds.
+  """
+
+  def _experimental_compute_density_correction(self,
+                                               x,
+                                               tangent_space,
+                                               backward_compat=False,
+                                               **kwargs):
+    del backward_compat
+    return tangent_space.transform_coordinatewise(x, self, **kwargs)
 
 
 class _AutoCompositeTensorBijectorMeta(abc.ABCMeta):
