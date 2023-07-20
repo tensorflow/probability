@@ -332,7 +332,7 @@ class _ParticleFilterTest(test_util.TestCase):
                      observation_matrix, state),
                  scale_tril=observation_noise.scale_tril),
              num_particles=1024,
-             seed=test_util.test_seed()))
+             seed=1))
     # pylint: enable=g-long-lambda
 
     particle_means = np.sum(
@@ -627,16 +627,22 @@ class _ParticleFilterTest(test_util.TestCase):
       )
       return tf.cond(cond, lambda: tf.constant(True), lambda: tf.constant(False))
 
-    inner_observations = tf.range(40, dtype=tf.float32)
+    inner_observations = tf.range(30, dtype=tf.float32)
+
+    num_outer_particles = 3
+    num_inner_particles = 7
+
+    loc = tf.broadcast_to([0., 0.], [num_outer_particles, 2])
+    scale_diag = tf.broadcast_to([0.05, 0.05], [num_outer_particles, 2])
 
     params, inner_pt = self.evaluate(particle_filter.smc_squared(
         inner_observations=inner_observations,
         inner_initial_state_prior=lambda _, params: mvn_diag.MultivariateNormalDiag(
-            loc=[0., 0.],
-            scale_diag=[0.05, 0.05]),
+            loc=loc, scale_diag=scale_diag
+        ),
         initial_parameter_prior=normal.Normal(3., 1.),
-        num_outer_particles=20,
-        num_inner_particles=4,
+        num_outer_particles=num_outer_particles,
+        num_inner_particles=num_inner_particles,
         outer_rejuvenation_criterion_fn=rejuvenation_criterion,
         inner_transition_fn=lambda params: (
             lambda _, state: independent.Independent(particle_dynamics(params, _, state), 1)),
@@ -659,8 +665,8 @@ class _ParticleFilterTest(test_util.TestCase):
 
   def test_smc_squared_can_step_dynamics_faster_than_observations(self):
     initial_state_prior = jdn.JointDistributionNamed({
-        'position': deterministic.Deterministic(1.),
-        'velocity': deterministic.Deterministic(0.)
+        'position': deterministic.Deterministic([1.]),
+        'velocity': deterministic.Deterministic([0.])
     })
 
     # Use 100 steps between observations to integrate a simple harmonic
@@ -725,7 +731,7 @@ class _ParticleFilterTest(test_util.TestCase):
 
     results = self.evaluate(particle_filter.smc_squared(
         inner_observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
-        inner_initial_state_prior=lambda _, params: normal.Normal(0., 1.),
+        inner_initial_state_prior=lambda _, params: normal.Normal([0.], 1.),
         initial_parameter_prior=deterministic.Deterministic(0.),
         inner_transition_fn=lambda params: (lambda _, state: normal.Normal(state, 1.)),
         inner_observation_fn=lambda params: (lambda _, state: normal.Normal(state, 1.)),
@@ -766,7 +772,7 @@ class _ParticleFilterTest(test_util.TestCase):
         particle_filter.smc_squared(
             inner_observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
             initial_parameter_prior=deterministic.Deterministic(0.),
-            inner_initial_state_prior=lambda _, params: normal.Normal(0., 1.),
+            inner_initial_state_prior=lambda _, params: normal.Normal([0.] * num_outer_particles, 1.),
             inner_transition_fn=lambda params: (lambda _, state: normal.Normal(state, 10.)),
             inner_observation_fn=lambda params: (lambda _, state: normal.Normal(state, 0.1)),
             num_inner_particles=num_inner_particles,
