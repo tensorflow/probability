@@ -26,6 +26,7 @@ from tensorflow_probability.python.internal import loop_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
+from tensorflow_probability.python.mcmc.internal.util import choose
 
 __all__ = [
     'infer_trajectories',
@@ -43,6 +44,10 @@ def _default_trace_fn(state, kernel_results):
           state.log_weights,
           kernel_results.parent_indices,
           kernel_results.incremental_log_marginal_likelihood)
+
+
+def _identity_rejuvenation(particles, log_weights, particles_dim, extra, seed):
+    return particles, log_weights
 
 
 def _default_extra_fn(step,
@@ -140,7 +145,8 @@ def infer_trajectories(observations,
                        resample_fn=weighted_resampling.resample_systematic,
                        resample_criterion_fn=smc_kernel.ess_below_threshold,
                        unbiased_gradients=True,
-                       rejuvenation_kernel_fn=None,
+                       rejuvenation_fn=_identity_rejuvenation,
+                       rejuvenation_criterion_fn=None,
                        num_transitions_per_observation=1,
                        seed=None,
                        name=None):  # pylint: disable=g-doc-args
@@ -250,6 +256,10 @@ def infer_trajectories(observations,
   with tf.name_scope(name or 'infer_trajectories') as name:
     pf_seed, resample_seed = samplers.split_seed(
         seed, salt='infer_trajectories')
+
+    if rejuvenation_criterion_fn is None:
+        rejuvenation_criterion_fn = lambda *_: False
+
     (particles,
      log_weights,
      parent_indices,
@@ -264,7 +274,8 @@ def infer_trajectories(observations,
          resample_fn=resample_fn,
          resample_criterion_fn=resample_criterion_fn,
          unbiased_gradients=unbiased_gradients,
-         rejuvenation_kernel_fn=rejuvenation_kernel_fn,
+         rejuvenation_fn=rejuvenation_fn,
+         rejuvenation_criterion_fn=rejuvenation_criterion_fn,
          num_transitions_per_observation=num_transitions_per_observation,
          trace_fn=_default_trace_fn,
          trace_criterion_fn=lambda *_: True,
@@ -405,7 +416,8 @@ def particle_filter(observations,
                     resample_fn=weighted_resampling.resample_systematic,
                     resample_criterion_fn=smc_kernel.ess_below_threshold,
                     unbiased_gradients=True,
-                    rejuvenation_kernel_fn=None,  # TODO(davmre): not yet supported. pylint: disable=unused-argument
+                    rejuvenation_fn=_identity_rejuvenation,
+                    rejuvenation_criterion_fn=None,
                     num_transitions_per_observation=1,
                     trace_fn=_default_trace_fn,
                     trace_criterion_fn=_always_trace,
@@ -462,12 +474,14 @@ def particle_filter(observations,
       Filtering without Modifying the Forward Pass. _arXiv preprint
       arXiv:2106.10314_, 2021. https://arxiv.org/abs/2106.10314
   """
-
   init_seed, loop_seed = samplers.split_seed(seed, salt='particle_filter')
   with tf.name_scope(name or 'particle_filter'):
     num_observation_steps = ps.size0(tf.nest.flatten(observations)[0])
     num_timesteps = (
         1 + num_transitions_per_observation * (num_observation_steps - 1))
+
+    if rejuvenation_criterion_fn is None:
+      rejuvenation_criterion_fn = lambda *_: tf.constant(False)
 
     # If trace criterion is `None`, we'll return only the final results.
     never_trace = lambda *_: False
@@ -490,6 +504,8 @@ def particle_filter(observations,
             proposal_fn=proposal_fn,
             observation_fn=observation_fn,
             particles_dim=particles_dim,
+            rejuvenation_fn=rejuvenation_fn,
+            rejuvenation_criterion_fn=rejuvenation_criterion_fn,
             num_transitions_per_observation=num_transitions_per_observation))
 
     traced_results = sequential_monte_carlo(
@@ -530,7 +546,7 @@ def sample_at_dim(initial_state_prior, dim, num_samples, seed=None):
     batch_shape = initial_state_prior.batch_shape
     initial_state_prior = batch_reshape.BatchReshape(initial_state_prior, batch_shape[:dim] + [1] + batch_shape[dim:])
     initial_state_prior = batch_broadcast.BatchBroadcast(initial_state_prior, batch_shape[:dim] + [num_samples] + batch_shape[dim:])
-    return initial_state_prior.sample( seed=seed)
+    return initial_state_prior.sample(seed=seed)
 
 
 def _particle_filter_initial_weighted_particles(observations,
@@ -591,6 +607,8 @@ def _particle_filter_propose_and_update_log_weights_fn(
     proposal_fn,
     observation_fn,
     num_transitions_per_observation=1,
+    rejuvenation_criterion_fn=None,
+    rejuvenation_fn=_identity_rejuvenation,
     particles_dim=0):
   """Build a function specifying a particle filter update step."""
   def propose_and_update_log_weights_fn(step, state, seed=None):
@@ -619,6 +637,29 @@ def _particle_filter_propose_and_update_log_weights_fn(
       log_weights = tf.nn.log_softmax(log_weights, axis=particles_dim)
     else:
       proposed_particles = transition_dist.sample(seed=seed)
+
+    if rejuvenation_criterion_fn == None:
+      do_rejuvenation = False
+    else:
+      do_rejuvenation = rejuvenation_criterion_fn(state, particles_dim)
+
+    [
+        rej_particles,
+        rej_log_weights
+    ] = rejuvenation_fn(
+        particles=particles,
+        log_weights=tf.stop_gradient(state.log_weights),
+        particles_dim=particles_dim,
+        extra=state.extra,
+        seed=seed)
+
+    (
+        proposed_particles,
+        log_weights
+    ) = tf.nest.map_structure(
+        lambda r, p: choose(do_rejuvenation, r, p),
+        (rej_particles, rej_log_weights),
+        (proposed_particles, log_weights))
 
     with tf.control_dependencies(assertions):
       return smc_kernel.WeightedParticles(

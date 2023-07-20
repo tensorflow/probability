@@ -108,7 +108,8 @@ class _SequentialMonteCarloTest(test_util.TestCase):
             particles=samplers.normal([num_particles], seed=seeds[0]),
             log_weights=tf.fill([num_particles],
                                 -tf.math.log(float(num_particles))),
-            extra=tf.constant(np.nan)))
+            extra=tf.constant(np.nan)
+        ))
 
     def propose_and_update_log_weights_fn(_,
                                           weighted_particles,
@@ -123,7 +124,8 @@ class _SequentialMonteCarloTest(test_util.TestCase):
           log_weights=(weighted_particles.log_weights +
                        transition_dist.log_prob(proposed_particles) -
                        proposal_dist.log_prob(proposed_particles)),
-          extra=tf.constant(np.nan))
+          extra=tf.constant(np.nan)
+      )
 
     def marginal_logprob(transition_scale):
       kernel = SequentialMonteCarlo(
