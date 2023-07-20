@@ -29,6 +29,8 @@ from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from tensorflow_probability.python.distributions import batch_reshape
 from tensorflow_probability.python.distributions import batch_broadcast
 from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import uniform
+from tensorflow_probability.python.internal import distribution_util as dist_util
 
 
 __all__ = [
@@ -456,7 +458,7 @@ def smc_squared(
         unbiased_gradients=True,
         seed=None,
 ):
-    init_seed, loop_seed = samplers.split_seed(seed, salt='smc_squared')
+    init_seed, loop_seed, step_seed = samplers.split_seed(seed, n=3, salt='smc_squared')
 
     num_observation_steps = ps.size0(tf.nest.flatten(inner_observations)[0])
 
@@ -498,7 +500,6 @@ def smc_squared(
         initial_state_proposal=(inner_initial_state_proposal(0, initial_state)
                                 if inner_initial_state_proposal is not None else None),
         num_inner_particles=num_inner_particles,
-        num_outer_particles=num_outer_particles,
         particles_dim=1,
         seed=seed)
 
@@ -615,7 +616,9 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
             particles_dim=1,
             unbiased_gradients=unbiased_gradients)
 
-        inner_weighted_particles, filter_results = kernel.one_step(inner_weighted_particles, filter_results)
+        inner_weighted_particles, filter_results = kernel.one_step(inner_weighted_particles,
+                                                                   filter_results,
+                                                                   seed=seed)
 
         updated_log_weights = log_weights + filter_results.incremental_log_marginal_likelihood
 
@@ -636,7 +639,6 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
               initial_state_proposal=(inner_initial_state_proposal(0, proposed_parameters)
                                       if inner_initial_state_proposal is not None else None),
               num_inner_particles=num_inner_particles,
-              num_outer_particles=num_outer_particles,
               particles_dim=1,
               seed=seed)
 
@@ -682,8 +684,9 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
                    rej_filter_results,
                    rej_parameters_weights,
                    rej_params_log_weights):
+
             rej_inner_weighted_particles, rej_filter_results = rej_kernel.one_step(
-                rej_inner_weighted_particles, rej_filter_results
+                rej_inner_weighted_particles, rej_filter_results, seed=seed
             )
 
             rej_parameters_weights += rej_inner_weighted_particles.log_weights
@@ -705,7 +708,7 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
 
           acceptance_probs = tf.minimum(1., tf.exp(log_a))
 
-          random_numbers = tf.random.uniform([num_outer_particles])
+          random_numbers = uniform.Uniform(0., 1.).sample(num_outer_particles, seed=seed)
 
           # Determine if the proposed particle should be accepted or reject
           accept = random_numbers > acceptance_probs
@@ -882,7 +885,7 @@ def particle_filter(observations,
     return traced_results
 
 
-def sample_at_dim(initial_state_prior, dim, num_samples, num_outer_particles, seed=None):
+def sample_at_dim(initial_state_prior, dim, num_samples, seed=None):
   if type(initial_state_prior.batch_shape) is dict:
     model_dict = initial_state_prior.model
     sampled_model = {}
@@ -892,7 +895,7 @@ def sample_at_dim(initial_state_prior, dim, num_samples, num_outer_particles, se
       batch_shape = d.batch_shape
       d = batch_reshape.BatchReshape(d, batch_shape[:dim] + [1] + batch_shape[dim:])
       d = batch_broadcast.BatchBroadcast(d, batch_shape[:dim] + [num_samples] + batch_shape[dim:])
-      sampled_model[key] = d.sample(num_outer_particles, seed=seed)
+      sampled_model[key] = d.sample(seed=seed)
 
     return sampled_model
 
@@ -900,7 +903,7 @@ def sample_at_dim(initial_state_prior, dim, num_samples, num_outer_particles, se
     batch_shape = initial_state_prior.batch_shape
     initial_state_prior = batch_reshape.BatchReshape(initial_state_prior, batch_shape[:dim] + [1] + batch_shape[dim:])
     initial_state_prior = batch_broadcast.BatchBroadcast(initial_state_prior, batch_shape[:dim] + [num_samples] + batch_shape[dim:])
-    return initial_state_prior.sample(num_outer_particles, seed=seed)
+    return initial_state_prior.sample(seed=seed)
 
 
 def _particle_filter_initial_weighted_particles(observations,
@@ -909,7 +912,6 @@ def _particle_filter_initial_weighted_particles(observations,
                                                 initial_state_proposal,
                                                 num_inner_particles,
                                                 particles_dim=0,
-                                                num_outer_particles=0,
                                                 extra=np.nan,
                                                 seed=None):
   """Initialize a set of weighted particles including the first observation."""
@@ -923,10 +925,15 @@ def _particle_filter_initial_weighted_particles(observations,
           initial_state_prior,
           particles_dim,
           num_inner_particles,
-          num_outer_particles,
           seed
       )
-      initial_log_weights = ps.zeros_like(initial_state_prior.log_prob(initial_state))
+
+      prior_sample = initial_state_prior.sample(num_inner_particles)
+      initial_log_weights = dist_util.move_dimension(
+          initial_state_prior.log_prob(prior_sample),
+          source_idx=0,
+          dest_idx=particles_dim
+      )
 
   else:
     initial_state = initial_state_proposal.sample(num_inner_particles, seed=seed)
@@ -939,12 +946,12 @@ def _particle_filter_initial_weighted_particles(observations,
   # Return particles weighted by the initial observation.
 
   if extra is np.nan:
-    if num_outer_particles == 0:
+    if len(ps.shape(initial_log_weights)) == 1:
       # initial extra for particle filter
       extra = tf.constant(0)
     else:
       # initial extra for inner particles of smc_squared
-      extra = tf.constant(0, shape=[num_outer_particles])
+      extra = tf.constant(0, shape=ps.shape(initial_log_weights))
 
   return smc_kernel.WeightedParticles(
       particles=initial_state,
