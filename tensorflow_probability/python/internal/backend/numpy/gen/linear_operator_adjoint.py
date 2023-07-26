@@ -41,7 +41,7 @@ from tensorflow_probability.python.internal.backend.numpy.gen import linear_oper
 from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator_util
 # from tensorflow.python.util.tf_export import tf_export
 
-__all__ = []
+__all__ = ["LinearOperatorAdjoint"]
 
 
 # @tf_export("linalg.LinearOperatorAdjoint")
