@@ -34,6 +34,7 @@ try:
 
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_addition import *
+  from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_adjoint import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_block_diag import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_block_lower_triangular import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_circulant import *
@@ -42,6 +43,7 @@ try:
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_full_matrix import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_householder import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_identity import *
+  from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_inversion import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_kronecker import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_permutation import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_low_rank_update import *
