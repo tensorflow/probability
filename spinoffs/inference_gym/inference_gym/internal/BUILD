@@ -15,6 +15,7 @@
 # Description:
 #   Internal utilities for the inference gym.
 
+# Placeholder: py_library
 # [internal] load pytype.bzl (pytype_library, pytype_strict_library)
 # [internal] load strict.bzl
 

@@ -16,6 +16,8 @@
 #   Contains ops for bijectors.
 #   APIs here are meant to evolve over time.
 
+# Placeholder: py_library
+# Placeholder: py_test
 load(
     "//tensorflow_probability/python:build_defs.bzl",
     "multi_substrate_py_library",

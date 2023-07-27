@@ -15,6 +15,9 @@
 # Description:
 #   Internal helper libraries for layers.
 
+# Placeholder: py_library
+# Placeholder: py_test
+
 licenses(["notice"])
 
 package(

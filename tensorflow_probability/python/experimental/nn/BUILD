@@ -15,6 +15,9 @@
 # Description:
 #   tf.Module tools for building neural architectures.
 
+# Placeholder: py_library
+# Placeholder: py_test
+
 licenses(["notice"])
 
 package(

@@ -15,6 +15,9 @@
 # Description:
 #   Numpy backend.
 
+# Placeholder: py_library
+# Placeholder: py_test
+
 licenses(["notice"])
 
 package(
