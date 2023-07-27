@@ -51,8 +51,9 @@ nptf.register_tensor_conversion_function(
 
 def _prefer_static(original_fn, static_fn, disable_spec_check=False):
   """Wraps original_fn, preferring to call static_fn when inputs are static."""
-  original_spec = tf_inspect.getfullargspec(original_fn)
-  static_spec = tf_inspect.getfullargspec(static_fn)
+  original_spec = (
+      tf_inspect.getfullargspec(original_fn)._replace(annotations={}))
+  static_spec = tf_inspect.getfullargspec(static_fn)._replace(annotations={})
   if not disable_spec_check and original_spec != static_spec:
     raise ValueError(
         'Arg specs do not match: original={}, static={}, fn={}'.format(
