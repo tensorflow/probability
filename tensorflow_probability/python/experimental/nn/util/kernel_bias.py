@@ -94,7 +94,7 @@ def make_kernel_bias(
     return tfd.Uniform(low=-s, high=s)
 
   def make_normal(size):
-    # Constant is: `scipy.stats.truncnorm.var(loc=0., scale=1., a=-2., b=2.)`.
+    # Constant is: `scipy.stats.truncnorm.std(loc=0., scale=1., a=-2., b=2.)`.
     s = tf.math.rsqrt(size) / 0.87962566103423978
     return tfd.TruncatedNormal(loc=0, scale=s, low=-2., high=2.)
 
