@@ -55,6 +55,10 @@ def resample(particles, log_weights, resample_fn, target_log_weights=None, parti
       `None`, the target measure is implicitly taken to be the normalized
       log weights (`log_weights - tf.reduce_logsumexp(log_weights, axis=0)`).
       Default value: `None`.
+    particles_dim: Python `int` axis of each state `Tensor` indexing into the
+      particles. This is almost always zero, but nonzero values may be necessary
+      when running SMC in nested contexts.
+      Default value: `0`.
     seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
   Returns:
@@ -70,7 +74,7 @@ def resample(particles, log_weights, resample_fn, target_log_weights=None, parti
       resampling are uniformly equal to `-log(num_particles)`.
   """
   with tf.name_scope('resample'):
-    num_particles = ps.shape(log_weights)[particles_dim]
+    num_particles = ps.dimension_size(log_weights, particles_dim)
 
     log_num_particles = tf.math.log(tf.cast(num_particles, log_weights.dtype))
 
