@@ -398,8 +398,8 @@ class GaussianProcessRegressionModel(
         observations.
       mean_fn: Python `callable` that acts on `index_points` to produce a
         collection, or batch of collections, of mean values at `index_points`.
-        Takes a (nested) `Tensor` of shape `[b1, ..., bB, f1, ..., fF]` and
-        returns a `Tensor` whose shape is broadcastable with `[b1, ..., bB]`.
+        Takes a (nested) `Tensor` of shape `[b1, ..., bB, e, f1, ..., fF]` and
+        returns a `Tensor` whose shape is broadcastable with `[b1, ..., bB, e]`.
         Default value: `None` implies the constant zero function.
       cholesky_fn: Callable which takes a single (batch) matrix argument and
         returns a Cholesky-like lower triangular factor.  Default value: `None`,
@@ -651,8 +651,8 @@ class GaussianProcessRegressionModel(
         observations.
       mean_fn: Python `callable` that acts on `index_points` to produce a
         collection, or batch of collections, of mean values at `index_points`.
-        Takes a (nested) `Tensor` of shape `[b1, ..., bB, f1, ..., fF]` and
-        returns a `Tensor` whose shape is broadcastable with `[b1, ..., bB]`.
+        Takes a (nested) `Tensor` of shape `[b1, ..., bB, e, f1, ..., fF]` and
+        returns a `Tensor` whose shape is broadcastable with `[b1, ..., bB, e]`.
         Default value: `None` implies the constant zero function.
       cholesky_fn: Callable which takes a single (batch) matrix argument and
         returns a Cholesky-like lower triangular factor.  Default value: `None`,
