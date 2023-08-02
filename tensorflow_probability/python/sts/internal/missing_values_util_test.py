@@ -61,13 +61,16 @@ class _MissingValuesUtilityTests(test_util.TestCase):
         source_idx=0,
         dest_idx=-1)
 
-    initial_values = missing_values_util.initial_value_of_masked_time_series(
-        self._build_tensor(self.evaluate(series)),
-        broadcast_mask=self._build_tensor(
-            self.evaluate(tf.broadcast_to(mask, series.shape)),
-            dtype=np.bool_))
+    initial_values, first_unmasked_indices = (
+        missing_values_util.initial_value_of_masked_time_series(
+            self._build_tensor(self.evaluate(series)),
+            broadcast_mask=self._build_tensor(
+                self.evaluate(tf.broadcast_to(mask, series.shape)),
+                dtype=np.bool_)))
 
     self.assertAllClose(self.evaluate(initial_values), expected_initial_values)
+    self.assertAllEqual(tf.broadcast_to(np.array([0, 1, 4]), [2, 1, 3]),
+                        first_unmasked_indices)
 
   def _build_tensor(self, ndarray, dtype=None):
     """Convert a numpy array to a TF placeholder.

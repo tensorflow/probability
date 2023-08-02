@@ -148,14 +148,16 @@ def moments_of_masked_time_series(time_series_tensor, broadcast_mask):
 def initial_value_of_masked_time_series(time_series_tensor, broadcast_mask):
   """Get the first unmasked entry of each time series in the batch.
 
-  If a batch element has no unmasked entries, the corresponding return value
-  for that element is undefined.
-
   Args:
     time_series_tensor: float `Tensor` of shape `batch_shape + [num_timesteps]`.
     broadcast_mask: bool `Tensor` of same shape as `time_series`.
   Returns:
-    initial_values: float `Tensor` of shape `batch_shape`.
+    initial_values: float `Tensor` of shape `batch_shape`.  If a batch element
+      has no unmasked entries, the corresponding return value for that element
+      is undefined.
+    first_unmasked_indices: int `Tensor` of shape `batch_shape` -- the index of
+      the first unmasked entry for each time series in the batch.  If there are
+      no unmasked entries, the returned index is the length of the series.
   """
 
   num_timesteps = ps.shape(time_series_tensor)[-1]
@@ -176,13 +178,16 @@ def initial_value_of_masked_time_series(time_series_tensor, broadcast_mask):
         'dynamic rank.')  # `batch_gather` requires static rank
 
   # Extract the initial value for each series in the batch.
-  return tf.squeeze(tf.gather(params=time_series_tensor,
-                              indices=safe_unmasked_indices[..., np.newaxis],
-                              batch_dims=batch_dims,
-                              axis=-1),
-                    # Since we've gathered exactly one step from the
-                    # `num_timesteps` axis, we can remove that axis entirely.
-                    axis=-1)
+  initial_values = tf.squeeze(
+      tf.gather(params=time_series_tensor,
+                indices=safe_unmasked_indices[..., np.newaxis],
+                batch_dims=batch_dims,
+                axis=-1),
+      # Since we've gathered exactly one step from the `num_timesteps` axis,
+      # we can remove that axis entirely.
+      axis=-1)
+
+  return initial_values, first_unmasked_indices
 
 
 def differentiate_masked_time_series(masked_time_series):
