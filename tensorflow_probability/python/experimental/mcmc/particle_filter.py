@@ -27,6 +27,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from tensorflow_probability.python.mcmc.internal.util import choose
+from tensorflow_probability.python.internal import distribution_util as dist_util
 
 __all__ = [
     'infer_trajectories',
@@ -564,15 +565,14 @@ def _particle_filter_initial_weighted_particles(observations,
       initial_state = initial_state_prior.sample(num_inner_particles, seed=seed)
       initial_log_weights = ps.zeros_like(initial_state_prior.log_prob(initial_state))
     else:
-      initial_state = sample_at_dim(
-          initial_state_prior,
-          particles_dim,
-          num_inner_particles,
-          seed
-      )
-      prior_sample = initial_state_prior.sample(num_inner_particles)
-      initial_log_weights = tf.transpose(initial_state_prior.log_prob(prior_sample))
-
+        particles_draw = initial_state_prior.sample(num_inner_particles)
+        initial_state = tf.nest.map_structure(
+            lambda x: dist_util.move_dimension(x, source_idx=0, dest_idx=particles_dim),
+            particles_draw
+        )
+        initial_log_weights = ps.zeros_like(
+            dist_util.move_dimension(initial_state_prior.log_prob(particles_draw), source_idx=0, dest_idx=particles_dim)
+        )
   else:
     initial_state = initial_state_proposal.sample(num_inner_particles, seed=seed)
     initial_log_weights = (initial_state_prior.log_prob(initial_state) -
