@@ -565,14 +565,14 @@ def _particle_filter_initial_weighted_particles(observations,
       initial_state = initial_state_prior.sample(num_inner_particles, seed=seed)
       initial_log_weights = ps.zeros_like(initial_state_prior.log_prob(initial_state))
     else:
-        particles_draw = initial_state_prior.sample(num_inner_particles)
-        initial_state = tf.nest.map_structure(
-            lambda x: dist_util.move_dimension(x, source_idx=0, dest_idx=particles_dim),
-            particles_draw
-        )
-        initial_log_weights = ps.zeros_like(
-            dist_util.move_dimension(initial_state_prior.log_prob(particles_draw), source_idx=0, dest_idx=particles_dim)
-        )
+      particles_draw = initial_state_prior.sample(num_inner_particles)
+      initial_state = tf.nest.map_structure(
+          lambda x: dist_util.move_dimension(x, source_idx=0, dest_idx=particles_dim),
+          particles_draw
+      )
+      initial_log_weights = ps.zeros_like(
+          dist_util.move_dimension(initial_state_prior.log_prob(particles_draw), source_idx=0, dest_idx=particles_dim)
+      )
   else:
     initial_state = initial_state_proposal.sample(num_inner_particles, seed=seed)
     initial_log_weights = (initial_state_prior.log_prob(initial_state) -
