@@ -14,6 +14,8 @@
 # ============================================================================
 # Ground truth computation.
 
+# Placeholder: py_binary
+
 package(
     # default_applicable_licenses
     default_visibility = [

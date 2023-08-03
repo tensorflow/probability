@@ -14,6 +14,9 @@
 # ============================================================================
 # Tests for the backend integration.
 
+# Placeholder: py_test
+# Placeholder: py_binary
+
 licenses(["notice"])
 
 package(

@@ -15,6 +15,8 @@
 # Description:
 #   Internal utilities for TensorFlow probability.
 
+# Placeholder: py_library
+# Placeholder: py_test
 load(
     "//tensorflow_probability/python:build_defs.bzl",
     "multi_substrate_py_library",

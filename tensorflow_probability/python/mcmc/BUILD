@@ -15,6 +15,8 @@
 # Description:
 #   MCMC methods, diagnostics, and related utilities.
 
+# Placeholder: py_library
+# Placeholder: py_test
 load(
     "//tensorflow_probability/python:build_defs.bzl",
     "multi_substrate_py_library",

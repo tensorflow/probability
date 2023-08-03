@@ -14,6 +14,8 @@
 # ============================================================================
 # Ground truth computation using Stan.
 
+# Placeholder: py_library
+
 package(
     # default_applicable_licenses
     default_visibility = [

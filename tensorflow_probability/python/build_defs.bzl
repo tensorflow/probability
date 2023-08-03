@@ -14,8 +14,8 @@
 # ============================================================================
 """Build defs for TF/NumPy/JAX-variadic libraries & tests."""
 
-# Placeholder: load py_test
-# Placeholder: load py_library
+# Placeholder: load native py_test
+# Placeholder: load native py_library
 
 NO_REWRITE_NEEDED = [
     "internal:all_util",

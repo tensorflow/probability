@@ -2010,9 +2010,9 @@ class _TestLoader(absltest.TestLoader):
     return names
 
 
-def main(jax_mode=JAX_MODE):
+def main(jax_mode=JAX_MODE, jax_enable_x64=True):
   """Test main function that injects a custom loader."""
-  if jax_mode:
+  if jax_mode and jax_enable_x64:
     from jax.config import config  # pylint: disable=g-import-not-at-top
     config.update('jax_enable_x64', True)
 

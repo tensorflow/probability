@@ -17,6 +17,7 @@
 from tensorflow_probability.python.experimental.psd_kernels.additive_kernel import AdditiveKernel
 from tensorflow_probability.python.experimental.psd_kernels.feature_scaled_with_categorical import ContinuousAndCategoricalValues
 from tensorflow_probability.python.experimental.psd_kernels.feature_scaled_with_categorical import FeatureScaledWithCategorical
+from tensorflow_probability.python.experimental.psd_kernels.feature_scaled_with_embedded_categorical import FeatureScaledWithEmbeddedCategorical
 from tensorflow_probability.python.experimental.psd_kernels.multitask_kernel import Independent
 from tensorflow_probability.python.experimental.psd_kernels.multitask_kernel import MultiTaskKernel
 from tensorflow_probability.python.experimental.psd_kernels.multitask_kernel import Separable
@@ -27,6 +28,7 @@ _allowed_symbols = [
     'AdditiveKernel',
     'ContinuousAndCategoricalValues',
     'FeatureScaledWithCategorical',
+    'FeatureScaledWithEmbeddedCategorical',
     'Independent',
     'MultiTaskKernel',
     'Separable',

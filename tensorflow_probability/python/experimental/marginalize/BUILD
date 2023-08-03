@@ -15,6 +15,9 @@
 # Description:
 #   Automatic marginalization of latent variables.
 
+# Placeholder: py_library
+# Placeholder: py_test
+
 package(
     # default_applicable_licenses
     default_visibility = [

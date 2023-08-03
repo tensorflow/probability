@@ -13,6 +13,9 @@
 # limitations under the License.
 # ============================================================================
 
+# Placeholder: py_library
+# Placeholder: py_test
+
 licenses(["notice"])
 
 package(

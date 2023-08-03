@@ -291,9 +291,9 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
         `kernel.batch_shape` and any batch dims yielded by `mean_fn`.
       mean_fn: Python `callable` that acts on `index_points` to produce a (batch
         of) vector(s) of mean values at `index_points`. Takes a (nested)
-        `Tensor` of shape `[b1, ..., bB, f1, ..., fF]` and returns a `Tensor`
-        whose shape is broadcastable with `[b1, ..., bB]`. Default value:
-        `None` implies constant zero function.
+        `Tensor` of shape `[b1, ..., bB, e, f1, ..., fF]` and returns a `Tensor`
+        whose shape is broadcastable with `[b1, ..., bB, e]`.
+        Default value: `None` implies constant zero function.
       observation_noise_variance: `float` `Tensor` representing (batch of)
         scalar variance(s) of the noise in the Normal likelihood
         distribution of the model. If batched, the batch shape must be

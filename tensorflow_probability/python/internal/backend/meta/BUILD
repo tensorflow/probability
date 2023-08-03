@@ -15,6 +15,8 @@
 # Description:
 #   Numpy backend rewriter.
 
+# Placeholder: py_binary
+
 licenses(["notice"])
 
 package(

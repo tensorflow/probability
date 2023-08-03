@@ -15,6 +15,7 @@
 # Description:
 #   Experimental methods and objectives for variational inference.
 
+# Placeholder: py_test
 load(
     "//tensorflow_probability/python:build_defs.bzl",
     "multi_substrate_py_library",

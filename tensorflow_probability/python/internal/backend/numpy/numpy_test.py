@@ -2046,6 +2046,18 @@ class NumpyTest(test_util.TestCase):
     self.assertListEqual([a.shape for a in tree_util.tree_leaves(linop)],
                          [(4, 3), (3, 2)])
 
+    full = nptf.linalg.LinearOperatorFullMatrix(
+        onp.array([[1.0, 2.0], [3.0, 4.0]]))
+    adjoint = full.adjoint()
+    inverse = full.inverse()
+    self.assertLen(tree_util.tree_leaves(adjoint), 1)
+    self.assertLen(tree_util.tree_leaves(inverse), 1)
+    adjoint2 = nptf.linalg.LinearOperatorAdjoint(full)
+    inverse2 = nptf.linalg.LinearOperatorInversion(full)
+    self.assertLen(tree_util.tree_leaves(adjoint2), 1)
+    self.assertLen(tree_util.tree_leaves(inverse2), 1)
+
+
 if __name__ == '__main__':
   # A rewrite oddity: the test_util we import here doesn't come from a rewritten
   # dependency, so we need to tell it that it's meant to be for JAX.

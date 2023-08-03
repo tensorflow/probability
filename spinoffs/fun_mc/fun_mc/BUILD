@@ -15,6 +15,7 @@
 # Description:
 #   Functional MC API.
 
+# Placeholder: py_test
 # [internal] load pytype.bzl (pytype_library)
 
 licenses(["notice"])
