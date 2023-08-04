@@ -1885,6 +1885,36 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
         new_log_weights,
         tf.fill(probs.shape, tfp.math.reduce_logmeanexp(log_weights)))
 
+  def testSystematicResampleAncestors(self):
+    log_weights = self._constant([-float('inf'), 0.])
+    particles = tf.range(log_weights.shape[0])
+    seed = self._make_seed(_test_seed())
+
+    (new_particles, new_log_weights), ancestors = fun_mc.systematic_resample(
+        particles, log_weights, seed=seed
+    )
+    self.assertAllEqual(new_particles, tf.ones_like(particles))
+    self.assertAllEqual(
+        new_log_weights, tf.math.log(self._constant([0.5, 0.5]))
+    )
+    self.assertAllEqual(ancestors, tf.ones_like(particles))
+
+    (new_particles, new_log_weights), ancestors = fun_mc.systematic_resample(
+        particles, log_weights, do_resample=True, seed=seed
+    )
+    self.assertAllEqual(new_particles, tf.ones_like(particles))
+    self.assertAllEqual(
+        new_log_weights, tf.math.log(self._constant([0.5, 0.5]))
+    )
+    self.assertAllEqual(ancestors, tf.ones_like(particles))
+
+    (new_particles, new_log_weights), ancestors = fun_mc.systematic_resample(
+        particles, log_weights, do_resample=False, seed=seed
+    )
+    self.assertAllEqual(new_particles, particles)
+    self.assertAllEqual(new_log_weights, log_weights)
+    self.assertAllEqual(ancestors, particles)
+
   def testAIS(self):
 
     def tlp_1(x):
