@@ -112,7 +112,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/math:root_search",
         "//tensorflow_probability/python/math:special",
-        "//tensorflow_probability/python/mcmc:sample_halton_sequence",
+        "//tensorflow_probability/python/mcmc",
     ],
 )
 
