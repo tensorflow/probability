@@ -734,8 +734,8 @@ class JointDistributionSequential(_JointDistributionSequential,
       else:
         model = kwargs.get('model')
 
-      if not all(isinstance(d, tf.__internal__.CompositeTensor) or callable(d)
-                 for d in model):
+      if not all(auto_composite_tensor.is_composite_tensor(d)
+                 or callable(d) for d in model):
         return _JointDistributionSequential(*args, **kwargs)
     return super(JointDistributionSequential, cls).__new__(cls)
 

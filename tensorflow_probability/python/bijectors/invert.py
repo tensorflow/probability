@@ -17,6 +17,7 @@
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import parameter_properties
 
 __all__ = [
@@ -160,7 +161,7 @@ class Invert(_Invert, bijector_lib.AutoCompositeTensorBijector):
       else:
         raise TypeError('`Invert.__new__()` is missing argument `bijector`.')
 
-      if not isinstance(bijector, tf.__internal__.CompositeTensor):
+      if not auto_composite_tensor.is_composite_tensor(bijector):
         return _Invert(*args, **kwargs)
     return super(Invert, cls).__new__(cls)
 

@@ -23,6 +23,7 @@ from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
@@ -695,9 +696,9 @@ class MixtureSameFamily(
       else:
         components_distribution = kwargs.get('components_distribution')
 
-      if not (isinstance(mixture_distribution, tf.__internal__.CompositeTensor)
-              and isinstance(
-                  components_distribution, tf.__internal__.CompositeTensor)):
+      if not (auto_composite_tensor.is_composite_tensor(mixture_distribution)
+              and auto_composite_tensor.is_composite_tensor(
+                  components_distribution)):
         return _MixtureSameFamily(*args, **kwargs)
     return super(MixtureSameFamily, cls).__new__(cls)
 

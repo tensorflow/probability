@@ -242,7 +242,7 @@ class Inflated(_Inflated, distribution_lib.AutoCompositeTensorDistribution):
       else:
         distribution = kwargs.get('distribution')
 
-      if not isinstance(distribution, tf.__internal__.CompositeTensor):
+      if not auto_composite_tensor.is_composite_tensor(distribution):
         return _Inflated(*args, **kwargs)
     return super(Inflated, cls).__new__(cls)
 

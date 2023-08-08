@@ -21,6 +21,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import log_prob_ratio
 from tensorflow_probability.python.experimental.bijectors import sharded as sharded_bij
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import distribute_lib
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import samplers
@@ -76,7 +77,7 @@ class Sharded(distribution_lib.AutoCompositeTensorDistribution):
     """
     parameters = dict(locals())
 
-    if not isinstance(distribution, tf.__internal__.CompositeTensor):
+    if not auto_composite_tensor.is_composite_tensor(distribution):
       raise ValueError('`distribution` must be a `CompositeTensor`.')
 
     if shard_axis_name is None:

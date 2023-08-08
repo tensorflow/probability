@@ -684,8 +684,8 @@ class TransformedDistribution(
       else:
         bijector = kwargs.get('bijector')
 
-      if not (isinstance(distribution, tf.__internal__.CompositeTensor)
-              and isinstance(bijector, tf.__internal__.CompositeTensor)):
+      if not (auto_composite_tensor.is_composite_tensor(distribution)
+              and auto_composite_tensor.is_composite_tensor(bijector)):
         return _TransformedDistribution(*args, **kwargs)
     return super(TransformedDistribution, cls).__new__(cls)
 

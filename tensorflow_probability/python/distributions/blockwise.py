@@ -22,6 +22,7 @@ from tensorflow_probability.python.distributions import distribution as distribu
 from tensorflow_probability.python.distributions import joint_distribution_sequential
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -95,7 +96,7 @@ class _Cast(_NonCompositeTensorCast,
       else:
         distribution = kwargs.get('distribution')
 
-      if not isinstance(distribution, tf.__internal__.CompositeTensor):
+      if not auto_composite_tensor.is_composite_tensor(distribution):
         return _NonCompositeTensorCast(*args, **kwargs)
     return super(_Cast, cls).__new__(cls)
 
@@ -430,7 +431,7 @@ class Blockwise(_Blockwise, distribution_lib.AutoCompositeTensorDistribution):
       else:
         distributions = kwargs.get('distributions')
 
-      if not all(isinstance(d, tf.__internal__.CompositeTensor)
+      if not all(auto_composite_tensor.is_composite_tensor(d)
                  for d in tf.nest.flatten(distributions)):
         return _Blockwise(*args, **kwargs)
     return super(Blockwise, cls).__new__(cls)

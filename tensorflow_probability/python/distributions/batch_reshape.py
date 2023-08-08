@@ -21,6 +21,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -486,7 +487,7 @@ class BatchReshape(
       else:
         distribution = kwargs.get('distribution')
 
-      if not isinstance(distribution, tf.__internal__.CompositeTensor):
+      if not auto_composite_tensor.is_composite_tensor(distribution):
         return _BatchReshape(*args, **kwargs)
     return super(BatchReshape, cls).__new__(cls)
 
@@ -625,6 +626,6 @@ class _BatchReshapeBijector(_NonCompositeTensorBatchReshapeBijector,
       else:
         base_bijector = kwargs.get('base_bijector')
 
-      if not isinstance(base_bijector, tf.__internal__.CompositeTensor):
+      if not auto_composite_tensor.is_composite_tensor(base_bijector):
         return _NonCompositeTensorBatchReshapeBijector(*args, **kwargs)
     return super(_BatchReshapeBijector, cls).__new__(cls)
