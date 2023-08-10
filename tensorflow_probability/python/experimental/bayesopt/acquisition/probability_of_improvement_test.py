@@ -74,6 +74,28 @@ class _ProbabilityOfImprovementTest(object):
     self.assertAllNotNan(grads)
     self.assertDTypeEqual(actual_poi, self.dtype)
 
+  def test_normal_probability_of_improvement_matches_parallel(self):
+    shape = [5, 20]
+    loc = 2. * np.random.uniform(size=shape).astype(self.dtype)
+    scale = 3. + np.random.uniform(size=[20]).astype(self.dtype)
+    observations = np.array([2., 3., 4.]).astype(self.dtype)
+    best_observed = tf.reduce_max(observations)
+    actual_pi = probability_of_improvement.normal_probability_of_improvement(
+        best_observed=best_observed,
+        mean=loc,
+        stddev=scale)
+
+    model = normal.Normal(
+        loc[..., tf.newaxis], scale[..., tf.newaxis], validate_args=True)
+    expected_pi = probability_of_improvement.ParallelProbabilityOfImprovement(
+        predictive_distribution=model,
+        observations=observations,
+        num_samples=int(2e5),
+        seed=test_util.test_seed())()
+    self.assertAllClose(
+        self.evaluate(actual_pi), self.evaluate(expected_pi), atol=1e-2)
+    self.assertDTypeEqual(actual_pi, self.dtype)
+
 
 @test_util.test_all_tf_execution_regimes
 class ProbabilityOfImprovementFloat32Test(_ProbabilityOfImprovementTest,

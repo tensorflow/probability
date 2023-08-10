@@ -71,6 +71,7 @@ py_test(
         # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:bijector",
+        "//tensorflow_probability/python/bijectors:bijector_test_util",
         "//tensorflow_probability/python/bijectors:reshape",
         "//tensorflow_probability/python/bijectors:scale",
         "//tensorflow_probability/python/bijectors:shift",
