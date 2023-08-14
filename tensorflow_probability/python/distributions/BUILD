@@ -2183,7 +2183,6 @@ multi_substrate_py_library(
         ":cholesky_util",
         ":distribution",
         ":multivariate_student_t",
-        ":student_t",
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:identity",
         "//tensorflow_probability/python/bijectors:softplus",
@@ -4503,7 +4502,6 @@ multi_substrate_py_test(
     shard_count = 2,
     deps = [
         ":multivariate_student_t",
-        ":student_t",
         ":student_t_process",
         # absl/testing:parameterized dep,
         # numpy dep,

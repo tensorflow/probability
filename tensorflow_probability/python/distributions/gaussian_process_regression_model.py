@@ -28,22 +28,11 @@ from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import slicing
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.psd_kernels import schur_complement
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
     'GaussianProcessRegressionModel',
 ]
-
-
-_ALWAYS_YIELD_MVN_DEPRECATION_WARNING = (
-    '`always_yield_multivariate_normal` is deprecated. This arg is now ignored'
-    'and will be removed after 2023-07-01. A `GaussianProcessRegressionModel`'
-    'evaluated at a single index point now always has event shape `[1]` (the'
-    'previous behavior for `always_yield_multivariate_normal=True`). To'
-    'reproduce the previous behavior of'
-    '`always_yield_multivariate_normal=False`, squeeze the rightmost singleton'
-    'dimension from the output of `mean`, `sample`, etc.')
 
 
 class GaussianProcessRegressionModel(
@@ -326,10 +315,6 @@ class GaussianProcessRegressionModel(
   """
   # pylint:disable=invalid-name
 
-  @deprecation.deprecated_args(
-      '2023-07-01',
-      _ALWAYS_YIELD_MVN_DEPRECATION_WARNING,
-      'always_yield_multivariate_normal')
   def __init__(self,
                kernel,
                index_points=None,
@@ -340,7 +325,6 @@ class GaussianProcessRegressionModel(
                mean_fn=None,
                cholesky_fn=None,
                jitter=1e-6,
-               always_yield_multivariate_normal=None,
                validate_args=False,
                allow_nan_stats=False,
                name='GaussianProcessRegressionModel',
@@ -409,7 +393,6 @@ class GaussianProcessRegressionModel(
         matrix to ensure positive definiteness of the covariance matrix.
         This argument is ignored if `cholesky_fn` is set.
         Default value: `1e-6`.
-      always_yield_multivariate_normal: Deprecated and ignored.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -541,7 +524,6 @@ class GaussianProcessRegressionModel(
             index_points=index_points,
             cholesky_fn=cholesky_fn,
             jitter=jitter,
-            always_yield_multivariate_normal=always_yield_multivariate_normal,
             # What the GP super class calls "observation noise variance" we call
             # here the "predictive noise variance". We use the observation noise
             # variance for the fit/solve process above, and predictive for
@@ -552,10 +534,6 @@ class GaussianProcessRegressionModel(
         self._parameters = parameters
 
   @staticmethod
-  @deprecation.deprecated_args(
-      '2023-07-01',
-      _ALWAYS_YIELD_MVN_DEPRECATION_WARNING,
-      'always_yield_multivariate_normal')
   def precompute_regression_model(
       kernel,
       observation_index_points,
@@ -567,7 +545,6 @@ class GaussianProcessRegressionModel(
       mean_fn=None,
       cholesky_fn=None,
       jitter=1e-6,
-      always_yield_multivariate_normal=None,
       validate_args=False,
       allow_nan_stats=False,
       name='PrecomputedGaussianProcessRegressionModel',
@@ -661,7 +638,6 @@ class GaussianProcessRegressionModel(
       jitter: `float` scalar `Tensor` added to the diagonal of the covariance
         matrix to ensure positive definiteness of the covariance matrix.
         Default value: `1e-6`.
-      always_yield_multivariate_normal: Deprecated and ignored.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -773,7 +749,6 @@ class GaussianProcessRegressionModel(
           predictive_noise_variance=predictive_noise_variance,
           cholesky_fn=cholesky_fn,
           jitter=jitter,
-          always_yield_multivariate_normal=always_yield_multivariate_normal,
           _conditional_kernel=conditional_kernel,
           _conditional_mean_fn=conditional_mean_fn,
           validate_args=validate_args,
