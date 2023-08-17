@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tests for sample_halton_sequence.py."""
+"""Tests for sample_halton_sequence_lib.py."""
 
 # Dependency imports
 
@@ -21,7 +21,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import monte_carlo
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.mcmc import sample_halton_sequence
+from tensorflow_probability.python.mcmc import sample_halton_sequence_lib
 
 
 JAX_MODE = False
@@ -38,7 +38,7 @@ class HaltonSequenceTest(test_util.TestCase):
                          [3. / 4, 1. / 9],
                          [1. / 8, 4. / 9],
                          [5. / 8, 7. / 9]], dtype=np.float32)
-    sample = sample_halton_sequence.sample_halton_sequence(
+    sample = sample_halton_sequence_lib.sample_halton_sequence(
         2, num_results=5, randomized=False)
     self.assertAllClose(expected, self.evaluate(sample), rtol=1e-6)
 
@@ -51,7 +51,7 @@ class HaltonSequenceTest(test_util.TestCase):
                          [3. / 4, 1. / 9],
                          [1. / 8, 4. / 9],
                          [5. / 8, 7. / 9]], dtype=np.float32)
-    sample = sample_halton_sequence.sample_halton_sequence(
+    sample = sample_halton_sequence_lib.sample_halton_sequence(
         2, num_results=tf.constant(5), randomized=False)
     self.assertAllClose(expected, self.evaluate(sample), rtol=1e-6)
 
@@ -59,9 +59,9 @@ class HaltonSequenceTest(test_util.TestCase):
     """Tests access of sequence elements by index."""
     dim = 5
     indices = tf.range(10, dtype=tf.int32)
-    sample_direct = sample_halton_sequence.sample_halton_sequence(
+    sample_direct = sample_halton_sequence_lib.sample_halton_sequence(
         dim, num_results=10, randomized=False)
-    sample_from_indices = sample_halton_sequence.sample_halton_sequence(
+    sample_from_indices = sample_halton_sequence_lib.sample_halton_sequence(
         dim, sequence_indices=indices, randomized=False)
     self.assertAllClose(
         self.evaluate(sample_direct), self.evaluate(sample_from_indices),
@@ -70,9 +70,9 @@ class HaltonSequenceTest(test_util.TestCase):
   def test_dtypes_works_correctly(self):
     """Tests that all supported dtypes work without error."""
     dim = 3
-    sample_float32 = sample_halton_sequence.sample_halton_sequence(
+    sample_float32 = sample_halton_sequence_lib.sample_halton_sequence(
         dim, num_results=10, dtype=tf.float32, seed=test_util.test_seed())
-    sample_float64 = sample_halton_sequence.sample_halton_sequence(
+    sample_float64 = sample_halton_sequence_lib.sample_halton_sequence(
         dim, num_results=10, dtype=tf.float64, seed=test_util.test_seed())
     self.assertEqual(self.evaluate(sample_float32).dtype, np.float32)
     self.assertEqual(self.evaluate(sample_float64).dtype, np.float64)
@@ -93,7 +93,7 @@ class HaltonSequenceTest(test_util.TestCase):
     p = normal.Normal(loc=mu_p, scale=sigma_p)
     q = normal.Normal(loc=mu_q, scale=sigma_q)
 
-    cdf_sample = sample_halton_sequence.sample_halton_sequence(
+    cdf_sample = sample_halton_sequence_lib.sample_halton_sequence(
         2, num_results=n, dtype=tf.float64, seed=test_util.test_seed())
     q_sample = q.quantile(cdf_sample)
 
@@ -116,7 +116,7 @@ class HaltonSequenceTest(test_util.TestCase):
     # Produce the first 1000 members of the Halton sequence in 3 dimensions.
     num_results = 1000
     dim = 3
-    sample = sample_halton_sequence.sample_halton_sequence(
+    sample = sample_halton_sequence_lib.sample_halton_sequence(
         dim, num_results=num_results, randomized=False)
 
     # Evaluate the integral of x_1 * x_2^2 * x_3^3  over the three dimensional
@@ -134,7 +134,7 @@ class HaltonSequenceTest(test_util.TestCase):
 
     sequence_indices = tf.range(start=1000, limit=1000 + num_results,
                                 dtype=tf.int32)
-    sample_leaped = sample_halton_sequence.sample_halton_sequence(
+    sample_leaped = sample_halton_sequence_lib.sample_halton_sequence(
         dim, sequence_indices=sequence_indices, randomized=False)
 
     integral_leaped = tf.reduce_mean(
@@ -150,7 +150,7 @@ class HaltonSequenceTest(test_util.TestCase):
     num_results = 2000
     replicas = 50
 
-    samples = sample_halton_sequence.sample_halton_sequence(
+    samples = sample_halton_sequence_lib.sample_halton_sequence(
         dim,
         num_results=replicas * num_results,
         seed=test_util.test_seed_stream())
@@ -195,9 +195,9 @@ class HaltonSequenceTest(test_util.TestCase):
           axis=-1)
 
     stream = test_util.test_seed_stream()
-    sample_lo = sample_halton_sequence.sample_halton_sequence(
+    sample_lo = sample_halton_sequence_lib.sample_halton_sequence(
         dim, num_results=replica * num_results_lo, seed=stream())
-    sample_hi = sample_halton_sequence.sample_halton_sequence(
+    sample_hi = sample_halton_sequence_lib.sample_halton_sequence(
         dim, num_results=replica * num_results_hi, seed=stream())
 
     sample_lo = tf.reshape(sample_lo, [replica, -1, dim])
@@ -223,11 +223,11 @@ class HaltonSequenceTest(test_util.TestCase):
     dim = 20
     num_results = 100
     seed = test_util.test_seed()
-    sample1 = sample_halton_sequence.sample_halton_sequence(
+    sample1 = sample_halton_sequence_lib.sample_halton_sequence(
         dim, num_results=num_results, seed=seed)
     if tf.executing_eagerly() and not JAX_MODE:
       tf.random.set_seed(seed)
-    sample2 = sample_halton_sequence.sample_halton_sequence(
+    sample2 = sample_halton_sequence_lib.sample_halton_sequence(
         dim, num_results=num_results, seed=seed)
     [sample1_, sample2_] = self.evaluate([sample1, sample2])
     self.assertAllClose(sample1_, sample2_, atol=0., rtol=1e-6)

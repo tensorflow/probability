@@ -18,7 +18,6 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import mcmc
 from tensorflow_probability.python.distributions import gumbel
 from tensorflow_probability.python.distributions import normal as normal_lib
 from tensorflow_probability.python.experimental.bayesopt.acquisition import acquisition_function
@@ -26,6 +25,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.math import root_search
 from tensorflow_probability.python.math import special
+from tensorflow_probability.python.mcmc import sample_halton_sequence_lib
 
 
 class GaussianProcessMaxValueEntropySearch(
@@ -156,7 +156,7 @@ def fit_max_value_distribution(
   # where F_k is the marginal (Normal) CDF at various points.
 
   # Adjoin a grid of points so the approximation is more accurate.
-  grid_points = mcmc.sample_halton_sequence(
+  grid_points = sample_halton_sequence_lib.sample_halton_sequence(
       dim=predictive_distribution.index_points.shape[-1],
       num_results=num_grid_points,
       dtype=predictive_distribution.index_points.dtype, seed=seed)

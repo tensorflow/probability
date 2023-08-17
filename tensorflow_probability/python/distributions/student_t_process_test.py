@@ -20,7 +20,6 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import multivariate_student_t as mvst
-from tensorflow_probability.python.distributions import student_t
 from tensorflow_probability.python.distributions import student_t_process
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
@@ -240,19 +239,6 @@ class _StudentTProcessTest(test_util.TestCase):
     with self.assertRaises(ValueError):
       tp.mean()
 
-  def testMarginalHasCorrectTypes(self):
-    tp = student_t_process.StudentTProcess(
-        df=3., kernel=psd_kernels.ExponentiatedQuadratic(), validate_args=True)
-
-    self.assertIsInstance(
-        tp.get_marginal_distribution(
-            index_points=np.ones([1, 1], dtype=np.float32)), student_t.StudentT)
-
-    self.assertIsInstance(
-        tp.get_marginal_distribution(
-            index_points=np.ones([10, 1], dtype=np.float32)),
-        mvst.MultivariateStudentTLinearOperator)
-
   @parameterized.parameters(
       {"foo_feature_shape": [5], "bar_feature_shape": [3]},
       {"foo_feature_shape": [3, 2], "bar_feature_shape": [5]},
@@ -338,26 +324,6 @@ class _StudentTProcessTest(test_util.TestCase):
     self.assertAllEqual(base_stp.batch_shape_tensor(),
                         stp_with_list.batch_shape_tensor())
     self.assertAllClose(base_stp.log_prob(s), stp_with_list.log_prob(s))
-
-  def testAlwaysYieldMultivariateStudentT(self):
-    df = np.float32(3.)
-    stp = student_t_process.StudentTProcess(
-        df=df,
-        kernel=psd_kernels.ExponentiatedQuadratic(),
-        index_points=tf.ones([5, 1, 2]),
-        always_yield_multivariate_student_t=False,
-    )
-    self.assertAllEqual([5], self.evaluate(stp.batch_shape_tensor()))
-    self.assertAllEqual([], self.evaluate(stp.event_shape_tensor()))
-
-    stp = student_t_process.StudentTProcess(
-        df=df,
-        kernel=psd_kernels.ExponentiatedQuadratic(),
-        index_points=tf.ones([5, 1, 2]),
-        always_yield_multivariate_student_t=True,
-    )
-    self.assertAllEqual([5], self.evaluate(stp.batch_shape_tensor()))
-    self.assertAllEqual([1], self.evaluate(stp.event_shape_tensor()))
 
   def testLogProbMatchesMVT(self):
     df = tf.convert_to_tensor(3.)

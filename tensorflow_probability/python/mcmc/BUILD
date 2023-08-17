@@ -494,7 +494,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_library(
     name = "sample_halton_sequence",
-    srcs = ["sample_halton_sequence.py"],
+    srcs = ["sample_halton_sequence_lib.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,

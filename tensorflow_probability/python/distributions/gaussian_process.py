@@ -15,7 +15,6 @@
 """The GaussianProcess distribution class."""
 
 import functools
-import warnings
 
 # Dependency imports
 import numpy as np
@@ -48,18 +47,6 @@ __all__ = [
 ]
 
 JAX_MODE = False
-
-
-_ALWAYS_YIELD_MVN_DEPRECATION_WARNING = (
-    '`always_yield_multivariate_normal` is deprecated. This arg is now ignored'
-    'and will be removed after 2023-07-01. A `GaussianProcess` evaluated at a'
-    'single index point now always has event shape `[1]` (the previous behavior'
-    'for `always_yield_multivariate_normal=True`). To reproduce the previous '
-    'behavior of `always_yield_multivariate_normal=False`, squeeze the '
-    'rightmost singleton dimension from the output of `mean`, `sample`, etc.')
-
-
-_GET_MARGINAL_DISTRIBUTION_ALREADY_WARNED = False
 
 
 def make_cholesky_factored_marginal_fn(cholesky_fn):
@@ -258,10 +245,6 @@ class GaussianProcess(
       '2021-05-10',
       '`jitter` is deprecated; please use `marginal_fn` directly.',
       'jitter')
-  @deprecation.deprecated_args(
-      '2023-07-01',
-      _ALWAYS_YIELD_MVN_DEPRECATION_WARNING,
-      'always_yield_multivariate_normal')
   def __init__(self,
                kernel,
                index_points=None,
@@ -270,7 +253,6 @@ class GaussianProcess(
                marginal_fn=None,
                cholesky_fn=None,
                jitter=1e-6,
-               always_yield_multivariate_normal=None,
                validate_args=False,
                allow_nan_stats=False,
                parameters=None,
@@ -317,7 +299,6 @@ class GaussianProcess(
         `marginal_fn` and `cholesky_fn` is None.
         This argument is ignored if `cholesky_fn` is set.
         Default value: `1e-6`.
-      always_yield_multivariate_normal: Deprecated and ignored.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -395,7 +376,6 @@ class GaussianProcess(
       else:
         self._marginal_fn = marginal_fn
 
-      self._always_yield_multivariate_normal = always_yield_multivariate_normal
       with tf.name_scope('init'):
         super(GaussianProcess, self).__init__(
             dtype=dtype,
@@ -424,24 +404,6 @@ class GaussianProcess(
       marginal: a Normal distribution with vector event shape.
     """
     with self._name_and_control_scope('get_marginal_distribution'):
-      global _GET_MARGINAL_DISTRIBUTION_ALREADY_WARNED
-      if (not _GET_MARGINAL_DISTRIBUTION_ALREADY_WARNED and  # pylint: disable=protected-access
-          self._always_yield_multivariate_normal is not None):  # pylint: disable=protected-access
-        warnings.warn(
-            'The `always_yield_multivariate_normal` arg to '
-            '`GaussianProcess.__init__` is now ignored and '
-            '`get_marginal_distribution` always returns a Normal distribution'
-            'with vector event shape. This was the previous behavior of'
-            '`always_yield_multivariate_normal=True`. To recover the behavior'
-            'of `always_yield_multivariate_normal=False` when `index_points`'
-            'contains a single index point, build a scalar `Normal`'
-            'distribution as follows: '
-            '`mvn = get_marginal_distribution(index_points); `'
-            '`norm = tfd.Normal(mvn.loc[..., 0], scale=mvn.stddev()[..., 0])`'
-            '. To suppress these warnings, build the `GaussianProcess` with '
-            '`always_yield_multivariate_normal=True`.',
-            FutureWarning)
-        _GET_MARGINAL_DISTRIBUTION_ALREADY_WARNED = True  # pylint: disable=protected-access
       return self._get_marginal_distribution(index_points=index_points)
 
   def _get_marginal_distribution(self, index_points=None, is_missing=None):
@@ -770,8 +732,6 @@ class GaussianProcess(
         'cholesky_fn': self.cholesky_fn,
         'mean_fn': self.mean_fn,
         'jitter': self.jitter,
-        'always_yield_multivariate_normal':
-            self._always_yield_multivariate_normal,
         'validate_args': self.validate_args,
         'allow_nan_stats': self.allow_nan_stats
     }
