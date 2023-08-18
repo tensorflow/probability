@@ -69,19 +69,31 @@ class DampedSchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
                name='DampedSchurComplement'):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      if tf.nest.is_nested(schur_complement.feature_ndims):
+      kernel_dtype = schur_complement.dtype
+
+      # If the input dtype is non-nested float, we infer a single dtype for the
+      # input and the float parameters, which is also the dtype of the STP's
+      # samples, log_prob, etc. If the input dtype is nested (or not float), we
+      # do not use it to infer the STP's float dtype.
+      if (not tf.nest.is_nested(kernel_dtype) and
+          dtype_util.is_floating(kernel_dtype)):
         dtype = dtype_util.common_dtype(
-            [df, fixed_inputs_observations],
-            tf.float32)
-        kernel_dtype = schur_complement.dtype
-      else:
-        # If the index points are not nested, we assume they are of the same
-        # dtype as the STPRM.
-        dtype = dtype_util.common_dtype([
-            schur_complement,
-            fixed_inputs_observations,
-            df], tf.float32)
+            dict(
+                schur_complement=schur_complement,
+                fixed_inputs_observations=fixed_inputs_observations,
+                df=df,
+            ),
+            dtype_hint=tf.float32,
+        )
         kernel_dtype = dtype
+      else:
+        dtype = dtype_util.common_dtype(
+            dict(
+                fixed_inputs_observations=fixed_inputs_observations,
+                df=df,
+            ),
+            dtype_hint=tf.float32,
+        )
       self._schur_complement = schur_complement
       self._df = tensor_util.convert_nonref_to_tensor(
           df, name='df', dtype=dtype)

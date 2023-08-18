@@ -292,22 +292,40 @@ class MultiTaskGaussianProcessRegressionModel(
       if not isinstance(kernel, multitask_kernel.MultiTaskKernel):
         raise ValueError('`kernel` must be a `MultiTaskKernel`.')
 
-      if tf.nest.is_nested(kernel.feature_ndims):
-        input_dtype = dtype_util.common_dtype(
-            [kernel, index_points, observation_index_points],
-            dtype_hint=nest_util.broadcast_structure(
-                kernel.feature_ndims, tf.float32))
+      input_dtype = dtype_util.common_dtype(
+          dict(
+              kernel=kernel,
+              index_points=index_points,
+              observation_index_points=observation_index_points,
+          ),
+          dtype_hint=nest_util.broadcast_structure(
+              kernel.feature_ndims, tf.float32))
+
+      # If the input dtype is non-nested float, we infer a single dtype for the
+      # input and the float parameters, which is also the dtype of the MTGP's
+      # samples, log_prob, etc. If the input dtype is nested (or not float), we
+      # do not use it to infer the MTGP's float dtype.
+      if (not tf.nest.is_nested(input_dtype) and
+          dtype_util.is_floating(input_dtype)):
         dtype = dtype_util.common_dtype(
-            [observations, observation_noise_variance,
-             predictive_noise_variance], tf.float32)
-      else:
-        # If the index points are not nested, we assume they are of the same
-        # dtype as the kernel.
-        dtype = dtype_util.common_dtype([
-            kernel, index_points, observation_index_points, observations,
-            observation_noise_variance, predictive_noise_variance
-        ], tf.float32)
+            dict(
+                kernel=kernel,
+                index_points=index_points,
+                observations=observations,
+                observation_index_points=observation_index_points,
+                observation_noise_variance=observation_noise_variance,
+                predictive_noise_variance=predictive_noise_variance,
+            ),
+            dtype_hint=tf.float32,
+        )
         input_dtype = dtype
+      else:
+        dtype = dtype_util.common_dtype(
+            dict(
+                observations=observations,
+                observation_noise_variance=observation_noise_variance,
+                predictive_noise_variance=predictive_noise_variance,
+            ), dtype_hint=tf.float32)
 
       if index_points is not None:
         index_points = nest_util.convert_to_nested_tensor(

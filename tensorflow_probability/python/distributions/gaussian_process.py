@@ -319,28 +319,40 @@ class GaussianProcess(
     """
     parameters = dict(locals()) if parameters is None else parameters
     with tf.name_scope(name) as name:
-      if tf.nest.is_nested(kernel.feature_ndims):
-        input_dtype = dtype_util.common_dtype(
+      input_dtype = dtype_util.common_dtype(
+          dict(
+              kernel=kernel,
+              index_points=index_points,
+          ),
+          dtype_hint=nest_util.broadcast_structure(
+              kernel.feature_ndims, tf.float32
+          ),
+      )
+
+      # If the input dtype is non-nested float, we infer a single dtype for the
+      # input and the float parameters, which is also the dtype of the GP's
+      # samples, log_prob, etc. If the input dtype is nested (or not float), we
+      # do not use it to infer the GP's float dtype.
+      if (not tf.nest.is_nested(input_dtype) and
+          dtype_util.is_floating(input_dtype)):
+        dtype = dtype_util.common_dtype(
             dict(
                 kernel=kernel,
                 index_points=index_points,
+                observation_noise_variance=observation_noise_variance,
+                jitter=jitter,
             ),
-            dtype_hint=nest_util.broadcast_structure(
-                kernel.feature_ndims, tf.float32
-            ),
+            dtype_hint=tf.float32,
         )
-        dtype = dtype_util.common_dtype(
-            [observation_noise_variance, jitter], tf.float32)
-      else:
-        # If the index points are not nested, we assume they are of the same
-        # float dtype as the GP.
-        dtype = dtype_util.common_dtype(
-            {
-                'index_points': index_points,
-                'observation_noise_variance': observation_noise_variance,
-                'jitter': jitter
-            }, tf.float32)
         input_dtype = dtype
+      else:
+        dtype = dtype_util.common_dtype(
+            dict(
+                observation_noise_variance=observation_noise_variance,
+                jitter=jitter,
+            ),
+            dtype_hint=tf.float32,
+        )
 
       if index_points is not None:
         index_points = nest_util.convert_to_nested_tensor(
