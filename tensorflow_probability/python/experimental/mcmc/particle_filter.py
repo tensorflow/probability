@@ -24,7 +24,6 @@ from tensorflow_probability.python.internal import docstring_util
 from tensorflow_probability.python.internal import loop_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
-from tensorflow_probability.python.mcmc.internal.util import choose
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from tensorflow_probability.python.distributions import batch_reshape
 from tensorflow_probability.python.distributions import batch_broadcast
@@ -82,10 +81,10 @@ def where_fn(accept, a, b, num_outer_particles, num_inner_particles):
     # extra
     return a
   elif a.shape == num_outer_particles and b.shape == num_outer_particles:
-    return choose(accept, a, b)
+    return mcmc_util.choose(accept, a, b)
   elif a.shape == [num_outer_particles, num_inner_particles] and \
       b.shape == [num_outer_particles, num_inner_particles]:
-    return choose(accept, a, b)
+    return mcmc_util.choose(accept, a, b)
   elif a.shape == () and b.shape == ():
     return a
   else:
@@ -717,11 +716,11 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
           outside_parameters = tf.where(accept, outside_parameters, proposed_parameters)
           updated_log_weights = tf.where(accept, updated_log_weights, rej_params_log_weights)
 
-          inner_weighted_particles_particles = choose(accept,
+          inner_weighted_particles_particles = mcmc_util.choose(accept,
                                                       inner_weighted_particles.particles,
                                                       rej_inner_weighted_particles.particles
                                                       )
-          inner_weighted_particles_log_weights = choose(accept,
+          inner_weighted_particles_log_weights = mcmc_util.choose(accept,
                                                         inner_weighted_particles.log_weights,
                                                         rej_inner_weighted_particles.log_weights
                                                         )
@@ -1020,7 +1019,7 @@ def _particle_filter_propose_and_update_log_weights_fn(
         proposed_particles,
         log_weights
     ) = tf.nest.map_structure(
-        lambda r, p: choose(do_rejuvenation, r, p),
+        lambda r, p: mcmc_util.choose(do_rejuvenation, r, p),
         (rej_particles, rej_log_weights),
         (proposed_particles, log_weights))
 

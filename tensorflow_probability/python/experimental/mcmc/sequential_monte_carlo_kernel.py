@@ -20,8 +20,8 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.experimental.mcmc import weighted_resampling
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
-from tensorflow_probability.python.mcmc.internal.util import choose
 from tensorflow_probability.python.mcmc import kernel as kernel_base
+from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 __all__ = [
     'SequentialMonteCarlo',
@@ -51,8 +51,9 @@ class WeightedParticles(collections.namedtuple(
       conjunction with `particles` to compute expectations under the target
       distribution.
     extra: a (structure of) Tensor(s) each of shape
-      `concat([[num_particles, b1, ..., bN], event_shape])`, where `event_shape`
-      may differ across component `Tensor`s.
+      `concat([[b1, ..., bN], event_shape])`, where `event_shape`
+      may differ across component `Tensor`s. This represents global state of the
+      sampling process that is not associated with individual particles.
 
   In some contexts, particles may be stacked across multiple inference steps,
   in which case all `Tensor` shapes will be prefixed by an additional dimension
@@ -120,7 +121,7 @@ def _dummy_indices_like(indices):
 
 
 def log_ess_from_log_weights(log_weights, particles_dim=0):
-  """Computes log-ESS estimate from log-weights along axis=0."""
+  """Computes log-ESS estimate from log-weights along axis=particles_dim."""
   with tf.name_scope('ess_from_log_weights'):
     log_weights = tf.math.log_softmax(log_weights, axis=particles_dim)
     return -tf.math.reduce_logsumexp(2 * log_weights, axis=particles_dim)
@@ -144,10 +145,6 @@ def _default_extra_fn(step,
                   seed
                   ):
   return extra
-
-
-def identity(state, new_particles, new_indices, log_weights, extra, step):
-    return new_particles, new_indices, log_weights, extra
 
 
 class SequentialMonteCarlo(kernel_base.TransitionKernel):
@@ -335,7 +332,7 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
         (new_particles,
          new_indices,
          log_weights) = tf.nest.map_structure(
-            lambda r, p: choose(do_resample, r, p),
+            lambda r, p: mcmc_util.choose(do_resample, r, p),
             (new_particles, new_indices, new_weights),
             (state.particles, _dummy_indices_like(new_indices),
             normalized_log_weights))
