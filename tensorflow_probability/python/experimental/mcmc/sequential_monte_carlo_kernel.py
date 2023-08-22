@@ -136,17 +136,6 @@ def ess_below_threshold(weighted_particles, particles_dim=0, threshold=0.5):
                       ps.log(threshold)), axis=particles_dim)
 
 
-def _default_extra_fn(step,
-                  state,
-                  particles,
-                  indices,
-                  log_weights,
-                  extra,
-                  seed
-                  ):
-  return extra
-
-
 class SequentialMonteCarlo(kernel_base.TransitionKernel):
   """Sequential Monte Carlo transition kernel.
 
@@ -161,7 +150,6 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
                propose_and_update_log_weights_fn,
                resample_fn=weighted_resampling.resample_systematic,
                resample_criterion_fn=ess_below_threshold,
-               extra_fn=_default_extra_fn,
                particles_dim=0,
                unbiased_gradients=True,
                name=None):
@@ -220,7 +208,6 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
     self._propose_and_update_log_weights_fn = propose_and_update_log_weights_fn
     self._resample_fn = resample_fn
     self._resample_criterion_fn = resample_criterion_fn
-    self._extra_fn = extra_fn
     self._particles_dim = particles_dim
     self._unbiased_gradients = unbiased_gradients
     self._name = name or 'SequentialMonteCarlo'
@@ -240,10 +227,6 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
   @property
   def resample_criterion_fn(self):
     return self._resample_criterion_fn
-
-  @property
-  def extra_fn(self):
-    return self._extra_fn
 
   @property
   def unbiased_gradients(self):
@@ -337,19 +320,9 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
             (state.particles, _dummy_indices_like(new_indices),
             normalized_log_weights))
 
-        proposed_extra = self.extra_fn(
-            kernel_results.steps,
-            state,
-            new_particles,
-            new_indices,
-            log_weights,
-            state.extra,
-            seed=proposal_seed,
-        )
-
       return (WeightedParticles(particles=new_particles,
                                 log_weights=log_weights,
-                                extra=proposed_extra),
+                                extra=state.extra),
               SequentialMonteCarloResults(
                   steps=kernel_results.steps + 1,
                   parent_indices=new_indices,

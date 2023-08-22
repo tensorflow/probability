@@ -795,15 +795,8 @@ class _ParticleFilterTest(test_util.TestCase):
     self.assertAllEqual(ps.shape(lp), [6])
 
   def test_extra(self):
-    def step_hundred(step,
-                    state,
-                    particles,
-                    indices,
-                    log_weights,
-                    extra,
-                    seed
-                    ):
-      return step + 100
+    def step_hundred(step, state, seed):
+      return step * 2
 
     results = self.evaluate(
         particle_filter.particle_filter(
@@ -817,7 +810,7 @@ class _ParticleFilterTest(test_util.TestCase):
             seed=test_util.test_seed())
     )
 
-    self.assertAllEqual(results, [100, 101, 102, 103, 104])
+    self.assertAllEqual(results, [0, 0, 2, 4, 6])
 
 
 # TODO(b/186068104): add tests with dynamic shapes.

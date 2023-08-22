@@ -62,13 +62,9 @@ def _default_kernel(parameters):
 
 def _default_extra_fn(step,
                   state,
-                  particles,
-                  indices,
-                  log_weights,
-                  extra,
                   seed
                   ):
-  return extra
+  return state.extra
 
 
 def where_fn(accept, a, b, num_outer_particles, num_inner_particles):
@@ -333,7 +329,6 @@ def sequential_monte_carlo(loop_seed,
         resample_criterion_fn,
         unbiased_gradients,
         trace_fn,
-        extra_fn=_default_extra_fn,
         particles_dim=0,
         static_trace_allocation_size=None,
         never_trace=lambda *_: False,
@@ -392,8 +387,8 @@ def sequential_monte_carlo(loop_seed,
         resample_fn=resample_fn,
         resample_criterion_fn=resample_criterion_fn,
         particles_dim=particles_dim,
-        unbiased_gradients=unbiased_gradients,
-        extra_fn=extra_fn)
+        unbiased_gradients=unbiased_gradients
+    )
 
     # Use `trace_scan` rather than `sample_chain` directly because the latter
     # would force us to trace the state history (with or without thinning),
@@ -541,7 +536,8 @@ def smc_squared(
             inner_initial_state_prior=inner_initial_state_prior,
             inner_initial_state_proposal=inner_initial_state_proposal,
             num_inner_particles=num_inner_particles,
-            num_outer_particles=num_outer_particles
+            num_outer_particles=num_outer_particles,
+            extra_fn=extra_fn
         )
     )
 
@@ -558,8 +554,7 @@ def smc_squared(
         particles_dim=0,
         trace_fn=outer_trace_fn,
         loop_seed=loop_seed,
-        never_trace=never_trace,
-        extra_fn=extra_fn
+        never_trace=never_trace
     )
 
     return traced_results
@@ -582,7 +577,8 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
         unbiased_gradients,
         parameter_proposal_kernel,
         num_inner_particles,
-        num_outer_particles
+        num_outer_particles,
+        extra_fn
 ):
     """Build a function specifying a particle filter update step."""
     def _outer_propose_and_update_log_weights_fn(step, state, seed=None):
@@ -606,7 +602,10 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
                 rejuvenation_criterion_fn=inner_rejuvenation_criterion_fn,
                 rejuvenation_fn=inner_rejuvenation_fn,
                 particles_dim=1,
-                num_transitions_per_observation=num_transitions_per_observation))
+                num_transitions_per_observation=num_transitions_per_observation,
+                extra_fn=extra_fn
+            )
+        )
 
         kernel = smc_kernel.SequentialMonteCarlo(
             propose_and_update_log_weights_fn=inner_propose_and_update_log_weights_fn,
@@ -661,6 +660,7 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
                   observation_fn=inner_observation_fn(proposed_parameters),
                   rejuvenation_criterion_fn=inner_rejuvenation_criterion_fn,
                   rejuvenation_fn=inner_rejuvenation_fn,
+                  extra_fn=extra_fn,
                   particles_dim=1,
                   num_transitions_per_observation=num_transitions_per_observation))
 
@@ -744,7 +744,6 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
             lambda: (rejuvenate_particles(outside_parameters, updated_log_weights, inner_weighted_particles, filter_results)),
             lambda: (outside_parameters, updated_log_weights, inner_weighted_particles, filter_results)
         )
-
 
         return smc_kernel.WeightedParticles(
             particles=(outside_parameters,
@@ -862,7 +861,9 @@ def particle_filter(observations,
             particles_dim=particles_dim,
             rejuvenation_fn=rejuvenation_fn,
             rejuvenation_criterion_fn=rejuvenation_criterion_fn,
-            num_transitions_per_observation=num_transitions_per_observation))
+            num_transitions_per_observation=num_transitions_per_observation,
+            extra_fn=extra_fn
+        ))
 
     traced_results = sequential_monte_carlo(
         initial_weighted_particles=initial_weighted_particles,
@@ -877,8 +878,7 @@ def particle_filter(observations,
         particles_dim=particles_dim,
         trace_fn=trace_fn,
         loop_seed=loop_seed,
-        never_trace=never_trace,
-        extra_fn=extra_fn
+        never_trace=never_trace
     )
 
     return traced_results
@@ -967,6 +967,7 @@ def _particle_filter_propose_and_update_log_weights_fn(
     transition_fn,
     proposal_fn,
     observation_fn,
+    extra_fn,
     num_transitions_per_observation=1,
     rejuvenation_criterion_fn=None,
     rejuvenation_fn=_identity_rejuvenation,
@@ -1023,13 +1024,17 @@ def _particle_filter_propose_and_update_log_weights_fn(
         (rej_particles, rej_log_weights),
         (proposed_particles, log_weights))
 
+    updated_extra = extra_fn(step,
+                             state,
+                             seed)
+
     with tf.control_dependencies(assertions):
       return smc_kernel.WeightedParticles(
           particles=proposed_particles,
           log_weights=log_weights + _compute_observation_log_weights(
               step + 1, proposed_particles, observations, observation_fn,
               num_transitions_per_observation=num_transitions_per_observation),
-          extra=state.extra)
+          extra=updated_extra)
   return propose_and_update_log_weights_fn
 
 
