@@ -53,8 +53,9 @@ MODULE_MAPPINGS = {
 COMMENT_OUT = [
     'from tensorflow.python.util import dispatch',
     'from tensorflow.python.util.tf_export',
-    'from tensorflow.python.framework import ' +
-    'tensor_conversion',
+    'from tensorflow.python.framework import tensor\n',
+    'from tensorflow.python.framework import '
+    + 'tensor_conversion',
     'from tensorflow.python.framework import tensor_util',
     '@tf_export',
     '@dispatch',
@@ -195,6 +196,7 @@ def gen_module(module_name):
                 'np.issubdtype(\\1, np.complexfloating)', code)
   code = re.sub(r'([_a-zA-Z0-9.\[\]]+).is_integer',
                 'np.issubdtype(\\1, np.integer)', code)
+  code = code.replace('tensor.Tensor', 'np.ndarray')
 
   code = code.replace('array_ops.shape', 'prefer_static.shape')
   code = code.replace('array_ops.concat', 'prefer_static.concat')

@@ -535,12 +535,8 @@ py_library(
 )
 
 LINOP_FILES = [
-    "adjoint_registrations",
-    "cholesky_registrations",
-    "inverse_registrations",
     "linear_operator_addition",
     "linear_operator_adjoint",
-    "linear_operator_algebra",
     "linear_operator_block_diag",
     "linear_operator_block_lower_triangular",
     "linear_operator_circulant",
@@ -558,10 +554,8 @@ LINOP_FILES = [
     "linear_operator_toeplitz",
     "linear_operator_util",
     "linear_operator_zeros",
-    "matmul_registrations",
-    "registrations_util",
+    "property_hint_util",
     "slicing",
-    "solve_registrations",
 ]
 
 [genrule(
