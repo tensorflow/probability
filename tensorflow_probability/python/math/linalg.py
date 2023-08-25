@@ -477,7 +477,7 @@ def low_rank_cholesky(matrix, max_rank, trace_atol=0, trace_rtol=0, name=None):
           residual_diag, axis=-1, output_type=tf.int64)[..., tf.newaxis]
 
       # 2. Construct vector v that kills that diagonal entry and its row & col.
-      # v = residual_matrix[max_j, :] / sqrt(residual_matrix[max_j, maxj])
+      # v = residual_matrix[max_j, :] / sqrt(residual_matrix[max_j, max_j])
       maxval = tf.gather(
           residual_diag, max_j, axis=-1, batch_dims=batch_dims)[..., 0]
       normalizer = tf.sqrt(maxval)
@@ -494,6 +494,13 @@ def low_rank_cholesky(matrix, max_rank, trace_atol=0, trace_rtol=0, name=None):
       unnormalized_v = matrix_row - lr_lrt_row
       v = unnormalized_v / normalizer[..., tf.newaxis]
 
+      # Mask v so that it is zero in row/columns we've already zerod.
+      # We can use the sign of the residual_diag as the mask because the input
+      # matrix being positive definite implies that the diag starts off
+      # positive, and only becomes zero on the entries that we've chosen
+      # in previous iterations.
+      v = v * tf.math.sign(residual_diag)
+
       # 3. Add v to lr.
       # Conceptually the same as
       #   new_lr = lr
@@ -508,6 +515,16 @@ def low_rank_cholesky(matrix, max_rank, trace_atol=0, trace_rtol=0, name=None):
 
       # 4. Compute the new residual_diag = old_residual_diag - v * v
       new_residual_diag = residual_diag - v * v
+
+      # Explicitly set new_residual_diag[max_j] = 0 (both to guarantee we never
+      # choose its index again, and to let us use the tf.math.sign of the
+      # residual as a mask.)
+      n = new_residual_diag.shape[-1]
+      oh = tf.one_hot(
+          indices=max_j[..., 0], depth=n, on_value=0.0, off_value=1.0,
+          dtype=new_residual_diag.dtype
+      )
+      new_residual_diag = new_residual_diag * oh
 
       return i + 1, new_lr, new_residual_diag
 

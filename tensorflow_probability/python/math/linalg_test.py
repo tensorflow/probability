@@ -447,12 +447,7 @@ class _LowRankCholesky(test_util.TestCase):
         self.assertTrue(self.evaluate(tf.reduce_all(
             residual_trace < old_residual_trace)))
       old_residual_trace = residual_trace
-      # Compared to pivot_cholesky, low_rank_cholesky will sometimes have
-      # approximate zeros like 7e-17 or -2.6e-7 where it "should" have a
-      # real zero.
-      zeros_per_col = tf.math.count_nonzero(
-          tf.math.less(tf.math.abs(pchol), 1e-6),
-          axis=-2)
+      zeros_per_col = dim - tf.math.count_nonzero(pchol, axis=-2)
       mat = tf.matmul(pchol, pchol, transpose_b=True)
       pchol_shp, diag_diff, diff_norm, zeros_per_col = self.evaluate([
           tf.shape(pchol),
