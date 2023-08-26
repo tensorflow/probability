@@ -361,6 +361,9 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     struct = fun_mc.maybe_broadcast_structure([3, 4], [1, 2])
     self.assertEqual([3, 4], struct)
 
+    struct = fun_mc.maybe_broadcast_structure([1, 2], [[0, 0], [0, 0, 0]])
+    self.assertEqual([[1, 1], [2, 2, 2]], struct)
+
   def testCallPotentialFn(self):
 
     def potential(x):
