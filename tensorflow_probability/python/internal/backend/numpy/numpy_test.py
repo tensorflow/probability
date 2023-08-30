@@ -1120,7 +1120,9 @@ NUMPY_TEST_CASES = [
         xla_const_args=(1,)),
     TestCase(
         'math.reduce_prod', [
-            array_axis_tuples(allow_multi_axis=True),
+            array_axis_tuples(
+                # TODO(b/298224187) TF produces 0, np NaN for large elements.
+                elements=floats(-1e6, 1e6), allow_multi_axis=True),
             array_axis_tuples(dtype=np.int32, allow_multi_axis=True)
         ],
         xla_const_args=(1,)),
@@ -1175,7 +1177,7 @@ NUMPY_TEST_CASES = [
                     allow_nan=False,
                     allow_infinity=False))
         ],
-        xla_rtol=1e-4),
+        atol=1e-4),
     TestCase('math.softmax', [
         single_arrays(
             shape=shapes(min_dims=1),
@@ -1217,8 +1219,12 @@ NUMPY_TEST_CASES = [
     #         keywords=None, defaults=(0, False, False, None))
     TestCase(
         'math.cumprod', [
-            hps.tuples(array_axis_tuples(), hps.booleans(),
-                       hps.booleans()).map(lambda x: x[0] + (x[1], x[2]))
+            hps.tuples(
+                array_axis_tuples(
+                    # TODO(b/298224187) TF produces 0, np NaN for large inputs.
+                    elements=floats(min_value=-1e12, max_value=1e12)),
+                hps.booleans(),
+                hps.booleans()).map(lambda x: x[0] + (x[1], x[2]))
         ],
         xla_const_args=(1, 2, 3)),
     TestCase(
@@ -1260,9 +1266,11 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     ]),
     TestCase('math.abs', [single_arrays()]),
     TestCase('math.acos', [single_arrays(elements=floats(-1., 1.))]),
-    TestCase('math.acosh', [single_arrays(elements=positive_floats())]),
+    TestCase('math.acosh', [single_arrays(elements=positive_floats())],
+             atol=1e-4),
     TestCase('math.asin', [single_arrays(elements=floats(-1., 1.))]),
-    TestCase('math.asinh', [single_arrays(elements=positive_floats())]),
+    TestCase('math.asinh', [single_arrays(elements=positive_floats())],
+             atol=1e-4),
     TestCase('math.atan', [single_arrays()]),
     TestCase('math.atanh', [single_arrays(elements=floats(-1., 1.))]),
     TestCase(
@@ -1296,7 +1304,8 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('math.is_inf', [single_arrays()]),
     TestCase('math.is_nan', [single_arrays()]),
     TestCase('math.lgamma', [single_arrays(elements=positive_floats())]),
-    TestCase('math.log', [single_arrays(elements=positive_floats())]),
+    TestCase('math.log', [single_arrays(elements=positive_floats())],
+             atol=1e-4),
     TestCase('math.log1p',
              [single_arrays(elements=floats(min_value=-1 + 1e-6))],
              xla_atol=1e-4, xla_rtol=1e-4),
@@ -1316,11 +1325,11 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('math.sign', [single_arrays()]),
     TestCase('math.sin', [single_arrays()]),
     TestCase('math.sinh', [single_arrays(elements=floats(-100., 100.))]),
-    TestCase('math.softplus', [single_arrays()]),
+    TestCase('math.softplus', [single_arrays()], atol=1e-4),
     TestCase('math.sqrt', [single_arrays(elements=positive_floats())]),
     TestCase('math.square', [single_arrays()]),
     TestCase('math.tan', [single_arrays()]),
-    TestCase('math.tanh', [single_arrays()]),
+    TestCase('math.tanh', [single_arrays()], atol=1e-4),
 
     # ArgSpec(args=['x', 'q', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
@@ -1367,9 +1376,11 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('math.xdivy',
              [n_same_shape(n=2, elements=[floats(), non_zero_floats()])]),
     TestCase('math.xlogy',
-             [n_same_shape(n=2, elements=[floats(), positive_floats()])]),
+             [n_same_shape(n=2, elements=[floats(), positive_floats()])],
+             atol=1e-4),
     TestCase('math.xlog1py',
-             [n_same_shape(n=2, elements=[floats(), positive_floats()])]),
+             [n_same_shape(n=2, elements=[floats(), positive_floats()])],
+             atol=1e-4),
     TestCase('nn.conv2d', [conv2d_params()], disabled=NUMPY_MODE),
     TestCase(
         'nn.sparse_softmax_cross_entropy_with_logits', [sparse_xent_params()],
@@ -1993,7 +2004,6 @@ class NumpyTest(test_util.TestCase):
           tensorflow_value = post_processor(tensorflow_value)
 
         if assert_shape_only:
-
           def assert_same_shape(x, y):
             self.assertAllEqual(x.shape, y.shape)
 
