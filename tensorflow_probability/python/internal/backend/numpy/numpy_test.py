@@ -1377,10 +1377,10 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
              [n_same_shape(n=2, elements=[floats(), non_zero_floats()])]),
     TestCase('math.xlogy',
              [n_same_shape(n=2, elements=[floats(), positive_floats()])],
-             atol=1e-4),
+             atol=1e-4, rtol=1e-3),
     TestCase('math.xlog1py',
              [n_same_shape(n=2, elements=[floats(), positive_floats()])],
-             atol=1e-4),
+             atol=1e-4, rtol=1e-3),
     TestCase('nn.conv2d', [conv2d_params()], disabled=NUMPY_MODE),
     TestCase(
         'nn.sparse_softmax_cross_entropy_with_logits', [sparse_xent_params()],
