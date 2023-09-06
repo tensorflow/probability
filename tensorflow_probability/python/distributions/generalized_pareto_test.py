@@ -141,7 +141,7 @@ class GeneralizedParetoTest(test_util.TestCase):
 
     loc, scale, conc = self.evaluate([dist.loc, dist.scale, dist.concentration])
     hp.assume(abs(loc / scale) < 1e7)
-    hp.assume(abs(conc) > 1e-12)
+    hp.assume((abs(conc) > 1e-12) or (conc == 0.))
     expected_cdf = sp_stats.genpareto(conc, loc=loc, scale=scale).cdf(xs)
     actual_cdf = self.evaluate(cdf)
     msg = ('Location: {}, scale: {}, concentration: {}, xs: {} '
