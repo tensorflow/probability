@@ -31,7 +31,7 @@ __all__ = [
 
 # The maximum dimension we support. This is limited by the number of primes
 # in the _PRIMES array.
-_MAX_DIMENSION = 1000
+_MAX_DIMENSION = 10000
 
 
 def sample_halton_sequence(dim,
@@ -53,7 +53,7 @@ def sample_halton_sequence(dim,
 
   Computes the members of the low discrepancy Halton sequence in dimension
   `dim`. The `dim`-dimensional sequence takes values in the unit hypercube in
-  `dim` dimensions. Currently, only dimensions up to 1000 are supported. The
+  `dim` dimensions. Currently, only dimensions up to 10000 are supported. The
   prime base for the k-th axes is the k-th prime starting from 2. For example,
   if `dim` = 3, then the bases will be [2, 3, 5] respectively and the first
   element of the non-randomized sequence will be: [0.5, 0.333, 0.2]. For a more
@@ -121,7 +121,7 @@ def sample_halton_sequence(dim,
 
   Args:
     dim: Positive Python `int` representing each sample's `event_size.` Must
-      not be greater than 1000.
+      not be greater than 10000.
     num_results: (Optional) Positive scalar `Tensor` of dtype int32. The number
       of samples to generate. Either this parameter or sequence_indices must
       be specified but not both. If this parameter is None, then the behaviour
@@ -158,7 +158,7 @@ def sample_halton_sequence(dim,
 
   Raises:
     ValueError: if both `sequence_indices` and `num_results` were specified or
-      if dimension `dim` is less than 1 or greater than 1000.
+      if dimension `dim` is less than 1 or greater than 10000.
 
   #### References
 
@@ -379,7 +379,7 @@ def _primes_less_than(n):
     sieve[(k ** 2 + 4 * k - 2 * k * (i & 1)) // 3::2 * k] = False
   return np.r_[2, 3, 3 * np.nonzero(sieve)[0] + 1 | 1]
 
-_PRIMES = _primes_less_than(7919 + 1)
+_PRIMES = _primes_less_than(104729 + 1)
 
 
 assert len(_PRIMES) == _MAX_DIMENSION
