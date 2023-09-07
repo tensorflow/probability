@@ -613,48 +613,46 @@ class MultiTaskGaussianProcessRegressionModel(
       if _precomputed_divisor_matrix_cholesky is not None:
         observation_scale = _scale_from_precomputed(
             _precomputed_divisor_matrix_cholesky, kernel)
-      elif observations_is_missing is not None:
-        # If observations are missing, there's nothing we can do to preserve the
-        # operator structure, so densify.
-
-        observation_covariance = kernel.matrix_over_all_tasks(
-            observation_index_points, observation_index_points).to_dense()
-
-        if observation_noise_variance is not None:
-          broadcast_shape = distribution_util.get_broadcast_shape(
-              observation_covariance, observation_noise_variance[
-                  ..., tf.newaxis, tf.newaxis])
-          observation_covariance = tf.broadcast_to(observation_covariance,
-                                                   broadcast_shape)
-          observation_covariance = _add_diagonal_shift(
-              observation_covariance, observation_noise_variance)
-        vec_observations_is_missing = _vec(observations_is_missing)
-        observation_covariance = tf.linalg.LinearOperatorFullMatrix(
-            psd_kernels_util.mask_matrix(
-                observation_covariance,
-                is_missing=vec_observations_is_missing),
-            is_non_singular=True,
-            is_positive_definite=True)
-        observation_scale = cholesky_util.cholesky_from_fn(
-            observation_covariance, cholesky_fn)
+        solve_on_observations = _precomputed_solve_on_observation
       else:
-        observation_scale = mtgp._compute_flattened_scale(  # pylint:disable=protected-access
-            kernel=kernel,
-            index_points=observation_index_points,
-            cholesky_fn=cholesky_fn,
-            observation_noise_variance=observation_noise_variance)
+        # Note that the conditional mean is
+        # k(x, o) @ (k(o, o) + sigma**2)^-1 obs. We can precompute the latter
+        # term since it won't change per iteration.
+        vec_diff = _vec(observations - mean_fn(observation_index_points))
 
-      # Note that the conditional mean is
-      # k(x, o) @ (k(o, o) + sigma**2)^-1 obs. We can precompute the latter
-      # term since it won't change per iteration.
-      vec_diff = _vec(observations - mean_fn(observation_index_points))
+        if observations_is_missing is not None:
+          # If observations are missing, there's nothing we can do to preserve
+          # the operator structure, so densify.
+          vec_observations_is_missing = _vec(observations_is_missing)
+          vec_diff = tf.where(vec_observations_is_missing,
+                              tf.zeros([], dtype=vec_diff.dtype),
+                              vec_diff)
 
-      if observations_is_missing is not None:
-        vec_diff = tf.where(vec_observations_is_missing,
-                            tf.zeros([], dtype=vec_diff.dtype),
-                            vec_diff)
-      solve_on_observations = _precomputed_solve_on_observation
-      if solve_on_observations is None:
+          observation_covariance = kernel.matrix_over_all_tasks(
+              observation_index_points, observation_index_points).to_dense()
+
+          if observation_noise_variance is not None:
+            broadcast_shape = distribution_util.get_broadcast_shape(
+                observation_covariance, observation_noise_variance[
+                    ..., tf.newaxis, tf.newaxis])
+            observation_covariance = tf.broadcast_to(observation_covariance,
+                                                     broadcast_shape)
+            observation_covariance = _add_diagonal_shift(
+                observation_covariance, observation_noise_variance)
+          observation_covariance = tf.linalg.LinearOperatorFullMatrix(
+              psd_kernels_util.mask_matrix(
+                  observation_covariance,
+                  is_missing=vec_observations_is_missing),
+              is_non_singular=True,
+              is_positive_definite=True)
+          observation_scale = cholesky_util.cholesky_from_fn(
+              observation_covariance, cholesky_fn)
+        else:
+          observation_scale = mtgp._compute_flattened_scale(  # pylint:disable=protected-access
+              kernel=kernel,
+              index_points=observation_index_points,
+              cholesky_fn=cholesky_fn,
+              observation_noise_variance=observation_noise_variance)
         solve_on_observations = observation_scale.solvevec(
             observation_scale.solvevec(vec_diff), adjoint=True)
 
@@ -678,6 +676,7 @@ class MultiTaskGaussianProcessRegressionModel(
           observation_noise_variance=observation_noise_variance,
           predictive_noise_variance=predictive_noise_variance,
           cholesky_fn=cholesky_fn,
+          observations_is_missing=observations_is_missing,
           _flattened_conditional_mean_fn=flattened_conditional_mean_fn,
           _observation_scale=observation_scale,
           validate_args=validate_args,

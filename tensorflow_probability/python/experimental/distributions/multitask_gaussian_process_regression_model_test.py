@@ -474,16 +474,26 @@ class MultiTaskGaussianProcessRegressionModelTest(
     tf.function(jit_compile=True)(mtgprm.mean)()
     tf.function(jit_compile=True)(mtgprm.variance)()
 
-  def testMeanVarianceAndCovariancePrecomputed(self):
+  @parameterized.parameters(True, False)
+  def testMeanVarianceAndCovariancePrecomputed(self, has_missing_observations):
     num_tasks = 3
+    num_obs = 7
     amplitude = np.array([1., 2.], np.float64).reshape([2, 1])
     length_scale = np.array([.1, .2, .3], np.float64).reshape([1, 3])
     observation_noise_variance = np.array([1e-9], np.float64)
 
     observation_index_points = (
-        np.random.uniform(-1., 1., (1, 1, 7, 2)).astype(np.float64))
+        np.random.uniform(-1., 1., (1, 1, num_obs, 2)).astype(np.float64))
     observations = np.linspace(
-        -20., 20., 7 * num_tasks).reshape(7, num_tasks).astype(np.float64)
+        -20., 20., num_obs * num_tasks).reshape(
+            num_obs, num_tasks).astype(np.float64)
+
+    if has_missing_observations:
+      observations_is_missing = np.stack(
+          [np.random.randint(2, size=(num_obs,))] * num_tasks, axis=-1
+          ).astype(np.bool_)
+    else:
+      observations_is_missing = None
 
     index_points = np.random.uniform(-1., 1., (6, 2)).astype(np.float64)
 
@@ -497,6 +507,7 @@ class MultiTaskGaussianProcessRegressionModelTest(
         observation_index_points=observation_index_points,
         observations=observations,
         observation_noise_variance=observation_noise_variance,
+        observations_is_missing=observations_is_missing,
         validate_args=True)
 
     precomputed_mtgprm = mtgprm_lib.MultiTaskGaussianProcessRegressionModel.precompute_regression_model(
@@ -505,6 +516,7 @@ class MultiTaskGaussianProcessRegressionModelTest(
         observation_index_points=observation_index_points,
         observations=observations,
         observation_noise_variance=observation_noise_variance,
+        observations_is_missing=observations_is_missing,
         validate_args=True)
 
     mock_cholesky_fn = mock.Mock(return_value=None)
@@ -514,6 +526,7 @@ class MultiTaskGaussianProcessRegressionModelTest(
         observation_index_points=observation_index_points,
         observations=observations,
         observation_noise_variance=observation_noise_variance,
+        observations_is_missing=observations_is_missing,
         _precomputed_divisor_matrix_cholesky=precomputed_mtgprm._precomputed_divisor_matrix_cholesky,
         _precomputed_solve_on_observation=precomputed_mtgprm._precomputed_solve_on_observation,
         cholesky_fn=mock_cholesky_fn,
