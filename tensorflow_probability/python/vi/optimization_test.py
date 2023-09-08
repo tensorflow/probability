@@ -351,9 +351,14 @@ class StatelessOptimizationTests(test_util.TestCase):
       return
     import optax  # pylint: disable=g-import-not-at-top
 
+    def seeded_target_log_prob_fn(*xs, seed=None):
+      # Add a tiny amount of noise to the target log-prob to see if it works.
+      ret = pinned.unnormalized_log_prob(xs)
+      return ret + samplers.normal(ret.shape, stddev=0.01, seed=seed)
+
     [optimized_parameters,
      (losses, _, sample_path)] = optimization.fit_surrogate_posterior_stateless(
-         target_log_prob_fn=pinned.unnormalized_log_prob,
+         target_log_prob_fn=seeded_target_log_prob_fn,
          build_surrogate_posterior_fn=build_surrogate_posterior_fn,
          initial_parameters=initial_parameters,
          optimizer=optax.adam(learning_rate=0.1),
