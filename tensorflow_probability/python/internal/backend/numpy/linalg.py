@@ -65,7 +65,8 @@ try:
           'LinearOperatorScaledIdentity': ('multiplier',),
           'LinearOperatorInversion': ('operator',),
           'LinearOperatorKronecker': ('operators',),
-          'LinearOperatorLowRankUpdate': ('base_operator', 'diag_update'),
+          'LinearOperatorLowRankUpdate': (
+              'base_operator', 'diag_update', 'u', 'v'),
           'LinearOperatorLowerTriangular': ('tril',),
           'LinearOperatorPermutation': ('perm',),
           'LinearOperatorToeplitz': ('col', 'row'),
