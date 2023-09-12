@@ -3150,7 +3150,7 @@ multi_substrate_py_test(
     name = "gaussian_process_regression_model_test",
     srcs = ["gaussian_process_regression_model_test.py"],
     jax_size = "medium",
-    shard_count = 2,
+    shard_count = 4,
     deps = [
         ":gaussian_process",
         ":gaussian_process_regression_model",
