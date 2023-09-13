@@ -67,7 +67,6 @@ py_test(
     deps = [
         ":conv_variational",
         ":util",
-        # keras/testing_infra:test_utils dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:independent",
@@ -102,7 +101,6 @@ py_test(
     deps = [
         ":dense_variational",
         ":util",
-        # keras/testing_infra:test_utils dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:independent",
@@ -251,7 +249,6 @@ py_library(
         "util.py",
     ],
     deps = [
-        # keras dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:deterministic",
