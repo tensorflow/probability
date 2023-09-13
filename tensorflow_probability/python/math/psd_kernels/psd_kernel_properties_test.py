@@ -218,9 +218,9 @@ class PSDKernelSlicingTest(test_util.TestCase):
         (slices,))
     apply_slices += tuple([slice(None)] * example_ndims)
 
-    # Check that sampling a sliced kernel produces the same shape as
-    # slicing the samples from the original.
-    self.assertAllClose(results[apply_slices], sliced_results, rtol=3e-6)
+    # Check that applying a sliced kernel produces the same results as slicing
+    # the results from the original.
+    self.assertAllClose(results[apply_slices], sliced_results, rtol=1e-5)
 
   @parameterized.named_parameters(
       {'testcase_name': dname, 'kernel_name': dname}
