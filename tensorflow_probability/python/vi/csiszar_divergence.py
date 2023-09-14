@@ -60,8 +60,11 @@ __all__ = [
 def _call_fn_maybe_with_seed(fn, args, *, seed=None):
   try:
     return nest_util.call_fn(functools.partial(fn, seed=seed), args)
-  except:  # pylint: disable=bare-except
-    return nest_util.call_fn(fn, args)
+  except (TypeError, ValueError) as e:
+    if ("'seed'" in str(e) or ('one of *args or **kwargs' in str(e))):
+      return nest_util.call_fn(fn, args)
+    else:
+      raise e
 
 
 class GradientEstimators(enum.Enum):
