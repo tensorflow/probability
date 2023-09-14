@@ -36,7 +36,7 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math import linalg
 
-from tensorflow.python.ops import parallel_for  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.ops.parallel_for import control_flow_ops  # pylint: disable=g-direct-tensorflow-import
 
 tfl = tf.linalg
 
@@ -694,8 +694,8 @@ class LinearGaussianStateSpaceModel(
                                                 sample_shape=(),
                                                 pass_covariance=False):
     """Builds a dict of model parameters across all timesteps."""
-    kwargs = parallel_for.pfor(self._get_time_varying_kwargs,
-                               self.num_timesteps)
+    kwargs = control_flow_ops.pfor(self._get_time_varying_kwargs,
+                                   self.num_timesteps)
 
     # If given a sample shape, encode it as additional batch dimension(s).
     # It is sufficient to do this for one parameter (we use initial_mean),
@@ -1371,7 +1371,7 @@ class LinearGaussianStateSpaceModel(
             t=self.initial_step + t,
             latent_mean=tf.gather(latent_means, t),
             latent_cov=tf.gather(latent_covs, t))
-      observation_means, observation_covs = parallel_for.pfor(
+      observation_means, observation_covs = control_flow_ops.pfor(
           pfor_body, self._num_timesteps)
 
       observation_means = distribution_util.move_dimension(

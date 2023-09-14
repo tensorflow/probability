@@ -67,9 +67,10 @@ TF_REPLACEMENTS = {
         'from tensorflow_probability.python.internal.backend.numpy.private',
     'from tensorflow.python.ops.linalg':
         'from tensorflow_probability.python.internal.backend.numpy.gen',
-    'from tensorflow.python.ops import parallel_for':
+    ('from tensorflow.python.ops.parallel_for '
+     'import control_flow_ops'):
         'from tensorflow_probability.python.internal.backend.numpy '
-        'import functional_ops as parallel_for',
+        'import functional_ops as control_flow_ops',
     'from tensorflow.python.ops import control_flow_case':
         'from tensorflow_probability.python.internal.backend.numpy '
         'import control_flow as control_flow_case',

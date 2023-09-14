@@ -43,7 +43,7 @@ from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.internal.backend import numpy as nptf
 from tensorflow_probability.python.internal.backend.numpy import functional_ops as np_pfor
-from tensorflow.python.ops import parallel_for as tf_pfor  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.ops.parallel_for import control_flow_ops as tf_pfor_control_flow_ops  # pylint: disable=g-direct-tensorflow-import
 
 
 # Allows us to test low-level TF:XLA match.
@@ -1832,7 +1832,7 @@ class NumpyTest(test_util.TestCase):
 
   def test_pfor(self):
     self.assertAllEqual(
-        self.evaluate(tf_pfor.pfor(lambda x: tf.ones([]), 7)),
+        self.evaluate(tf_pfor_control_flow_ops.pfor(lambda x: tf.ones([]), 7)),
         np_pfor.pfor(lambda x: nptf.ones([]), 7))
 
   def test_pfor_with_closure(self):
@@ -1843,7 +1843,7 @@ class NumpyTest(test_util.TestCase):
     def np_fn(x):
       return nptf.gather(val, x)**2
     self.assertAllEqual(
-        self.evaluate(tf_pfor.pfor(tf_fn, 7)),
+        self.evaluate(tf_pfor_control_flow_ops.pfor(tf_fn, 7)),
         np_pfor.pfor(np_fn, 7))
 
   def test_pfor_with_closure_multi_out(self):
@@ -1854,7 +1854,7 @@ class NumpyTest(test_util.TestCase):
     def np_fn(x):
       return nptf.gather(val, x)**2, nptf.gather(val, x)
     self.assertAllEqual(
-        self.evaluate(tf_pfor.pfor(tf_fn, 7)),
+        self.evaluate(tf_pfor_control_flow_ops.pfor(tf_fn, 7)),
         np_pfor.pfor(np_fn, 7))
 
   def test_convert_variable_to_tensor(self):
