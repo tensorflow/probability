@@ -276,7 +276,7 @@ def _get_permutations(num_results, dims, seed=None):
   Args:
     num_results: A positive scalar `Tensor` of integral type. The number of
       draws from the discrete uniform distribution over the permutation groups.
-    dims: A 1D `Tensor` of the same dtype as `num_results`. The degree of the
+    dims: A 1D numpy array of the same dtype as `num_results`. The degree of the
       permutation groups from which to sample.
     seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
@@ -284,15 +284,20 @@ def _get_permutations(num_results, dims, seed=None):
     permutations: A `Tensor` of shape `[num_results, sum(dims)]` and the same
     dtype as `dims`.
   """
-  seeds = samplers.split_seed(seed, n=ps.size(dims))
-
-  def generate_one(dim, seed):
-    return tf.argsort(samplers.uniform(
-        [num_results, dim], seed=seed), axis=-1)
-
-  return tf.concat([generate_one(dim, seed)
-                    for dim, seed in zip(dims, tf.unstack(seeds))],
-                   axis=-1)
+  n = dims.size
+  max_size = np.max(dims)
+  samples = samplers.uniform([num_results, n, max_size], seed=seed)
+  should_mask = np.arange(max_size) >= dims[..., np.newaxis]
+  # Choose a number that does not affect the permutation and relative location.
+  samples = tf.where(
+      should_mask,
+      dtype_util.as_numpy_dtype(samples.dtype)(np.arange(max_size) + 10.),
+      samples)
+  samples = tf.argsort(samples, axis=-1)
+  # Generate the set of indices to gather.
+  should_mask = np.tile(should_mask, [num_results, 1, 1])
+  indices = np.stack(np.where(~should_mask), axis=-1)
+  return tf.gather_nd(samples, indices)
 
 
 def _get_indices(num_results, sequence_indices, dtype, name=None):
