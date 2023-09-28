@@ -120,6 +120,7 @@ from tensorflow_probability.python.distributions.relaxed_onehot_categorical impo
 from tensorflow_probability.python.distributions.sample import Sample
 from tensorflow_probability.python.distributions.sigmoid_beta import SigmoidBeta
 from tensorflow_probability.python.distributions.sinh_arcsinh import SinhArcsinh
+from tensorflow_probability.python.distributions.skew_generalized_normal import SkewGeneralizedNormal
 from tensorflow_probability.python.distributions.skellam import Skellam
 from tensorflow_probability.python.distributions.spherical_uniform import SphericalUniform
 from tensorflow_probability.python.distributions.stopping_ratio_logistic import StoppingRatioLogistic
@@ -163,9 +164,6 @@ import sys as _sys  # pylint: disable=g-import-not-at-top
 augment_kl_xent_docs(_sys.modules[__name__])
 del augment_kl_xent_docs
 del _sys
-
-# pylint: enable=unused-import,wildcard-import,g-importing-member,g-bad-import-order
-# pylint: enable=line-too-long
 
 __all__ = [
     'Autoregressive',
@@ -279,6 +277,7 @@ __all__ = [
     'Sample',
     'SigmoidBeta',
     'SinhArcsinh',
+    'SkewGeneralizedNormal',
     'Skellam',
     'SphericalUniform',
     'StoppingRatioLogistic',

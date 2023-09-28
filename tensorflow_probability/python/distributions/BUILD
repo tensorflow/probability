@@ -143,6 +143,7 @@ multi_substrate_py_library(
         ":sample",
         ":sigmoid_beta",
         ":sinh_arcsinh",
+        ":skew_generalized_normal",
         ":skellam",
         ":spherical_uniform",
         ":stopping_ratio_logistic",
@@ -2081,6 +2082,18 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "skew_generalized_normal",
+    srcs = ["skew_generalized_normal.py"],
+    deps = [
+        ":distribution",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:special_math",
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -4112,6 +4125,20 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math:gradient",
         "//tensorflow_probability/python/math:special",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "skew_generalized_normal_test",
+    size = "medium",
+    srcs = ["skew_generalized_normal_test.py"],
+    shard_count = 3,
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

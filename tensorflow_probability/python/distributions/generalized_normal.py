@@ -267,11 +267,11 @@ class GeneralizedNormal(distribution.AutoCompositeTensorDistribution):
       # `scale`, and `power` have incompatible shapes.
       try:
         self._batch_shape()
-      except ValueError:
+      except Exception as e:
         raise ValueError(
             'Arguments `loc`, `scale` and `power` must have compatible shapes; '
             'loc.shape={}, scale.shape={}, power.shape={}.'.format(
-                self.loc.shape, self.scale.shape, self.power.shape))
+                self.loc.shape, self.scale.shape, self.power.shape)) from e
       # We don't bother checking the shapes in the dynamic case because
       # all member functions access the three arguments anyway.
 
