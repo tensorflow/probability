@@ -70,7 +70,7 @@ setup(
     url='http://github.com/tensorflow/probability',
     license='Apache 2.0',
     packages=find_packages(),
-    python_requires='>=3.8',
+    python_requires='>=3.9',
     install_requires=REQUIRED_PACKAGES,
     # Add in any packaged data.
     include_package_data=True,
@@ -88,7 +88,6 @@ setup(
         'Intended Audience :: Science/Research',
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
