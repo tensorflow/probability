@@ -61,8 +61,11 @@ BfgsOptimizerResults = collections.namedtuple(
                                # `final_position`. If the search converged
                                # the max-norm of this tensor should be
                                # below the tolerance.
-        'inverse_hessian_estimate'  # A tensor containing the inverse of the
-                                    # estimated Hessian.
+        'inverse_hessian_estimate',  # A tensor containing the inverse of the
+                                     # estimated Hessian.
+        'scale_initial_inverse_hessian'  # Should the initial inverse Hessian
+                                         # be rescaled on the first iteration,
+                                         # as per Chapter 6 of Nocedal and Wright.
     ])
 
 
@@ -72,6 +75,7 @@ def minimize(value_and_gradients_function,
              x_tolerance=0,
              f_relative_tolerance=0,
              initial_inverse_hessian_estimate=None,
+             scale_initial_inverse_hessian=True,
              max_iterations=50,
              parallel_iterations=1,
              stopping_condition=None,
@@ -290,6 +294,7 @@ def minimize(value_and_gradients_function,
         tolerance,
         control_inputs)
     kwargs['inverse_hessian_estimate'] = initial_inv_hessian
+    kwargs['scale_initial_inverse_hessian'] = scale_initial_inverse_hessian
     initial_state = BfgsOptimizerResults(**kwargs)
     return tf.while_loop(
         cond=_cond,
@@ -355,9 +360,15 @@ def _update_inv_hessian(prev_state, next_state):
   # Rescale the initial hessian at the first step, as suggested
   # in Chapter 6 of Numerical Optimization, by Nocedal and Wright.
   scale_factor = tf.where(
-      tf.math.equal(prev_state.num_iterations, 0),
-      normalization_factor / tf.reduce_sum(
-          tf.math.square(gradient_delta), axis=-1), 1.)
+    (
+      tf.math.equal(prev_state.num_iterations, 0) &
+      prev_state.scale_initial_inverse_hessian
+    ),
+    normalization_factor / tf.reduce_sum(
+        tf.math.square(gradient_delta), axis=-1
+    ),
+    1.
+  )
 
   inverse_hessian_estimate = scale_factor[
       ..., tf.newaxis, tf.newaxis] * prev_state.inverse_hessian_estimate
