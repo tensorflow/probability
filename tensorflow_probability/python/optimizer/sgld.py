@@ -20,7 +20,6 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
-from tensorflow.python.training import training_ops
 
 
 __all__ = [
@@ -235,10 +234,10 @@ class StochasticGradientLangevinDynamics(tf.keras.optimizers.legacy.Optimizer):
   def _resource_apply_dense(self, grad, var):
     rms = self.get_slot(var, 'rms')
     new_grad = self._apply_noisy_update(rms, grad, var)
-    return training_ops.resource_apply_gradient_descent(
-        var.handle,
-        tf.cast(self._learning_rate_tensor, var.dtype.base_dtype),
-        new_grad,
+    return tf.raw_ops.ResourceApplyGradientDescent(
+        var=var.handle,
+        alpha=tf.cast(self._learning_rate_tensor, var.dtype.base_dtype),
+        delta=new_grad,
         use_locking=self._use_locking)
 
   def _resource_apply_sparse(self, grad, var, indices):
