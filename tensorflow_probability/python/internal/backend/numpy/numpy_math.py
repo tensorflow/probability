@@ -165,10 +165,15 @@ __all__ = [
 
 def _astuple(x):
   """Attempt to convert the given argument to be a Python tuple."""
-  try:
-    return (int(x),)
-  except TypeError:
-    pass
+  # Numpy used to allow casting a size-1 ndarray to python scalar literal types.
+  # In version 1.25 this was deprecated, causing a warning to be issued in the
+  # below try/except. To avoid that, we just fall through in the case of an
+  # np.ndarray.
+  if not isinstance(x, np.ndarray):
+    try:
+      return (int(x),)
+    except TypeError:
+      pass
 
   try:
     return tuple(x)
