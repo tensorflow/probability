@@ -21,7 +21,7 @@ import os
 
 from absl.testing import parameterized
 import jax
-from jax.config import config as jax_config
+from jax import config as jax_config
 import tensorflow.compat.v2 as real_tf
 
 from tensorflow_probability.python.internal import test_util as tfp_test_util

@@ -22,7 +22,7 @@ import os
 
 from absl.testing import parameterized
 import jax
-from jax.config import config as jax_config
+from jax import config as jax_config
 import numpy as np
 import scipy.stats
 import tensorflow.compat.v2 as real_tf

@@ -37,7 +37,7 @@ class RandomTest(test_util.TestCase):
     super().setUp()
 
     if JAX_MODE and FLAGS.test_tfp_jax_prng != 'default':
-      from jax.config import config  # pylint: disable=g-import-not-at-top
+      from jax import config  # pylint: disable=g-import-not-at-top
       config.update('jax_default_prng_impl', FLAGS.test_tfp_jax_prng)
 
   @test_util.substrate_disable_stateful_random_test

@@ -2021,7 +2021,7 @@ class _TestLoader(absltest.TestLoader):
 def main(jax_mode=JAX_MODE, jax_enable_x64=True):
   """Test main function that injects a custom loader."""
   if jax_mode and jax_enable_x64:
-    from jax.config import config  # pylint: disable=g-import-not-at-top
+    from jax import config  # pylint: disable=g-import-not-at-top
     config.update('jax_enable_x64', True)
 
   # This logic is borrowed from TensorFlow.
