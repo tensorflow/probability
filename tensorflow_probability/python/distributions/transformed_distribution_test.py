@@ -42,6 +42,7 @@ from tensorflow_probability.python.bijectors import softmax_centered
 from tensorflow_probability.python.bijectors import split
 from tensorflow_probability.python.bijectors import tanh
 from tensorflow_probability.python.distributions import beta
+from tensorflow_probability.python.distributions import dirichlet
 from tensorflow_probability.python.distributions import exponential
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import joint_distribution_auto_batched as jdab
@@ -54,6 +55,7 @@ from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.distributions import normal as normal_lib
 from tensorflow_probability.python.distributions import sample as sample_lib
 from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
@@ -649,6 +651,26 @@ class TransformedDistributionTest(test_util.TestCase):
     # self.assertAllClose(
     #     oracle_64, d0.log_prob(x0) - d1.log_prob(x1),
     #     rtol=0., atol=0.007)
+
+  @test_util.numpy_disable_test_missing_functionality('b/306384754')
+  def testLogProbMatchesProbDirichlet(self):
+    # This was https://github.com/tensorflow/probability/issues/1761
+    scaled_dir = transformed_distribution.TransformedDistribution(
+        distribution=dirichlet.Dirichlet([2.0, 3.0]),
+        bijector=scale_lib.Scale(2.0))
+    x = np.array([0.2, 1.8], dtype=np.float32)
+    self.assertAllClose(scaled_dir.prob(x),
+                        tf.exp(scaled_dir.log_prob(x)))
+
+  @test_util.numpy_disable_test_missing_functionality('b/306384754')
+  def testLogProbMatchesProbUniform(self):
+    # Uniform does not define _log_prob
+    scaled_uniform = transformed_distribution.TransformedDistribution(
+        distribution=uniform.Uniform(),
+        bijector=scale_lib.Scale(2.0))
+    x = np.array([0.2], dtype=np.float32)
+    self.assertAllClose(scaled_uniform.prob(x),
+                        tf.exp(scaled_uniform.log_prob(x)))
 
 
 @test_util.test_all_tf_execution_regimes

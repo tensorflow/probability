@@ -4540,6 +4540,7 @@ multi_substrate_py_test(
     tags = ["colab-smoke"],
     deps = [
         ":beta",
+        ":dirichlet",
         ":exponential",
         ":independent",
         ":joint_distribution_auto_batched",
@@ -4552,6 +4553,7 @@ multi_substrate_py_test(
         ":normal",
         ":sample",
         ":transformed_distribution",
+        ":uniform",
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
