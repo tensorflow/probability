@@ -1516,7 +1516,7 @@ class VariationalGaussianProcessEndToEnd(test_util.TestCase):
         super(KernelFn, self).__init__(**kwargs)
 
         self._amplitude = self.add_weight(
-            initializer=tf.initializers.constant(.54),
+            initializer=tf.keras.initializers.constant(.54),
             dtype=dtype,
             name='amplitude')
 
@@ -1533,7 +1533,7 @@ class VariationalGaussianProcessEndToEnd(test_util.TestCase):
     # Add a leading dimension for the event_shape.
     eyes = np.expand_dims(np.eye(num_inducing_points), 0)
     variational_inducing_observations_scale_initializer = (
-        tf.initializers.constant(1e-3 * eyes))
+        tf.keras.initializers.constant(1e-3 * eyes))
 
     model = tf.keras.Sequential([
         tf.keras.layers.InputLayer(input_shape=[1], dtype=dtype),
@@ -1543,7 +1543,7 @@ class VariationalGaussianProcessEndToEnd(test_util.TestCase):
             num_inducing_points=num_inducing_points,
             kernel_provider=KernelFn(dtype=dtype),
             inducing_index_points_initializer=(
-                tf.initializers.constant(
+                tf.keras.initializers.constant(
                     np.linspace(*x_range,
                                 num=num_inducing_points,
                                 dtype=dtype)[..., np.newaxis])),

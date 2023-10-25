@@ -58,9 +58,9 @@ def make_kernel_bias(
     kernel_shape: ...
     bias_shape: ...
     kernel_initializer: ...
-      Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
+      Default value: `None` (i.e., `tf.keras.initializers.glorot_uniform()`).
     bias_initializer: ...
-      Default value: `None` (i.e., `tf.initializers.zeros()`).
+      Default value: `None` (i.e., `tf.keras.initializers.zeros()`).
     kernel_batch_ndims: ...
       Default value: `0`.
     bias_batch_ndims: ...
@@ -79,13 +79,13 @@ def make_kernel_bias(
   #### Recommendations:
 
   ```python
-  #   tf.nn.relu    ==> tf.initializers.he_*
-  #   tf.nn.elu     ==> tf.initializers.he_*
-  #   tf.nn.selu    ==> tf.initializers.lecun_*
-  #   tf.nn.tanh    ==> tf.initializers.glorot_*
-  #   tf.nn.sigmoid ==> tf.initializers.glorot_*
-  #   tf.nn.softmax ==> tf.initializers.glorot_*
-  #   None          ==> tf.initializers.glorot_*
+  #   tf.nn.relu    ==> tf.keras.initializers.he_*
+  #   tf.nn.elu     ==> tf.keras.initializers.he_*
+  #   tf.nn.selu    ==> tf.keras.initializers.lecun_*
+  #   tf.nn.tanh    ==> tf.keras.initializers.glorot_*
+  #   tf.nn.sigmoid ==> tf.keras.initializers.glorot_*
+  #   tf.nn.softmax ==> tf.keras.initializers.glorot_*
+  #   None          ==> tf.keras.initializers.glorot_*
   # https://towardsdatascience.com/hyper-parameters-in-action-part-ii-weight-initializers-35aee1a28404
   # https://stats.stackexchange.com/a/393012/1835
 
@@ -112,7 +112,7 @@ def make_kernel_bias(
   if kernel_initializer is None:
     kernel_initializer = nn_init_lib.glorot_uniform()
   if bias_initializer is None:
-    bias_initializer = tf.initializers.zeros()
+    bias_initializer = tf.keras.initializers.zeros()
   return (
       tf.Variable(_try_call_init_fn(kernel_initializer,
                                     kernel_shape,
@@ -156,9 +156,9 @@ def make_kernel_bias_prior_spike_and_slab(
     kernel_shape: ...
     bias_shape: ...
     kernel_initializer: Ignored.
-      Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
+      Default value: `None` (i.e., `tf.keras.initializers.glorot_uniform()`).
     bias_initializer: Ignored.
-      Default value: `None` (i.e., `tf.initializers.zeros()`).
+      Default value: `None` (i.e., `tf.keras.initializers.zeros()`).
     kernel_batch_ndims: ...
       Default value: `0`.
     bias_batch_ndims: ...
@@ -200,9 +200,9 @@ def make_kernel_bias_posterior_mvn_diag(
     kernel_shape: ...
     bias_shape: ...
     kernel_initializer: ...
-      Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
+      Default value: `None` (i.e., `tf.keras.initializers.glorot_uniform()`).
     bias_initializer: ...
-      Default value: `None` (i.e., `tf.initializers.zeros()`).
+      Default value: `None` (i.e., `tf.keras.initializers.zeros()`).
     kernel_batch_ndims: ...
       Default value: `0`.
     bias_batch_ndims: ...
@@ -220,7 +220,7 @@ def make_kernel_bias_posterior_mvn_diag(
   if kernel_initializer is None:
     kernel_initializer = nn_init_lib.glorot_uniform()
   if bias_initializer is None:
-    bias_initializer = tf.initializers.zeros()
+    bias_initializer = tf.keras.initializers.zeros()
   make_loc = lambda init_fn, shape, batch_ndims, name: tf.Variable(  # pylint: disable=g-long-lambda
       _try_call_init_fn(init_fn, shape, dtype, batch_ndims),
       name=name + '_loc')

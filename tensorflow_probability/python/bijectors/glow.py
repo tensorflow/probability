@@ -859,15 +859,15 @@ class GlowDefaultNetwork(tfk.Sequential):
     conv_last = functools.partial(
         tfkl.Conv2D,
         padding='same',
-        kernel_initializer=tf.initializers.zeros(),
-        bias_initializer=tf.initializers.zeros())
+        kernel_initializer=tf.keras.initializers.zeros(),
+        bias_initializer=tf.keras.initializers.zeros())
     super(GlowDefaultNetwork, self).__init__([
         tfkl.Input(shape=input_shape),
         tfkl.Conv2D(num_hidden, kernel_shape, padding='same',
-                    kernel_initializer=tf.initializers.he_normal(),
+                    kernel_initializer=tf.keras.initializers.he_normal(),
                     activation='relu'),
         tfkl.Conv2D(num_hidden, 1, padding='same',
-                    kernel_initializer=tf.initializers.he_normal(),
+                    kernel_initializer=tf.keras.initializers.he_normal(),
                     activation='relu'),
         conv_last(this_nchan, kernel_shape)
     ])
@@ -886,8 +886,8 @@ class GlowDefaultExitNetwork(tfk.Sequential):
     conv = functools.partial(
         tfkl.Conv2D,
         padding='same',
-        kernel_initializer=tf.initializers.zeros(),
-        bias_initializer=tf.initializers.zeros())
+        kernel_initializer=tf.keras.initializers.zeros(),
+        bias_initializer=tf.keras.initializers.zeros())
 
     super(GlowDefaultExitNetwork, self).__init__([
         tfkl.Input(input_shape),

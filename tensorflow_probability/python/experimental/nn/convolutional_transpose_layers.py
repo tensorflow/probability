@@ -91,7 +91,7 @@ class ConvolutionTranspose(layers_lib.KernelBiasLayer):
       method='auto',
       # Weights
       kernel_initializer=None,  # tfp.nn.initializers.glorot_uniform()
-      bias_initializer=None,    # tf.initializers.zeros()
+      bias_initializer=None,    # tf.keras.initializers.zeros()
       make_kernel_bias_fn=kernel_bias_lib.make_kernel_bias,
       dtype=tf.float32,
       index_dtype=tf.int32,
@@ -156,7 +156,7 @@ class ConvolutionTranspose(layers_lib.KernelBiasLayer):
         Default value: `None` (i.e.,
         `tfp.experimental.nn.initializers.glorot_uniform()`).
       bias_initializer: ...
-        Default value: `None` (i.e., `tf.initializers.zeros()`).
+        Default value: `None` (i.e., `tf.keras.initializers.zeros()`).
       make_kernel_bias_fn: ...
         Default value: `tfp.experimental.nn.util.make_kernel_bias`.
       dtype: ...
@@ -278,7 +278,7 @@ class ConvolutionTransposeVariationalReparameterization(
       padding='same',
       filter_shape=5,
       # Use `he_uniform` because we'll use the `relu` family.
-      kernel_initializer=tf.initializers.he_uniform())
+      kernel_initializer=tf.keras.initializers.he_uniform())
 
   BayesDeconv2D = functools.partial(
       tfn.ConvolutionTransposeVariationalReparameterization,
@@ -286,7 +286,7 @@ class ConvolutionTransposeVariationalReparameterization(
       padding='same',
       filter_shape=5,
       # Use `he_uniform` because we'll use the `relu` family.
-      kernel_initializer=tf.initializers.he_uniform())
+      kernel_initializer=tf.keras.initializers.he_uniform())
 
   scale = tfp.util.TransformedVariable(1., tfb.Softplus())
   bnn = tfn.Sequential([
@@ -351,7 +351,7 @@ class ConvolutionTransposeVariationalReparameterization(
       method='auto',
       # Weights
       kernel_initializer=None,  # tfp.nn.initializers.glorot_uniform()
-      bias_initializer=None,    # tf.initializers.zeros()
+      bias_initializer=None,    # tf.keras.initializers.zeros()
       make_posterior_fn=kernel_bias_lib.make_kernel_bias_posterior_mvn_diag,
       make_prior_fn=kernel_bias_lib.make_kernel_bias_prior_spike_and_slab,
       posterior_value_fn=tfd.Distribution.sample,
@@ -420,7 +420,7 @@ class ConvolutionTransposeVariationalReparameterization(
         Default value: `None` (i.e.,
         `tfp.experimental.nn.initializers.glorot_uniform()`).
       bias_initializer: ...
-        Default value: `None` (i.e., `tf.initializers.zeros()`).
+        Default value: `None` (i.e., `tf.keras.initializers.zeros()`).
       make_posterior_fn: ...
         Default value:
           `tfp.experimental.nn.util.make_kernel_bias_posterior_mvn_diag`.
@@ -527,14 +527,14 @@ class ConvolutionTransposeVariationalFlipout(
       padding='same',
       filter_shape=5,
       # Use `he_uniform` because we'll use the `relu` family.
-      kernel_initializer=tf.initializers.he_uniform())
+      kernel_initializer=tf.keras.initializers.he_uniform())
   BayesDeconv2D = functools.partial(
       tfn.ConvolutionTransposeVariationalFlipout,
       rank=2,
       padding='same',
       filter_shape=5,
       # Use `he_uniform` because we'll use the `relu` family.
-      kernel_initializer=tf.initializers.he_uniform())
+      kernel_initializer=tf.keras.initializers.he_uniform())
   ```
 
   This example uses reparameterization gradients to minimize the
@@ -567,7 +567,7 @@ class ConvolutionTransposeVariationalFlipout(
       method='auto',
       # Weights
       kernel_initializer=None,  # tfp.nn.initializers.glorot_uniform()
-      bias_initializer=None,    # tf.initializers.zeros()
+      bias_initializer=None,    # tf.keras.initializers.zeros()
       make_posterior_fn=kernel_bias_lib.make_kernel_bias_posterior_mvn_diag,
       make_prior_fn=kernel_bias_lib.make_kernel_bias_prior_spike_and_slab,
       posterior_value_fn=tfd.Distribution.sample,
@@ -636,7 +636,7 @@ class ConvolutionTransposeVariationalFlipout(
         Default value: `None` (i.e.,
         `tfp.experimental.nn.initializers.glorot_uniform()`).
       bias_initializer: ...
-        Default value: `None` (i.e., `tf.initializers.zeros()`).
+        Default value: `None` (i.e., `tf.keras.initializers.zeros()`).
       make_posterior_fn: ...
         Default value:
           `tfp.experimental.nn.util.make_kernel_bias_posterior_mvn_diag`.

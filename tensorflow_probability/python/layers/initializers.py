@@ -103,7 +103,7 @@ class BlockwiseInitializer(tf.keras.initializers.Initializer):
     """Returns initializer configuration as a JSON-serializable dict."""
     return {
         'initializers': [
-            tf.initializers.serialize(
+            tf.keras.initializers.serialize(
                 tf.keras.initializers.get(init))
             for init in self.initializers
         ],
@@ -115,7 +115,7 @@ class BlockwiseInitializer(tf.keras.initializers.Initializer):
   def from_config(cls, config):
     """Instantiates an initializer from a configuration dictionary."""
     return cls(**{
-        'initializers': [tf.initializers.deserialize(init)
+        'initializers': [tf.keras.initializers.deserialize(init)
                          for init in config.get('initializers', [])],
         'sizes': config.get('sizes', []),
         'validate_args': config.get('validate_args', False),

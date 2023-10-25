@@ -1782,7 +1782,7 @@ class VariationalGaussianProcess(DistributionLambda):
       event_shape=(1,),
       inducing_index_points_initializer=None,
       unconstrained_observation_noise_variance_initializer=(
-          tf.initializers.constant(-10.)),
+          tf.keras.initializers.constant(-10.)),
       variational_inducing_observations_scale_initializer=None,
       mean_fn=None,
       jitter=1e-6,
@@ -1869,7 +1869,7 @@ class VariationalGaussianProcess(DistributionLambda):
 
     if self._mean_fn is None:
       self.mean = self.add_weight(
-          initializer=tf.initializers.constant([0.]),
+          initializer=tf.keras.initializers.constant([0.]),
           dtype=self._dtype,
           name='mean')
       self._mean_fn = lambda x: self.mean
@@ -1896,14 +1896,14 @@ class VariationalGaussianProcess(DistributionLambda):
     self._variational_inducing_observations_loc = self.add_weight(
         name='variational_inducing_observations_loc',
         shape=self._event_shape.as_list() + [self._num_inducing_points],
-        initializer=tf.initializers.zeros(),
+        initializer=tf.keras.initializers.zeros(),
         dtype=self._dtype)
 
     if self._variational_inducing_observations_scale_initializer is None:
       eyes = (np.ones(self._event_shape.as_list() + [1, 1]) *
               np.eye(self._num_inducing_points, dtype=self._dtype))
       self._variational_inducing_observations_scale_initializer = (
-          tf.initializers.constant(1e-5 * eyes))
+          tf.keras.initializers.constant(1e-5 * eyes))
     self._variational_inducing_observations_scale = self.add_weight(
         name='variational_inducing_observations_scale',
         shape=(self._event_shape.as_list() +

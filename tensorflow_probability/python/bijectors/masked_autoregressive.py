@@ -1355,8 +1355,8 @@ def _make_masked_initializer(mask, initializer):
   initializer = tf.keras.initializers.get(initializer)
   def masked_initializer(shape, dtype=None, partition_info=None):
     # If no `partition_info` is given, then don't pass it to `initializer`, as
-    # `initializer` may be a `tf.initializers.Initializer` (which don't accept a
-    # `partition_info` argument).
+    # `initializer` may be a `tf.keras.initializers.Initializer` (which don't
+    # accept a `partition_info` argument).
     if partition_info is None:
       x = initializer(shape, dtype)
     else:

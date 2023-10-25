@@ -34,9 +34,9 @@ class BlockwiseInitializerTest(test_util.TestCase):
     self.assertAllEqual(np.zeros([2, 1, 4]), x_[..., 3:])
 
   def test_de_serialization(self):
-    s = tf.initializers.serialize(
+    s = tf.keras.initializers.serialize(
         initializers.BlockwiseInitializer(['glorot_uniform', 'zeros'], [3, 4]))
-    init_clone = tf.initializers.deserialize(s)
+    init_clone = tf.keras.initializers.deserialize(s)
     x = init_clone([2, 1, 7])
     self.assertEqual((2, 1, 7), x.shape)
     x_ = self.evaluate(x)
