@@ -131,7 +131,7 @@ class _SurrogatePosterior(object):
         lambda rate, concentration: model.log_prob((rate, concentration, y)),
         surrogate_posterior,
         num_steps=5,  # Don't optimize to completion.
-        optimizer=tf.optimizers.Adam(0.1),
+        optimizer=tf.keras.optimizers.Adam(0.1),
         sample_size=10)
 
     # Compute posterior statistics.

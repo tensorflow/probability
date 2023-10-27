@@ -44,7 +44,7 @@ class SuccessiveGradientsAreUncorrelatedTests(test_util.TestCase):
     trained_dist = normal.Normal(locs, scales)
     target_dist = normal.Normal(loc=-0.4, scale=1.2)
 
-    optimizer = tf.optimizers.Adam(learning_rate=0.1)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.1)
     @tf.function(autograph=False)
     def optimization_step():
       with tf.GradientTape() as tape:

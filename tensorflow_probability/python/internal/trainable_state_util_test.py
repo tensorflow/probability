@@ -347,7 +347,7 @@ class TestWrapGeneratorAsStateful(test_util.TestCase):
     trainable_dist = build_trainable_normal(
         shape=[],
         seed=test_util.test_seed(sampler_type='stateless'))
-    optimizer = tf.optimizers.Adam(1.0)
+    optimizer = tf.keras.optimizers.Adam(1.0)
     # Find the maximum likelihood distribution given observed data.
     x_observed = [3., -2., 1.7]
     losses = minimize(

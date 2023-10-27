@@ -226,7 +226,7 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
 
   tp = tfd.StudentTProcess(3., kernel, observed_index_points)
 
-  optimizer = tf.optimizers.Adam()
+  optimizer = tf.keras.optimizers.Adam()
 
   @tf.function
   def optimize():

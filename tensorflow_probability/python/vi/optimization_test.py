@@ -79,7 +79,7 @@ class OptimizationTests(test_util.TestCase):
         q,
         num_steps=1000,
         sample_size=10,
-        optimizer=tf.optimizers.Adam(0.1),
+        optimizer=tf.keras.optimizers.Adam(0.1),
         seed=seed)
     self.evaluate(tf1.global_variables_initializer())
     with tf.control_dependencies([loss_curve]):
@@ -112,7 +112,7 @@ class OptimizationTests(test_util.TestCase):
         conditioned_log_prob,
         surrogate_posterior=q_z,
         importance_sample_size=10,
-        optimizer=tf.optimizers.Adam(learning_rate=0.1),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=0.1),
         num_steps=100,
         seed=opt_seed)
     self.evaluate(tf1.global_variables_initializer())
@@ -140,7 +140,7 @@ class OptimizationTests(test_util.TestCase):
         conditioned_log_prob,
         surrogate_posterior=q_z_again,
         importance_sample_size=10,
-        optimizer=tf.optimizers.Adam(learning_rate=0.1),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=0.1),
         num_steps=100,
         seed=opt_seed)
     self.evaluate(tf1.global_variables_initializer())
@@ -172,7 +172,7 @@ class OptimizationTests(test_util.TestCase):
         q,
         num_steps=1000,
         sample_size=100,
-        optimizer=tf.optimizers.Adam(learning_rate=0.1),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=0.1),
         seed=seed)
     self.evaluate(tf1.global_variables_initializer())
     loss_curve_ = self.evaluate((loss_curve))
@@ -230,7 +230,7 @@ class OptimizationTests(test_util.TestCase):
     losses, sample_path = optimization.fit_surrogate_posterior(
         target_log_prob_fn=lambda *args: model.log_prob(args),
         surrogate_posterior=q,
-        optimizer=tf.optimizers.Adam(learning_rate=0.1),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=0.1),
         num_steps=100,
         seed=test_util.test_seed(),
         sample_size=1,

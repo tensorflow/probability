@@ -198,7 +198,7 @@ class TestStatefulMakeTrainable(test_util.TestCase):
         normal.Normal, seed=test_util.test_seed(sampler_type='stateless'))
     losses = minimize(
         lambda: -model.log_prob(samples),
-        optimizer=tf.optimizers.Adam(0.1),
+        optimizer=tf.keras.optimizers.Adam(0.1),
         num_steps=200)
     self.evaluate(tf1.global_variables_initializer())
     self.evaluate(losses)

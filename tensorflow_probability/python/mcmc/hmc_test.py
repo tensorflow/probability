@@ -997,7 +997,7 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
     sigma = deferred_tensor.TransformedVariable(
         name='sigma', initial_value=np.array(1, dtype), bijector=exp.Exp())
 
-    optimizer = tf.optimizers.SGD(learning_rate=0.01)
+    optimizer = tf.keras.optimizers.SGD(learning_rate=0.01)
 
     # TODO(b/144045420): eliminate the need for this tf.function decorator. The
     # reason it was added was that the test code is written to work in both

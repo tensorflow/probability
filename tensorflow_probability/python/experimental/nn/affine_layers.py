@@ -206,7 +206,7 @@ class AffineVariationalReparameterization(
     kl = bnn.extra_loss / tf.cast(train_size, tf.float32)
     loss = nll + kl
     return loss, (nll, kl)
-  opt = tf.optimizers.Adam()
+  opt = tf.keras.optimizers.Adam()
   fit_op = tfn.util.make_fit_op(loss_fn, opt, bnn.trainable_variables)
   for _ in range(200):
     loss, (nll, kl), g = fit_op()

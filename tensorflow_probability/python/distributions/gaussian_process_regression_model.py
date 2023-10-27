@@ -190,7 +190,7 @@ class GaussianProcessRegressionModel(
       index_points=observation_index_points,
       observation_noise_variance=observation_noise_variance)
 
-  optimizer = tf.optimizers.Adam(learning_rate=.05, beta_1=.5, beta_2=.99)
+  optimizer = tf.keras.optimizers.Adam(learning_rate=.05, beta_1=.5, beta_2=.99)
 
   @tf.function
   def optimize():

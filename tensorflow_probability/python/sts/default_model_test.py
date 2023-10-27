@@ -111,7 +111,7 @@ class DefaultModelTests(test_util.TestCase):
     _ = optimization.fit_surrogate_posterior(
         target_log_prob_fn=model.joint_distribution(series).log_prob,
         surrogate_posterior=surrogate_posterior,
-        optimizer=tf.optimizers.Adam(0.1),
+        optimizer=tf.keras.optimizers.Adam(0.1),
         num_steps=1000,
         convergence_criterion=(successive_gradients_are_uncorrelated
                                .SuccessiveGradientsAreUncorrelated(

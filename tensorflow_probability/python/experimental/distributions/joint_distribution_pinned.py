@@ -246,7 +246,7 @@ class JointDistributionPinned(object):
       pulled_back_shape)
   vars = tf.nest.map_structure(tf.Variable, uniform_init)
 
-  opt = tf.optimizers.Adam(.01)
+  opt = tf.keras.optimizers.Adam(.01)
 
   @tf.function(autograph=False)
   def one_step():

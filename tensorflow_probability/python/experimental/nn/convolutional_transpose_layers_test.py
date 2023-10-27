@@ -78,7 +78,7 @@ class BnnEndToEnd(object):
       kl = tfn.losses.compute_extra_loss(bnn) / tf.cast(train_size, tf.float32)
       loss = nll + kl
       return loss, (nll, kl)
-    opt = tf.optimizers.Adam()
+    opt = tf.keras.optimizers.Adam()
     fit_op = tfn.util.make_fit_op(loss_fn, opt, bnn.trainable_variables)
     for _ in range(2):
       loss, (nll, kl) = fit_op()  # pylint: disable=unused-variable

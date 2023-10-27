@@ -664,7 +664,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
   log_prob_ = distribution.log_prob(x_)
   model = tfk.Model(x_, log_prob_)
 
-  model.compile(optimizer=tf.optimizers.Adam(),
+  model.compile(optimizer=tf.keras.optimizers.Adam(),
                 loss=lambda _, log_prob: -log_prob)
 
   batch_size = 25
@@ -718,7 +718,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
     x_, bijector_kwargs={'conditional_input': c_})
   model = tfk.Model([x_, c_], log_prob_)
 
-  model.compile(optimizer=tf.optimizers.Adam(learning_rate=0.1),
+  model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.1),
                 loss=lambda _, log_prob: -log_prob)
 
   batch_size = 25
@@ -780,7 +780,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
       log_prob_ = distribution.log_prob(x_)
       model = tfk.Model(x_, log_prob_)
 
-      model.compile(optimizer=tf.optimizers.Adam(),
+      model.compile(optimizer=tf.keras.optimizers.Adam(),
                     loss=lambda _, log_prob: -log_prob)
 
       batch_size = 10
@@ -838,7 +838,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
       log_prob_ = distribution.log_prob(x_)
       model = tfk.Model(x_, log_prob_)
 
-      model.compile(optimizer=tf.optimizers.Adam(),
+      model.compile(optimizer=tf.keras.optimizers.Adam(),
                     loss=lambda _, log_prob: -log_prob)
 
       batch_size = 10

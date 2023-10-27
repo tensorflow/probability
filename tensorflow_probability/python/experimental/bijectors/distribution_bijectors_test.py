@@ -205,7 +205,7 @@ class DistributionBijectorsTest(test_util.TestCase):
     optimization.fit_surrogate_posterior(
         pinned_model.unnormalized_log_prob,
         surrogate_posterior=surrogate_posterior,
-        optimizer=tf.optimizers.Adam(0.01),
+        optimizer=tf.keras.optimizers.Adam(0.01),
         sample_size=10,
         num_steps=1)
     bijector = (

@@ -107,7 +107,7 @@ def make_distribution_bijector(distribution, name='make_distribution_bijector'):
     pinned_model)
   _ = tfp.vi.fit_surrogate_posterior(pinned_model.unnormalized_log_prob,
                                      surrogate_posterior=surrogate_posterior,
-                                     optimizer=tf.optimizers.Adam(0.01),
+                                     optimizer=tf.keras.optimizers.Adam(0.01),
                                      num_steps=200)
   ```
 

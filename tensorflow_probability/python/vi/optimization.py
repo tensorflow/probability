@@ -442,8 +442,8 @@ def fit_surrogate_posterior(target_log_prob_fn,
       transformations of unconstrained variables, so that the transformations
       execute at runtime instead of at distribution creation.
     optimizer: Optimizer instance to use. This may be a TF1-style
-      `tf.train.Optimizer`, TF2-style `tf.optimizers.Optimizer`, or any Python
-      object that implements `optimizer.apply_gradients(grads_and_vars)`.
+      `tf.train.Optimizer`, TF2-style `tf.keras.optimizers.Optimizer`, or any
+      Python object that implements `optimizer.apply_gradients(grads_and_vars)`.
     num_steps: Python `int` number of steps to run the optimizer.
     convergence_criterion: Optional instance of
       `tfp.optimizer.convergence_criteria.ConvergenceCriterion`
@@ -522,7 +522,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
   losses = tfp.vi.fit_surrogate_posterior(
       conditioned_log_prob,
       surrogate_posterior=q_z,
-      optimizer=tf.optimizers.Adam(learning_rate=0.1),
+      optimizer=tf.keras.optimizers.Adam(learning_rate=0.1),
       num_steps=100)
   print(q_z.mean(), q_z.stddev())  # => approximately [2.5, 1/sqrt(2)]
   ```
@@ -535,7 +535,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
     losses = tfp.vi.fit_surrogate_posterior(
         conditioned_log_prob,
         surrogate_posterior=q_z,
-        optimizer=tf.optimizers.Adam(learning_rate=0.1),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=0.1),
         num_steps=100,
         discrepancy_fn=tfp.vi.kl_forward)
   ```
@@ -589,7 +589,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
         conditioned_log_prob,
         surrogate_posterior=q_z,
         importance_sample_size=10,
-        optimizer=tf.optimizers.Adam(learning_rate=0.1),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=0.1),
         num_steps=200)
 
   # Estimate posterior statistics with importance sampling.
@@ -680,7 +680,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
   losses, log_amplitude_path, sample_path = tfp.vi.fit_surrogate_posterior(
     target_log_prob_fn=lambda *args: model.log_prob(args),
     surrogate_posterior=q,
-    optimizer=tf.optimizers.Adam(learning_rate=0.1),
+    optimizer=tf.keras.optimizers.Adam(learning_rate=0.1),
     sample_size=1,
     num_steps=500,
     trace_fn=lambda loss, grads, vars: (loss, kernel_log_amplitude,

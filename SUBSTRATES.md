@@ -75,11 +75,11 @@ vmap, etc.), we will special-case using an `if JAX_MODE:` block.
     tests, TFP impl, etc), with `tfp.math.value_and_gradient` or similar. Then,
     we can special-case `JAX_MODE` inside the body of `value_and_gradient`.
 
-*   __`tf.Variable`, `tf.optimizers.Optimizer`__
+*   __`tf.Variable`, `tf.keras.optimizers.Optimizer`__
 
     TF provides a `Variable` abstraction so that graph functions may modify
-    state, including using the TF `Optimizer` subclasses like `Adam`. JAX, in
-    contrast, operates only on pure functions. In general, TFP is fairly
+    state, including using the Keras `Optimizer` subclasses like `Adam`. JAX,
+    in contrast, operates only on pure functions. In general, TFP is fairly
     functional (e.g. `tfp.optimizer.lbfgs_minimize`), but in some cases (e.g.
     `tfp.vi.fit_surrogate_posterior`,
     `tfp.optimizer.StochasticGradientLangevinDynamics`) we have felt the
