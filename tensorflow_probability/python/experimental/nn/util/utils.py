@@ -249,7 +249,7 @@ def make_fit_op(loss_fn, optimizer, trainable_variables,
     loss_fn: Python `callable` which returns the pair `loss` (`tf.Tensor`) and
       any other second result such that
       `tf.nest.map_structure(tf.convert_to_tensor, other)` will succeed.
-    optimizer: `tf.keras.optimizers.Optimizer`-like instance which has members
+    optimizer: `tf_keras.optimizers.Optimizer`-like instance which has members
       `gradient` and `apply_gradients`.
     trainable_variables: `tf.nest.flatten`-able structure of `tf.Variable`
       instances.

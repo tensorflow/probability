@@ -48,6 +48,7 @@ from tensorflow_probability.python.internal import custom_gradient
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.math import gradient
 from tensorflow_probability.python.math.minimize import minimize_stateless
 from tensorflow_probability.python.vi import optimization
@@ -239,7 +240,7 @@ class ASVISurrogatePosteriorTestBrownianMotion(_TrainableASVISurrogate):
         target_log_prob,
         surrogate_posterior,
         num_steps=3,  # Don't optimize to completion.
-        optimizer=tf.keras.optimizers.Adam(0.1),
+        optimizer=tf_keras.optimizers.Adam(0.1),
         sample_size=5)
 
     # Compute posterior statistics.

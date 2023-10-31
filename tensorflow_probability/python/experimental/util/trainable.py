@@ -185,7 +185,7 @@ make_trainable = docstring_util.expand_docstring(
 model = tfp.util.make_trainable(tfd.Normal)
 losses = tfp.math.minimize(
   lambda: -model.log_prob(samples),
-  optimizer=tf.keras.optimizers.Adam(0.1),
+  optimizer=tf_keras.optimizers.Adam(0.1),
   num_steps=200)
 print('Fit Normal distribution with mean {} and stddev {}'.format(
   model.mean(),

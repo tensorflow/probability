@@ -187,7 +187,7 @@ they supersede all previous conventions.
 1.  Submodule names should be singular, except where they overlap to TF.
 
     Justification: Having plural looks strange in user code, ie,
-    tf.optimizer.Foo reads nicer than tf.keras.optimizers.Foo since submodules
+    tf.optimizer.Foo reads nicer than tf_keras.optimizers.Foo since submodules
     are only used to access a single, specific thing (at a time).
 
 1.  Use `tf.newaxis` rather than `None` to `tf.expand_dims`.

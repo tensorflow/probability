@@ -47,6 +47,8 @@ import tensorflow_probability as tfp
 from tensorflow_probability.examples.models.bayesian_resnet import bayesian_resnet
 from tensorflow_probability.examples.models.bayesian_vgg import bayesian_vgg
 
+from tensorflow_probability.python.internal import tf_keras
+
 matplotlib.use("Agg")
 warnings.simplefilter(action="ignore")
 tfd = tfp.distributions
@@ -169,7 +171,7 @@ def main(argv):
   if FLAGS.fake_data:
     (x_train, y_train), (x_test, y_test) = build_fake_data()
   else:
-    (x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar10.load_data()
+    (x_train, y_train), (x_test, y_test) = tf_keras.datasets.cifar10.load_data()
 
   (images, labels, handle,
    training_iterator,

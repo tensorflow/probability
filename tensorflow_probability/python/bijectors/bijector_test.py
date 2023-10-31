@@ -46,6 +46,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
 
+from tensorflow_probability.python.internal import tf_keras
 
 JAX_MODE = False
 
@@ -978,7 +979,7 @@ class BijectorCachingTest(test_util.TestCase):
     bijector = InverseOnlyBijector(scale=2.)
     y = tf.constant(10.)
     if keras:
-      y = tf.keras.layers.Input(shape=(), dtype=tf.float32, tensor=y)
+      y = tf_keras.layers.Input(shape=(), dtype=tf.float32, tensor=y)
     x = bijector.inverse(y)
     # Forward computation should work here because it should look up
     # `y` in the cache and call `inverse_log_det_jacobian`.

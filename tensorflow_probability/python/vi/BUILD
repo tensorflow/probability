@@ -149,6 +149,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/experimental/util",
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/math/psd_kernels:exponentiated_quadratic",
         "//tensorflow_probability/python/util:deferred_tensor",
     ],

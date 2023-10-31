@@ -17,9 +17,10 @@
 import warnings
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.internal import tf_keras
 
 
-class WeightNorm(tf.keras.layers.Wrapper):
+class WeightNorm(tf_keras.layers.Wrapper):
   """Layer wrapper to decouple magnitude and direction of the layer's weights.
 
   This wrapper reparameterizes a layer by decoupling the weight's
@@ -32,13 +33,13 @@ class WeightNorm(tf.keras.layers.Wrapper):
   #### Example
 
   ```python
-    net = WeightNorm(tf.keras.layers.Conv2D(2, 2, activation='relu'),
+    net = WeightNorm(tf_keras.layers.Conv2D(2, 2, activation='relu'),
            input_shape=(32, 32, 3), data_init=True)(x)
-    net = WeightNorm(tf.keras.layers.Conv2DTranspose(16, 5, activation='relu'),
+    net = WeightNorm(tf_keras.layers.Conv2DTranspose(16, 5, activation='relu'),
                      data_init=True)
-    net = WeightNorm(tf.keras.layers.Dense(120, activation='relu'),
+    net = WeightNorm(tf_keras.layers.Dense(120, activation='relu'),
                      data_init=True)(net)
-    net = WeightNorm(tf.keras.layers.Dense(num_classes),
+    net = WeightNorm(tf_keras.layers.Dense(num_classes),
                      data_init=True)(net)
   ```
 
@@ -54,19 +55,19 @@ class WeightNorm(tf.keras.layers.Wrapper):
     """Initialize WeightNorm wrapper.
 
     Args:
-      layer: A `tf.keras.layers.Layer` instance. Supported layer types are
+      layer: A `tf_keras.layers.Layer` instance. Supported layer types are
         `Dense`, `Conv2D`, and `Conv2DTranspose`. Layers with multiple inputs
         are not supported.
       data_init: `bool`, if `True` use data dependent variable initialization.
-      **kwargs: Additional keyword args passed to `tf.keras.layers.Wrapper`.
+      **kwargs: Additional keyword args passed to `tf_keras.layers.Wrapper`.
 
     Raises:
-      ValueError: If `layer` is not a `tf.keras.layers.Layer` instance.
+      ValueError: If `layer` is not a `tf_keras.layers.Layer` instance.
 
     """
-    if not isinstance(layer, tf.keras.layers.Layer):
+    if not isinstance(layer, tf_keras.layers.Layer):
       raise ValueError(
-          'Please initialize `WeightNorm` layer with a `tf.keras.layers.Layer` '
+          'Please initialize `WeightNorm` layer with a `tf_keras.layers.Layer` '
           'instance. You passed: {input}'.format(input=layer))
 
     layer_type = type(layer).__name__
@@ -138,7 +139,7 @@ class WeightNorm(tf.keras.layers.Wrapper):
 
     input_shape = tf.TensorShape(input_shape).as_list()
     input_shape[0] = None
-    self.input_spec = tf.keras.layers.InputSpec(shape=input_shape)
+    self.input_spec = tf_keras.layers.InputSpec(shape=input_shape)
 
     if not self.layer.built:
       self.layer.build(input_shape)

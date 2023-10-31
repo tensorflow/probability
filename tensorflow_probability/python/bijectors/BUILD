@@ -260,6 +260,7 @@ multi_substrate_py_library(
     deps = [
         ":bijector",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 
@@ -477,6 +478,7 @@ py_library(
         ":tanh",
         ":transpose",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/util",
     ],
 )
@@ -612,6 +614,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/math:numeric",
     ],
 )
@@ -745,6 +748,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/util",
     ],
 )
@@ -770,6 +774,7 @@ multi_substrate_py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 
@@ -1108,6 +1113,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 
@@ -1207,6 +1213,7 @@ py_test(
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/distributions:transformed_distribution",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 
@@ -1271,6 +1278,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/distributions:sample",
         "//tensorflow_probability/python/distributions:transformed_distribution",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 
@@ -1699,6 +1707,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/distributions:transformed_distribution",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/math:gradient",
     ],
 )
@@ -1796,6 +1805,7 @@ multi_substrate_py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 
@@ -1859,6 +1869,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/distributions:transformed_distribution",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 
@@ -1879,6 +1890,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 

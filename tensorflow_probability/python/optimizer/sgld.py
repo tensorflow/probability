@@ -19,6 +19,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
 
 
@@ -28,7 +29,7 @@ __all__ = [
 
 
 # pylint: disable=g-classes-have-attributes
-class StochasticGradientLangevinDynamics(tf.keras.optimizers.legacy.Optimizer):
+class StochasticGradientLangevinDynamics(tf_keras.optimizers.legacy.Optimizer):
   """An optimizer module for stochastic gradient Langevin dynamics.
 
   This implements the preconditioned Stochastic Gradient Langevin Dynamics
@@ -167,7 +168,7 @@ class StochasticGradientLangevinDynamics(tf.keras.optimizers.legacy.Optimizer):
           diagonal_bias, name='diagonal_bias')
       # TODO(b/124800185): Consider migrating `learning_rate` to be a
       # hyperparameter handled by the base Optimizer class. This would allow
-      # users to plug in a `tf.keras.optimizers.schedules.LearningRateSchedule`
+      # users to plug in a `tf_keras.optimizers.schedules.LearningRateSchedule`
       # object in addition to Tensors.
       self._learning_rate = tf.convert_to_tensor(
           learning_rate, name='learning_rate')

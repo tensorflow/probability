@@ -19,7 +19,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import masked_autoregressive as masked_autoregressive_lib
 from tensorflow_probability.python.distributions import transformed_distribution as transformed_distribution_lib
-
+from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.layers.distribution_layer import DistributionLambda
 
 
@@ -61,7 +61,7 @@ class AutoregressiveTransform(DistributionLambda):
   tfd = tfp.distributions
   tfpl = tfp.layers
   tfb = tfp.bijectors
-  tfk = tf.keras
+  tfk = tf_keras
 
   # Generate data -- as in Figure 1 in [Papamakarios et al. (2017)][1]).
   n = 2000
@@ -121,7 +121,7 @@ class AutoregressiveTransform(DistributionLambda):
 
     Args:
       made: A `Made` layer, which must output two parameters for each input.
-      **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
+      **kwargs: Additional keyword arguments passed to `tf_keras.Layer`.
     """
     super(AutoregressiveTransform, self).__init__(self._transform, **kwargs)
 
@@ -132,8 +132,8 @@ class AutoregressiveTransform(DistributionLambda):
     self._made = made
 
   def build(self, input_shape):
-    tf.keras.Sequential([
-        tf.keras.layers.InputLayer(
+    tf_keras.Sequential([
+        tf_keras.layers.InputLayer(
             input_shape=input_shape[1:], dtype=self.dtype),
         self._made
     ])
