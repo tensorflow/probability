@@ -84,7 +84,6 @@ py_library(
         # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 

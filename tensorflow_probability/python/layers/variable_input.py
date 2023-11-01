@@ -18,28 +18,27 @@
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python.internal import tf_keras
 
 
-class VariableLayer(tf_keras.layers.Layer):
+class VariableLayer(tf.keras.layers.Layer):
   """Simply returns a (trainable) variable, regardless of input.
 
   This layer implements the mathematical function `f(x) = c` where `c` is a
   constant, i.e., unchanged for all `x`. Like other Keras layers, the constant
   is `trainable`.  This layer can also be interpretted as the special case of
-  `tf_keras.layers.Dense` when the `kernel` is forced to be the zero matrix
+  `tf.keras.layers.Dense` when the `kernel` is forced to be the zero matrix
   (`tf.zeros`).
 
   #### Examples
 
   ```python
-  trainable_normal = tf_keras.models.Sequential([
+  trainable_normal = tf.keras.models.Sequential([
       tfp.layers.VariableLayer(
           shape=[3, 4, 2],
           dtype=tf.float64,
           initializer=tfp.layers.BlockwiseInitializer([
               'zeros',
-              tf_keras.initializers.Constant(np.log(np.expm1(1.))),
+              tf.keras.initializers.Constant(np.log(np.expm1(1.))),
           ], sizes=[1, 1])),
       tfp.layers.DistributionLambda(lambda t: tfd.Independent(
           tfd.Normal(loc=t[..., 0], scale=tf.math.softplus(t[..., 1])),
@@ -84,7 +83,7 @@ class VariableLayer(tf_keras.layers.Layer):
       shape: integer or integer vector specifying the shape of the output of
         this layer.
       dtype: TensorFlow `dtype` of the variable created by this layer.
-        Default value: `None` (i.e., `tf.as_dtype(tf_keras.backend.floatx())`).
+        Default value: `None` (i.e., `tf.as_dtype(tf.keras.backend.floatx())`).
       activation: Activation function to use.  If you don't specify anything, no
         activation is applied (ie. "linear" activation: `a(x) = x`).
         Default value: `None`.
@@ -94,7 +93,7 @@ class VariableLayer(tf_keras.layers.Layer):
         ```python
         tfp.layers.BlockwiseInitializer([
             'zeros',
-            tf_keras.initializers.Constant(np.log(np.expm1(1.))),  # = 0.541325
+            tf.keras.initializers.Constant(np.log(np.expm1(1.))),  # = 0.541325
         ], sizes=[1, 1])
         ```
         Default value: `'zeros'`.
@@ -102,14 +101,14 @@ class VariableLayer(tf_keras.layers.Layer):
         Default value: `None`.
       constraint: Constraint function applied to the `constant` vector.
         Default value: `None`.
-      **kwargs: Extra arguments forwarded to `tf_keras.layers.Layer`.
+      **kwargs: Extra arguments forwarded to `tf.keras.layers.Layer`.
     """
     super(VariableLayer, self).__init__(**kwargs)
 
-    self.activation = tf_keras.activations.get(activation)
-    self.initializer = tf_keras.initializers.get(initializer)
-    self.regularizer = tf_keras.regularizers.get(regularizer)
-    self.constraint = tf_keras.constraints.get(constraint)
+    self.activation = tf.keras.activations.get(activation)
+    self.initializer = tf.keras.initializers.get(initializer)
+    self.regularizer = tf.keras.regularizers.get(regularizer)
+    self.constraint = tf.keras.constraints.get(constraint)
 
     shape = tf.get_static_value(shape)
     if shape is None:

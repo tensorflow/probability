@@ -16,7 +16,6 @@
 
 import tensorflow.compat.v1 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.internal import tf_keras
 
 
 def bayesian_resnet(input_shape,
@@ -43,7 +42,7 @@ def bayesian_resnet(input_shape,
       i.e. log_var <= log(kernel_posterior_scale_constraint).
 
   Returns:
-    tf_keras.Model.
+    tf.keras.Model.
   """
 
   filters = [64, 128, 256, 512]
@@ -60,7 +59,7 @@ def bayesian_resnet(input_shape,
           stddev=kernel_posterior_scale_stddev),
       untransformed_scale_constraint=_untransformed_scale_constraint)
 
-  image = tf_keras.layers.Input(shape=input_shape, dtype='float32')
+  image = tf.keras.layers.Input(shape=input_shape, dtype='float32')
   x = tfp.layers.Convolution2DFlipout(
       64,
       3,
@@ -76,23 +75,23 @@ def bayesian_resnet(input_shape,
         strides[i],
         kernel_posterior_fn)
 
-  x = tf_keras.layers.BatchNormalization()(x)
-  x = tf_keras.layers.Activation('relu')(x)
-  x = tf_keras.layers.AveragePooling2D(4, 1)(x)
-  x = tf_keras.layers.Flatten()(x)
+  x = tf.keras.layers.BatchNormalization()(x)
+  x = tf.keras.layers.Activation('relu')(x)
+  x = tf.keras.layers.AveragePooling2D(4, 1)(x)
+  x = tf.keras.layers.Flatten()(x)
 
   x = tfp.layers.DenseFlipout(
       num_classes,
       kernel_posterior_fn=kernel_posterior_fn)(x)
 
-  model = tf_keras.Model(inputs=image, outputs=x, name='resnet18')
+  model = tf.keras.Model(inputs=image, outputs=x, name='resnet18')
   return model
 
 
 def _resnet_block(x, filters, kernel, stride, kernel_posterior_fn):
   """Network block for ResNet."""
-  x = tf_keras.layers.BatchNormalization()(x)
-  x = tf_keras.layers.Activation('relu')(x)
+  x = tf.keras.layers.BatchNormalization()(x)
+  x = tf.keras.layers.Activation('relu')(x)
 
   if stride != 1 or filters != x.shape[1]:
     shortcut = _projection_shortcut(x, filters, stride, kernel_posterior_fn)
@@ -105,8 +104,8 @@ def _resnet_block(x, filters, kernel, stride, kernel_posterior_fn):
       strides=stride,
       padding='same',
       kernel_posterior_fn=kernel_posterior_fn)(x)
-  x = tf_keras.layers.BatchNormalization()(x)
-  x = tf_keras.layers.Activation('relu')(x)
+  x = tf.keras.layers.BatchNormalization()(x)
+  x = tf.keras.layers.Activation('relu')(x)
 
   x = tfp.layers.Convolution2DFlipout(
       filters,
@@ -114,7 +113,7 @@ def _resnet_block(x, filters, kernel, stride, kernel_posterior_fn):
       strides=1,
       padding='same',
       kernel_posterior_fn=kernel_posterior_fn)(x)
-  x = tf_keras.layers.add([x, shortcut])
+  x = tf.keras.layers.add([x, shortcut])
   return x
 
 

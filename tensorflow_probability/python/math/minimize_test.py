@@ -24,7 +24,6 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import optimizer
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.math.minimize import minimize
 from tensorflow_probability.python.math.minimize import minimize_stateless
 
@@ -33,14 +32,14 @@ JAX_MODE = False
 
 def _get_adam_optimizer(learning_rate):
   if tf.__internal__.tf2.enabled():
-    return tf_keras.optimizers.Adam(learning_rate=learning_rate)
-  return tf_keras.optimizers.legacy.Adam(learning_rate=learning_rate)
+    return tf.keras.optimizers.Adam(learning_rate=learning_rate)
+  return tf.keras.optimizers.legacy.Adam(learning_rate=learning_rate)
 
 
 def _get_sgd_optimizer(learning_rate):
   if tf.__internal__.tf2.enabled():
-    return tf_keras.optimizers.SGD(learning_rate=learning_rate)
-  return tf_keras.optimizers.legacy.SGD(learning_rate=learning_rate)
+    return tf.keras.optimizers.SGD(learning_rate=learning_rate)
+  return tf.keras.optimizers.legacy.SGD(learning_rate=learning_rate)
 
 
 @test_util.test_all_tf_execution_regimes

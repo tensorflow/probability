@@ -221,7 +221,7 @@ class GaussianProcess(
 
   gp = tfd.GaussianProcess(kernel, observed_index_points)
 
-  optimizer = tf_keras.optimizers.Adam()
+  optimizer = tf.keras.optimizers.Adam()
 
   @tf.function
   def optimize():

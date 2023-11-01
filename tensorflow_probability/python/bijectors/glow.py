@@ -34,11 +34,10 @@ from tensorflow_probability.python.bijectors import transpose
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.util.deferred_tensor import TransformedVariable
 from tensorflow_probability.python.util.seed_stream import SeedStream
 
-tfk = tf_keras
+tfk = tf.keras
 tfkl = tfk.layers
 
 __all__ = [
@@ -860,15 +859,15 @@ class GlowDefaultNetwork(tfk.Sequential):
     conv_last = functools.partial(
         tfkl.Conv2D,
         padding='same',
-        kernel_initializer=tf_keras.initializers.zeros(),
-        bias_initializer=tf_keras.initializers.zeros())
+        kernel_initializer=tf.keras.initializers.zeros(),
+        bias_initializer=tf.keras.initializers.zeros())
     super(GlowDefaultNetwork, self).__init__([
         tfkl.Input(shape=input_shape),
         tfkl.Conv2D(num_hidden, kernel_shape, padding='same',
-                    kernel_initializer=tf_keras.initializers.he_normal(),
+                    kernel_initializer=tf.keras.initializers.he_normal(),
                     activation='relu'),
         tfkl.Conv2D(num_hidden, 1, padding='same',
-                    kernel_initializer=tf_keras.initializers.he_normal(),
+                    kernel_initializer=tf.keras.initializers.he_normal(),
                     activation='relu'),
         conv_last(this_nchan, kernel_shape)
     ])
@@ -887,8 +886,8 @@ class GlowDefaultExitNetwork(tfk.Sequential):
     conv = functools.partial(
         tfkl.Conv2D,
         padding='same',
-        kernel_initializer=tf_keras.initializers.zeros(),
-        bias_initializer=tf_keras.initializers.zeros())
+        kernel_initializer=tf.keras.initializers.zeros(),
+        bias_initializer=tf.keras.initializers.zeros())
 
     super(GlowDefaultExitNetwork, self).__init__([
         tfkl.Input(input_shape),

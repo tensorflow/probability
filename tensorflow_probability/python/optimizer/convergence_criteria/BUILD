@@ -99,7 +99,6 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/bijectors:softplus",
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
-        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/util:deferred_tensor",
         "//tensorflow_probability/python/vi:csiszar_divergence",
     ],

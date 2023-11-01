@@ -22,7 +22,6 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.bijectors import permute
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.internal import tf_keras
 
 
 @test_util.test_all_tf_execution_regimes
@@ -89,7 +88,7 @@ class PermuteBijectorTest(test_util.TestCase):
     # TODO(b/131157549, b/131124359): Test should not be needed. Consider
     # deleting when underlying issue with constant eager tensors is fixed.
     permutation = [2, 1, 0]
-    x = tf_keras.Input((3,), batch_size=None)
+    x = tf.keras.Input((3,), batch_size=None)
     bijector = permute.Permute(
         permutation=permutation, axis=-1, validate_args=True)
 

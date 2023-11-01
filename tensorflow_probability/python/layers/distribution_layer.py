@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Layers for combining `tfp.distributions` and `tf_keras`."""
+"""Layers for combining `tfp.distributions` and `tf.keras`."""
 
 import codecs
 import collections
@@ -43,7 +43,6 @@ from tensorflow_probability.python.distributions import poisson as poisson_lib
 from tensorflow_probability.python.distributions import transformed_distribution as transformed_distribution_lib
 from tensorflow_probability.python.distributions import variational_gaussian_process as variational_gaussian_process_lib
 from tensorflow_probability.python.internal import distribution_util as dist_util
-from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.layers.internal import distribution_tensor_coercible as dtc
 from tensorflow_probability.python.layers.internal import tensor_tuple
 
@@ -66,7 +65,7 @@ __all__ = [
 ]
 
 
-tf_keras.__internal__.utils.register_symbolic_tensor_type(dtc._TensorCoercible)  # pylint: disable=protected-access
+tf.keras.__internal__.utils.register_symbolic_tensor_type(dtc._TensorCoercible)  # pylint: disable=protected-access
 
 
 def _event_size(event_shape, name=None):
@@ -93,7 +92,7 @@ def _event_size(event_shape, name=None):
       return tf.reduce_prod(event_shape)
 
 
-class DistributionLambda(tf_keras.layers.Lambda):
+class DistributionLambda(tf.keras.layers.Lambda):
   """Keras layer enabling plumbing TFP distributions through Keras models.
 
   A `DistributionLambda` is minimially characterized by a function that returns
@@ -109,8 +108,8 @@ class DistributionLambda(tf_keras.layers.Lambda):
   #### Examples
 
   ```python
-  tfk = tf_keras
-  tfkl = tf_keras.layers
+  tfk = tf.keras
+  tfkl = tf.keras.layers
   tfd = tfp.distributions
   tfpl = tfp.layers
 
@@ -140,7 +139,7 @@ class DistributionLambda(tf_keras.layers.Lambda):
         instance and returns a `tf.Tensor`-like object. For examples, see
         `class` docstring.
         Default value: `tfd.Distribution.sample`.
-      **kwargs: Additional keyword arguments passed to `tf_keras.Layer`.
+      **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
     """
     # TODO(b/120440642): See if something like this code block is needed.
     # if output_shape is None:
@@ -299,8 +298,8 @@ class MultivariateNormalTriL(DistributionLambda):
   #### Example
 
   ```python
-  tfk = tf_keras
-  tfkl = tf_keras.layers
+  tfk = tf.keras
+  tfkl = tf.keras.layers
   tfd = tfp.distributions
   tfpl = tfp.layers
 
@@ -356,7 +355,7 @@ class MultivariateNormalTriL(DistributionLambda):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
         Default value: `False`.
-      **kwargs: Additional keyword arguments passed to `tf_keras.Layer`.
+      **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
     """
     super(MultivariateNormalTriL, self).__init__(
         lambda t: MultivariateNormalTriL.new(t, event_size, validate_args),
@@ -397,8 +396,8 @@ class OneHotCategorical(DistributionLambda):
   #### Example
 
   ```python
-  tfk = tf_keras
-  tfkl = tf_keras.layers
+  tfk = tf.keras
+  tfkl = tf.keras.layers
   tfd = tfp.distributions
   tfpl = tfp.layers
 
@@ -460,7 +459,7 @@ class OneHotCategorical(DistributionLambda):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
         Default value: `False`.
-      **kwargs: Additional keyword arguments passed to `tf_keras.Layer`.
+      **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
     """
     super(OneHotCategorical, self).__init__(
         lambda t: OneHotCategorical.new(  # pylint: disable=g-long-lambda
@@ -501,8 +500,8 @@ class CategoricalMixtureOfOneHotCategorical(DistributionLambda):
   #### Example
 
   ```python
-  tfk = tf_keras
-  tfkl = tf_keras.layers
+  tfk = tf.keras
+  tfkl = tf.keras.layers
   tfd = tfp.distributions
   tfpl = tfp.layers
 
@@ -565,7 +564,7 @@ class CategoricalMixtureOfOneHotCategorical(DistributionLambda):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
         Default value: `False`.
-      **kwargs: Additional keyword arguments passed to `tf_keras.Layer`.
+      **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
     """
     super(CategoricalMixtureOfOneHotCategorical, self).__init__(
         # pylint: disable=g-long-lambda
@@ -623,8 +622,8 @@ class IndependentBernoulli(DistributionLambda):
   #### Example
 
   ```python
-  tfk = tf_keras
-  tfkl = tf_keras.layers
+  tfk = tf.keras
+  tfkl = tf.keras.layers
   tfd = tfp.distributions
   tfpl = tfp.layers
 
@@ -686,7 +685,7 @@ class IndependentBernoulli(DistributionLambda):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
         Default value: `False`.
-      **kwargs: Additional keyword arguments passed to `tf_keras.Layer`.
+      **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
     """
     convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
 
@@ -789,8 +788,8 @@ class IndependentLogistic(DistributionLambda):
   ```python
   tfd = tfp.distributions
   tfpl = tfp.layers
-  tfk = tf_keras
-  tfkl = tf_keras.layers
+  tfk = tf.keras
+  tfkl = tf.keras.layers
 
   # Create a stochastic encoder -- e.g., for use in a variational auto-encoder.
   input_shape = [28, 28, 1]
@@ -824,7 +823,7 @@ class IndependentLogistic(DistributionLambda):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
         Default value: `False`.
-      **kwargs: Additional keyword arguments passed to `tf_keras.Layer`.
+      **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
     """
     convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
 
@@ -904,8 +903,8 @@ class IndependentNormal(DistributionLambda):
   ```python
   tfd = tfp.distributions
   tfpl = tfp.layers
-  tfk = tf_keras
-  tfkl = tf_keras.layers
+  tfk = tf.keras
+  tfkl = tf.keras.layers
 
   # Create a stochastic encoder -- e.g., for use in a variational auto-encoder.
   input_shape = [28, 28, 1]
@@ -939,7 +938,7 @@ class IndependentNormal(DistributionLambda):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
         Default value: `False`.
-      **kwargs: Additional keyword arguments passed to `tf_keras.Layer`.
+      **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
     """
     convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
 
@@ -1019,8 +1018,8 @@ class IndependentPoisson(DistributionLambda):
   ```python
   tfd = tfp.distributions
   tfpl = tfp.layers
-  tfk = tf_keras
-  tfkl = tf_keras.layers
+  tfk = tf.keras
+  tfkl = tf.keras.layers
 
   # Create example data.
   n = 2000
@@ -1070,7 +1069,7 @@ class IndependentPoisson(DistributionLambda):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
         Default value: `False`.
-      **kwargs: Additional keyword arguments passed to `tf_keras.Layer`.
+      **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
     """
     convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
 
@@ -1142,7 +1141,7 @@ class IndependentPoisson(DistributionLambda):
 
 # We mix-in `tf.Module` since Keras `Regularizer` base class tracks neither
 # tf.Variables nor tf.Modules.
-class KLDivergenceRegularizer(tf_keras.regularizers.Regularizer, tf.Module):
+class KLDivergenceRegularizer(tf.keras.regularizers.Regularizer, tf.Module):
   """Regularizer that adds a KL divergence penalty to the model loss.
 
   When using Monte Carlo approximation (e.g., `use_exact=False`), it is presumed
@@ -1155,8 +1154,8 @@ class KLDivergenceRegularizer(tf_keras.regularizers.Regularizer, tf.Module):
   ```python
   tfd = tfp.distributions
   tfpl = tfp.layers
-  tfk = tf_keras
-  tfkl = tf_keras.layers
+  tfk = tf.keras
+  tfkl = tf.keras.layers
 
   # Create a variational encoder and add a KL Divergence penalty to the
   # loss that encourages marginal coherence with a unit-MVN (the "prior").
@@ -1252,7 +1251,7 @@ class KLDivergenceRegularizer(tf_keras.regularizers.Regularizer, tf.Module):
     return self._kl_divergence_fn(distribution_a)
 
 
-class KLDivergenceAddLoss(tf_keras.layers.Layer):
+class KLDivergenceAddLoss(tf.keras.layers.Layer):
   """Pass-through layer that adds a KL divergence penalty to the model loss.
 
   When using Monte Carlo approximation (e.g., `use_exact=False`), it is presumed
@@ -1265,8 +1264,8 @@ class KLDivergenceAddLoss(tf_keras.layers.Layer):
   ```python
   tfd = tfp.distributions
   tfpl = tfp.layers
-  tfk = tf_keras
-  tfkl = tf_keras.layers
+  tfk = tf.keras
+  tfkl = tf.keras.layers
 
   # Create a variational encoder and add a KL Divergence penalty to the
   # loss that encourages marginal coherence with a unit-MVN (the "prior").
@@ -1316,7 +1315,7 @@ class KLDivergenceAddLoss(tf_keras.layers.Layer):
       weight: Multiplier applied to the calculated KL divergence for each Keras
         batch member.
         Default value: `None` (i.e., do not weight each batch member).
-      **kwargs: Additional keyword arguments passed to `tf_keras.Layer`.
+      **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
     """
     super(KLDivergenceAddLoss, self).__init__(**kwargs)
     self._regularizer = KLDivergenceRegularizer(
@@ -1359,7 +1358,7 @@ def _make_kl_divergence_fn(
   def _fn(distribution_a):
     """Closure that computes KLDiv as a function of `a` as in `KL[a, b]`."""
     with tf.name_scope('kldivergence_loss'):
-      if isinstance(distribution_b, tf_keras.Model):
+      if isinstance(distribution_b, tf.keras.Model):
         distribution_b_ = distribution_b(0.)  # Pass a dummy arg.
       elif callable(distribution_b):
         # TODO(b/119756336): Due to eager/graph Jacobian graph caching bug we
@@ -1392,8 +1391,8 @@ class MixtureSameFamily(DistributionLambda):
   ```python
   tfd = tfp.distributions
   tfpl = tfp.layers
-  tfk = tf_keras
-  tfkl = tf_keras.layers
+  tfk = tf.keras
+  tfkl = tf.keras.layers
 
   # Load data -- graph of a [cardioid](https://en.wikipedia.org/wiki/Cardioid).
   n = 2000
@@ -1450,7 +1449,7 @@ class MixtureSameFamily(DistributionLambda):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
         Default value: `False`.
-      **kwargs: Additional keyword arguments passed to `tf_keras.Layer`.
+      **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
     """
     super(MixtureSameFamily, self).__init__(
         lambda t: MixtureSameFamily.new(  # pylint: disable=g-long-lambda
@@ -1519,8 +1518,8 @@ class MixtureNormal(DistributionLambda):
   ```python
   tfd = tfp.distributions
   tfpl = tfp.layers
-  tfk = tf_keras
-  tfkl = tf_keras.layers
+  tfk = tf.keras
+  tfkl = tf.keras.layers
 
   # Load data -- graph of a [cardioid](https://en.wikipedia.org/wiki/Cardioid).
   n = 2000
@@ -1572,7 +1571,7 @@ class MixtureNormal(DistributionLambda):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
         Default value: `False`.
-      **kwargs: Additional keyword arguments passed to `tf_keras.Layer`.
+      **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
     """
     convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
 
@@ -1644,8 +1643,8 @@ class MixtureLogistic(DistributionLambda):
   ```python
   tfd = tfp.distributions
   tfpl = tfp.layers
-  tfk = tf_keras
-  tfkl = tf_keras.layers
+  tfk = tf.keras
+  tfkl = tf.keras.layers
 
   # Load data -- graph of a [cardioid](https://en.wikipedia.org/wiki/Cardioid).
   n = 2000
@@ -1697,7 +1696,7 @@ class MixtureLogistic(DistributionLambda):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
         Default value: `False`.
-      **kwargs: Additional keyword arguments passed to `tf_keras.Layer`.
+      **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
     """
     convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
 
@@ -1767,7 +1766,7 @@ class VariationalGaussianProcess(DistributionLambda):
 
   Create a VariationalGaussianProcess distribtuion whose `index_points` are the
   inputs to the layer. Parameterized by number of inducing points and a
-  `kernel_provider`, which should be a `tf_keras.Layer` with an @property that
+  `kernel_provider`, which should be a `tf.keras.Layer` with an @property that
   late-binds variable parameters to a
   `tfp.positive_semidefinite_kernel.PositiveSemidefiniteKernel` instance (this
   requirement has to do with the way that variables must be created in a keras
@@ -1783,7 +1782,7 @@ class VariationalGaussianProcess(DistributionLambda):
       event_shape=(1,),
       inducing_index_points_initializer=None,
       unconstrained_observation_noise_variance_initializer=(
-          tf_keras.initializers.constant(-10.)),
+          tf.keras.initializers.constant(-10.)),
       variational_inducing_observations_scale_initializer=None,
       mean_fn=None,
       jitter=1e-6,
@@ -1803,17 +1802,17 @@ class VariationalGaussianProcess(DistributionLambda):
         example, `event_shape = [3]` means we are modeling a batch of 3
         distributions over functions. We can think of this as a distrbution over
         3-dimensional vector-valued functions.
-      inducing_index_points_initializer: a `tf_keras.initializer.Initializer`
+      inducing_index_points_initializer: a `tf.keras.initializer.Initializer`
         used to initialize the trainable `inducing_index_points` variables.
         Training VGP's is pretty sensitive to choice of initial inducing index
         point locations. A reasonable heuristic is to scatter them near the
         data, not too close to each other.
       unconstrained_observation_noise_variance_initializer: a
-        `tf_keras.initializer.Initializer` used to initialize the unconstrained
+        `tf.keras.initializer.Initializer` used to initialize the unconstrained
         observation noise variable. The observation noise variance is computed
         from this variable via the `tf.nn.softplus` function.
       variational_inducing_observations_scale_initializer: a
-        `tf_keras.initializer.Initializer` used to initialize the variational
+        `tf.keras.initializer.Initializer` used to initialize the variational
         inducing observations scale.
       mean_fn: a callable that maps layer inputs to mean function values. Passed
         to the mean_fn parameter of VariationalGaussianProcess distribution. If
@@ -1870,7 +1869,7 @@ class VariationalGaussianProcess(DistributionLambda):
 
     if self._mean_fn is None:
       self.mean = self.add_weight(
-          initializer=tf_keras.initializers.constant([0.]),
+          initializer=tf.keras.initializers.constant([0.]),
           dtype=self._dtype,
           name='mean')
       self._mean_fn = lambda x: self.mean
@@ -1897,14 +1896,14 @@ class VariationalGaussianProcess(DistributionLambda):
     self._variational_inducing_observations_loc = self.add_weight(
         name='variational_inducing_observations_loc',
         shape=self._event_shape.as_list() + [self._num_inducing_points],
-        initializer=tf_keras.initializers.zeros(),
+        initializer=tf.keras.initializers.zeros(),
         dtype=self._dtype)
 
     if self._variational_inducing_observations_scale_initializer is None:
       eyes = (np.ones(self._event_shape.as_list() + [1, 1]) *
               np.eye(self._num_inducing_points, dtype=self._dtype))
       self._variational_inducing_observations_scale_initializer = (
-          tf_keras.initializers.constant(1e-5 * eyes))
+          tf.keras.initializers.constant(1e-5 * eyes))
     self._variational_inducing_observations_scale = self.add_weight(
         name='variational_inducing_observations_scale',
         shape=(self._event_shape.as_list() +
@@ -1946,7 +1945,7 @@ class VariationalGaussianProcess(DistributionLambda):
 
 
 # For deserialization.
-tf_keras.utils.get_custom_objects().update({
+tf.keras.utils.get_custom_objects().update({
     'DistributionLambda': DistributionLambda,
     'IndependentBernoulli': IndependentBernoulli,
     'IndependentLogistic': IndependentLogistic,
@@ -1964,11 +1963,11 @@ variance = tfd.Distribution.variance
 
 
 def _serialize(convert_to_tensor_fn):
-  return tf_keras.utils.legacy.serialize_keras_object(convert_to_tensor_fn)
+  return tf.keras.utils.legacy.serialize_keras_object(convert_to_tensor_fn)
 
 
 def _deserialize(name, custom_objects=None):
-  return tf_keras.utils.legacy.deserialize_keras_object(
+  return tf.keras.utils.legacy.deserialize_keras_object(
       name,
       module_objects=globals(),
       custom_objects=custom_objects,

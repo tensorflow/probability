@@ -16,10 +16,10 @@
 
 
 # Dependency imports
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow_probability.python.internal import tf_keras
 
 
 __all__ = [
@@ -128,7 +128,7 @@ class BatchNormalization(bijector.Bijector):
 
     Args:
       batchnorm_layer: `tf.layers.BatchNormalization` layer object. If `None`,
-        defaults to a `tf_keras.layers.BatchNormalization` with
+        defaults to a `tf.keras.layers.BatchNormalization` with
         `gamma_constraint=tf.nn.relu(x) + 1e-6)`.
         This ensures positivity of the scale variable.
 
@@ -146,7 +146,7 @@ class BatchNormalization(bijector.Bijector):
     with tf.name_scope(name) as name:
       # Scale must be positive.
       g_constraint = lambda x: tf.nn.relu(x) + 1e-6
-      self.batchnorm = batchnorm_layer or tf_keras.layers.BatchNormalization(
+      self.batchnorm = batchnorm_layer or tf.keras.layers.BatchNormalization(
           gamma_constraint=g_constraint)
       self._validate_bn_layer(self.batchnorm)
       self._training = training
@@ -174,11 +174,11 @@ class BatchNormalization(bijector.Bijector):
       `tf.layers.BatchNormalization`, or if `batchnorm_layer.renorm=True` or
       if `batchnorm_layer.virtual_batch_size` is specified.
     """
-    if (not isinstance(layer, tf_keras.layers.BatchNormalization) and
-        not isinstance(layer, tf_keras.tf1_layers.BatchNormalization)):
+    if (not isinstance(layer, tf.keras.layers.BatchNormalization) and
+        not isinstance(layer, tf1.layers.BatchNormalization)):
       raise ValueError(
           'batchnorm_layer must be an instance of '
-          '`tf_keras.layers.BatchNormalization` or '
+          '`tf.keras.layers.BatchNormalization` or '
           '`tf.compat.v1.layers.BatchNormalization`. Got {}'.format(
               type(layer)))
     if layer.renorm:

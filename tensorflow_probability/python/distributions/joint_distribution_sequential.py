@@ -54,10 +54,10 @@ class _JointDistributionSequential(joint_distribution_lib.JointDistribution):
   a single model specification.
 
   A joint distribution is a collection of possibly interdependent distributions.
-  Like `tf_keras.Sequential`, the `JointDistributionSequential` can be specified
+  Like `tf.keras.Sequential`, the `JointDistributionSequential` can be specified
   via a `list` of functions (each responsible for making a
   `tfp.distributions.Distribution`-like instance).  Unlike
-  `tf_keras.Sequential`, each function can depend on the output of all previous
+  `tf.keras.Sequential`, each function can depend on the output of all previous
   elements rather than only the immediately previous.
 
   #### Mathematical Details

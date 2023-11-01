@@ -26,7 +26,6 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.layers import conv_variational
 from tensorflow_probability.python.layers import util
 from tensorflow_probability.python.random import random_ops
@@ -217,7 +216,7 @@ class ConvVariational(object):
     if self.data_format == 'channels_first':
       input_shape = channels_last_to_first(input_shape)
 
-    with tf_keras.utils.CustomObjectScope({layer_class.__name__: layer_class}):
+    with tf.keras.utils.CustomObjectScope({layer_class.__name__: layer_class}):
       with self.cached_session():
         # TODO(scottzhu): reenable the test when the repo switch change reach
         # the TF PIP package.
@@ -607,7 +606,7 @@ class ConvVariational(object):
     inputs = self.maybe_transpose_tensor(inputs)
     outputs = self.maybe_transpose_tensor(outputs)
 
-    net = tf_keras.Sequential([
+    net = tf.keras.Sequential([
         layer_class(filters=2, kernel_size=3, data_format=self.data_format,
                     input_shape=inputs.shape[1:]),
         layer_class(filters=2, kernel_size=1, data_format=self.data_format)])
@@ -718,7 +717,7 @@ class ConvVariational(object):
     self._testLayerInSequential(conv_variational.Convolution3DFlipout)
 
   def testGradients(self):
-    net = tf_keras.Sequential([
+    net = tf.keras.Sequential([
         conv_variational.Convolution1DFlipout(
             1, 1, data_format=self.data_format),
         conv_variational.Convolution1DReparameterization(

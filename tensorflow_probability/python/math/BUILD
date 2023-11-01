@@ -338,7 +338,6 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:loop_util",
         "//tensorflow_probability/python/internal:prefer_static",
-        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 
@@ -354,7 +353,6 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
-        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/optimizer",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],

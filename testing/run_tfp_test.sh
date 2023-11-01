@@ -66,6 +66,7 @@ bazel test \
   --test_timeout 300,450,1200,3600 \
   --test_tag_filters="-gpu,-requires-gpu-nvidia,-notap,-no-oss-ci,-tf2-broken,-tf2-kokoro-broken" \
   --test_env=TFP_HYPOTHESIS_MAX_EXAMPLES=2 \
+  --test_env=TF_USE_LEGACY_KERAS=1 \
   --action_env=PATH \
   --action_env=LD_LIBRARY_PATH \
   --test_output=errors \

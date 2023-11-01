@@ -35,7 +35,6 @@ from tensorflow_probability.python.experimental.vi import automatic_structured_v
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.math import gradient
 from tensorflow_probability.python.mcmc import dual_averaging_step_size_adaptation as dassa
 from tensorflow_probability.python.mcmc import nuts
@@ -206,7 +205,7 @@ class DistributionBijectorsTest(test_util.TestCase):
     optimization.fit_surrogate_posterior(
         pinned_model.unnormalized_log_prob,
         surrogate_posterior=surrogate_posterior,
-        optimizer=tf_keras.optimizers.Adam(0.01),
+        optimizer=tf.keras.optimizers.Adam(0.01),
         sample_size=10,
         num_steps=1)
     bijector = (

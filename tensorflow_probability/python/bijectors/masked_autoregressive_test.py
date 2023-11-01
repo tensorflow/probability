@@ -39,11 +39,10 @@ from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.math import gradient
 
-tfk = tf_keras
-tfkl = tf_keras.layers
+tfk = tf.keras
+tfkl = tf.keras.layers
 
 
 def _funnel_bijector_fn(x):
@@ -712,7 +711,7 @@ class AutoregressiveNetworkTest(test_util.TestCase):
     self.assertIsAutoregressive(made, event_size=3, order="left-to-right")
 
   def test_layer_v2_kernel_initializer(self):
-    init = tf_keras.initializers.GlorotNormal()
+    init = tf.keras.initializers.GlorotNormal()
     made = masked_autoregressive.AutoregressiveNetwork(
         params=2,
         event_shape=4,
@@ -799,9 +798,9 @@ class AutoregressiveNetworkTest(test_util.TestCase):
     model = tfk.Model([x_, c_], log_prob_)
 
     if tf.__internal__.tf2.enabled() and tf.executing_eagerly():
-      optimizer = tf_keras.optimizers.Adam(learning_rate=0.1)
+      optimizer = tf.keras.optimizers.Adam(learning_rate=0.1)
     else:
-      optimizer = tf_keras.optimizers.legacy.Adam(learning_rate=0.1)
+      optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=0.1)
     model.compile(
         optimizer=optimizer,
         loss=lambda _, log_prob: -log_prob)

@@ -102,12 +102,10 @@ import functools
 
 from absl import app
 from absl import flags
-import tensorflow.compat.v1 as tf1
-import tensorflow.compat.v2 as tf
+import tensorflow.compat.v1 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.examples import sprites_dataset
-from tensorflow_probability.python.internal import tf_keras
 
 tfd = tfp.distributions
 
@@ -180,7 +178,7 @@ flags.DEFINE_integer(
 FLAGS = flags.FLAGS
 
 
-class LearnableMultivariateNormalDiag(tf_keras.v1.Model):
+class LearnableMultivariateNormalDiag(tf.keras.Model):
   """Learnable multivariate diagonal normal distribution.
 
   The model is a multivariate normal distribution with learnable
@@ -195,19 +193,19 @@ class LearnableMultivariateNormalDiag(tf_keras.v1.Model):
         distribution.
     """
     super(LearnableMultivariateNormalDiag, self).__init__()
-    with tf1.name_scope(self._name):
+    with tf.compat.v1.name_scope(self._name):
       self.dimensions = dimensions
-      self._mean = tf.Variable(
-          tf1.random.normal([dimensions], stddev=0.1), name="mean")
+      self._mean = tf.compat.v2.Variable(
+          tf.random.normal([dimensions], stddev=0.1), name="mean")
       # Initialize the std dev such that it will be close to 1 after a softplus
       # function.
-      self._untransformed_stddev = tf.Variable(
-          tf1.random.normal([dimensions], mean=0.55, stddev=0.1),
+      self._untransformed_stddev = tf.compat.v2.Variable(
+          tf.random.normal([dimensions], mean=0.55, stddev=0.1),
           name="untransformed_stddev")
 
   def __call__(self, *args, **kwargs):
     # Allow this Model to be called without inputs.
-    dummy = tf1.zeros(self.dimensions)
+    dummy = tf.zeros(self.dimensions)
     return super(LearnableMultivariateNormalDiag, self).__call__(
         dummy, *args, **kwargs)
 
@@ -223,7 +221,7 @@ class LearnableMultivariateNormalDiag(tf_keras.v1.Model):
       dimensions].
     """
     del inputs  # unused
-    with tf1.name_scope(self._name):
+    with tf.compat.v1.name_scope(self._name):
       return tfd.MultivariateNormalDiag(self.loc, self.scale_diag)
 
   @property
@@ -234,10 +232,10 @@ class LearnableMultivariateNormalDiag(tf_keras.v1.Model):
   @property
   def scale_diag(self):
     """The diagonal standard deviation of the normal distribution."""
-    return tf1.nn.softplus(self._untransformed_stddev) + 1e-5  # keep > 0
+    return tf.nn.softplus(self._untransformed_stddev) + 1e-5  # keep > 0
 
 
-class LearnableMultivariateNormalDiagCell(tf_keras.v1.Model):
+class LearnableMultivariateNormalDiagCell(tf.keras.Model):
   """Multivariate diagonal normal distribution RNN cell.
 
   The model is an LSTM-based recurrent function that computes the
@@ -256,8 +254,8 @@ class LearnableMultivariateNormalDiagCell(tf_keras.v1.Model):
     super(LearnableMultivariateNormalDiagCell, self).__init__()
     self.dimensions = dimensions
     self.hidden_size = hidden_size
-    self.lstm_cell = tf_keras.v1.layers.LSTMCell(hidden_size)
-    self.output_layer = tf_keras.v1.layers.Dense(2*dimensions)
+    self.lstm_cell = tf.keras.layers.LSTMCell(hidden_size)
+    self.output_layer = tf.keras.layers.Dense(2*dimensions)
 
   def zero_state(self, sample_batch_shape=()):
     """Returns an initial state for the LSTM cell.
@@ -270,11 +268,12 @@ class LearnableMultivariateNormalDiagCell(tf_keras.v1.Model):
       A tuple of the initial previous output at timestep 0 of shape
       [sample_batch_shape, dimensions], and the cell state.
     """
-    h0 = tf1.zeros([1, self.hidden_size])
-    c0 = tf1.zeros([1, self.hidden_size])
-    combined_shape = tf1.concat((tf1.convert_to_tensor(
-        value=sample_batch_shape, dtype=tf1.int32), [self.dimensions]), axis=-1)
-    previous_output = tf1.zeros(combined_shape)
+    h0 = tf.zeros([1, self.hidden_size])
+    c0 = tf.zeros([1, self.hidden_size])
+    combined_shape = tf.concat((tf.convert_to_tensor(
+        value=sample_batch_shape, dtype=tf.int32), [self.dimensions]),
+                               axis=-1)
+    previous_output = tf.zeros(combined_shape)
     return previous_output, (h0, c0)
 
   def call(self, inputs, state):
@@ -299,20 +298,20 @@ class LearnableMultivariateNormalDiagCell(tf_keras.v1.Model):
     # In order to allow the user to pass in a single example without a batch
     # dimension, we always expand the input to at least two dimensions, then
     # fix the output shape to remove the batch dimension if necessary.
-    # original_shape = inputs.shape
-    # if len(original_shape) < 2:
-    #   inputs = tf1.reshape(inputs, [1, -1])
+    original_shape = inputs.shape
+    if len(original_shape) < 2:
+      inputs = tf.reshape(inputs, [1, -1])
     out, state = self.lstm_cell(inputs, state)
     out = self.output_layer(out)
-    # correct_shape = tf1.concat(
-    #     (original_shape[:-1], tf1.shape(input=out)[-1:]), 0)
-    # out = tf1.reshape(out, correct_shape)
+    correct_shape = tf.concat((original_shape[:-1], tf.shape(input=out)[-1:]),
+                              0)
+    out = tf.reshape(out, correct_shape)
     loc = out[..., :self.dimensions]
-    scale_diag = tf1.nn.softplus(out[..., self.dimensions:]) + 1e-5  # keep > 0
+    scale_diag = tf.nn.softplus(out[..., self.dimensions:]) + 1e-5  # keep > 0
     return tfd.MultivariateNormalDiag(loc=loc, scale_diag=scale_diag), state
 
 
-class Decoder(tf_keras.v1.Model):
+class Decoder(tf.keras.Model):
   """Probabilistic decoder for `p(x_t | z_t, f)`.
 
   The decoder generates a sequence of image frames `x_{1:T}` from
@@ -342,11 +341,11 @@ class Decoder(tf_keras.v1.Model):
     """
     super(Decoder, self).__init__()
     self.hidden_size = hidden_size
-    activation = tf1.nn.leaky_relu
-    self.dense = tf_keras.v1.layers.Dense(hidden_size, activation=activation)
+    activation = tf.nn.leaky_relu
+    self.dense = tf.keras.layers.Dense(hidden_size, activation=activation)
     # Spatial sizes: (1,1) -> (8,8) -> (16,16) -> (32,32) -> (64,64).
-    conv_transpose = functools.partial(tf_keras.v1.layers.Conv2DTranspose,
-                                       padding="SAME", activation=activation)
+    conv_transpose = functools.partial(
+        tf.keras.layers.Conv2DTranspose, padding="SAME", activation=activation)
     self.conv_transpose1 = conv_transpose(256, 8, 1, padding="VALID")
     self.conv_transpose2 = conv_transpose(256, 3, 2)
     self.conv_transpose3 = conv_transpose(256, 3, 2)
@@ -368,27 +367,27 @@ class Decoder(tf_keras.v1.Model):
       batch_size, timesteps, height, width, channels].
     """
     # We explicitly broadcast f to the same shape as z other than the final
-    # dimension, because `tf1.concat` can't automatically do this.
+    # dimension, because `tf.concat` can't automatically do this.
     dynamic, static = inputs
-    timesteps = tf1.shape(input=dynamic)[-2]
-    static = static[..., tf1.newaxis, :] + tf1.zeros([timesteps, 1])
-    latents = tf1.concat([dynamic, static], axis=-1)  # (sample, N, T, latents)
+    timesteps = tf.shape(input=dynamic)[-2]
+    static = static[..., tf.newaxis, :] + tf.zeros([timesteps, 1])
+    latents = tf.concat([dynamic, static], axis=-1)  # (sample, N, T, latents)
     out = self.dense(latents)
-    out = tf1.reshape(out, (-1, 1, 1, self.hidden_size))
+    out = tf.reshape(out, (-1, 1, 1, self.hidden_size))
     out = self.conv_transpose1(out)
     out = self.conv_transpose2(out)
     out = self.conv_transpose3(out)
     out = self.conv_transpose4(out)  # (sample*N*T, h, w, c)
-    expanded_shape = tf1.concat(
-        (tf1.shape(input=latents)[:-1], tf1.shape(input=out)[1:]), axis=0)
-    out = tf1.reshape(out, expanded_shape)  # (sample, N, T, h, w, c)
+    expanded_shape = tf.concat(
+        (tf.shape(input=latents)[:-1], tf.shape(input=out)[1:]), axis=0)
+    out = tf.reshape(out, expanded_shape)  # (sample, N, T, h, w, c)
     return tfd.Independent(
         distribution=tfd.Normal(loc=out, scale=1.),
         reinterpreted_batch_ndims=3,  # wrap (h, w, c)
         name="decoded_image")
 
 
-class Compressor(tf_keras.v1.Model):
+class Compressor(tf.keras.Model):
   """Feature extractor.
 
   This convolutional model aims to extract features corresponding to a
@@ -409,7 +408,7 @@ class Compressor(tf_keras.v1.Model):
     self.hidden_size = hidden_size
     # Spatial sizes: (64,64) -> (32,32) -> (16,16) -> (8,8) -> (1,1).
     conv = functools.partial(
-        tf_keras.v1.layers.Conv2D, padding="SAME", activation=tf1.nn.leaky_relu)
+        tf.keras.layers.Conv2D, padding="SAME", activation=tf.nn.leaky_relu)
     self.conv1 = conv(256, 3, 2)
     self.conv2 = conv(256, 3, 2)
     self.conv3 = conv(256, 3, 2)
@@ -427,18 +426,18 @@ class Compressor(tf_keras.v1.Model):
       A batch of intermediate representations of shape [sample_shape,
       batch_size, timesteps, hidden_size].
     """
-    image_shape = tf1.shape(input=inputs)[-3:]
-    collapsed_shape = tf1.concat(([-1], image_shape), axis=0)
-    out = tf1.reshape(inputs, collapsed_shape)  # (sample*batch*T, h, w, c)
+    image_shape = tf.shape(input=inputs)[-3:]
+    collapsed_shape = tf.concat(([-1], image_shape), axis=0)
+    out = tf.reshape(inputs, collapsed_shape)  # (sample*batch*T, h, w, c)
     out = self.conv1(out)
     out = self.conv2(out)
     out = self.conv3(out)
     out = self.conv4(out)
-    expanded_shape = tf1.concat((tf1.shape(input=inputs)[:-3], [-1]), axis=0)
-    return tf1.reshape(out, expanded_shape)  # (sample, batch, T, hidden)
+    expanded_shape = tf.concat((tf.shape(input=inputs)[:-3], [-1]), axis=0)
+    return tf.reshape(out, expanded_shape)  # (sample, batch, T, hidden)
 
 
-class EncoderStatic(tf_keras.v1.Model):
+class EncoderStatic(tf.keras.Model):
   """Probabilistic encoder for the time-invariant latent variable `f`.
 
   The conditional distribution `q(f | x_{1:T})` is a multivariate
@@ -477,10 +476,10 @@ class EncoderStatic(tf_keras.v1.Model):
     super(EncoderStatic, self).__init__()
     self.latent_size = latent_size
     self.hidden_size = hidden_size
-    self.bilstm = tf_keras.v1.layers.Bidirectional(
-        tf_keras.v1.layers.LSTM(hidden_size),
+    self.bilstm = tf.keras.layers.Bidirectional(
+        tf.keras.layers.LSTM(hidden_size),
         merge_mode="sum")
-    self.output_layer = tf_keras.v1.layers.Dense(2*latent_size)
+    self.output_layer = tf.keras.layers.Dense(2*latent_size)
 
   def call(self, inputs):
     """Runs the model to generate a distribution `q(f | x_{1:T})`.
@@ -501,18 +500,18 @@ class EncoderStatic(tf_keras.v1.Model):
     """
     # TODO(dusenberrymw): Remove these reshaping commands after b/113126249 is
     # fixed.
-    collapsed_shape = tf1.concat(([-1], tf1.shape(input=inputs)[-2:]), axis=0)
-    out = tf1.reshape(inputs, collapsed_shape)  # (sample*batch_size, T, hidden)
+    collapsed_shape = tf.concat(([-1], tf.shape(input=inputs)[-2:]), axis=0)
+    out = tf.reshape(inputs, collapsed_shape)  # (sample*batch_size, T, hidden)
     out = self.bilstm(out)  # (sample*batch_size, hidden)
-    expanded_shape = tf1.concat((tf1.shape(input=inputs)[:-2], [-1]), axis=0)
-    out = tf1.reshape(out, expanded_shape)  # (sample, batch_size, hidden)
+    expanded_shape = tf.concat((tf.shape(input=inputs)[:-2], [-1]), axis=0)
+    out = tf.reshape(out, expanded_shape)  # (sample, batch_size, hidden)
     out = self.output_layer(out)  # (sample, batch_size, 2*latent_size)
     loc = out[..., :self.latent_size]
-    scale_diag = tf1.nn.softplus(out[..., self.latent_size:]) + 1e-5  # keep > 0
+    scale_diag = tf.nn.softplus(out[..., self.latent_size:]) + 1e-5  # keep > 0
     return tfd.MultivariateNormalDiag(loc=loc, scale_diag=scale_diag)
 
 
-class EncoderDynamicFactorized(tf_keras.v1.Model):
+class EncoderDynamicFactorized(tf.keras.Model):
   """Probabilistic encoder for the time-variant latent variable `z_t`.
 
   The conditional distribution `q(z_t | x_t)` is a multivariate normal
@@ -543,9 +542,8 @@ class EncoderDynamicFactorized(tf_keras.v1.Model):
     super(EncoderDynamicFactorized, self).__init__()
     self.latent_size = latent_size
     self.hidden_size = hidden_size
-    self.dense = tf_keras.v1.layers.Dense(hidden_size,
-                                          activation=tf1.nn.leaky_relu)
-    self.output_layer = tf_keras.v1.layers.Dense(2*latent_size)
+    self.dense = tf.keras.layers.Dense(hidden_size, activation=tf.nn.leaky_relu)
+    self.output_layer = tf.keras.layers.Dense(2*latent_size)
 
   def call(self, inputs):
     """Runs the model to generate a distribution `q(z_{1:T} | x_{1:T})`.
@@ -564,11 +562,11 @@ class EncoderDynamicFactorized(tf_keras.v1.Model):
     out = self.dense(inputs)  # (..., batch, time, hidden)
     out = self.output_layer(out)  # (..., batch, time, 2*latent)
     loc = out[..., :self.latent_size]
-    scale_diag = tf1.nn.softplus(out[..., self.latent_size:]) + 1e-5  # keep > 0
+    scale_diag = tf.nn.softplus(out[..., self.latent_size:]) + 1e-5  # keep > 0
     return tfd.MultivariateNormalDiag(loc=loc, scale_diag=scale_diag)
 
 
-class EncoderDynamicFull(tf_keras.v1.Model):
+class EncoderDynamicFull(tf.keras.Model):
   """Probabilistic encoder for the time-variant latent variable `z_t`.
 
   The conditional distribution `q(z_{1:T} | x_{1:T}, f)` is a
@@ -603,11 +601,11 @@ class EncoderDynamicFull(tf_keras.v1.Model):
     super(EncoderDynamicFull, self).__init__()
     self.latent_size = latent_size
     self.hidden_size = hidden_size
-    self.bilstm = tf_keras.v1.layers.Bidirectional(
-        tf_keras.v1.layers.LSTM(hidden_size, return_sequences=True),
+    self.bilstm = tf.keras.layers.Bidirectional(
+        tf.keras.layers.LSTM(hidden_size, return_sequences=True),
         merge_mode="sum")
-    self.rnn = tf_keras.v1.layers.SimpleRNN(hidden_size, return_sequences=True)
-    self.output_layer = tf_keras.v1.layers.Dense(2*latent_size)
+    self.rnn = tf.keras.layers.SimpleRNN(hidden_size, return_sequences=True)
+    self.output_layer = tf.keras.layers.Dense(2*latent_size)
 
   def call(self, inputs):
     """Runs the model to generate a distribution `q(z_{1:T} | x_{1:T}, f)`.
@@ -631,37 +629,37 @@ class EncoderDynamicFull(tf_keras.v1.Model):
       sample.
     """
     # We explicitly broadcast `x` and `f` to the same shape other than the final
-    # dimension, because `tf1.concat` can't automatically do this. This will
+    # dimension, because `tf.concat` can't automatically do this. This will
     # entail adding a `timesteps` dimension to `f` to give the shape `(...,
     # batch, timesteps, latent)`, and then broadcasting the sample shapes of
     # both tensors to the same shape.
     features, static_sample = inputs
-    length = tf1.shape(input=features)[-2]
-    static_sample = static_sample[..., tf1.newaxis, :] + tf1.zeros([length, 1])
-    sample_shape_static = tf1.shape(input=static_sample)[:-3]
-    sample_shape_inputs = tf1.shape(input=features)[:-3]
-    broadcast_shape_inputs = tf1.concat((sample_shape_static, [1, 1, 1]), 0)
-    broadcast_shape_static = tf1.concat((sample_shape_inputs, [1, 1, 1]), 0)
-    features = features + tf1.zeros(broadcast_shape_inputs)
-    static_sample = static_sample + tf1.zeros(broadcast_shape_static)
+    length = tf.shape(input=features)[-2]
+    static_sample = static_sample[..., tf.newaxis, :] + tf.zeros([length, 1])
+    sample_shape_static = tf.shape(input=static_sample)[:-3]
+    sample_shape_inputs = tf.shape(input=features)[:-3]
+    broadcast_shape_inputs = tf.concat((sample_shape_static, [1, 1, 1]), 0)
+    broadcast_shape_static = tf.concat((sample_shape_inputs, [1, 1, 1]), 0)
+    features = features + tf.zeros(broadcast_shape_inputs)
+    static_sample = static_sample + tf.zeros(broadcast_shape_static)
     # `combined` will have shape (..., batch, T, hidden+latent).
-    combined = tf1.concat((features, static_sample), axis=-1)
+    combined = tf.concat((features, static_sample), axis=-1)
     # TODO(dusenberrymw): Remove these reshaping commands after b/113126249 is
     # fixed.
-    collapsed_shape = tf1.concat(([-1], tf1.shape(input=combined)[-2:]), axis=0)
-    out = tf1.reshape(combined, collapsed_shape)
+    collapsed_shape = tf.concat(([-1], tf.shape(input=combined)[-2:]), axis=0)
+    out = tf.reshape(combined, collapsed_shape)
     out = self.bilstm(out)  # (sample*batch, T, hidden_size)
     out = self.rnn(out)  # (sample*batch, T, hidden_size)
-    expanded_shape = tf1.concat(
-        (tf1.shape(input=combined)[:-2], tf1.shape(input=out)[1:]), axis=0)
-    out = tf1.reshape(out, expanded_shape)  # (sample, batch, T, hidden_size)
+    expanded_shape = tf.concat(
+        (tf.shape(input=combined)[:-2], tf.shape(input=out)[1:]), axis=0)
+    out = tf.reshape(out, expanded_shape)  # (sample, batch, T, hidden_size)
     out = self.output_layer(out)  # (sample, batch, T, 2*latent_size)
     loc = out[..., :self.latent_size]
-    scale_diag = tf1.nn.softplus(out[..., self.latent_size:]) + 1e-5  # keep > 0
+    scale_diag = tf.nn.softplus(out[..., self.latent_size:]) + 1e-5  # keep > 0
     return tfd.MultivariateNormalDiag(loc=loc, scale_diag=scale_diag)
 
 
-class DisentangledSequentialVAE(tf_keras.v1.Model):
+class DisentangledSequentialVAE(tf.keras.Model):
   """Disentangled Sequential Variational Autoencoder.
 
   The disentangled sequential variational autoencoder posits a generative
@@ -814,8 +812,8 @@ class DisentangledSequentialVAE(tf_keras.v1.Model):
       sample shape [sample_shape, samples, batch_size, timesteps,
       height, width, channels].
     """
-    batch_size = tf1.shape(input=inputs)[-5]
-    length = len(tf1.unstack(inputs, axis=-4))  # hack for graph mode
+    batch_size = tf.shape(input=inputs)[-5]
+    length = len(tf.unstack(inputs, axis=-4))  # hack for graph mode
 
     features = self.compressor(inputs)  # (..., batch, timesteps, hidden)
 
@@ -826,7 +824,7 @@ class DisentangledSequentialVAE(tf_keras.v1.Model):
       static_sample, _ = self.sample_static_posterior(features, samples)
 
     if swap_static:
-      static_sample = tf1.reverse(static_sample, axis=[1])
+      static_sample = tf.reverse(static_sample, axis=[1])
 
     if sample_dynamic:
       dynamic_sample, _ = self.sample_dynamic_prior(
@@ -836,7 +834,7 @@ class DisentangledSequentialVAE(tf_keras.v1.Model):
           features, samples, static_sample)
 
     if swap_dynamic:
-      dynamic_sample = tf1.reverse(dynamic_sample, axis=[1])
+      dynamic_sample = tf.reverse(dynamic_sample, axis=[1])
 
     likelihood = self.decoder((dynamic_sample, static_sample))
     return likelihood
@@ -858,7 +856,7 @@ class DisentangledSequentialVAE(tf_keras.v1.Model):
     """
     dist = self.static_prior()
     if fixed:  # in either case, shape is (samples, batch, latent)
-      sample = dist.sample((samples, 1)) + tf1.zeros([batch_size, 1])
+      sample = dist.sample((samples, 1)) + tf.zeros([batch_size, 1])
     else:
       sample = dist.sample((samples, batch_size))
     return sample, dist
@@ -915,12 +913,12 @@ class DisentangledSequentialVAE(tf_keras.v1.Model):
       scale_diags.append(dist.parameters["scale_diag"])
       sample_list.append(sample)
 
-    sample = tf1.stack(sample_list, axis=2)
-    loc = tf1.stack(locs, axis=2)
-    scale_diag = tf1.stack(scale_diags, axis=2)
+    sample = tf.stack(sample_list, axis=2)
+    loc = tf.stack(locs, axis=2)
+    scale_diag = tf.stack(scale_diags, axis=2)
 
     if fixed:  # tile along the batch axis
-      sample = sample + tf1.zeros([batch_size, 1, 1])
+      sample = sample + tf.zeros([batch_size, 1, 1])
 
     return sample, tfd.MultivariateNormalDiag(loc=loc, scale_diag=scale_diag)
 
@@ -969,15 +967,15 @@ def image_summary(seqs, name, num=None):
     num: Integer for the number of examples to visualize. Defaults to
       all examples.
   """
-  seqs = tf1.clip_by_value(seqs, 0., 1.)
-  seqs = tf1.unstack(seqs[:num])
-  joined_seqs = [tf1.concat(tf1.unstack(seq), 1) for seq in seqs]
-  joined_seqs = tf1.expand_dims(tf1.concat(joined_seqs, 0), 0)
-  tf.summary.image(
+  seqs = tf.clip_by_value(seqs, 0., 1.)
+  seqs = tf.unstack(seqs[:num])
+  joined_seqs = [tf.concat(tf.unstack(seq), 1) for seq in seqs]
+  joined_seqs = tf.expand_dims(tf.concat(joined_seqs, 0), 0)
+  tf.compat.v2.summary.image(
       name,
       joined_seqs,
       max_outputs=1,
-      step=tf1.train.get_or_create_global_step())
+      step=tf.compat.v1.train.get_or_create_global_step())
 
 
 def visualize_reconstruction(inputs, reconstruct, num=3, name="reconstruction"):
@@ -991,8 +989,8 @@ def visualize_reconstruction(inputs, reconstruct, num=3, name="reconstruction"):
     num: Integer for the number of examples to visualize.
     name: String name of this summary.
   """
-  reconstruct = tf1.clip_by_value(reconstruct, 0., 1.)
-  inputs_and_reconstruct = tf1.concat((inputs[:num], reconstruct[:num]), axis=0)
+  reconstruct = tf.clip_by_value(reconstruct, 0., 1.)
+  inputs_and_reconstruct = tf.concat((inputs[:num], reconstruct[:num]), axis=0)
   image_summary(inputs_and_reconstruct, name)
 
 
@@ -1008,9 +1006,9 @@ def visualize_qualitative_analysis(inputs, model, samples=1, batch_size=3,
     batch_size: Number of sequences to generate.
     length: Number of timesteps to generate for each sequence.
   """
-  average = lambda dist: tf1.reduce_mean(
+  average = lambda dist: tf.reduce_mean(
       input_tensor=dist.mean(), axis=0)  # avg over samples
-  with tf1.name_scope("val_reconstruction"):
+  with tf.compat.v1.name_scope("val_reconstruction"):
     reconstruct = functools.partial(model.reconstruct, inputs=inputs,
                                     samples=samples)
     visualize_reconstruction(inputs, average(reconstruct()))
@@ -1023,7 +1021,7 @@ def visualize_qualitative_analysis(inputs, model, samples=1, batch_size=3,
     visualize_reconstruction(inputs, average(reconstruct(swap_dynamic=True)),
                              name="swap_dynamic")
 
-  with tf1.name_scope("generation"):
+  with tf.compat.v1.name_scope("generation"):
     generate = functools.partial(model.generate, batch_size=batch_size,
                                  length=length, samples=samples)
     image_summary(average(generate(fix_static=True)), "fix_static")
@@ -1039,15 +1037,15 @@ def summarize_dist_params(dist, name, name_scope="dist_params"):
     name: The name of the distribution.
     name_scope: The name scope of this summary.
   """
-  with tf1.name_scope(name_scope):
-    tf.summary.histogram(
+  with tf.compat.v1.name_scope(name_scope):
+    tf.compat.v2.summary.histogram(
         name="{}/{}".format(name, "mean"),
         data=dist.mean(),
-        step=tf1.train.get_or_create_global_step())
-    tf.summary.histogram(
+        step=tf.compat.v1.train.get_or_create_global_step())
+    tf.compat.v2.summary.histogram(
         name="{}/{}".format(name, "stddev"),
         data=dist.stddev(),
-        step=tf1.train.get_or_create_global_step())
+        step=tf.compat.v1.train.get_or_create_global_step())
 
 
 def summarize_mean_in_nats_and_bits(inputs, units, name,
@@ -1063,29 +1061,29 @@ def summarize_mean_in_nats_and_bits(inputs, units, name,
     nats_name_scope: The name scope of the nats summary.
     bits_name_scope: The name scope of the bits summary.
   """
-  mean = tf1.reduce_mean(input_tensor=inputs)
-  with tf1.name_scope(nats_name_scope):
-    tf.summary.scalar(
+  mean = tf.reduce_mean(input_tensor=inputs)
+  with tf.compat.v1.name_scope(nats_name_scope):
+    tf.compat.v2.summary.scalar(
         name,
         mean,
-        step=tf1.train.get_or_create_global_step())
-  with tf1.name_scope(bits_name_scope):
-    tf.summary.scalar(
+        step=tf.compat.v1.train.get_or_create_global_step())
+  with tf.compat.v1.name_scope(bits_name_scope):
+    tf.compat.v2.summary.scalar(
         name,
-        mean / units / tf1.math.log(2.),
-        step=tf1.train.get_or_create_global_step())
+        mean / units / tf.math.log(2.),
+        step=tf.compat.v1.train.get_or_create_global_step())
 
 
 def main(argv):
   del argv  # unused
 
-  tf1.enable_eager_execution()
-  tf1.set_random_seed(FLAGS.seed)
+  tf.compat.v1.enable_eager_execution()
+  tf.compat.v1.set_random_seed(FLAGS.seed)
   timestamp = datetime.strftime(datetime.today(), "%y%m%d_%H%M%S")
   FLAGS.logdir = FLAGS.logdir.format(timestamp=timestamp)
   FLAGS.model_dir = FLAGS.model_dir.format(timestamp=timestamp)
-  if not tf1.io.gfile.exists(FLAGS.model_dir):
-    tf1.io.gfile.makedirs(FLAGS.model_dir)
+  if not tf.io.gfile.exists(FLAGS.model_dir):
+    tf.io.gfile.makedirs(FLAGS.model_dir)
 
   sprites_data = sprites_dataset.SpritesDataset(fake_data=FLAGS.fake_data)
 
@@ -1095,17 +1093,18 @@ def main(argv):
       hidden_size=FLAGS.hidden_size, channels=sprites_data.channels,
       latent_posterior=FLAGS.latent_posterior)
 
-  global_step = tf1.train.get_or_create_global_step()
-  optimizer = tf1.train.AdamOptimizer(
-      tf1.train.cosine_decay(FLAGS.learning_rate, global_step, FLAGS.max_steps))
+  global_step = tf.compat.v1.train.get_or_create_global_step()
+  optimizer = tf.compat.v1.train.AdamOptimizer(
+      tf.compat.v1.train.cosine_decay(FLAGS.learning_rate, global_step,
+                                      FLAGS.max_steps))
 
-  checkpoint = tf1.train.Checkpoint(model=model, global_step=global_step,
-                                    optimizer=optimizer)
-  checkpoint_manager = tf1.train.CheckpointManager(
+  checkpoint = tf.train.Checkpoint(model=model, global_step=global_step,
+                                   optimizer=optimizer)
+  checkpoint_manager = tf.train.CheckpointManager(
       checkpoint, directory=FLAGS.model_dir, max_to_keep=5)
   checkpoint.restore(checkpoint_manager.latest_checkpoint)
 
-  writer = tf.summary.create_file_writer(FLAGS.logdir)
+  writer = tf.compat.v2.summary.create_file_writer(FLAGS.logdir)
   writer.set_as_default()
 
   dataset = sprites_data.train.map(lambda *x: x[0]).shuffle(1000).repeat()
@@ -1113,14 +1112,14 @@ def main(argv):
 
   if FLAGS.enable_debug_logging:
     for inputs in dataset.prefetch(buffer_size=None):
-      with tf.summary.record_if(
-          lambda: tf1.math.equal(0, global_step % FLAGS.log_steps)):
-        tf.summary.histogram(
+      with tf.compat.v2.summary.record_if(
+          lambda: tf.math.equal(0, global_step % FLAGS.log_steps)):
+        tf.compat.v2.summary.histogram(
             "image",
             data=inputs,
-            step=tf1.train.get_or_create_global_step())
+            step=tf.compat.v1.train.get_or_create_global_step())
 
-      with tf1.GradientTape() as tape:
+      with tf.GradientTape() as tape:
         features = model.compressor(inputs)  # (batch, timesteps, hidden)
         static_sample, static_posterior = model.sample_static_posterior(
             features, FLAGS.num_samples)  # (samples, batch, latent)
@@ -1128,7 +1127,7 @@ def main(argv):
             features, FLAGS.num_samples, static_sample)  # (sampl, N, T, latent)
         likelihood = model.decoder((dynamic_sample, static_sample))
 
-        reconstruction = tf1.reduce_mean(  # integrate samples
+        reconstruction = tf.reduce_mean(  # integrate samples
             input_tensor=likelihood.mean()[:FLAGS.num_reconstruction_samples],
             axis=0)
         visualize_reconstruction(inputs, reconstruction,
@@ -1147,17 +1146,17 @@ def main(argv):
 
         static_prior_log_prob = static_prior.log_prob(static_sample)
         static_posterior_log_prob = static_posterior.log_prob(static_sample)
-        dynamic_prior_log_prob = tf1.reduce_sum(
+        dynamic_prior_log_prob = tf.reduce_sum(
             input_tensor=dynamic_prior.log_prob(dynamic_sample),
             axis=-1)  # sum time
-        dynamic_posterior_log_prob = tf1.reduce_sum(
+        dynamic_posterior_log_prob = tf.reduce_sum(
             input_tensor=dynamic_posterior.log_prob(dynamic_sample),
             axis=-1)  # sum time
-        likelihood_log_prob = tf1.reduce_sum(
+        likelihood_log_prob = tf.reduce_sum(
             input_tensor=likelihood.log_prob(inputs), axis=-1)  # sum time
 
         if FLAGS.enable_debug_logging:
-          with tf1.name_scope("log_probs"):
+          with tf.compat.v1.name_scope("log_probs"):
             summarize_mean_in_nats_and_bits(
                 static_prior_log_prob, FLAGS.latent_size_static, "static_prior")
             summarize_mean_in_nats_and_bits(
@@ -1173,40 +1172,40 @@ def main(argv):
                 likelihood_log_prob, sprites_data.frame_size ** 2 *
                 sprites_data.channels * sprites_data.length, "likelihood")
 
-        elbo = tf1.reduce_mean(input_tensor=static_prior_log_prob -
-                               static_posterior_log_prob +
-                               dynamic_prior_log_prob -
-                               dynamic_posterior_log_prob + likelihood_log_prob)
+        elbo = tf.reduce_mean(input_tensor=static_prior_log_prob -
+                              static_posterior_log_prob +
+                              dynamic_prior_log_prob -
+                              dynamic_posterior_log_prob + likelihood_log_prob)
         loss = -elbo
-        tf.summary.scalar(
+        tf.compat.v2.summary.scalar(
             "elbo",
             elbo,
-            step=tf1.train.get_or_create_global_step())
+            step=tf.compat.v1.train.get_or_create_global_step())
 
       grads = tape.gradient(loss, model.variables)
-      grads, global_norm = tf1.clip_by_global_norm(grads, FLAGS.clip_norm)
+      grads, global_norm = tf.clip_by_global_norm(grads, FLAGS.clip_norm)
       grads_and_vars = list(zip(grads, model.variables))  # allow reuse in py3
       if FLAGS.enable_debug_logging:
-        with tf1.name_scope("grads"):
-          tf.summary.scalar(
+        with tf.compat.v1.name_scope("grads"):
+          tf.compat.v2.summary.scalar(
               "global_norm_grads",
               global_norm,
-              step=tf1.train.get_or_create_global_step())
-          tf.summary.scalar(
+              step=tf.compat.v1.train.get_or_create_global_step())
+          tf.compat.v2.summary.scalar(
               "global_norm_grads_clipped",
-              tf1.linalg.global_norm(grads),
-              step=tf1.train.get_or_create_global_step())
+              tf.linalg.global_norm(grads),
+              step=tf.compat.v1.train.get_or_create_global_step())
         for grad, var in grads_and_vars:
-          with tf1.name_scope("grads"):
-            tf.summary.histogram(
+          with tf.compat.v1.name_scope("grads"):
+            tf.compat.v2.summary.histogram(
                 "{}/grad".format(var.name),
                 data=grad,
-                step=tf1.train.get_or_create_global_step())
-          with tf1.name_scope("vars"):
-            tf.summary.histogram(
+                step=tf.compat.v1.train.get_or_create_global_step())
+          with tf.compat.v1.name_scope("vars"):
+            tf.compat.v2.summary.histogram(
                 var.name,
                 data=var,
-                step=tf1.train.get_or_create_global_step())
+                step=tf.compat.v1.train.get_or_create_global_step())
       optimizer.apply_gradients(grads_and_vars, global_step)
 
     is_log_step = global_step.numpy() % FLAGS.log_steps == 0
@@ -1215,7 +1214,7 @@ def main(argv):
       checkpoint_manager.save()
       print("ELBO ({}/{}): {}".format(global_step.numpy(), FLAGS.max_steps,
                                       elbo.numpy()))
-      with tf.summary.record_if(True):
+      with tf.compat.v2.summary.record_if(True):
         val_data = sprites_data.test.take(20)
         inputs = next(iter(val_data.shuffle(20).batch(3)))[0]
         visualize_qualitative_analysis(inputs, model,

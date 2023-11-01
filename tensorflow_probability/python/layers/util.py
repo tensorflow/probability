@@ -29,8 +29,6 @@ from tensorflow_probability.python.distributions import deterministic as determi
 from tensorflow_probability.python.distributions import independent as independent_lib
 from tensorflow_probability.python.distributions import normal as normal_lib
 
-from tensorflow_probability.python.internal import tf_keras
-
 
 __all__ = [
     'default_loc_scale_fn',
@@ -237,7 +235,7 @@ def deserialize_function(serial, function_type):
   Keras-deserialized functions do not perform lexical scoping. Any modules that
   the function requires must be imported within the function itself.
 
-  This serialization mimicks the implementation in `tf_keras.layers.Lambda`.
+  This serialization mimicks the implementation in `tf.keras.layers.Lambda`.
 
   Args:
     serial: Serialized Keras object: typically a dict, string, or bytecode.
@@ -257,7 +255,7 @@ def deserialize_function(serial, function_type):
   """
   if function_type == 'function':
     # Simple lookup in custom objects
-    function = tf_keras.utils.legacy.deserialize_keras_object(serial)
+    function = tf.keras.utils.legacy.deserialize_keras_object(serial)
   elif function_type == 'lambda':
     # Unsafe deserialization from bytecode
     function = _func_load(serial)
@@ -275,7 +273,7 @@ def serialize_function(func):
   us use the Python scope to obtain the function rather than reload it from
   bytecode. (Note that both cases are brittle!)
 
-  This serialization mimicks the implementation in `tf_keras.layers.Lambda`.
+  This serialization mimicks the implementation in `tf.keras.layers.Lambda`.
 
   Args:
     func: Python function to serialize.

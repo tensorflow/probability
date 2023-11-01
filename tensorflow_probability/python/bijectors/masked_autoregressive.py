@@ -27,7 +27,6 @@ from tensorflow_probability.python.bijectors import shift as shift_lib
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
 
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
@@ -88,7 +87,7 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
   is possible that this architecture is suboptimal for your task. To build
   alternative networks, either change the arguments to
   `tfp.bijectors.AutoregressiveNetwork` or use some other architecture, e.g.,
-  using `tf_keras.layers`.
+  using `tf.keras.layers`.
 
   Warning: no attempt is made to validate that the `shift_and_log_scale_fn`
   enforces the 'autoregressive property'.
@@ -216,7 +215,7 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
   track variables used inside `shift_and_log_scale_fn` or `bijector_fn`.  To get
   `tfb.MaskedAutoregressiveFlow` to track such variables, either:
 
-   1. Replace the Python function with a `tf.Module`, `tf_keras.Layer`,
+   1. Replace the Python function with a `tf.Module`, `tf.keras.Layer`,
       or other callable object through which `tf.Module` can find variables.
 
    2. Or, add a reference to the variables to the `tfb.MaskedAutoregressiveFlow`
@@ -483,7 +482,7 @@ def masked_dense(inputs,
     return mask * kernel_initializer(shape, dtype, partition_info)
 
   with tf.name_scope(name or 'masked_dense'):
-    layer = tf_keras.tf1_layers.Dense(
+    layer = tf1.layers.Dense(
         units,
         kernel_initializer=masked_initializer,
         kernel_constraint=lambda x: mask * x,
@@ -622,7 +621,7 @@ def masked_autoregressive_default_template(hidden_layers,
     return tf1.make_template(name, _fn)
 
 
-class AutoregressiveNetwork(tf_keras.layers.Layer):
+class AutoregressiveNetwork(tf.keras.layers.Layer):
   r"""Masked Autoencoder for Distribution Estimation [Germain et al. (2015)][1].
 
   A `AutoregressiveNetwork` takes as input a Tensor of shape `[..., event_size]`
@@ -665,7 +664,7 @@ class AutoregressiveNetwork(tf_keras.layers.Layer):
   log_prob_ = distribution.log_prob(x_)
   model = tfk.Model(x_, log_prob_)
 
-  model.compile(optimizer=tf_keras.optimizers.Adam(),
+  model.compile(optimizer=tf.keras.optimizers.Adam(),
                 loss=lambda _, log_prob: -log_prob)
 
   batch_size = 25
@@ -719,7 +718,7 @@ class AutoregressiveNetwork(tf_keras.layers.Layer):
     x_, bijector_kwargs={'conditional_input': c_})
   model = tfk.Model([x_, c_], log_prob_)
 
-  model.compile(optimizer=tf_keras.optimizers.Adam(learning_rate=0.1),
+  model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.1),
                 loss=lambda _, log_prob: -log_prob)
 
   batch_size = 25
@@ -781,7 +780,7 @@ class AutoregressiveNetwork(tf_keras.layers.Layer):
       log_prob_ = distribution.log_prob(x_)
       model = tfk.Model(x_, log_prob_)
 
-      model.compile(optimizer=tf_keras.optimizers.Adam(),
+      model.compile(optimizer=tf.keras.optimizers.Adam(),
                     loss=lambda _, log_prob: -log_prob)
 
       batch_size = 10
@@ -839,7 +838,7 @@ class AutoregressiveNetwork(tf_keras.layers.Layer):
       log_prob_ = distribution.log_prob(x_)
       model = tfk.Model(x_, log_prob_)
 
-      model.compile(optimizer=tf_keras.optimizers.Adam(),
+      model.compile(optimizer=tf.keras.optimizers.Adam(),
                     loss=lambda _, log_prob: -log_prob)
 
       batch_size = 10
@@ -924,10 +923,10 @@ class AutoregressiveNetwork(tf_keras.layers.Layer):
       hidden_degrees: Method for assigning degrees to the hidden units:
         'equal', 'random'.  If 'equal', hidden units in each layer are allocated
         equally (up to a remainder term) to each degree.  Default: 'equal'.
-      activation: An activation function.  See `tf_keras.layers.Dense`. Default:
+      activation: An activation function.  See `tf.keras.layers.Dense`. Default:
         `None`.
       use_bias: Whether or not the dense layers constructed in this layer
-        should have a bias term.  See `tf_keras.layers.Dense`.  Default: `True`.
+        should have a bias term.  See `tf.keras.layers.Dense`.  Default: `True`.
       kernel_initializer: Initializer for the `Dense` kernel weight
         matrices.  Default: 'glorot_uniform'.
       bias_initializer: Initializer for the `Dense` bias vectors. Default:
@@ -945,7 +944,7 @@ class AutoregressiveNetwork(tf_keras.layers.Layer):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
       **kwargs: Additional keyword arguments passed to this layer (but not to
-        the `tf_keras.layer.Dense` layers constructed by this layer).
+        the `tf.keras.layer.Dense` layers constructed by this layer).
     """
     super().__init__(**kwargs)
 
@@ -965,7 +964,7 @@ class AutoregressiveNetwork(tf_keras.layers.Layer):
     self._bias_initializer = bias_initializer
     self._kernel_regularizer = kernel_regularizer
     self._bias_regularizer = bias_regularizer
-    self._kernel_constraint = tf_keras.constraints.get(kernel_constraint)
+    self._kernel_constraint = tf.keras.constraints.get(kernel_constraint)
     self._bias_constraint = bias_constraint
     self._validate_args = validate_args
     self._kwargs = kwargs
@@ -1031,10 +1030,10 @@ class AutoregressiveNetwork(tf_keras.layers.Layer):
         hidden_degrees=self._hidden_degrees,
     )
 
-    outputs = [tf_keras.Input((self._event_size,), dtype=self.dtype)]
+    outputs = [tf.keras.Input((self._event_size,), dtype=self.dtype)]
     inputs = outputs[0]
     if self._conditional:
-      conditional_input = tf_keras.Input((self._conditional_size,),
+      conditional_input = tf.keras.Input((self._conditional_size,),
                                          dtype=self.dtype)
       inputs = [inputs, conditional_input]
 
@@ -1044,7 +1043,7 @@ class AutoregressiveNetwork(tf_keras.layers.Layer):
     #  [..., self._hidden_units[-1]] -> [..., event_size * self._params].
     layer_output_sizes = self._hidden_units + [self._event_size * self._params]
     for k in range(len(self._masks)):
-      autoregressive_output = tf_keras.layers.Dense(
+      autoregressive_output = tf.keras.layers.Dense(
           layer_output_sizes[k],
           activation=None,
           use_bias=self._use_bias,
@@ -1060,7 +1059,7 @@ class AutoregressiveNetwork(tf_keras.layers.Layer):
       if (self._conditional and
           ((self._conditional_layers == 'all_layers') or
            ((self._conditional_layers == 'first_layer') and (k == 0)))):
-        conditional_output = tf_keras.layers.Dense(
+        conditional_output = tf.keras.layers.Dense(
             layer_output_sizes[k],
             activation=None,
             use_bias=False,
@@ -1071,16 +1070,16 @@ class AutoregressiveNetwork(tf_keras.layers.Layer):
             kernel_constraint=self._kernel_constraint,
             bias_constraint=None,
             dtype=self.dtype)(conditional_input)
-        outputs.append(tf_keras.layers.Add()([
+        outputs.append(tf.keras.layers.Add()([
             autoregressive_output,
             conditional_output]))
       else:
         outputs.append(autoregressive_output)
       if k + 1 < len(self._masks):
         outputs.append(
-            tf_keras.layers.Activation(self._activation)
+            tf.keras.layers.Activation(self._activation)
             (outputs[-1]))
-    self._network = tf_keras.models.Model(
+    self._network = tf.keras.models.Model(
         inputs=inputs,
         outputs=outputs[-1])
     # Allow network to be called with inputs of shapes that don't match
@@ -1353,10 +1352,10 @@ def _create_masks(degrees):
 
 def _make_masked_initializer(mask, initializer):
   """Returns a masked version of the given initializer."""
-  initializer = tf_keras.initializers.get(initializer)
+  initializer = tf.keras.initializers.get(initializer)
   def masked_initializer(shape, dtype=None, partition_info=None):
     # If no `partition_info` is given, then don't pass it to `initializer`, as
-    # `initializer` may be a `tf_keras.initializers.Initializer` (which don't
+    # `initializer` may be a `tf.keras.initializers.Initializer` (which don't
     # accept a `partition_info` argument).
     if partition_info is None:
       x = initializer(shape, dtype)
@@ -1367,7 +1366,7 @@ def _make_masked_initializer(mask, initializer):
 
 
 def _make_masked_constraint(mask, constraint=None):
-  constraint = tf_keras.constraints.get(constraint)
+  constraint = tf.keras.constraints.get(constraint)
   def masked_constraint(x):
     x = tf.convert_to_tensor(x, dtype_hint=tf.float32, name='x')
     if constraint is not None:

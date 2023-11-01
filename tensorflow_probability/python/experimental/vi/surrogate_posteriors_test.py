@@ -44,7 +44,6 @@ from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.vi import optimization
 
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
@@ -132,7 +131,7 @@ class _SurrogatePosterior(object):
         lambda rate, concentration: model.log_prob((rate, concentration, y)),
         surrogate_posterior,
         num_steps=5,  # Don't optimize to completion.
-        optimizer=tf_keras.optimizers.Adam(0.1),
+        optimizer=tf.keras.optimizers.Adam(0.1),
         sample_size=10)
 
     # Compute posterior statistics.

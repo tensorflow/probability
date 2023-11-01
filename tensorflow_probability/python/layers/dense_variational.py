@@ -21,7 +21,6 @@ from tensorflow_probability.python.distributions import independent as independe
 from tensorflow_probability.python.distributions import kullback_leibler as kl_lib
 from tensorflow_probability.python.distributions import normal as normal_lib
 from tensorflow_probability.python.internal import docstring_util
-from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.layers import util as tfp_layers_util
 from tensorflow_probability.python.util import SeedStream
 
@@ -71,7 +70,7 @@ doc_args = """units: Integer or Long, dimensionality of the output space.
     sample is a `Tensor`."""
 
 
-class _DenseVariational(tf_keras.layers.Layer):
+class _DenseVariational(tf.keras.layers.Layer):
   """Abstract densely-connected class (private, used as implementation base).
 
   This layer implements the Bayesian variational inference analogue to
@@ -116,8 +115,8 @@ class _DenseVariational(tf_keras.layers.Layer):
         activity_regularizer=activity_regularizer,
         **kwargs)
     self.units = units
-    self.activation = tf_keras.activations.get(activation)
-    self.input_spec = tf_keras.layers.InputSpec(min_ndim=2)
+    self.activation = tf.keras.activations.get(activation)
+    self.input_spec = tf.keras.layers.InputSpec(min_ndim=2)
     self.kernel_posterior_fn = kernel_posterior_fn
     self.kernel_posterior_tensor_fn = kernel_posterior_tensor_fn
     self.kernel_prior_fn = kernel_prior_fn
@@ -133,10 +132,10 @@ class _DenseVariational(tf_keras.layers.Layer):
     if in_size is None:
       raise ValueError('The last dimension of the inputs to `Dense` '
                        'should be defined. Found `None`.')
-    self._input_spec = tf_keras.layers.InputSpec(min_ndim=2, axes={-1: in_size})
+    self._input_spec = tf.keras.layers.InputSpec(min_ndim=2, axes={-1: in_size})
 
     # If self.dtype is None, build weights using the default dtype.
-    dtype = tf.as_dtype(self.dtype or tf_keras.backend.floatx())
+    dtype = tf.as_dtype(self.dtype or tf.keras.backend.floatx())
 
     # Must have a posterior kernel.
     self.kernel_posterior = self.kernel_posterior_fn(
@@ -222,10 +221,10 @@ class _DenseVariational(tf_keras.layers.Layer):
     """
     config = {
         'units': self.units,
-        'activation': (tf_keras.activations.serialize(self.activation)
+        'activation': (tf.keras.activations.serialize(self.activation)
                        if self.activation else None),
         'activity_regularizer':
-            tf_keras.initializers.serialize(self.activity_regularizer),
+            tf.keras.initializers.serialize(self.activity_regularizer),
     }
     function_keys = [
         'kernel_posterior_fn',
@@ -347,7 +346,7 @@ class DenseReparameterization(_DenseVariational):
   import tensorflow as tf
   import tensorflow_probability as tfp
 
-  model = tf_keras.Sequential([
+  model = tf.keras.Sequential([
       tfp.layers.DenseReparameterization(512, activation=tf.nn.relu),
       tfp.layers.DenseReparameterization(10),
   ])
@@ -466,7 +465,7 @@ class DenseLocalReparameterization(_DenseVariational):
   ```python
   import tensorflow_probability as tfp
 
-  model = tf_keras.Sequential([
+  model = tf.keras.Sequential([
       tfp.layers.DenseLocalReparameterization(512, activation=tf.nn.relu),
       tfp.layers.DenseLocalReparameterization(10),
   ])
@@ -593,7 +592,7 @@ class DenseFlipout(_DenseVariational):
   ```python
   import tensorflow_probability as tfp
 
-  model = tf_keras.Sequential([
+  model = tf.keras.Sequential([
       tfp.layers.DenseFlipout(512, activation=tf.nn.relu),
       tfp.layers.DenseFlipout(10),
   ])

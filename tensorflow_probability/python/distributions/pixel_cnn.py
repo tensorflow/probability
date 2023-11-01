@@ -30,7 +30,6 @@ from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.layers import weight_norm
 
 
@@ -104,8 +103,8 @@ class PixelCNN(distribution.Distribution):
   import tensorflow_probability as tfp
 
   tfd = tfp.distributions
-  tfk = tf_keras
-  tfkl = tf_keras.layers
+  tfk = tf.keras
+  tfkl = tf.keras.layers
 
   # Load MNIST from tensorflow_datasets
   data = tfds.load('mnist')
@@ -382,7 +381,7 @@ class PixelCNN(distribution.Distribution):
         must broadcast to the leading batch dimensions of `value`.
       training: `bool` or `None`. If `bool`, it controls the dropout layer,
         where `True` implies dropout is active. If `None`, it defaults to
-        `tf_keras.backend.learning_phase()`.
+        `tf.keras.backend.learning_phase()`.
     Returns:
       log_prob_values: `Tensor`.
     """
@@ -619,7 +618,7 @@ class PixelCNN(distribution.Distribution):
     return tf.TensorShape(self.image_shape)
 
 
-class _PixelCNNNetwork(tf_keras.layers.Layer):
+class _PixelCNNNetwork(tf.keras.layers.Layer):
   """Keras `Layer` to parameterize a Pixel CNN++ distribution.
 
   This is a Keras implementation of the Pixel CNN++ network, as described in
@@ -702,33 +701,33 @@ class _PixelCNNNetwork(tf_keras.layers.Layer):
     dtype = self.dtype
     if len(input_shape) == 2:
       batch_image_shape, batch_conditional_shape = input_shape
-      conditional_input = tf_keras.layers.Input(
+      conditional_input = tf.keras.layers.Input(
           shape=batch_conditional_shape[1:], dtype=dtype)
     else:
       batch_image_shape = input_shape
       conditional_input = None
 
     image_shape = batch_image_shape[1:]
-    image_input = tf_keras.layers.Input(shape=image_shape, dtype=dtype)
+    image_input = tf.keras.layers.Input(shape=image_shape, dtype=dtype)
 
     if self._resnet_activation == 'concat_elu':
-      activation = tf_keras.layers.Lambda(
+      activation = tf.keras.layers.Lambda(
           lambda x: tf.nn.elu(tf.concat([x, -x], axis=-1)), dtype=dtype)
     else:
-      activation = tf_keras.activations.get(self._resnet_activation)
+      activation = tf.keras.activations.get(self._resnet_activation)
 
     # Define layers with default inputs and layer wrapper applied
     Conv2D = functools.partial(  # pylint:disable=invalid-name
-        self._layer_wrapper(tf_keras.layers.Convolution2D),
+        self._layer_wrapper(tf.keras.layers.Convolution2D),
         filters=self._num_filters,
         padding='same',
         dtype=dtype)
 
     Dense = functools.partial(  # pylint:disable=invalid-name
-        self._layer_wrapper(tf_keras.layers.Dense), dtype=dtype)
+        self._layer_wrapper(tf.keras.layers.Dense), dtype=dtype)
 
     Conv2DTranspose = functools.partial(  # pylint:disable=invalid-name
-        self._layer_wrapper(tf_keras.layers.Conv2DTranspose),
+        self._layer_wrapper(tf.keras.layers.Conv2DTranspose),
         filters=self._num_filters,
         padding='same',
         strides=(2, 2),
@@ -774,7 +773,7 @@ class _PixelCNNNetwork(tf_keras.layers.Layer):
         kernel_constraint=_make_kernel_constraint(
             (3, cols), (0, 2), (0, cols // 2)))(image_input)
 
-    horizontal_stack_init = tf_keras.layers.add(
+    horizontal_stack_init = tf.keras.layers.add(
         [horizontal_stack_up, horizontal_stack_left], dtype=dtype)
 
     layer_stacks = {
@@ -804,10 +803,10 @@ class _PixelCNNNetwork(tf_keras.layers.Layer):
           if stack == 'horizontal':
             h = activation(layer_stacks['vertical'][-1])
             h = Dense(self._num_filters)(h)
-            x = tf_keras.layers.add([h, x], dtype=dtype)
+            x = tf.keras.layers.add([h, x], dtype=dtype)
 
           x = activation(x)
-          x = tf_keras.layers.Dropout(self._dropout_p, dtype=dtype)(x)
+          x = tf.keras.layers.Dropout(self._dropout_p, dtype=dtype)(x)
           x = Conv2D(filters=2*self._num_filters,
                      kernel_size=kernel_sizes[stack],
                      kernel_constraint=kernel_constraints[stack])(x)
@@ -815,12 +814,12 @@ class _PixelCNNNetwork(tf_keras.layers.Layer):
           if conditional_input is not None:
             h_projection = _build_and_apply_h_projection(
                 conditional_input, self._num_filters, dtype=dtype)
-            x = tf_keras.layers.add([x, h_projection], dtype=dtype)
+            x = tf.keras.layers.add([x, h_projection], dtype=dtype)
 
           x = _apply_sigmoid_gating(x)
 
           # Add a residual connection from the layer's input.
-          out = tf_keras.layers.add([input_x, x], dtype=dtype)
+          out = tf.keras.layers.add([input_x, x], dtype=dtype)
           layer_stacks[stack].append(out)
 
       if i < self._num_hierarchies - 1:
@@ -873,17 +872,17 @@ class _PixelCNNNetwork(tf_keras.layers.Layer):
           # Include the vertical-stack layer of the upward pass in the layers
           # to be added to the horizontal layer.
           if stack == 'horizontal':
-            x_symmetric = tf_keras.layers.Concatenate(axis=-1, dtype=dtype)(
+            x_symmetric = tf.keras.layers.Concatenate(axis=-1, dtype=dtype)(
                 [upward_pass['vertical'], x_symmetric])
 
           # Add a skip-connection from the symmetric layer in the downward
           # pass to the layer `x` in the upward pass.
           h = activation(x_symmetric)
           h = Dense(self._num_filters)(h)
-          x = tf_keras.layers.add([h, x], dtype=dtype)
+          x = tf.keras.layers.add([h, x], dtype=dtype)
 
           x = activation(x)
-          x = tf_keras.layers.Dropout(self._dropout_p, dtype=dtype)(x)
+          x = tf.keras.layers.Dropout(self._dropout_p, dtype=dtype)(x)
           x = Conv2D(filters=2*self._num_filters,
                      kernel_size=kernel_sizes[stack],
                      kernel_constraint=kernel_constraints[stack])(x)
@@ -891,10 +890,10 @@ class _PixelCNNNetwork(tf_keras.layers.Layer):
           if conditional_input is not None:
             h_projection = _build_and_apply_h_projection(
                 conditional_input, self._num_filters, dtype=dtype)
-            x = tf_keras.layers.add([x, h_projection], dtype=dtype)
+            x = tf.keras.layers.add([x, h_projection], dtype=dtype)
 
           x = _apply_sigmoid_gating(x)
-          upward_pass[stack] = tf_keras.layers.add([input_x, x], dtype=dtype)
+          upward_pass[stack] = tf.keras.layers.add([input_x, x], dtype=dtype)
 
     # Define deconvolutional layers that expand height/width dimensions on the
     # upward pass (e.g. expanding from 8x8 to 16x16 in Figure 2 of [1]), with
@@ -919,7 +918,7 @@ class _PixelCNNNetwork(tf_keras.layers.Layer):
                               kernel_constraint=kernel_constraint)(x)
           upward_pass[stack] = x
 
-    x_out = tf_keras.layers.ELU(dtype=dtype)(upward_pass['horizontal'])
+    x_out = tf.keras.layers.ELU(dtype=dtype)(upward_pass['horizontal'])
 
     # Build final Dense/Reshape layers to output the correct number of
     # parameters per pixel.
@@ -949,7 +948,7 @@ class _PixelCNNNetwork(tf_keras.layers.Layer):
 
     inputs = (image_input if conditional_input is None
               else [image_input, conditional_input])
-    self._network = tf_keras.Model(inputs=inputs, outputs=outputs)
+    self._network = tf.keras.Model(inputs=inputs, outputs=outputs)
     super(_PixelCNNNetwork, self).build(input_shape)
 
   def call(self, inputs, training=None):
@@ -963,7 +962,7 @@ class _PixelCNNNetwork(tf_keras.layers.Layer):
         same leading batch dimension as the image `Tensor`.
       training: `bool` or `None`. If `bool`, it controls the dropout layer,
         where `True` implies dropout is active. If `None`, it it defaults to
-        `tf_keras.backend.learning_phase()`
+        `tf.keras.backend.learning_phase()`
 
     Returns:
       outputs: a 3- or 4-element `list` of `Tensor`s in the following order:
@@ -997,8 +996,8 @@ def _make_kernel_constraint(kernel_size, valid_rows, valid_columns):
 
 def _build_and_apply_h_projection(h, num_filters, dtype):
   """Project the conditional input."""
-  h = tf_keras.layers.Flatten(dtype=dtype)(h)
-  h_projection = tf_keras.layers.Dense(
+  h = tf.keras.layers.Flatten(dtype=dtype)(h)
+  h_projection = tf.keras.layers.Dense(
       2*num_filters, kernel_initializer='random_normal', dtype=dtype)(h)
   return h_projection[..., tf.newaxis, tf.newaxis, :]
 
@@ -1007,6 +1006,6 @@ def _apply_sigmoid_gating(x):
   """Apply the sigmoid gating in Figure 2 of [2]."""
   activation_tensor, gate_tensor = tf.split(x, 2, axis=-1)
   sigmoid_gate = tf.sigmoid(gate_tensor)
-  return tf_keras.layers.multiply(
+  return tf.keras.layers.multiply(
       [sigmoid_gate, activation_tensor], dtype=x.dtype)
 

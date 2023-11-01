@@ -308,7 +308,7 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
 
   log_sigma = tf.Variable(0., dtype=dtype, name='log_sigma')
 
-  optimizer = tf_keras.optimizers.SGD(learning_rate=0.01)
+  optimizer = tf.keras.optimizers.SGD(learning_rate=0.01)
 
   @tf.function
   def mcem_iter(weights_chain_start, step_size):

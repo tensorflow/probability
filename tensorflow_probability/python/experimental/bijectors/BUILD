@@ -96,7 +96,6 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/distributions:sample",
         "//tensorflow_probability/python/distributions:transformed_distribution",
         "//tensorflow_probability/python/distributions:uniform",
-        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 
@@ -125,7 +124,6 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
-        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/math:gradient",
         "//tensorflow_probability/python/mcmc:dual_averaging_step_size_adaptation",
         "//tensorflow_probability/python/mcmc:nuts",

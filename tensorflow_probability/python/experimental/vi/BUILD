@@ -69,7 +69,6 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:samplers",
-        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/internal:trainable_state_util",
         "//tensorflow_probability/python/util",
     ],
@@ -142,7 +141,6 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:custom_gradient",
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
-        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/math:gradient",
         "//tensorflow_probability/python/math:minimize",
         "//tensorflow_probability/python/vi:optimization",
@@ -182,7 +180,6 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/distributions:student_t",
         "//tensorflow_probability/python/experimental/vi/util",
         "//tensorflow_probability/python/internal:test_util",
-        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/vi:optimization",
     ],
 )

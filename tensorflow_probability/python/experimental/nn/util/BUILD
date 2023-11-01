@@ -49,7 +49,6 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:test_util",
-        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 
@@ -69,7 +68,6 @@ py_library(
         "//tensorflow_probability/python/distributions:sample",
         "//tensorflow_probability/python/experimental/nn/initializers:initializers_lib",
         "//tensorflow_probability/python/internal:prefer_static",
-        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 
@@ -133,6 +131,5 @@ py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )

@@ -45,7 +45,7 @@ class Affine(layers_lib.KernelBiasLayer):
       output_size,
       # Weights
       kernel_initializer=None,  # tfp.nn.initializers.glorot_uniform()
-      bias_initializer=None,    # tf_keras.initializers.zeros()
+      bias_initializer=None,    # tf.keras.initializers.zeros()
       make_kernel_bias_fn=kernel_bias_lib.make_kernel_bias,
       dtype=tf.float32,
       batch_shape=(),
@@ -61,7 +61,7 @@ class Affine(layers_lib.KernelBiasLayer):
         Default value: `None` (i.e.,
         `tfp.experimental.nn.initializers.glorot_uniform()`).
       bias_initializer: ...
-        Default value: `None` (i.e., `tf_keras.initializers.zeros()`).
+        Default value: `None` (i.e., `tf.keras.initializers.zeros()`).
       make_kernel_bias_fn: ...
         Default value: `tfp.experimental.nn.util.make_kernel_bias`.
       dtype: ...
@@ -179,11 +179,11 @@ class AffineVariationalReparameterization(
       padding='same',
       filter_shape=5,
       # Use `he_uniform` because we'll use the `relu` family.
-      kernel_initializer=tf_keras.initializers.he_uniform())
+      kernel_initializer=tf.keras.initializers.he_uniform())
 
   BayesAffine = functools.partial(
       tfn.AffineVariationalReparameterization,
-      kernel_initializer=tf_keras.initializers.he_normal())
+      kernel_initializer=tf.keras.initializers.he_normal())
 
   scale = tfp.util.TransformedVariable(1., tfb.Softplus())
   bnn = tfn.Sequential([
@@ -206,7 +206,7 @@ class AffineVariationalReparameterization(
     kl = bnn.extra_loss / tf.cast(train_size, tf.float32)
     loss = nll + kl
     return loss, (nll, kl)
-  opt = tf_keras.optimizers.Adam()
+  opt = tf.keras.optimizers.Adam()
   fit_op = tfn.util.make_fit_op(loss_fn, opt, bnn.trainable_variables)
   for _ in range(200):
     loss, (nll, kl), g = fit_op()
@@ -232,7 +232,7 @@ class AffineVariationalReparameterization(
       output_size,
       # Weights
       kernel_initializer=None,  # tfp.nn.initializers.glorot_uniform()
-      bias_initializer=None,    # tf_keras.initializers.zeros()
+      bias_initializer=None,    # tf.keras.initializers.zeros()
       make_posterior_fn=kernel_bias_lib.make_kernel_bias_posterior_mvn_diag,
       make_prior_fn=kernel_bias_lib.make_kernel_bias_prior_spike_and_slab,
       posterior_value_fn=tfd.Distribution.sample,
@@ -252,7 +252,7 @@ class AffineVariationalReparameterization(
         Default value: `None` (i.e.,
         `tfp.experimental.nn.initializers.glorot_uniform()`).
       bias_initializer: ...
-        Default value: `None` (i.e., `tf_keras.initializers.zeros()`).
+        Default value: `None` (i.e., `tf.keras.initializers.zeros()`).
       make_posterior_fn: ...
         Default value:
           `tfp.experimental.nn.util.make_kernel_bias_posterior_mvn_diag`.
@@ -363,7 +363,7 @@ class AffineVariationalFlipout(vi_lib.VariationalFlipoutKernelBiasLayer):
       output_size,
       # Weights
       kernel_initializer=None,  # tfp.nn.initializers.glorot_uniform()
-      bias_initializer=None,    # tf_keras.initializers.zeros()
+      bias_initializer=None,    # tf.keras.initializers.zeros()
       make_posterior_fn=kernel_bias_lib.make_kernel_bias_posterior_mvn_diag,
       make_prior_fn=kernel_bias_lib.make_kernel_bias_prior_spike_and_slab,
       posterior_value_fn=tfd.Distribution.sample,
@@ -383,7 +383,7 @@ class AffineVariationalFlipout(vi_lib.VariationalFlipoutKernelBiasLayer):
         Default value: `None` (i.e.,
         `tfp.experimental.nn.initializers.glorot_uniform()`).
       bias_initializer: ...
-        Default value: `None` (i.e., `tf_keras.initializers.zeros()`).
+        Default value: `None` (i.e., `tf.keras.initializers.zeros()`).
       make_posterior_fn: ...
         Default value:
           `tfp.experimental.nn.util.make_kernel_bias_posterior_mvn_diag`.
@@ -502,7 +502,7 @@ class AffineVariationalReparameterizationLocal(vi_lib.VariationalLayer):
       output_size,
       # Weights
       kernel_initializer=None,  # tfp.nn.initializers.glorot_uniform()
-      bias_initializer=None,    # tf_keras.initializers.zeros()
+      bias_initializer=None,    # tf.keras.initializers.zeros()
       make_posterior_fn=kernel_bias_lib.make_kernel_bias_posterior_mvn_diag,
       make_prior_fn=kernel_bias_lib.make_kernel_bias_prior_spike_and_slab,
       posterior_value_fn=tfd.Distribution.sample,
@@ -522,7 +522,7 @@ class AffineVariationalReparameterizationLocal(vi_lib.VariationalLayer):
         Default value: `None` (i.e.,
         `tfp.nn.initializers.glorot_uniform()`).
       bias_initializer: ...
-        Default value: `None` (i.e., `tf_keras.initializers.zeros()`).
+        Default value: `None` (i.e., `tf.keras.initializers.zeros()`).
       make_posterior_fn: ...
         Default value:
           `tfp.experimental.nn.util.make_kernel_bias_posterior_mvn_diag`.

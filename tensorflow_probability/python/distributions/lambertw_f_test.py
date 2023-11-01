@@ -27,7 +27,6 @@ from tensorflow_probability.python.distributions import student_t
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.internal import tf_keras
 
 
 @test_util.test_all_tf_execution_regimes
@@ -191,16 +190,16 @@ class LambertWNormalTest(test_util.TestCase):
 
     from tensorflow_probability.python.layers import distribution_layer  # pylint:disable=g-import-not-at-top
     dist_layer = distribution_layer.DistributionLambda(dist_lambda)
-    model = tf_keras.Sequential([
-        tf_keras.layers.Dense(10, "relu"),
-        tf_keras.layers.Dense(5, "selu"),
-        tf_keras.layers.Dense(1 + 1 + 1),
+    model = tf.keras.Sequential([
+        tf.keras.layers.Dense(10, "relu"),
+        tf.keras.layers.Dense(5, "selu"),
+        tf.keras.layers.Dense(1 + 1 + 1),
         dist_layer])
     negloglik = lambda y, p_y: -p_y.log_prob(y)
     if tf.__internal__.tf2.enabled() and tf.executing_eagerly():
-      optimizer = tf_keras.optimizers.Adam(learning_rate=0.01)
+      optimizer = tf.keras.optimizers.Adam(learning_rate=0.01)
     else:
-      optimizer = tf_keras.optimizers.legacy.Adam(learning_rate=0.01)
+      optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=0.01)
 
     model.compile(optimizer=optimizer, loss=negloglik)
 

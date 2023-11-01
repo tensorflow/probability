@@ -22,7 +22,6 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.layers import dense_variational_v2
 from tensorflow_probability.python.layers import distribution_layer
 from tensorflow_probability.python.layers import variable_input
@@ -52,7 +51,7 @@ def create_dataset():
 def posterior_mean_field(kernel_size, bias_size=0, dtype=None):
   n = kernel_size + bias_size
   c = np.log(np.expm1(1.))
-  return tf_keras.Sequential([
+  return tf.keras.Sequential([
       variable_input.VariableLayer(2 * n, dtype=dtype),
       distribution_layer.DistributionLambda(lambda t: independent.Independent(  # pylint: disable=g-long-lambda
           normal.Normal(loc=t[..., :n],
@@ -63,7 +62,7 @@ def posterior_mean_field(kernel_size, bias_size=0, dtype=None):
 
 def prior_trainable(kernel_size, bias_size=0, dtype=None):
   n = kernel_size + bias_size
-  return tf_keras.Sequential([
+  return tf.keras.Sequential([
       variable_input.VariableLayer(n, dtype=dtype),
       distribution_layer.DistributionLambda(
           lambda t: independent.Independent(normal.Normal(loc=t, scale=1),  # pylint: disable=g-long-lambda
@@ -84,16 +83,16 @@ class DenseVariationalLayerTest(test_util.TestCase):
     layer = dense_variational_v2.DenseVariational(1, posterior_mean_field,
                                                   prior_trainable)
 
-    model = tf_keras.Sequential([
+    model = tf.keras.Sequential([
         layer,
         distribution_layer.DistributionLambda(
             lambda t: normal.Normal(loc=t, scale=1))
     ])
 
     if tf.__internal__.tf2.enabled() and tf.executing_eagerly():
-      optimizer = tf_keras.optimizers.Adam(learning_rate=0.05)
+      optimizer = tf.keras.optimizers.Adam(learning_rate=0.05)
     else:
-      optimizer = tf_keras.optimizers.legacy.Adam(learning_rate=0.05)
+      optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=0.05)
     # Do inference.
     model.compile(optimizer=optimizer,
                   loss=negloglik)

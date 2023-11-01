@@ -29,7 +29,6 @@ from tensorflow_probability.python.bijectors import sigmoid
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.math.gradient import batch_jacobian
 
 
@@ -332,14 +331,14 @@ class GlowTest(test_util.TestCase):
 
     def float64_net(input_shape):
       input_nchan = input_shape[-1]
-      return tf_keras.Sequential([
-          tf_keras.layers.Input(input_shape, dtype=tf.float64),
-          tf_keras.layers.Conv2D(
+      return tf.keras.Sequential([
+          tf.keras.layers.Input(input_shape, dtype=tf.float64),
+          tf.keras.layers.Conv2D(
               2 * input_nchan, 3, padding='same', dtype=tf.float64)])
     def float64_exit(input_shape, output_chan):
-      return tf_keras.Sequential([
-          tf_keras.layers.Input(input_shape, dtype=tf.float64),
-          tf_keras.layers.Conv2D(
+      return tf.keras.Sequential([
+          tf.keras.layers.Input(input_shape, dtype=tf.float64),
+          tf.keras.layers.Conv2D(
               2*output_chan, 3, padding='same', dtype=tf.float64)])
 
     float64_bijection = glow.Glow(
@@ -360,15 +359,15 @@ class GlowTest(test_util.TestCase):
     ims = self._make_images()
     def shiftfn(input_shape):
       input_nchan = input_shape[-1]
-      return tf_keras.Sequential([
-          tf_keras.layers.Input(input_shape),
-          tf_keras.layers.Conv2D(
+      return tf.keras.Sequential([
+          tf.keras.layers.Input(input_shape),
+          tf.keras.layers.Conv2D(
               input_nchan, 3, padding='same')])
 
     def shiftexitfn(input_shape, output_chan):
-      return tf_keras.Sequential([
-          tf_keras.layers.Input(input_shape),
-          tf_keras.layers.Conv2D(
+      return tf.keras.Sequential([
+          tf.keras.layers.Input(input_shape),
+          tf.keras.layers.Conv2D(
               output_chan, 3, padding='same')])
 
     shiftonlyglow = glow.Glow(

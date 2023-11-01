@@ -20,8 +20,6 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 
-from tensorflow_probability.python.internal import tf_keras
-
 
 __all__ = [
     'VariationalSGD',
@@ -29,7 +27,7 @@ __all__ = [
 
 
 # pylint: disable=g-classes-have-attributes
-class VariationalSGD(tf_keras.optimizers.legacy.Optimizer):
+class VariationalSGD(tf.keras.optimizers.legacy.Optimizer):
   """An optimizer module for constant stochastic gradient descent.
 
   This implements an optimizer module for the constant stochastic gradient

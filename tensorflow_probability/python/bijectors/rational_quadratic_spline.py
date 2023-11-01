@@ -100,11 +100,11 @@ class RationalQuadraticSpline(bijector.AutoCompositeTensorBijector):
           x = tf.reshape(x, out_shape)
           return tf.math.softplus(x) + self._min_slope
 
-        self._bin_widths = tf_keras.layers.Dense(
+        self._bin_widths = tf.keras.layers.Dense(
           nunits * self._nbins, activation=_bin_positions, name='w')
-        self._bin_heights = tf_keras.layers.Dense(
+        self._bin_heights = tf.keras.layers.Dense(
           nunits * self._nbins, activation=_bin_positions, name='h')
-        self._knot_slopes = tf_keras.layers.Dense(
+        self._knot_slopes = tf.keras.layers.Dense(
           nunits * (self._nbins - 1), activation=_slopes, name='s')
         self._built = True
 

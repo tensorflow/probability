@@ -153,7 +153,7 @@ def _factored_surrogate_posterior(  # pylint: disable=dangerous-default-value
     lambda rate, concentration: model.log_prob([rate, concentration, y]),
     surrogate_posterior=surrogate_posterior,
     num_steps=100,
-    optimizer=tf_keras.optimizers.Adam(0.1),
+    optimizer=tf.keras.optimizers.Adam(0.1),
     sample_size=10)
 
   # After optimization, samples from the surrogate will approximate
@@ -350,7 +350,7 @@ def _affine_surrogate_posterior(
       target_model.unnormalized_log_prob,
       surrogate_posterior,
       num_steps=100,
-      optimizer=tf_keras.optimizers.Adam(0.1),
+      optimizer=tf.keras.optimizers.Adam(0.1),
       sample_size=10)
   ```
   """
@@ -532,7 +532,7 @@ def _affine_surrogate_posterior_from_base_distribution(
       target_model.unnormalized_log_prob,
       surrogate_posterior,
       num_steps=100,
-      optimizer=tf_keras.optimizers.Adam(0.1),
+      optimizer=tf.keras.optimizers.Adam(0.1),
       sample_size=10)
   ```
 
@@ -728,7 +728,7 @@ def build_split_flow_surrogate_posterior(
       target_model.unnormalized_log_prob,
       surrogate_posterior,
       num_steps=100,
-      optimizer=tf_keras.optimizers.Adam(0.1),
+      optimizer=tf.keras.optimizers.Adam(0.1),
       sample_size=10)
   ```
 

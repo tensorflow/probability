@@ -410,7 +410,7 @@ def minimize_stateless(loss_fn,
 
 
 def _make_stateful_optimizer_step_fn(loss_fn, optimizer, trainable_variables):
-  """Constructs a single step of a stateful (`tf_keras.optimizers`) optimizer."""
+  """Constructs a single step of a stateful (`tf.keras.optimizers`) optimizer."""
 
   @tf.function(autograph=False)
   def optimizer_step(parameters,
@@ -460,7 +460,7 @@ def minimize(loss_fn,
       `tfp.random.sanitize_seed`).
     num_steps: Python `int` maximum number of steps to run the optimizer.
     optimizer: Optimizer instance to use. This may be a TF1-style
-      `tf.train.Optimizer`, TF2-style `tf_keras.optimizers.Optimizer`, or any
+      `tf.train.Optimizer`, TF2-style `tf.keras.optimizers.Optimizer`, or any
       Python object that implements `optimizer.apply_gradients(grads_and_vars)`.
     convergence_criterion: Optional instance of
       `tfp.optimizer.convergence_criteria.ConvergenceCriterion`
@@ -531,7 +531,7 @@ def minimize(loss_fn,
   losses = tfp.math.minimize(
       loss_fn,
       num_steps=100,
-      optimizer=tf_keras.optimizers.Adam(learning_rate=0.1))
+      optimizer=tf.keras.optimizers.Adam(learning_rate=0.1))
 
   # In TF2/eager mode, the optimization runs immediately.
   print("optimized value is {} with loss {}".format(x, losses[-1]))
@@ -555,7 +555,7 @@ def minimize(loss_fn,
   losses = tfp.math.minimize(
     loss_fn,
     num_steps=1000,
-    optimizer=tf_keras.optimizers.Adam(learning_rate=0.1),
+    optimizer=tf.keras.optimizers.Adam(learning_rate=0.1),
     convergence_criterion=(
       tfp.optimizers.convergence_criteria.LossNotDecreasing(atol=0.01)))
   ```
@@ -577,7 +577,7 @@ def minimize(loss_fn,
   trace_fn = lambda traceable_quantities: {
     'loss': traceable_quantities.loss, 'x': x}
   trace = tfp.math.minimize(loss_fn, num_steps=100,
-                            optimizer=tf_keras.optimizers.Adam(0.1),
+                            optimizer=tf.keras.optimizers.Adam(0.1),
                             trace_fn=trace_fn)
   print(trace['loss'].shape,   # => [100]
         trace['x'].shape)      # => [100]
@@ -597,7 +597,7 @@ def minimize(loss_fn,
     'loss': traceable_quantities.loss,
     'has_converged': traceable_quantities.has_converged}
   trace = tfp.math.minimize(loss_fn, num_steps=100,
-                            optimizer=tf_keras.optimizers.Adam(0.1),,
+                            optimizer=tf.keras.optimizers.Adam(0.1),,
                             trace_fn=trace_fn,
                             convergence_criterion=(
       tfp.optimizers.convergence_criteria.LossNotDecreasing(atol=0.01)))

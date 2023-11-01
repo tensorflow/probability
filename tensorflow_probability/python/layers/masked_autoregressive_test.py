@@ -19,12 +19,11 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import masked_autoregressive as masked_autoregressive_lib
 from tensorflow_probability.python.distributions import mvn_diag
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.layers import distribution_layer
 from tensorflow_probability.python.layers import masked_autoregressive
 
-tfk = tf_keras
-tfkl = tf_keras.layers
+tfk = tf.keras
+tfkl = tf.keras.layers
 
 
 @test_util.test_all_tf_execution_regimes

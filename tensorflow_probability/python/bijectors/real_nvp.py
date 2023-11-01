@@ -23,7 +23,6 @@ from tensorflow_probability.python.bijectors import chain as chain_lib
 from tensorflow_probability.python.bijectors import scale as scale_lib
 from tensorflow_probability.python.bijectors import shift as shift_lib
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import tf_keras
 
 
 __all__ = [
@@ -390,13 +389,13 @@ def real_nvp_default_template(hidden_layers,
       else:
         reshape_output = lambda x: x
       for units in hidden_layers:
-        x = tf_keras.tf1_layers.dense(
+        x = tf1.layers.dense(
             inputs=x,
             units=units,
             activation=activation,
             *args,  # pylint: disable=keyword-arg-before-vararg
             **kwargs)
-      x = tf_keras.tf1_layers.dense(
+      x = tf1.layers.dense(
           inputs=x,
           units=(1 if shift_only else 2) * output_units,
           activation=None,

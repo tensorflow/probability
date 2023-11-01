@@ -16,7 +16,6 @@
 
 import tensorflow.compat.v1 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.internal import tf_keras
 
 
 def bayesian_vgg(input_shape,
@@ -43,7 +42,7 @@ def bayesian_vgg(input_shape,
       i.e. log_var <= log(kernel_posterior_scale_constraint).
 
   Returns:
-    tf_keras.Model.
+    tf.keras.Model.
   """
 
   filters = [64, 128, 256, 512, 512]
@@ -60,7 +59,7 @@ def bayesian_vgg(input_shape,
           stddev=kernel_posterior_scale_stddev),
       untransformed_scale_constraint=_untransformed_scale_constraint)
 
-  image = tf_keras.layers.Input(shape=input_shape, dtype='float32')
+  image = tf.keras.layers.Input(shape=input_shape, dtype='float32')
 
   x = image
   for i in range(len(kernels)):
@@ -71,11 +70,11 @@ def bayesian_vgg(input_shape,
         strides[i],
         kernel_posterior_fn)
 
-  x = tf_keras.layers.Flatten()(x)
+  x = tf.keras.layers.Flatten()(x)
   x = tfp.layers.DenseFlipout(
       num_classes,
       kernel_posterior_fn=kernel_posterior_fn)(x)
-  model = tf_keras.Model(inputs=image, outputs=x, name='vgg16')
+  model = tf.keras.Model(inputs=image, outputs=x, name='vgg16')
   return model
 
 
@@ -86,17 +85,17 @@ def _vggconv_block(x, filters, kernel, stride, kernel_posterior_fn):
       kernel,
       padding='same',
       kernel_posterior_fn=kernel_posterior_fn)(x)
-  out = tf_keras.layers.BatchNormalization()(out)
-  out = tf_keras.layers.Activation('relu')(out)
+  out = tf.keras.layers.BatchNormalization()(out)
+  out = tf.keras.layers.Activation('relu')(out)
 
   out = tfp.layers.Convolution2DFlipout(
       filters,
       kernel,
       padding='same',
       kernel_posterior_fn=kernel_posterior_fn)(out)
-  out = tf_keras.layers.BatchNormalization()(out)
-  out = tf_keras.layers.Activation('relu')(out)
+  out = tf.keras.layers.BatchNormalization()(out)
+  out = tf.keras.layers.Activation('relu')(out)
 
-  out = tf_keras.layers.MaxPooling2D(
+  out = tf.keras.layers.MaxPooling2D(
       pool_size=(2, 2), strides=stride)(out)
   return out

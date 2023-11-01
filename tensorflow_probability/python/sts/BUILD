@@ -113,7 +113,6 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/distributions:exponential",
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
-        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/optimizer",
         "//tensorflow_probability/python/sts/components:local_linear_trend",
         "//tensorflow_probability/python/sts/components:seasonal",

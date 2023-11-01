@@ -21,7 +21,6 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import pixel_cnn
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.math import gradient
 
 
@@ -65,7 +64,7 @@ class PixelCnnTest(test_util.TestCase):
     return self._make_fake_images()
 
   def _make_input_layers(self):
-    return tf_keras.layers.Input(self.image_shape)
+    return tf.keras.layers.Input(self.image_shape)
 
   def _get_single_pixel_logit_gradients(self, dist, logit_ind, pixel_ind):
 
@@ -171,12 +170,12 @@ class PixelCnnTest(test_util.TestCase):
       log_prob = dist.log_prob(inputs)
 
     # Build/fit a model to activate autoregressive kernel constraints
-    model = tf_keras.Model(inputs=inputs, outputs=log_prob)
+    model = tf.keras.Model(inputs=inputs, outputs=log_prob)
     model.add_loss(-tf.reduce_mean(log_prob))
 
     model.compile()
     if not tf.executing_eagerly() and isinstance(
-        model.optimizer, tf_keras.optimizers.experimental.Optimizer):
+        model.optimizer, tf.keras.optimizers.experimental.Optimizer):
       return
     train_data = self._make_fake_inputs()
     model.fit(x=train_data)
@@ -277,8 +276,8 @@ class ConditionalPixelCnnTest(PixelCnnTest):
     return [self._make_fake_images(), self._make_fake_conditional()]
 
   def _make_input_layers(self):
-    return [tf_keras.layers.Input(shape=self.image_shape),
-            tf_keras.layers.Input(shape=self.h_shape)]
+    return [tf.keras.layers.Input(shape=self.image_shape),
+            tf.keras.layers.Input(shape=self.h_shape)]
 
   def testScalarConditional(self):
     dist = pixel_cnn.PixelCNN(

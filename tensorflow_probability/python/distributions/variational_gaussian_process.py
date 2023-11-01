@@ -558,7 +558,7 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess,
   # For training, we use some simplistic numpy-based minibatching.
   batch_size = 64
 
-  optimizer = tf_keras.optimizers.Adam(learning_rate=.1)
+  optimizer = tf.keras.optimizers.Adam(learning_rate=.1)
 
   @tf.function
   def optimize(x_train_batch, y_train_batch):
@@ -670,7 +670,7 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess,
   # For training, we use some simplistic numpy-based minibatching.
   batch_size = 64
 
-  optimizer = tf_keras.optimizers.Adam(learning_rate=.05, beta_1=.5, beta_2=.99)
+  optimizer = tf.keras.optimizers.Adam(learning_rate=.05, beta_1=.5, beta_2=.99)
 
   @tf.function
   def optimize(x_train_batch, y_train_batch):
