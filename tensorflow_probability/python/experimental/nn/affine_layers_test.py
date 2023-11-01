@@ -29,6 +29,7 @@ from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.experimental import nn as tfn
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.util import deferred_tensor
 
 
@@ -87,7 +88,7 @@ class BnnEndToEnd(object):
       nll = -tf.reduce_mean(bnn(x).log_prob(y), axis=-1)
       kl = tfn.losses.compute_extra_loss(bnn) / n
       return nll + kl, (nll, kl)
-    opt = tf.keras.optimizers.Adam()
+    opt = tf_keras.optimizers.Adam()
     fit_op = tfn.util.make_fit_op(loss_fn, opt, bnn.trainable_variables)
     for _ in range(2):
       loss, (nll, kl) = fit_op()  # pylint: disable=unused-variable

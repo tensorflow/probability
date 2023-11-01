@@ -86,7 +86,10 @@ TF_REPLACEMENTS = {
         'pass',
     ('from tensorflow.python '
      'import pywrap_tensorflow as c_api'):
-        'pass'
+        'pass',
+    'from tensorflow_probability.python.internal import tf_keras':
+        ('from tensorflow_probability.python.internal.backend.numpy '
+         'import keras as tf_keras'),
 }
 
 DISABLED_BY_PKG = {

@@ -75,7 +75,7 @@ vmap, etc.), we will special-case using an `if JAX_MODE:` block.
     tests, TFP impl, etc), with `tfp.math.value_and_gradient` or similar. Then,
     we can special-case `JAX_MODE` inside the body of `value_and_gradient`.
 
-*   __`tf.Variable`, `tf.keras.optimizers.Optimizer`__
+*   __`tf.Variable`, `tf_keras.optimizers.Optimizer`__
 
     TF provides a `Variable` abstraction so that graph functions may modify
     state, including using the Keras `Optimizer` subclasses like `Adam`. JAX,

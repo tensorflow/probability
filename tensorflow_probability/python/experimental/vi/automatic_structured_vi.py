@@ -497,7 +497,7 @@ def _build_asvi_surrogate_posterior(prior,
     target_log_prob_fn,
     surrogate_posterior=surrogate_posterior,
     num_steps=100,
-    optimizer=tf.keras.optimizers.Adam(0.1),
+    optimizer=tf_keras.optimizers.Adam(0.1),
     sample_size=10)
 
   # After optimization, samples from the surrogate will approximate

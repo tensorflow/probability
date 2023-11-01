@@ -24,7 +24,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.experimental.nn.util import convolution_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
-
+from tensorflow_probability.python.internal import tf_keras
 
 # pylint: disable=bad-whitespace
 _CONV_TEST_CASES = (
@@ -374,7 +374,7 @@ class _BatchedConvTransposeTest(test_util.TestCase, _Common):
         perm=[0, 1, 3, 2])
     # conv2d_transpose does not support dilations > 1; use Keras instead.
     if any(d > 1 for d in dilations):
-      keras_convt = tf.keras.layers.Conv2DTranspose(
+      keras_convt = tf_keras.layers.Conv2DTranspose(
           filters=channels_out,
           kernel_size=filter_shape,
           strides=strides,

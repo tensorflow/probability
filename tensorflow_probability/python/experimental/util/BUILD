@@ -149,6 +149,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/distributions:wishart",
         "//tensorflow_probability/python/internal:structural_tuple",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/math:gradient",
         "//tensorflow_probability/python/math:minimize",
     ],

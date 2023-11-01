@@ -18,9 +18,10 @@
 import numpy as np
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.internal import tf_keras
 
 
-class BlockwiseInitializer(tf.keras.initializers.Initializer):
+class BlockwiseInitializer(tf_keras.initializers.Initializer):
   """Initializer which concats other intializers."""
 
   def __init__(self, initializers, sizes, validate_args=False):
@@ -28,7 +29,7 @@ class BlockwiseInitializer(tf.keras.initializers.Initializer):
 
     Args:
       initializers: `list` of Keras initializers, e.g., `"glorot_uniform"` or
-        `tf.keras.initializers.Constant(0.5413)`.
+        `tf_keras.initializers.Constant(0.5413)`.
       sizes: `list` of `int` scalars representing the number of elements
         associated with each initializer in `initializers`.
       validate_args: Python `bool` indicating we should do (possibly expensive)
@@ -58,7 +59,7 @@ class BlockwiseInitializer(tf.keras.initializers.Initializer):
       dtype: Optional dtype of the tensor. If not provided will return tensor
        of `tf.float32`.
     """
-    dtype = tf.as_dtype(dtype or tf.keras.backend.floatx())
+    dtype = tf.as_dtype(dtype or tf_keras.backend.floatx())
     if isinstance(shape, tf.TensorShape):
       shape_dtype = tf.int32
       shape_ = np.int32(shape)
@@ -88,14 +89,14 @@ class BlockwiseInitializer(tf.keras.initializers.Initializer):
          else shape_[:-1])
     if sizes_ is not None and isinstance(s, (np.ndarray, np.generic)):
       return tf.concat([
-          tf.keras.initializers.get(init)(np.concatenate([
+          tf_keras.initializers.get(init)(np.concatenate([
               s, np.array([e], shape_dtype.as_numpy_dtype)], axis=-1), dtype)
           for init, e in zip(self.initializers, sizes_.tolist())
       ], axis=-1)
 
     sizes = tf.split(self.sizes, len(self.initializers))
     return tf.concat([
-        tf.keras.initializers.get(init)(tf.concat([s, e], axis=-1), dtype)
+        tf_keras.initializers.get(init)(tf.concat([s, e], axis=-1), dtype)
         for init, e in zip(self.initializers, sizes)
     ], axis=-1)
 
@@ -103,8 +104,8 @@ class BlockwiseInitializer(tf.keras.initializers.Initializer):
     """Returns initializer configuration as a JSON-serializable dict."""
     return {
         'initializers': [
-            tf.keras.initializers.serialize(
-                tf.keras.initializers.get(init))
+            tf_keras.initializers.serialize(
+                tf_keras.initializers.get(init))
             for init in self.initializers
         ],
         'sizes': self.sizes,
@@ -115,12 +116,12 @@ class BlockwiseInitializer(tf.keras.initializers.Initializer):
   def from_config(cls, config):
     """Instantiates an initializer from a configuration dictionary."""
     return cls(**{
-        'initializers': [tf.keras.initializers.deserialize(init)
+        'initializers': [tf_keras.initializers.deserialize(init)
                          for init in config.get('initializers', [])],
         'sizes': config.get('sizes', []),
         'validate_args': config.get('validate_args', False),
     })
 
 
-tf.keras.utils.get_custom_objects()[
+tf_keras.utils.get_custom_objects()[
     'BlockwiseInitializer'] = BlockwiseInitializer

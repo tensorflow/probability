@@ -29,6 +29,7 @@ from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import sample
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import tf_keras
 
 
 @test_util.test_all_tf_execution_regimes
@@ -68,7 +69,7 @@ class BatchNormTest(test_util.TestCase,
         x_, input_shape if 0 in event_dims else (None,) + input_shape[1:])
     # When training, memorize the exact mean of the last
     # minibatch that it normalized (instead of moving average assignment).
-    layer = tf.keras.layers.BatchNormalization(
+    layer = tf_keras.layers.BatchNormalization(
         axis=event_dims, momentum=0., epsilon=0.)
     batch_norm = batch_normalization.BatchNormalization(
         batchnorm_layer=layer, training=training)
@@ -140,13 +141,13 @@ class BatchNormTest(test_util.TestCase,
 
   @parameterized.named_parameters(
       ("2d_event_ndims_v1",
-       (10, 4), [-1], False, tf1.layers.BatchNormalization),
+       (10, 4), [-1], False, tf_keras.tf1_layers.BatchNormalization),
       ("1d_event_ndims_v1",
-       2, [-1], False, tf1.layers.BatchNormalization),
+       2, [-1], False, tf_keras.tf1_layers.BatchNormalization),
       ("2d_event_ndims_keras",
-       (10, 4), [-1], False, tf.keras.layers.BatchNormalization),
+       (10, 4), [-1], False, tf_keras.layers.BatchNormalization),
       ("1d_event_ndims_keras",
-       2, [-1], False, tf.keras.layers.BatchNormalization))
+       2, [-1], False, tf_keras.layers.BatchNormalization))
   def testLogProb(self, event_shape, event_dims, training, layer_cls):
     training = tf1.placeholder_with_default(training, (), "training")
     layer = layer_cls(axis=event_dims, epsilon=0.)
@@ -173,8 +174,8 @@ class BatchNormTest(test_util.TestCase,
     self.assertAllClose(base_log_prob_, dist_log_prob_)
 
   @parameterized.named_parameters(
-      ("v1", tf1.layers.BatchNormalization),
-      ("keras", tf.keras.layers.BatchNormalization))
+      ("v1", tf_keras.tf1_layers.BatchNormalization),
+      ("keras", tf_keras.layers.BatchNormalization))
   def testMutuallyConsistent(self, layer_cls):
     # BatchNorm bijector is only mutually consistent when training=False.
     dims = 4
@@ -195,8 +196,8 @@ class BatchNormTest(test_util.TestCase,
         rtol=0.02)
 
   @parameterized.named_parameters(
-      ("v1", tf1.layers.BatchNormalization),
-      ("keras", tf.keras.layers.BatchNormalization))
+      ("v1", tf_keras.tf1_layers.BatchNormalization),
+      ("keras", tf_keras.layers.BatchNormalization))
   def testInvertMutuallyConsistent(self, layer_cls):
     # BatchNorm bijector is only mutually consistent when training=False.
     dims = 4
@@ -227,9 +228,9 @@ class BatchNormTest(test_util.TestCase,
         bijector=batch_normalization.BatchNormalization(batchnorm_layer=layer),
         validate_args=True)
 
-    x_ = tf.keras.Input(shape=(1,))
+    x_ = tf_keras.Input(shape=(1,))
     log_prob_ = dist.log_prob(x_)
-    model = tf.keras.Model(x_, log_prob_)
+    model = tf_keras.Model(x_, log_prob_)
 
     model.compile(optimizer="adam", loss=lambda _, log_prob: -log_prob)
 
