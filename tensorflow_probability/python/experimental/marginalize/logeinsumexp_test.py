@@ -18,7 +18,7 @@ import hypothesis
 from hypothesis.extra import numpy as hpnp
 import hypothesis.strategies as hps
 import numpy as np
-import tensorflow.compat.v1 as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.experimental.marginalize.logeinsumexp import _binary_einslogsumexp
 from tensorflow_probability.python.experimental.marginalize.logeinsumexp import logeinsumexp
 from tensorflow_probability.python.internal import test_util
@@ -179,7 +179,6 @@ class _EinLogSumExpTest(test_util.TestCase):
     formula = 'abcdcfg,edfcbaa->bd'
     u = tf.math.log(tf.einsum(formula, a, b))
     v = logeinsumexp(formula, tf.math.log(a), tf.math.log(b))
-
     self.assertAllClose(u, v)
 
   def test_zero_zero_multiplication(self):
