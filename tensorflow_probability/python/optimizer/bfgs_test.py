@@ -427,6 +427,50 @@ class BfgsTest(test_util.TestCase):
       self.assertArrayNear(actual, expected, 1e-5)
     self.assertEqual(batch_results.num_objective_evaluations, 31)
 
+  def test_scale_initial_inverse_hessian(self):
+    """Tests optional scaling of the initial inverse Hessian estimate.
+
+    Shows that the choice of the option determines the behaviour inside
+    the BFGS optimisation.
+    """
+    @_make_val_and_grad_fn
+    def sin_x_times_sin_y(coord):
+      x, y = coord[0], coord[1]
+      return tf.math.sin(x) + tf.math.sin(y)
+
+    start = tf.constant((1, -2), dtype=np.float64)
+
+    results = {}
+    for scale in (True, False):
+      for max_iter in (1, 2, 50):
+        results[scale, max_iter] = self.evaluate(
+            bfgs.minimize(
+                sin_x_times_sin_y,
+                initial_position=start,
+                tolerance=1e-8,
+                scale_initial_inverse_hessian=scale,
+                max_iterations=max_iter,
+            )
+        )
+
+    expected_positions = {
+        # Positions traced by the optimisation on the first iteration
+        # are not affected by the choice of `scale_initial_inverse_hessian`.
+        (True, 1): (-0.62581634, -0.7477782),
+        (False, 1): (-0.62581634, -0.7477782),
+        # However, gradient calculations on the first iteration _are_ affected,
+        # and this affects positions identified on the second iteration.
+        (True, 2): (-1.70200959, -0.37774139),
+        (False, 2): (-1.24714478, -0.55028845),
+        # Both approaches converge to the same maximum eventually (although
+        # this is not guaranteed, it depends on the exact problem being solved).
+        (True, 50): (-1.57079633, -1.57079633),
+        (False, 50): (-1.57079633, -1.57079633),
+    }
+
+    for key, res in results.items():
+      self.assertArrayNear(res.position, expected_positions[key], 1e-6)
+
   def test_data_fitting(self):
     """Tests MLE estimation for a simple geometric GLM."""
     n, dim = 100, 3
