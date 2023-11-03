@@ -220,7 +220,7 @@ class BatchNormTest(test_util.TestCase,
 
   def testWithKeras(self):
     # NOTE: Keras throws an error below if we use
-    # tf1.layers.BatchNormalization() here.
+    # tf_keras.tf1_layers.BatchNormalization() here.
     layer = None
 
     dist = transformed_distribution.TransformedDistribution(
