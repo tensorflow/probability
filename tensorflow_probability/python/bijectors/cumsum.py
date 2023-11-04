@@ -117,5 +117,5 @@ class Cumsum(bijector.AutoCompositeTensorBijector):
     return tf.constant(0., x.dtype)
 
   @property
-  def _compposite_tensor_shape_params(self):
+  def _composite_tensor_shape_params(self):
     return ('axis',)
