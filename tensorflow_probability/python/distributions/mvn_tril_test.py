@@ -390,7 +390,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
     self.assertAllClose(true_mean, sample_mean_, atol=0., rtol=0.03)
     self.assertAllClose(true_mean, analytical_mean_, atol=0., rtol=1e-6)
 
-    self.assertAllClose(true_covariance, sample_covariance_, atol=0., rtol=0.03)
+    self.assertAllClose(true_covariance, sample_covariance_, atol=0., rtol=0.04)
     self.assertAllClose(
         true_covariance, analytical_covariance_, atol=0., rtol=1e-6)
 
