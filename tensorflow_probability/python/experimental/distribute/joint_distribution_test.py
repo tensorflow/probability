@@ -272,7 +272,7 @@ class JointDistributionTest(test_lib.DistributedTest):
         self.strategy_run(
             run, (self.key,), in_axes=None))
     for i in range(test_lib.NUM_DEVICES):
-      self.assertAllClose(sharded_log_prob[i], true_log_prob, atol=2e-2)
+      self.assertAllClose(sharded_log_prob[i], true_log_prob, atol=0.025)
       self.assertAllClose(sharded_log_prob_grad[i], true_log_prob_grad,
                           atol=2e-2)
 

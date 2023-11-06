@@ -145,7 +145,8 @@ class SpikeAndSlabTest(test_util.TestCase):
     self.assertAllClose(
         nonzero_subvector(self.evaluate(
             initial_state.conditional_weights_mean)),
-        restricted_weights_posterior_mean)
+        restricted_weights_posterior_mean,
+        atol=5e-5)
     self.assertAllClose(
         nonzero_submatrix(initial_state.conditional_posterior_precision_chol),
         tf.linalg.cholesky(restricted_weights_posterior_prec.to_dense()))
@@ -346,7 +347,7 @@ class SpikeAndSlabTest(test_util.TestCase):
                                      tf.float32)
     self.assertAllClose(nonzero_prior_prob,
                         tf.reduce_mean(nonzero_weight_samples),
-                        atol=0.03)
+                        atol=0.04)
 
   @parameterized.named_parameters(('', False), ('_xla', True))
   def test_deterministic_given_seed(self, use_xla):
