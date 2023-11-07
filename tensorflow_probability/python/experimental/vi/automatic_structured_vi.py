@@ -509,7 +509,7 @@ def _build_asvi_surrogate_posterior(prior,
 
   #### References
 
-  [1]: Luca Ambrogioni, Kate Line, Emily Fertig, Sharad Vikram, Max Hinne,
+  [1]: Luca Ambrogioni, Kate Lin, Emily Fertig, Sharad Vikram, Max Hinne,
         Dave Moore, Marcel van Gerven. Automatic structured variational
         inference. _arXiv preprint arXiv:2002.00643_, 2020
         https://arxiv.org/abs/2002.00643
