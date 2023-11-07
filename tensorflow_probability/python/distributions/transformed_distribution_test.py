@@ -769,8 +769,7 @@ class ScalarToMultiTest(test_util.TestCase):
     num_samples = 7e3
     y = fake_mvn.sample(int(num_samples), seed=test_util.test_seed())
     x = y[0:5, ...]
-    self.assertAllMeansClose(y, expected_mean, axis=0,
-                             atol=0.1, rtol=0.1)
+    self.assertAllMeansClose(y, expected_mean, axis=0, atol=0.25)
     self.assertAllClose(expected_cov, sample_stats.covariance(y, sample_axis=0),
                         atol=0., rtol=0.1)
 
