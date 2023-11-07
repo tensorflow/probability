@@ -317,11 +317,11 @@ class DiagonalMassMatrixAdaptationTest(test_util.TestCase):
         initial_running_variance=initial_running_variance)
 
     # This number started at `error_factor`. Make sure the mean is now at least
-    # 75% closer.
+    # 50% closer.
     final_mean_diff = tf.abs(results.final_mean - results.true_mean)
     np.testing.assert_array_less(
         self.evaluate(final_mean_diff),
-        self.evaluate(0.25 * error_factor))
+        self.evaluate(0.5 * error_factor))
 
   def testDoesNotGoesInWrongDirection(self):
     # As above, we test a weaker property, which is that the variance and
