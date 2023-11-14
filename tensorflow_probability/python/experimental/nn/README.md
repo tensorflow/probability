@@ -11,7 +11,7 @@ Design goals include but are not limited to:
 - extensibility
 - simple implementations.
 
-The primary differences from `tf.keras` are:
+The primary differences from `tf_keras` are:
 
 1. The TFP NN toolbox use `tf.Module` for `tf.Variable` tracking.
 2. Users are expected to implement their own train loops.

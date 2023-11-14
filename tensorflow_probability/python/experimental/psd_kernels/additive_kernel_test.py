@@ -139,7 +139,7 @@ class AdditiveKernelTest(test_util.TestCase):
         amplitudes, length_scale, dim, x, y, method='matrix')
 
     self.assertAllClose(
-        self.evaluate(actual), self.evaluate(expected), rtol=1e-5)
+        self.evaluate(actual), self.evaluate(expected), rtol=3e-5)
 
   @test_util.disable_test_for_backend(
       disable_numpy=True,

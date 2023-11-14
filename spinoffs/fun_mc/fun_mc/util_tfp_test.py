@@ -17,7 +17,7 @@
 # Dependency imports
 
 from absl.testing import parameterized
-from jax.config import config as jax_config
+from jax import config as jax_config
 import numpy as np
 import tensorflow.compat.v2 as real_tf
 

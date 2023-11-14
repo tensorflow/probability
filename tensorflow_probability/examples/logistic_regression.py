@@ -25,6 +25,7 @@ from matplotlib.backends import backend_agg
 import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import tf_keras
 
 tf.enable_v2_behavior()
 
@@ -132,7 +133,7 @@ def toy_logistic_data(num_examples, input_size=2, weights_prior_stddev=5.0):
   return random_weights, random_bias, np.float32(design_matrix), labels
 
 
-class ToyDataSequence(tf.keras.utils.Sequence):
+class ToyDataSequence(tf_keras.utils.Sequence):
   """Creates a sequence of labeled points from provided numpy arrays."""
 
   def __init__(self, features, labels, batch_size):
@@ -177,7 +178,7 @@ def create_model(num_samples, num_dimensions):
   # parameterized by logits from a single linear layer. We use the Flipout
   # Monte Carlo estimator for the layer: this enables lower variance
   # stochastic gradients than naive reparameterization.
-  input_layer = tf.keras.layers.Input(shape=num_dimensions)
+  input_layer = tf_keras.layers.Input(shape=num_dimensions)
   dense_layer = tfp.layers.DenseFlipout(
       units=1,
       activation='sigmoid',
@@ -186,8 +187,8 @@ def create_model(num_samples, num_dimensions):
       kernel_divergence_fn=kl_divergence_function)(input_layer)
 
   # Model compilation.
-  model = tf.keras.Model(inputs=input_layer, outputs=dense_layer)
-  optimizer = tf.keras.optimizers.Adam(lr=FLAGS.learning_rate)
+  model = tf_keras.Model(inputs=input_layer, outputs=dense_layer)
+  optimizer = tf_keras.optimizers.Adam(lr=FLAGS.learning_rate)
   # We use the binary_crossentropy loss since this toy example contains
   # two labels. The Keras API will then automatically add the
   # Kullback-Leibler divergence (contained on the individual layers of

@@ -24,10 +24,11 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.layers import weight_norm
-tfk = tf.keras
 
-tfkl = tf.keras.layers
+tfk = tf_keras
+tfkl = tf_keras.layers
 
 
 # TODO(b/143642032): Figure out how to get this working with
@@ -225,9 +226,9 @@ class WeightNormTest(test_util.TestCase):
   @parameterized.parameters(['sequential', 'sequential_no_input', 'functional'])
   def testTrainableVariableInitializationInModelFit(self, model_type):
     if tf.__internal__.tf2.enabled() and tf.executing_eagerly():
-      sgd = tf.keras.optimizers.SGD(learning_rate=0.)
+      sgd = tf_keras.optimizers.SGD(learning_rate=0.)
     else:
-      sgd = tf.keras.optimizers.legacy.SGD(learning_rate=0.)
+      sgd = tf_keras.optimizers.legacy.SGD(learning_rate=0.)
     model = self._define_model(model_type, self.data_dim, self.num_hidden)
     model.compile(optimizer=sgd, loss='mse')
     model.fit(

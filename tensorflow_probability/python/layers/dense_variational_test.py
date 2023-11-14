@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.layers import dense_variational
 from tensorflow_probability.python.layers import util
 from tensorflow_probability.python.random import random_ops
@@ -124,7 +125,7 @@ class DenseVariational(test_util.TestCase):
               'kernel_prior_fn': None,
               'bias_posterior_fn': None,
               'bias_prior_fn': None}
-    with tf.keras.utils.CustomObjectScope({layer_class.__name__: layer_class}):
+    with tf_keras.utils.CustomObjectScope({layer_class.__name__: layer_class}):
       # TODO(scottzhu): reenable the test when the repo switch change reach
       # the TF PIP package.
       self.skipTest('Skip the test until the TF and Keras has a new PIP.')
@@ -500,7 +501,7 @@ class DenseVariational(test_util.TestCase):
     y = np.random.uniform(
         -1., 1., size=(data_size, out_size)).astype(np.float32)
 
-    model = tf.keras.Sequential([
+    model = tf_keras.Sequential([
         dense_variational.DenseReparameterization(6, activation=tf.nn.relu),
         dense_variational.DenseFlipout(6, activation=tf.nn.relu),
         dense_variational.DenseLocalReparameterization(out_size)
@@ -514,7 +515,7 @@ class DenseVariational(test_util.TestCase):
     self.assertAllEqual(batch_output.shape, [batch_size, out_size])
 
   def testGradients(self):
-    net = tf.keras.Sequential([
+    net = tf_keras.Sequential([
         dense_variational.DenseReparameterization(1),
         dense_variational.DenseFlipout(1),
         dense_variational.DenseLocalReparameterization(1)

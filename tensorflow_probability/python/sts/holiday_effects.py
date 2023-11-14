@@ -52,8 +52,8 @@ def get_default_holidays(times, country):
       columns=['geo', 'holiday', 'date'])
   holidays = holidays.explode('holiday')
   # Ensure that only holiday dates covered by times are used.
-  holidays = holidays[(holidays['date'] >= times.min())
-                      & (holidays['date'] <= times.max())]
+  holidays = holidays[(pd.to_datetime(holidays['date']) >= times.min())
+                      & (pd.to_datetime(holidays['date']) <= times.max())]
   holidays = holidays.reset_index(drop=True)
   holidays['date'] = pd.to_datetime(holidays['date'])
   holidays = holidays.sort_values('date')

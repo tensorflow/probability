@@ -907,7 +907,10 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
 
     # Manually estimate the expected multi-sample / IWAE loss.
     zs, q_lp = surrogate_posterior.experimental_sample_and_log_prob(
-        [sample_size, importance_sample_size], seed=seed)
+        [sample_size, importance_sample_size],
+        # Brittle hack to ensure that the q samples match those
+        # drawn in `monte_carlo_variational_loss`.
+        seed=samplers.split_seed(seed, 2)[0])
     log_weights = target_log_prob_fn(zs) - q_lp
     iwae_loss = -tf.reduce_mean(
         tf.math.reduce_logsumexp(log_weights, axis=1) - tf.math.log(
@@ -988,7 +991,10 @@ class CsiszarVIMCOTest(test_util.TestCase):
 
     def logu(s):
       q = build_q(s)
-      x = q.sample(sample_shape=[num_draws, num_batch_draws], seed=seed)
+      x = q.sample(sample_shape=[num_draws, num_batch_draws],
+                   # Brittle hack to ensure that the q samples match those
+                   # drawn in `monte_carlo_variational_loss`.
+                   seed=samplers.split_seed(seed, 2)[0])
       x = tf.stop_gradient(x)
       return p.log_prob(x) - q.log_prob(x)
 
@@ -997,7 +1003,10 @@ class CsiszarVIMCOTest(test_util.TestCase):
 
     def q_log_prob_x(s):
       q = build_q(s)
-      x = q.sample(sample_shape=[num_draws, num_batch_draws], seed=seed)
+      x = q.sample(sample_shape=[num_draws, num_batch_draws],
+                   # Brittle hack to ensure that the q samples match those
+                   # drawn in `monte_carlo_variational_loss`.
+                   seed=samplers.split_seed(seed, 2)[0])
       x = tf.stop_gradient(x)
       return q.log_prob(x)
 

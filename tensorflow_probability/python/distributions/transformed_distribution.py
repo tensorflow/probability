@@ -388,7 +388,7 @@ class _TransformedDistribution(distribution_lib.Distribution):
     return tf.reduce_logsumexp(tf.stack(lp_on_fibers), axis=0)
 
   def _prob(self, y, **kwargs):
-    if not hasattr(self.distribution, '_prob'):
+    if not hasattr(self.distribution, '_prob') or self.bijector._is_injective:  # pylint: disable=protected-access
       return tf.exp(self._log_prob(y, **kwargs))
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
 
@@ -400,9 +400,6 @@ class _TransformedDistribution(distribution_lib.Distribution):
         )
     ildj = self.bijector.inverse_log_det_jacobian(
         y, event_ndims=event_ndims, **bijector_kwargs)
-    if self.bijector._is_injective:  # pylint: disable=protected-access
-      base_prob = self.distribution.prob(x, **distribution_kwargs)
-      return base_prob * tf.exp(tf.cast(ildj, base_prob.dtype))
 
     # Compute prob on each element of the inverse image.
     prob_on_fibers = []

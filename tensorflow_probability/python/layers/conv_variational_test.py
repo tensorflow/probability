@@ -26,11 +26,11 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.layers import conv_variational
 from tensorflow_probability.python.layers import util
 from tensorflow_probability.python.random import random_ops
 from tensorflow_probability.python.util import seed_stream
-from tensorflow.python.layers import utils as tf_layers_util
 from tensorflow.python.ops import nn_ops
 
 
@@ -217,7 +217,7 @@ class ConvVariational(object):
     if self.data_format == 'channels_first':
       input_shape = channels_last_to_first(input_shape)
 
-    with tf.keras.utils.CustomObjectScope({layer_class.__name__: layer_class}):
+    with tf_keras.utils.CustomObjectScope({layer_class.__name__: layer_class}):
       with self.cached_session():
         # TODO(scottzhu): reenable the test when the repo switch change reach
         # the TF PIP package.
@@ -369,13 +369,13 @@ class ConvVariational(object):
           tf.TensorShape(inputs.shape),
           filter_shape=tf.TensorShape(kernel_shape),
           padding='SAME',
-          data_format=tf_layers_util.convert_data_format(
+          data_format=conv_variational.convert_data_format(
               self.data_format, inputs.shape.rank))
       expected_outputs = convolution_op(inputs, kernel_posterior.result_sample)
       expected_outputs = tf.nn.bias_add(
           expected_outputs,
           bias_posterior.result_sample,
-          data_format=tf_layers_util.convert_data_format(self.data_format, 4))
+          data_format=conv_variational.convert_data_format(self.data_format, 4))
 
       [
           expected_outputs_, actual_outputs_,
@@ -435,7 +435,7 @@ class ConvVariational(object):
           tf.TensorShape(inputs.shape),
           filter_shape=tf.TensorShape(kernel_shape),
           padding='SAME',
-          data_format=tf_layers_util.convert_data_format(
+          data_format=conv_variational.convert_data_format(
               self.data_format, inputs.shape.rank))
 
       expected_kernel_posterior_affine = normal.Normal(
@@ -483,7 +483,7 @@ class ConvVariational(object):
       expected_outputs = tf.nn.bias_add(
           expected_outputs,
           bias_posterior.result_sample,
-          data_format=tf_layers_util.convert_data_format(self.data_format, 4))
+          data_format=conv_variational.convert_data_format(self.data_format, 4))
 
       [
           expected_outputs_, actual_outputs_,
@@ -607,7 +607,7 @@ class ConvVariational(object):
     inputs = self.maybe_transpose_tensor(inputs)
     outputs = self.maybe_transpose_tensor(outputs)
 
-    net = tf.keras.Sequential([
+    net = tf_keras.Sequential([
         layer_class(filters=2, kernel_size=3, data_format=self.data_format,
                     input_shape=inputs.shape[1:]),
         layer_class(filters=2, kernel_size=1, data_format=self.data_format)])
@@ -718,7 +718,7 @@ class ConvVariational(object):
     self._testLayerInSequential(conv_variational.Convolution3DFlipout)
 
   def testGradients(self):
-    net = tf.keras.Sequential([
+    net = tf_keras.Sequential([
         conv_variational.Convolution1DFlipout(
             1, 1, data_format=self.data_format),
         conv_variational.Convolution1DReparameterization(

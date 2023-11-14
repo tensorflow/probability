@@ -77,6 +77,23 @@ class HaltonSequenceTest(test_util.TestCase):
     self.assertEqual(self.evaluate(sample_float32).dtype, np.float32)
     self.assertEqual(self.evaluate(sample_float64).dtype, np.float64)
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, reason="Numpy has no notion of jit compilation.")
+  def test_jit_works_correctly(self):
+    @tf.function(jit_compile=True)
+    def sample_float32():
+      return sample_halton_sequence_lib.sample_halton_sequence(
+          5, num_results=10, dtype=tf.float32, seed=test_util.test_seed())
+    samples = sample_float32()
+    self.assertEqual(samples.shape, [10, 5])
+
+    @tf.function(jit_compile=True)
+    def sample_float64():
+      return sample_halton_sequence_lib.sample_halton_sequence(
+          5, num_results=10, dtype=tf.float64, seed=test_util.test_seed())
+    samples = sample_float64()
+    self.assertEqual(samples.shape, [10, 5])
+
   def test_normal_integral_mean_and_var_correctly_estimated(self):
     n = 1000
     # This test is almost identical to the similarly named test in

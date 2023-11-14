@@ -732,9 +732,9 @@ def maybe_broadcast_structure(from_structure: Any,
                               to_structure: Any) -> Any:
   """Maybe broadcasts `from_structure` to `to_structure`.
 
-  If `from_structure` is a singleton, it is tiled to match the structure of
-  `to_structure`. Note that the elements in `from_structure` are not copied if
-  this tiling occurs.
+  This assumes that `from_structure` is a shallow version of `to_structure`.
+  Subtrees of `to_structure` are set to the leaf values of `from_structure` that
+  those subtrees correspond to.
 
   Args:
     from_structure: A structure.
@@ -743,11 +743,12 @@ def maybe_broadcast_structure(from_structure: Any,
   Returns:
     new_from_structure: Same structure as `to_structure`.
   """
-  flat_from = util.flatten_tree(from_structure)
-  flat_to = util.flatten_tree(to_structure)
-  if len(flat_from) == 1:
-    flat_from *= len(flat_to)
-  return util.unflatten_tree(to_structure, flat_from)
+  def _broadcast_leaf(from_val, to_subtree):
+    return util.map_tree(lambda _: from_val, to_subtree)
+
+  return util.map_tree_up_to(
+      from_structure, _broadcast_leaf, from_structure, to_structure
+  )
 
 
 def reparameterize_potential_fn(

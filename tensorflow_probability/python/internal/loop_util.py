@@ -52,8 +52,8 @@ def _convert_variables_to_tensors(values):
 
 def tensor_array_from_element(elem, size=None, **kwargs):
   """Construct a tf.TensorArray of elements with the dtype + shape of `elem`."""
-  if JAX_MODE and isinstance(elem, jax.random.PRNGKeyArray):
-    # If `trace_elt` is a `PRNGKeyArray`, then then it is not possible to create
+  if JAX_MODE and jax.dtypes.issubdtype(elem.dtype, jax.dtypes.prng_key):
+    # If `trace_elt` is a typed prng key, then then it is not possible to create
     # a matching (i.e., with the same custom PRNG) instance/array inside
     # `TensorArray.__init__` given just a `dtype`, `size`, and `shape`.
     #

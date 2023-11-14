@@ -218,10 +218,14 @@ def _default_convert_to_tensor(value, dtype=None):
   """Default tensor conversion function for array, bool, int, float, and complex."""
   if JAX_MODE:
     # TODO(b/223267515): We shouldn't need to specialize here.
-    if 'PRNGKeyArray' in str(type(value)):
+    if hasattr(value, 'dtype') and jax.dtypes.issubdtype(
+        value.dtype, jax.dtypes.prng_key
+    ):
       return value
     if isinstance(value, (list, tuple)) and value:
-      if 'PRNGKeyArray' in str(type(value[0])):
+      if hasattr(value[0], 'dtype') and jax.dtypes.issubdtype(
+          value[0].dtype, jax.dtypes.prng_key
+      ):
         return np.stack(value, axis=0)
 
   inferred_dtype = _infer_dtype(value, np.float32)

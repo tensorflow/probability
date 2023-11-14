@@ -19,7 +19,8 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow.python.training import training_ops
+
+from tensorflow_probability.python.internal import tf_keras
 
 
 __all__ = [
@@ -28,7 +29,7 @@ __all__ = [
 
 
 # pylint: disable=g-classes-have-attributes
-class VariationalSGD(tf.keras.optimizers.legacy.Optimizer):
+class VariationalSGD(tf_keras.optimizers.legacy.Optimizer):
   """An optimizer module for constant stochastic gradient descent.
 
   This implements an optimizer module for the constant stochastic gradient
@@ -236,10 +237,10 @@ class VariationalSGD(tf.keras.optimizers.legacy.Optimizer):
         tf.cast(max_learning_rate, var.dtype.base_dtype))
 
     newgrad = grad * learn_rates
-    return training_ops.resource_apply_gradient_descent(
-        var.handle,
-        tf.cast(1., var.dtype),
-        newgrad,
+    return tf.raw_ops.ResourceApplyGradientDescent(
+        var=var.handle,
+        alpha=tf.cast(1., var.dtype),
+        delta=newgrad,
         use_locking=self._use_locking)
 
   def _resource_apply_sparse(self, grad, var, indices):

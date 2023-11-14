@@ -762,6 +762,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/math:linalg",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
     ],
@@ -780,6 +781,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:nest_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/math/psd_kernels:schur_complement",
         "//tensorflow_probability/python/util",
     ],
@@ -1156,6 +1158,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/distributions:joint_distribution_coroutine",
         "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )
@@ -1857,6 +1860,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/layers:weight_norm",
     ],
 )
@@ -2195,6 +2199,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/math:linalg",
         "//tensorflow_probability/python/math:special",
     ],
@@ -2406,6 +2411,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/math:linalg",
         "//tensorflow_probability/python/math/psd_kernels:positive_semidefinite_kernel",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
@@ -3150,7 +3156,7 @@ multi_substrate_py_test(
     name = "gaussian_process_regression_model_test",
     srcs = ["gaussian_process_regression_model_test.py"],
     jax_size = "medium",
-    shard_count = 2,
+    shard_count = 4,
     deps = [
         ":gaussian_process",
         ":gaussian_process_regression_model",
@@ -3623,6 +3629,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/layers:distribution_layer",
     ],
 )
@@ -4215,6 +4222,7 @@ multi_substrate_py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/math:gradient",
     ],
 )
@@ -4540,6 +4548,7 @@ multi_substrate_py_test(
     tags = ["colab-smoke"],
     deps = [
         ":beta",
+        ":dirichlet",
         ":exponential",
         ":independent",
         ":joint_distribution_auto_batched",
@@ -4552,6 +4561,7 @@ multi_substrate_py_test(
         ":normal",
         ":sample",
         ":transformed_distribution",
+        ":uniform",
         # numpy dep,
         # scipy dep,
         # tensorflow dep,

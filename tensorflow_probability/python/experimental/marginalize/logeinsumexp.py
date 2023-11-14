@@ -15,7 +15,8 @@
 """Compute einsums in log space."""
 
 import opt_einsum as oe
-import tensorflow.compat.v1 as tf
+import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.internal import prefer_static as ps
 
 
 # pylint: disable=no-member
@@ -72,8 +73,8 @@ def rearrange(src, dst, t):
     if i not in src:
       new_indices += i
   new_src = src + new_indices
-  new_t = tf.reshape(t, tf.concat(
-      [tf.shape(t), tf.ones(len(new_indices), dtype=tf.int32)], axis=0))
+  new_t = tf.reshape(t, ps.concat(
+      [ps.shape(t), ps.ones(len(new_indices), dtype=tf.int32)], axis=0))
   formula = '{}->{}'.format(new_src, dst)
   # It is safe to use ordinary `einsum` here as no summations
   # are performed.

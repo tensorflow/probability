@@ -43,6 +43,7 @@ from six.moves import urllib
 import tensorflow.compat.v1 as tf
 
 from tensorflow_probability import distributions as tfd
+from tensorflow_probability.python.internal import tf_keras
 from tensorflow.contrib.learn.python.learn.datasets import mnist
 from tensorflow.python.training import moving_averages
 
@@ -174,17 +175,17 @@ def make_encoder(base_depth, activation, latent_size, code_size):
       `[..., latent_size, code_size]`.
   """
   conv = functools.partial(
-      tf.keras.layers.Conv2D, padding="SAME", activation=activation)
+      tf_keras.layers.Conv2D, padding="SAME", activation=activation)
 
-  encoder_net = tf.keras.Sequential([
+  encoder_net = tf_keras.Sequential([
       conv(base_depth, 5, 1),
       conv(base_depth, 5, 2),
       conv(2 * base_depth, 5, 1),
       conv(2 * base_depth, 5, 2),
       conv(4 * latent_size, 7, padding="VALID"),
-      tf.keras.layers.Flatten(),
-      tf.keras.layers.Dense(latent_size * code_size, activation=None),
-      tf.keras.layers.Reshape([latent_size, code_size])
+      tf_keras.layers.Flatten(),
+      tf_keras.layers.Dense(latent_size * code_size, activation=None),
+      tf_keras.layers.Reshape([latent_size, code_size])
   ])
 
   def encoder(images):
@@ -219,11 +220,11 @@ def make_decoder(base_depth, activation, input_size, output_shape):
       `tfd.Distribution` instance over images.
   """
   deconv = functools.partial(
-      tf.keras.layers.Conv2DTranspose, padding="SAME", activation=activation)
+      tf_keras.layers.Conv2DTranspose, padding="SAME", activation=activation)
   conv = functools.partial(
-      tf.keras.layers.Conv2D, padding="SAME", activation=activation)
-  decoder_net = tf.keras.Sequential([
-      tf.keras.layers.Reshape((1, 1, input_size)),
+      tf_keras.layers.Conv2D, padding="SAME", activation=activation)
+  decoder_net = tf_keras.Sequential([
+      tf_keras.layers.Reshape((1, 1, input_size)),
       deconv(2 * base_depth, 7, padding="VALID"),
       deconv(2 * base_depth, 5),
       deconv(2 * base_depth, 5, 2),
@@ -231,7 +232,7 @@ def make_decoder(base_depth, activation, input_size, output_shape):
       deconv(base_depth, 5, 2),
       deconv(base_depth, 5),
       conv(output_shape[-1], 5, activation=None),
-      tf.keras.layers.Reshape(output_shape),
+      tf_keras.layers.Reshape(output_shape),
   ])
 
   def decoder(codes):

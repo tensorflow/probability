@@ -350,7 +350,7 @@ def adaptive_mcmc_step(
     target_log_prob_fn: fun_mc.PotentialFn,
     num_mala_steps: int,
     num_adaptation_steps: int,
-    seed: jax.random.KeyArray,
+    seed: jax.Array,
     method: str = 'hmc',
     damping: Optional[jnp.ndarray] = None,
     scalar_step_size: Optional[jnp.ndarray] = None,
@@ -778,7 +778,7 @@ def adaptive_nuts_step(
     target_log_prob_fn: fun_mc.PotentialFn,
     num_mala_steps: int,
     num_adaptation_steps: int,
-    seed: jax.random.KeyArray,
+    seed: jax.Array,
     scalar_step_size: Optional[jnp.ndarray] = None,
     vector_step_size: Optional[jnp.ndarray] = None,
     rvar_factor: int = 8,
@@ -1040,7 +1040,7 @@ class MeadsExtra(NamedTuple):
 
 
 def meads_init(state: jnp.ndarray, target_log_prob_fn: fun_mc.PotentialFn,
-               num_folds: int, seed: jax.random.KeyArray):
+               num_folds: int, seed: jax.Array):
   """Initializes MEADS."""
   num_dimensions = state.shape[-1]
   num_chains = state.shape[0]
@@ -1062,7 +1062,7 @@ def meads_init(state: jnp.ndarray, target_log_prob_fn: fun_mc.PotentialFn,
 
 def meads_step(meads_state: MeadsState,
                target_log_prob_fn: fun_mc.PotentialFn,
-               seed: jax.random.KeyArray,
+               seed: jax.Array,
                vector_step_size: Optional[jnp.ndarray] = None,
                damping: Optional[jnp.ndarray] = None,
                step_size_multiplier: float = 0.5,
@@ -1221,7 +1221,7 @@ def run_adaptive_mcmc_on_target(
     init_step_size: jnp.ndarray,
     num_adaptation_steps: int,
     num_results: int,
-    seed: jax.random.KeyArray,
+    seed: jax.Array,
     num_mala_steps: int = 100,
     rvar_smoothing: int = 0,
     trajectory_opt_kwargs: Mapping[str, Any] = immutabledict.immutabledict({
@@ -1358,7 +1358,7 @@ def run_adaptive_nuts_on_target(
     init_step_size: jnp.ndarray,
     num_adaptation_steps: int,
     num_results: int,
-    seed: jax.random.KeyArray,
+    seed: jax.Array,
     num_mala_steps: int = 100,
     rvar_smoothing: int = 0,
     num_chains: Optional[int] = None,
@@ -1478,7 +1478,7 @@ def run_meads_on_target(
     num_adaptation_steps: int,
     num_results: int,
     thinning: int,
-    seed: jax.random.KeyArray,
+    seed: jax.Array,
     num_folds: int,
     num_chains: Optional[int] = None,
     init_x: Optional[jnp.ndarray] = None,
@@ -1596,7 +1596,7 @@ def run_fixed_mcmc_on_target(
     target: gym.targets.Model,
     init_x: jnp.ndarray,
     method: str,
-    seed: jax.random.KeyArray,
+    seed: jax.Array,
     num_warmup_steps: int,
     num_results: int,
     scalar_step_size: jnp.ndarray,
@@ -1706,7 +1706,7 @@ def run_vi_on_target(
     init_x: jnp.ndarray,
     num_steps: int,
     learning_rate: float,
-    seed: jax.random.KeyArray,
+    seed: jax.Array,
 ):
   """Run VI on a target.
 

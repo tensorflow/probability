@@ -212,6 +212,7 @@ def multi_substrate_py_library(
     remove_deps = [
         "//third_party/py/tensorflow",
         "//third_party/py/tensorflow:tensorflow",
+        "//tensorflow_probability/python/internal:tf_keras",
     ]
 
     trimmed_deps = [dep for dep in deps if (dep not in substrates_omit_deps and
@@ -337,6 +338,7 @@ def multi_substrate_py_test(
     remove_deps = [
         "//third_party/py/tensorflow",
         "//third_party/py/tensorflow:tensorflow",
+        "//tensorflow_probability/python/internal:tf_keras",
     ]
 
     trimmed_deps = [dep for dep in deps if dep not in remove_deps]

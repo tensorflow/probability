@@ -22,7 +22,7 @@ import os
 
 from absl.testing import parameterized
 import jax
-from jax.config import config as jax_config
+from jax import config as jax_config
 import numpy as np
 import scipy.stats
 import tensorflow.compat.v2 as real_tf
@@ -360,6 +360,9 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
 
     struct = fun_mc.maybe_broadcast_structure([3, 4], [1, 2])
     self.assertEqual([3, 4], struct)
+
+    struct = fun_mc.maybe_broadcast_structure([1, 2], [[0, 0], [0, 0, 0]])
+    self.assertEqual([[1, 1], [2, 2, 2]], struct)
 
   def testCallPotentialFn(self):
 

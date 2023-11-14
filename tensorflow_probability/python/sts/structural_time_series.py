@@ -346,7 +346,7 @@ class StructuralTimeSeries(object):
     losses = tfp.vi.fit_surrogate_posterior(
       target_log_prob_fn=jd.unnormalized_log_prob,
       surrogate_posterior=surrogate_posterior,
-      optimizer=tf.optimizers.Adam(0.1),
+      optimizer=tf_keras.optimizers.Adam(0.1),
       num_steps=200)
     parameter_samples = surrogate_posterior.sample(50)
 

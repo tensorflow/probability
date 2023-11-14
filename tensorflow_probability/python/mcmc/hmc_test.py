@@ -40,6 +40,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.math import generic
 from tensorflow_probability.python.mcmc import hmc
 from tensorflow_probability.python.mcmc import sample as sample_lib
@@ -997,7 +998,7 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
     sigma = deferred_tensor.TransformedVariable(
         name='sigma', initial_value=np.array(1, dtype), bijector=exp.Exp())
 
-    optimizer = tf.optimizers.SGD(learning_rate=0.01)
+    optimizer = tf_keras.optimizers.SGD(learning_rate=0.01)
 
     # TODO(b/144045420): eliminate the need for this tf.function decorator. The
     # reason it was added was that the test code is written to work in both

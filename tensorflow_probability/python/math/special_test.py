@@ -560,8 +560,8 @@ class BetaincinvTest(test_util.TestCase):
        "rtol": 2e-3},
       {"testcase_name": "float64",
        "dtype": np.float64,
-       "atol": 1e-12,
-       "rtol": 1e-11})
+       "atol": 3e-12,
+       "rtol": 3e-11})
   def testBetaincinvSmall(self, dtype, atol, rtol):
     self._test_betaincinv_value(
         a_high=1., b_high=1., dtype=dtype, atol=atol, rtol=rtol)

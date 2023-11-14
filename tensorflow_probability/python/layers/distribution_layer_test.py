@@ -37,15 +37,15 @@ from tensorflow_probability.python.distributions import onehot_categorical
 from tensorflow_probability.python.distributions import poisson
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.layers import distribution_layer
 from tensorflow_probability.python.layers import variable_input
 from tensorflow_probability.python.math import generic
 from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic
 from tensorflow_probability.python.util import deferred_tensor
 
-tfk = tf.keras
-
-tfkl = tf.keras.layers
+tfk = tf_keras
+tfkl = tf_keras.layers
 
 
 def _logit_avg_expit(t):
@@ -72,8 +72,8 @@ def _unwrap_tensor_coercible(dist):
 
 def _get_adam_optimizer(learning_rate):
   if tf.__internal__.tf2.enabled() and tf.executing_eagerly():
-    return tf.keras.optimizers.Adam(learning_rate=learning_rate)
-  return tf.keras.optimizers.legacy.Adam(learning_rate=learning_rate)
+    return tf_keras.optimizers.Adam(learning_rate=learning_rate)
+  return tf_keras.optimizers.legacy.Adam(learning_rate=learning_rate)
 
 
 # TODO(b/143642032): Figure out how to solve issues with save/load, so that we
@@ -92,9 +92,9 @@ class EndToEndTest(test_util.TestCase):
   registered via `tf.register_tensor_conversion_function`.
 
   Fundamentally, there are three ways to be Keras models:
-  1. `tf.keras.Sequential`
+  1. `tf_keras.Sequential`
   2. Functional API
-  3. Subclass `tf.keras.Model`.
+  3. Subclass `tf_keras.Model`.
 
   Its important to have end-to-end tests for all three, because #1 and #2 call
   `__call__` and `call` differently. (#3's call pattern depends on user
@@ -336,8 +336,8 @@ class EndToEndTest(test_util.TestCase):
     # `s` is the "side variable".
     s = deferred_tensor.TransformedVariable(1., softplus.Softplus())
     prior = normal_lib.Normal(tf.Variable(0.), 1.)
-    linear_regression = tf.keras.Sequential([
-        tf.keras.layers.Dense(1),
+    linear_regression = tf_keras.Sequential([
+        tf_keras.layers.Dense(1),
         distribution_layer.DistributionLambda(
             lambda t: normal_lib.Normal(t, s),
             activity_regularizer=distribution_layer.KLDivergenceRegularizer(
@@ -600,8 +600,8 @@ class MultivariateNormalTriLTest(test_util.TestCase):
     true_bias = np.array([0, 0, np.log(scale_noise), 0, np.log(scale_noise)])
 
     # Create model.
-    model = tf.keras.Sequential([
-        tf.keras.layers.Dense(
+    model = tf_keras.Sequential([
+        tf_keras.layers.Dense(
             distribution_layer.MultivariateNormalTriL.params_size(d),
             kernel_initializer=lambda s, **_: true_kernel,
             bias_initializer=lambda s, **_: true_bias),
@@ -660,10 +660,10 @@ class OneHotCategoricalTest(test_util.TestCase):
     d = y.shape[-1]
 
     # Create model.
-    model = tf.keras.Sequential([
-        tf.keras.layers.Dense(
+    model = tf_keras.Sequential([
+        tf_keras.layers.Dense(
             distribution_layer.OneHotCategorical.params_size(d) - 1),
-        tf.keras.layers.Lambda(_vec_pad),
+        tf_keras.layers.Lambda(_vec_pad),
         distribution_layer.OneHotCategorical(d),
     ])
 
@@ -748,8 +748,8 @@ class CategoricalMixtureOfOneHotCategoricalTest(test_util.TestCase):
     k = 2
     p = distribution_layer.CategoricalMixtureOfOneHotCategorical.params_size(
         d, k)
-    model = tf.keras.Sequential([
-        tf.keras.layers.Dense(p),
+    model = tf_keras.Sequential([
+        tf_keras.layers.Dense(p),
         distribution_layer.CategoricalMixtureOfOneHotCategorical(d, k),
     ])
 
@@ -908,8 +908,8 @@ class IndependentBernoulliTestStaticShape(test_util.TestCase,
     event_shape = y.shape[1:]
 
     # Create model.
-    model = tf.keras.Sequential([
-        tf.keras.layers.Dense(
+    model = tf_keras.Sequential([
+        tf_keras.layers.Dense(
             distribution_layer.IndependentBernoulli.params_size(event_shape)),
         distribution_layer.IndependentBernoulli(event_shape),
     ])
@@ -1510,13 +1510,13 @@ class VariationalGaussianProcessEndToEnd(test_util.TestCase):
     y = (w0 * x * (1 + np.sin(x)) + b0) + eps
     x0 = np.linspace(*x_range, num=1000)
 
-    class KernelFn(tf.keras.layers.Layer):
+    class KernelFn(tf_keras.layers.Layer):
 
       def __init__(self, **kwargs):
         super(KernelFn, self).__init__(**kwargs)
 
         self._amplitude = self.add_weight(
-            initializer=tf.initializers.constant(.54),
+            initializer=tf_keras.initializers.constant(.54),
             dtype=dtype,
             name='amplitude')
 
@@ -1533,17 +1533,17 @@ class VariationalGaussianProcessEndToEnd(test_util.TestCase):
     # Add a leading dimension for the event_shape.
     eyes = np.expand_dims(np.eye(num_inducing_points), 0)
     variational_inducing_observations_scale_initializer = (
-        tf.initializers.constant(1e-3 * eyes))
+        tf_keras.initializers.constant(1e-3 * eyes))
 
-    model = tf.keras.Sequential([
-        tf.keras.layers.InputLayer(input_shape=[1], dtype=dtype),
-        tf.keras.layers.Dense(1, kernel_initializer='Ones', use_bias=False,
+    model = tf_keras.Sequential([
+        tf_keras.layers.InputLayer(input_shape=[1], dtype=dtype),
+        tf_keras.layers.Dense(1, kernel_initializer='Ones', use_bias=False,
                               activation=None, dtype=dtype),
         distribution_layer.VariationalGaussianProcess(
             num_inducing_points=num_inducing_points,
             kernel_provider=KernelFn(dtype=dtype),
             inducing_index_points_initializer=(
-                tf.initializers.constant(
+                tf_keras.initializers.constant(
                     np.linspace(*x_range,
                                 num=num_inducing_points,
                                 dtype=dtype)[..., np.newaxis])),
