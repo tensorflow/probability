@@ -649,8 +649,8 @@ def _mvn_log_prob(mean, covariance, y):
   log_prob = log_prob - 0.5 * linalg.hpsd_logdet(
       covariance, cholesky_matrix=cholesky_matrix)
   event_dims = ps.shape(mean)[-1]
-  return log_prob - 0.5 * event_dims * dtype_util.as_numpy_dtype(
-      mean.dtype)(np.log(2 * np.pi))
+  return log_prob - dtype_util.as_numpy_dtype(mean.dtype)(
+      0.5 * event_dims * np.log(2 * np.pi))
 
 
 def _extract_batch_shape(x, sample_ndims, event_ndims):
