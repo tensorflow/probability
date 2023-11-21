@@ -83,6 +83,12 @@ class JointDistributionUtilTest(test_util.TestCase):
                     'c': (dirichlet.Dirichlet([1., 1.]),)}],
         expect_isinstance=jds.JointDistributionSequential)
 
+  def test_independent_jd_from_nested_input_one_empty(self):
+    self._test_independent_joint_distribution_from_structure_helper(
+        structure={'a': {'b': normal.Normal(0., 1.)},
+                   'c': {'d': normal.Normal(0., 1.)}},
+        expect_isinstance=jdn.JointDistributionNamed)
+
   def test_batch_ndims_nested_input(self):
     dist = jdu.independent_joint_distribution_from_structure(
         [normal.Normal(0., tf.ones([5, 4])),
