@@ -24,6 +24,7 @@ from tensorflow_probability.python.internal import loop_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
+from tensorflow_probability.python.internal import distribution_util as dist_util
 
 __all__ = [
     'infer_trajectories',
@@ -123,11 +124,11 @@ def infer_trajectories(observations,
                        observation_fn,
                        num_particles,
                        initial_state_proposal=None,
+                       particles_dim=0,
                        proposal_fn=None,
                        resample_fn=weighted_resampling.resample_systematic,
                        resample_criterion_fn=smc_kernel.ess_below_threshold,
                        unbiased_gradients=True,
-                       rejuvenation_kernel_fn=None,
                        num_transitions_per_observation=1,
                        seed=None,
                        name=None):  # pylint: disable=g-doc-args
@@ -247,30 +248,143 @@ def infer_trajectories(observations,
          observation_fn=observation_fn,
          num_particles=num_particles,
          initial_state_proposal=initial_state_proposal,
+         particles_dim=particles_dim,
          proposal_fn=proposal_fn,
          resample_fn=resample_fn,
          resample_criterion_fn=resample_criterion_fn,
          unbiased_gradients=unbiased_gradients,
-         rejuvenation_kernel_fn=rejuvenation_kernel_fn,
          num_transitions_per_observation=num_transitions_per_observation,
          trace_fn=_default_trace_fn,
          trace_criterion_fn=lambda *_: True,
          seed=pf_seed,
          name=name)
-    weighted_trajectories = reconstruct_trajectories(particles, parent_indices)
+    weighted_trajectories = reconstruct_trajectories(
+        particles,
+        parent_indices,
+        particles_dim=particles_dim
+    )
 
     # Resample all steps of the trajectories using the final weights.
     resample_indices = resample_fn(log_probs=log_weights[-1],
                                    event_size=num_particles,
+                                   particles_dim=particles_dim,
                                    sample_shape=(),
                                    seed=resample_seed)
     trajectories = tf.nest.map_structure(
         lambda x: mcmc_util.index_remapping_gather(x,  # pylint: disable=g-long-lambda
                                                    resample_indices,
-                                                   axis=1),
+                                                   axis=particles_dim+1,
+                                                   indices_axis=particles_dim),
         weighted_trajectories)
 
     return trajectories, incremental_log_marginal_likelihoods
+
+
+def sequential_monte_carlo(loop_seed,
+        initial_weighted_particles,
+        num_timesteps,
+        parallel_iterations,
+        trace_criterion_fn,
+        propose_and_update_log_weights_fn,
+        resample_fn,
+        resample_criterion_fn,
+        unbiased_gradients,
+        trace_fn,
+        particles_dim=0,
+        static_trace_allocation_size=None,
+        never_trace=lambda *_: False,
+        ):
+
+  """Samples a series of particles representing filtered latent states.
+
+  The particle filter samples from the sequence of "filtering" distributions
+  `p(state[t] | observations[:t])` over latent
+  states: at each point in time, this is a sample from the distribution
+  conditioned on all observations *up to that time*. Because particles may be
+  resampled, a particle at time `t` may be different from the particle with
+  the same index at time `t + 1`. To reconstruct trajectories by tracing back
+  through the resampling process,
+  see `tfp.mcmc.experimental.reconstruct_trajectories`.
+
+  ${particle_filter_arg_str}
+    trace_fn: Python `callable` defining the values to be traced at each step,
+      with signature `traced_values = trace_fn(weighted_particles, results)`
+      in which the first argument is an instance of
+      `tfp.experimental.mcmc.WeightedParticles` and the second an instance of
+      `SequentialMonteCarloResults` tuple, and the return value is a structure
+       of `Tensor`s.
+       Default value: `lambda s, r: (s.particles, s.log_weights,
+       r.parent_indices, r.incremental_log_marginal_likelihood)`
+    trace_criterion_fn: optional Python `callable` with signature
+      `trace_this_step = trace_criterion_fn(weighted_particles, results)`
+      taking the same arguments as `trace_fn` and returning a boolean `Tensor`.
+      If `None`, only values from the final step are returned.
+      Default value: `lambda *_: True` (trace every step).
+    static_trace_allocation_size: Optional Python `int` size of trace to
+      allocate statically. This should be an upper bound on the number of steps
+      traced and is used only when the length cannot be
+      statically inferred (for example, if a `trace_criterion_fn` is
+      specified).
+      It is primarily intended for contexts where static shapes are required,
+      such as in XLA-compiled code.
+      Default value: `None`.
+    parallel_iterations: Passed to the internal `tf.while_loop`.
+      Default value: `1`.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
+      name: Python `str` name for ops created by this method.
+      Default value: `None` (i.e., `'particle_filter'`).
+  Returns:
+    traced_results: A structure of Tensors as returned by `trace_fn`. If
+      `trace_criterion_fn==None`, this is computed from the final step;
+      otherwise, each Tensor will have initial dimension `num_steps_traced`
+      and stacks the traced results across all steps.
+
+  #### References
+
+  [1] Adam Scibior, Vaden Masrani, and Frank Wood. Differentiable Particle
+      Filtering without Modifying the Forward Pass. _arXiv preprint
+      arXiv:2106.10314_, 2021. https://arxiv.org/abs/2106.10314
+  """
+  kernel = smc_kernel.SequentialMonteCarlo(
+      propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
+      resample_fn=resample_fn,
+      resample_criterion_fn=resample_criterion_fn,
+      particles_dim=particles_dim,
+      unbiased_gradients=unbiased_gradients
+  )
+
+  # Use `trace_scan` rather than `sample_chain` directly because the latter
+  # would force us to trace the state history (with or without thinning),
+  # which is not always appropriate.
+  def seeded_one_step(seed_state_results, _):
+
+    seed, state, results = seed_state_results
+
+    one_step_seed, next_seed = samplers.split_seed(seed)
+
+    next_state, next_results = kernel.one_step(
+        state, results, seed=one_step_seed)
+
+    return next_seed, next_state, next_results
+
+  final_seed_state_result, traced_results = loop_util.trace_scan(
+      loop_fn=seeded_one_step,
+      initial_state=(loop_seed,
+                     initial_weighted_particles,
+                     kernel.bootstrap_results(initial_weighted_particles)),
+      elems=tf.ones([num_timesteps]),
+      trace_fn=lambda seed_state_results: trace_fn(*seed_state_results[1:]),
+      trace_criterion_fn=(
+          lambda seed_state_results: trace_criterion_fn(  # pylint: disable=g-long-lambda
+              *seed_state_results[1:])),
+      static_trace_allocation_size=static_trace_allocation_size,
+      parallel_iterations=parallel_iterations)
+
+  if trace_criterion_fn is never_trace:
+    # Return results from just the final step.
+    traced_results = trace_fn(*final_seed_state_result[1:])
+
+  return traced_results
 
 
 @docstring_util.expand_docstring(
@@ -281,6 +395,7 @@ def particle_filter(observations,
                     observation_fn,
                     num_particles,
                     initial_state_proposal=None,
+                    particles_dim=0,
                     proposal_fn=None,
                     resample_fn=weighted_resampling.resample_systematic,
                     resample_criterion_fn=smc_kernel.ess_below_threshold,
@@ -298,10 +413,10 @@ def particle_filter(observations,
   The particle filter samples from the sequence of "filtering" distributions
   `p(state[t] | observations[:t])` over latent
   states: at each point in time, this is the distribution conditioned on all
-  observations *up to that time*. Because particles may be resampled, a particle
-  at time `t` may be different from the particle with the same index at time
-  `t + 1`. To reconstruct trajectories by tracing back through the resampling
-  process, see `tfp.mcmc.experimental.reconstruct_trajectories`.
+  observations *up to that time*. Because particles may be resampled, a
+  particle at time `t` may be different from the particle with the same index
+  at time `t + 1`. To reconstruct trajectories by tracing back through the
+  resampling process, see `tfp.mcmc.experimental.reconstruct_trajectories`.
 
   ${particle_filter_arg_str}
     trace_fn: Python `callable` defining the values to be traced at each step,
@@ -313,9 +428,9 @@ def particle_filter(observations,
       Default value: `lambda s, r: (s.particles, s.log_weights,
       r.parent_indices, r.incremental_log_marginal_likelihood)`
     trace_criterion_fn: optional Python `callable` with signature
-      `trace_this_step = trace_criterion_fn(weighted_particles, results)` taking
-      the same arguments as `trace_fn` and returning a boolean `Tensor`. If
-      `None`, only values from the final step are returned.
+      `trace_this_step = trace_criterion_fn(weighted_particles, results)`
+      taking the same arguments as `trace_fn` and returning a boolean `Tensor`.
+      If `None`, only values from the final step are returned.
       Default value: `lambda *_: True` (trace every step).
     static_trace_allocation_size: Optional Python `int` size of trace to
       allocate statically. This should be an upper bound on the number of steps
@@ -329,6 +444,8 @@ def particle_filter(observations,
     seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: Python `str` name for ops created by this method.
       Default value: `None` (i.e., `'particle_filter'`).
+    particles_dim: int `Tensor` specifying the dimension in `observations`
+      that corresponds to the particles dimension.
   Returns:
     traced_results: A structure of Tensors as returned by `trace_fn`. If
       `trace_criterion_fn==None`, this is computed from the final step;
@@ -360,47 +477,32 @@ def particle_filter(observations,
         initial_state_prior=initial_state_prior,
         initial_state_proposal=initial_state_proposal,
         num_particles=num_particles,
+        particles_dim=particles_dim,
         seed=init_seed)
     propose_and_update_log_weights_fn = (
         _particle_filter_propose_and_update_log_weights_fn(
             observations=observations,
             transition_fn=transition_fn,
+            particles_dim=particles_dim,
             proposal_fn=proposal_fn,
             observation_fn=observation_fn,
             num_transitions_per_observation=num_transitions_per_observation))
 
-    kernel = smc_kernel.SequentialMonteCarlo(
+    traced_results = sequential_monte_carlo(
+        initial_weighted_particles=initial_weighted_particles,
+        num_timesteps=num_timesteps,
+        parallel_iterations=parallel_iterations,
+        particles_dim=particles_dim,
         propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
         resample_fn=resample_fn,
         resample_criterion_fn=resample_criterion_fn,
-        unbiased_gradients=unbiased_gradients)
-
-    # Use `trace_scan` rather than `sample_chain` directly because the latter
-    # would force us to trace the state history (with or without thinning),
-    # which is not always appropriate.
-    def seeded_one_step(seed_state_results, _):
-      seed, state, results = seed_state_results
-      one_step_seed, next_seed = samplers.split_seed(seed)
-      next_state, next_results = kernel.one_step(
-          state, results, seed=one_step_seed)
-      return next_seed, next_state, next_results
-
-    final_seed_state_result, traced_results = loop_util.trace_scan(
-        loop_fn=seeded_one_step,
-        initial_state=(loop_seed,
-                       initial_weighted_particles,
-                       kernel.bootstrap_results(initial_weighted_particles)),
-        elems=tf.ones([num_timesteps]),
-        trace_fn=lambda seed_state_results: trace_fn(*seed_state_results[1:]),
-        trace_criterion_fn=(
-            lambda seed_state_results: trace_criterion_fn(  # pylint: disable=g-long-lambda
-                *seed_state_results[1:])),
         static_trace_allocation_size=static_trace_allocation_size,
-        parallel_iterations=parallel_iterations)
-
-    if trace_criterion_fn is never_trace:
-      # Return results from just the final step.
-      traced_results = trace_fn(*final_seed_state_result[1:])
+        trace_criterion_fn=trace_criterion_fn,
+        trace_fn=trace_fn,
+        unbiased_gradients=unbiased_gradients,
+        never_trace=never_trace,
+        loop_seed=loop_seed
+    )
 
     return traced_results
 
@@ -410,20 +512,55 @@ def _particle_filter_initial_weighted_particles(observations,
                                                 initial_state_prior,
                                                 initial_state_proposal,
                                                 num_particles,
+                                                particles_dim=0,
                                                 seed=None):
   """Initialize a set of weighted particles including the first observation."""
   # Propose an initial state.
   if initial_state_proposal is None:
-    initial_state = initial_state_prior.sample(num_particles, seed=seed)
-    initial_log_weights = ps.zeros_like(
-        initial_state_prior.log_prob(initial_state))
+    if particles_dim == 0:
+      initial_state = initial_state_prior.sample(num_particles, seed=seed)
+      initial_log_weights = ps.zeros_like(
+          initial_state_prior.log_prob(initial_state)
+      )
+    else:
+      particles_draw = initial_state_prior.sample(num_particles)
+      initial_state = tf.nest.map_structure(
+          lambda x: dist_util.move_dimension(x,
+                                             source_idx=0,
+                                             dest_idx=particles_dim),
+          particles_draw
+      )
+      initial_log_weights = ps.zeros_like(
+          dist_util.move_dimension(
+              initial_state_prior.log_prob(particles_draw),
+              source_idx=0,
+              dest_idx=particles_dim)
+      )
   else:
-    initial_state = initial_state_proposal.sample(num_particles, seed=seed)
-    initial_log_weights = (initial_state_prior.log_prob(initial_state) -
-                           initial_state_proposal.log_prob(initial_state))
+    if particles_dim == 0:
+      initial_state = initial_state_proposal.sample(num_particles, seed=seed)
+      initial_log_weights = (initial_state_prior.log_prob(initial_state) -
+                             initial_state_proposal.log_prob(initial_state))
+    else:
+      particles_draw = initial_state_proposal.sample(num_particles, seed=seed)
+      initial_state = tf.nest.map_structure(
+          lambda x: dist_util.move_dimension(x,
+                                             source_idx=0,
+                                             dest_idx=particles_dim),
+          particles_draw
+      )
+      initial_log_weights = ps.zeros_like(
+          dist_util.move_dimension(
+              (initial_state_prior.log_prob(particles_draw) -
+               initial_state_proposal.log_prob(particles_draw)),
+              source_idx=0,
+              dest_idx=particles_dim)
+      )
+
   # Normalize the initial weights. If we used a proposal, the weights are
   # normalized in expectation, but actually normalizing them reduces variance.
-  initial_log_weights = tf.nn.log_softmax(initial_log_weights, axis=0)
+  initial_log_weights = tf.nn.log_softmax(initial_log_weights,
+                                          axis=particles_dim)
 
   # Return particles weighted by the initial observation.
   return smc_kernel.WeightedParticles(
@@ -432,7 +569,9 @@ def _particle_filter_initial_weighted_particles(observations,
           step=0,
           particles=initial_state,
           observations=observations,
-          observation_fn=observation_fn))
+          observation_fn=observation_fn,
+          particles_dim=particles_dim)
+  )
 
 
 def _particle_filter_propose_and_update_log_weights_fn(
@@ -440,7 +579,8 @@ def _particle_filter_propose_and_update_log_weights_fn(
     transition_fn,
     proposal_fn,
     observation_fn,
-    num_transitions_per_observation=1):
+    num_transitions_per_observation=1,
+    particles_dim=0):
   """Build a function specifying a particle filter update step."""
   def propose_and_update_log_weights_fn(step, state, seed=None):
     particles, log_weights = state.particles, state.log_weights
@@ -465,7 +605,7 @@ def _particle_filter_propose_and_update_log_weights_fn(
       # likelihood of a model with no observations is constant
       # (equal to 1.), so the transition and proposal distributions shouldn't
       # affect it.
-      log_weights = tf.nn.log_softmax(log_weights, axis=0)
+      log_weights = tf.nn.log_softmax(log_weights, axis=particles_dim)
     else:
       proposed_particles = transition_dist.sample(seed=seed)
 
@@ -474,7 +614,9 @@ def _particle_filter_propose_and_update_log_weights_fn(
           particles=proposed_particles,
           log_weights=log_weights + _compute_observation_log_weights(
               step + 1, proposed_particles, observations, observation_fn,
-              num_transitions_per_observation=num_transitions_per_observation))
+              num_transitions_per_observation=num_transitions_per_observation,
+              particles_dim=particles_dim),
+      )
   return propose_and_update_log_weights_fn
 
 
@@ -482,7 +624,8 @@ def _compute_observation_log_weights(step,
                                      particles,
                                      observations,
                                      observation_fn,
-                                     num_transitions_per_observation=1):
+                                     num_transitions_per_observation=1,
+                                     particles_dim=0):
   """Computes particle importance weights from an observation step.
 
   Args:
@@ -502,6 +645,8 @@ def _compute_observation_log_weights(step,
     num_transitions_per_observation: optional int `Tensor` number of times
       to apply the transition model between successive observation steps.
       Default value: `1`.
+    particles_dim: int `Tensor` specifying the dimension in `observations`
+      that corresponds to the particles dimension.
   Returns:
     log_weights: `Tensor` of shape `concat([num_particles, b1, ..., bN])`.
   """
@@ -514,7 +659,12 @@ def _compute_observation_log_weights(step,
         ps.equal(step % num_transitions_per_observation, 0))
     observation_idx = step // num_transitions_per_observation
     observation = tf.nest.map_structure(
-        lambda x, step=step: tf.gather(x, observation_idx), observations)
+        lambda x, step=step: tf.gather(x, observation_idx),
+        observations)
+
+    observation = tf.nest.map_structure(lambda x:
+                                        tf.expand_dims(x, axis=particles_dim), 
+                                        observation)
 
     log_weights = observation_fn(step, particles).log_prob(observation)
     return tf.where(step_has_observation,
@@ -522,14 +672,17 @@ def _compute_observation_log_weights(step,
                     tf.zeros_like(log_weights))
 
 
-def reconstruct_trajectories(particles, parent_indices, name=None):
+def reconstruct_trajectories(particles,
+                             parent_indices,
+                             particles_dim=0,
+                             name=None):
   """Reconstructs the ancestor trajectory that generated each final particle."""
   with tf.name_scope(name or 'reconstruct_trajectories'):
     # Walk backwards to compute the ancestor of each final particle at time t.
     final_indices = smc_kernel._dummy_indices_like(parent_indices[-1])  # pylint: disable=protected-access
     ancestor_indices = tf.scan(
         fn=lambda ancestor, parent: mcmc_util.index_remapping_gather(  # pylint: disable=g-long-lambda
-            parent, ancestor, axis=0),
+            parent, ancestor, axis=particles_dim, indices_axis=particles_dim),
         elems=parent_indices[1:],
         initializer=final_indices,
         reverse=True)
@@ -537,7 +690,10 @@ def reconstruct_trajectories(particles, parent_indices, name=None):
 
   return tf.nest.map_structure(
       lambda part: mcmc_util.index_remapping_gather(  # pylint: disable=g-long-lambda
-          part, ancestor_indices, axis=1, indices_axis=1),
+          part,
+          ancestor_indices,
+          axis=particles_dim + 1,
+          indices_axis=particles_dim + 1),
       particles)
 
 

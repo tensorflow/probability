@@ -62,7 +62,8 @@ class _SequentialMonteCarloTest(test_util.TestCase):
     state, results = kernel.one_step(
         state=initial_state,
         kernel_results=kernel.bootstrap_results(initial_state),
-        seed=seeds[0])
+        seed=seeds[0],
+        )
     state, results = kernel.one_step(state=state, kernel_results=results,
                                      seed=seeds[1])
     state, results = self.evaluate(
