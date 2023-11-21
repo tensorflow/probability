@@ -663,7 +663,7 @@ def _compute_observation_log_weights(step,
         observations)
 
     observation = tf.nest.map_structure(lambda x:
-                                        tf.expand_dims(x, axis=particles_dim), 
+                                        tf.expand_dims(x, axis=particles_dim),
                                         observation)
 
     log_weights = observation_fn(step, particles).log_prob(observation)
