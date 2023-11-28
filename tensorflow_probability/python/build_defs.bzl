@@ -14,6 +14,7 @@
 # ============================================================================
 """Build defs for TF/NumPy/JAX-variadic libraries & tests."""
 
+# Placeholder: load PyCcLinkParamsInfo
 # Placeholder: load PyInfo
 # Placeholder: load native py_library
 # Placeholder: load native py_test
@@ -110,8 +111,8 @@ def _substrate_runfiles_symlinks_impl(ctx):
             has_py2_only_sources.append(dep[PyInfo].has_py2_only_sources)
             has_py3_only_sources.append(dep[PyInfo].has_py3_only_sources)
 
-#         if PyCcLinkParamsProvider in dep:  # DisableOnExport
-#             cc_infos.append(dep[PyCcLinkParamsProvider].cc_info)  # DisableOnExport
+#         if PyCcLinkParamsInfo in dep:  # DisableOnExport
+#             cc_infos.append(dep[PyCcLinkParamsInfo].cc_info)  # DisableOnExport
 
         if CcInfo in dep:
             cc_infos.append(dep[CcInfo])
