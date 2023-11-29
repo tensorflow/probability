@@ -97,8 +97,8 @@ DISABLED_BY_PKG = {
         ('auto_batching', 'composite_tensor', 'linalg',
          'marginalize', 'nn', 'sequential', 'substrates'),
 }
-LIBS = ('bijectors', 'distributions', 'experimental', 'glm', 'math', 'mcmc',
-        'monte_carlo', 'optimizer', 'random', 'staging', 'stats', 'sts',
+LIBS = ('autosts', 'bijectors', 'distributions', 'experimental', 'glm', 'math',
+        'mcmc', 'monte_carlo', 'optimizer', 'random', 'staging', 'stats', 'sts',
         'tfp_google', 'util', 'vi')
 DISTRIBUTION_INTERNALS = ('stochastic_process_util',)
 INTERNALS = ('assert_util', 'auto_composite_tensor',
