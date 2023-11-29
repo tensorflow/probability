@@ -299,6 +299,48 @@ class _SMCResamplersTest(test_util.TestCase):
         tf.reduce_sum(tf.nn.softmax(new_log_weights) * new_particles),
         30., atol=1.)
 
+  def test_with_target_distribution_dim_one(self):
+    stacked_particles = np.stack([
+        np.linspace(0., 500., num=2500, dtype=np.float32),
+        np.linspace(0.17, 433., num=2500, dtype=np.float32),
+    ], axis=0)
+
+    stacked_log_weights = poisson.Poisson(20.).log_prob(stacked_particles)
+
+    # Resample particles to target a Poisson(20.) distribution.
+    new_particles, _, new_log_weights = resample(
+        stacked_particles, stacked_log_weights,
+        resample_fn=resample_systematic,
+        particles_dim=1,
+        seed=test_util.test_seed(sampler_type='stateless'))
+
+    self.assertAllMeansClose(new_particles,
+                             [20., 20.],
+                             axis=1,
+                             atol=1e-2)
+    self.assertAllClose(
+        tf.reduce_sum(tf.nn.softmax(new_log_weights) * new_particles, axis=1),
+        [20., 20.],
+        atol=1e-2)
+
+    # Reweight the resampled particles to target a Poisson(30.) distribution.
+    new_particles, _, new_log_weights = resample(
+        stacked_particles,
+        stacked_log_weights,
+        resample_fn=resample_systematic,
+        particles_dim=1,
+        target_log_weights=poisson.Poisson(30).log_prob(stacked_particles),
+        seed=test_util.test_seed(sampler_type='stateless'))
+    self.assertAllMeansClose(new_particles,
+                             [20., 20.],
+                             axis=1,
+                             atol=1e-2)
+
+    self.assertAllClose(
+        tf.reduce_sum(tf.nn.softmax(new_log_weights) * new_particles, axis=1),
+        [30., 30.],
+        atol=1.5)
+
   def maybe_compiler(self, f):
     if self.use_xla:
       return tf.function(f, autograph=False, jit_compile=True)
