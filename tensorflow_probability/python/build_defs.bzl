@@ -14,8 +14,10 @@
 # ============================================================================
 """Build defs for TF/NumPy/JAX-variadic libraries & tests."""
 
-# Placeholder: load py_test
-# Placeholder: load py_library
+# Placeholder: load PyCcLinkParamsInfo
+# Placeholder: load PyInfo
+# Placeholder: load native py_library
+# Placeholder: load native py_test
 
 NO_REWRITE_NEEDED = [
     "internal:all_util",
@@ -109,8 +111,8 @@ def _substrate_runfiles_symlinks_impl(ctx):
             has_py2_only_sources.append(dep[PyInfo].has_py2_only_sources)
             has_py3_only_sources.append(dep[PyInfo].has_py3_only_sources)
 
-#         if PyCcLinkParamsProvider in dep:  # DisableOnExport
-#             cc_infos.append(dep[PyCcLinkParamsProvider].cc_info)  # DisableOnExport
+#         if PyCcLinkParamsInfo in dep:  # DisableOnExport
+#             cc_infos.append(dep[PyCcLinkParamsInfo].cc_info)  # DisableOnExport
 
         if CcInfo in dep:
             cc_infos.append(dep[CcInfo])
@@ -212,6 +214,7 @@ def multi_substrate_py_library(
     remove_deps = [
         "//third_party/py/tensorflow",
         "//third_party/py/tensorflow:tensorflow",
+        "//tensorflow_probability/python/internal:tf_keras",
     ]
 
     trimmed_deps = [dep for dep in deps if (dep not in substrates_omit_deps and
@@ -337,6 +340,7 @@ def multi_substrate_py_test(
     remove_deps = [
         "//third_party/py/tensorflow",
         "//third_party/py/tensorflow:tensorflow",
+        "//tensorflow_probability/python/internal:tf_keras",
     ]
 
     trimmed_deps = [dep for dep in deps if dep not in remove_deps]

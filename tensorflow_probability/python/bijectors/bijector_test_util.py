@@ -28,6 +28,8 @@ from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow_probability.python.math.gradient import batch_jacobian
 
+JAX_MODE = False
+
 
 def assert_finite(array):
   if not np.isfinite(array).all():
@@ -368,3 +370,28 @@ class NonCompositeTensorExp(bijector_lib.Bijector):
   def _parameter_properties(cls, dtype):
     return dict()
 
+
+class PytreeShift(bijector_lib.Bijector):
+  """Mimics a user-defined bijector that is registered as a Pytree."""
+
+  def __init__(self, shift):
+    parameters = dict(locals())
+    self.shift = shift
+    super(PytreeShift, self).__init__(
+        validate_args=True,
+        forward_min_event_ndims=0,
+        parameters=parameters,
+        name='pytree_shift')
+
+  def _forward(self, x):
+    return x + self.shift
+
+  def _inverse(self, y):
+    return y - self.shift
+
+if JAX_MODE:
+  from jax import tree_util  # pylint: disable=g-import-not-at-top, g-bad-import-order
+  tree_util.register_pytree_node(
+      PytreeShift,
+      flatten_func=lambda v: (v.shift, None),
+      unflatten_func=lambda _, c: PytreeShift(c))

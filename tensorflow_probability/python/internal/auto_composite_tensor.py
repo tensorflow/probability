@@ -42,6 +42,29 @@ _DEFERRED_ASSERTION_CONTEXT = threading.local()
 _DEFERRED_ASSERTION_CONTEXT.is_deferred = False
 
 
+def is_composite_tensor(value):
+  """Returns True for CTs and non-CT custom pytrees in JAX mode.
+
+  Args:
+    value: A TFP component (e.g. a distribution or bijector instance) or object
+      that behaves as one.
+
+  Returns:
+    value_is_composite: bool, True if `value` is a `CompositeTensor` in TF mode
+      or a non-leaf pytree in JAX mode.
+  """
+  if isinstance(value, composite_tensor.CompositeTensor):
+    return True
+  if JAX_MODE:
+    from jax import tree_util  # pylint: disable=g-import-not-at-top
+    # If `value` is not a pytree leaf, then it must be an instance of a class
+    # that was specially registered as a pytree or that inherits from a class
+    # representing a nested structure.
+    treedef = tree_util.tree_structure(value)
+    return not tree_util.treedef_is_leaf(treedef)
+  return False
+
+
 def is_deferred_assertion_context():
   return getattr(_DEFERRED_ASSERTION_CONTEXT, 'is_deferred', False)
 
@@ -132,15 +155,16 @@ def _extract_type_spec_recursively(value):
   `value` is a collection containing `Tensor` values, recursively supplant them
   with their respective `TypeSpec`s in a collection of parallel stucture.
 
-  If `value` is nont of the above, return it unchanged.
+  If `value` is none of the above, return it unchanged.
 
   Args:
     value: a Python `object` to (possibly) turn into a (collection of)
     `tf.TypeSpec`(s).
 
   Returns:
-    spec: the `TypeSpec` or collection of `TypeSpec`s corresponding to `value`
-    or `value`, if no `Tensor`s are found.
+    spec: the `TypeSpec` or collection of `TypeSpec`s corresponding to `value`;
+    `value`, if no `Tensor`s are found; or `None` to indicate that `value` is
+    registered as a JAX pytree.
   """
   if isinstance(value, composite_tensor.CompositeTensor):
     return value._type_spec  # pylint: disable=protected-access
@@ -161,6 +185,14 @@ def _extract_type_spec_recursively(value):
             'Found `{}` with both Tensor and non-Tensor parts: {}'.format(
                 type(value), value))
       return specs
+  elif JAX_MODE:  # Handle custom pytrees.
+    from jax import tree_util  # pylint: disable=g-import-not-at-top
+    treedef = tree_util.tree_structure(value)
+    # Return None so that the object identity comparison in
+    # `_AutoCompositeTensorTypeSpec.from_instance` is False, indicating that
+    # `value` should be treated as a "Tensor" param.
+    if not tree_util.treedef_is_leaf(treedef):
+      return None
   return value
 
 

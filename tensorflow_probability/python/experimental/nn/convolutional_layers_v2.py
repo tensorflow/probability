@@ -94,7 +94,7 @@ class ConvolutionV2(layers_lib.KernelBiasLayer):
       dilations=1,          # keras::Conv::dilation_rate
       # Weights
       kernel_initializer=None,  # tfp.nn.initializers.glorot_uniform()
-      bias_initializer=None,    # tf.initializers.zeros()
+      bias_initializer=None,    # tf_keras.initializers.zeros()
       make_kernel_bias_fn=kernel_bias_lib.make_kernel_bias,
       dtype=tf.float32,
       index_dtype=tf.int32,
@@ -151,7 +151,7 @@ class ConvolutionV2(layers_lib.KernelBiasLayer):
         Default value: `None` (i.e.,
         `tfp.experimental.nn.initializers.glorot_uniform()`).
       bias_initializer: ...
-        Default value: `None` (i.e., `tf.initializers.zeros()`).
+        Default value: `None` (i.e., `tf_keras.initializers.zeros()`).
       make_kernel_bias_fn: ...
         Default value: `tfp.experimental.nn.util.make_kernel_bias`.
       dtype: ...
@@ -288,7 +288,7 @@ class ConvolutionVariationalReparameterizationV2(
       padding='same',
       filter_shape=5,
       # Use `he_uniform` because we'll use the `relu` family.
-      kernel_initializer=tf.initializers.he_uniform(),
+      kernel_initializer=tf_keras.initializers.he_uniform(),
       penalty_weight=1. / n)
 
   BayesAffine = functools.partial(
@@ -316,7 +316,7 @@ class ConvolutionVariationalReparameterizationV2(
     kl = bnn.extra_loss  # Already normalized via `penalty_weight` arg.
     loss = nll + kl
     return loss, (nll, kl)
-  opt = tf.optimizers.Adam()
+  opt = tf_keras.optimizers.Adam()
   fit_op = tfn.util.make_fit_op(loss_fn, opt, bnn.trainable_variables)
   for _ in range(200):
     loss, (nll, kl), g = fit_op()
@@ -349,7 +349,7 @@ class ConvolutionVariationalReparameterizationV2(
       dilations=1,          # keras::Conv::dilation_rate
       # Weights
       kernel_initializer=None,  # tfp.nn.initializers.glorot_uniform()
-      bias_initializer=None,    # tf.initializers.zeros()
+      bias_initializer=None,    # tf_keras.initializers.zeros()
       make_posterior_fn=kernel_bias_lib.make_kernel_bias_posterior_mvn_diag,
       make_prior_fn=kernel_bias_lib.make_kernel_bias_prior_spike_and_slab,
       posterior_value_fn=tfd.Distribution.sample,
@@ -409,7 +409,7 @@ class ConvolutionVariationalReparameterizationV2(
         Default value: `None` (i.e.,
         `tfp.experimental.nn.initializers.glorot_uniform()`).
       bias_initializer: ...
-        Default value: `None` (i.e., `tf.initializers.zeros()`).
+        Default value: `None` (i.e., `tf_keras.initializers.zeros()`).
       make_posterior_fn: ...
         Default value:
           `tfp.experimental.nn.util.make_kernel_bias_posterior_mvn_diag`.
@@ -549,7 +549,7 @@ class ConvolutionVariationalFlipoutV2(vi_lib.VariationalFlipoutKernelBiasLayer):
       dilations=1,          # keras::Conv::dilation_rate
       # Weights
       kernel_initializer=None,  # tfp.nn.initializers.glorot_uniform()
-      bias_initializer=None,    # tf.initializers.zeros()
+      bias_initializer=None,    # tf_keras.initializers.zeros()
       make_posterior_fn=kernel_bias_lib.make_kernel_bias_posterior_mvn_diag,
       make_prior_fn=kernel_bias_lib.make_kernel_bias_prior_spike_and_slab,
       posterior_value_fn=tfd.Distribution.sample,
@@ -609,7 +609,7 @@ class ConvolutionVariationalFlipoutV2(vi_lib.VariationalFlipoutKernelBiasLayer):
         Default value: `None` (i.e.,
         `tfp.experimental.nn.initializers.glorot_uniform()`).
       bias_initializer: ...
-        Default value: `None` (i.e., `tf.initializers.zeros()`).
+        Default value: `None` (i.e., `tf_keras.initializers.zeros()`).
       make_posterior_fn: ...
         Default value:
           `tfp.experimental.nn.util.make_kernel_bias_posterior_mvn_diag`.

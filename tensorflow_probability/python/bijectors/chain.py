@@ -18,6 +18,7 @@
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.bijectors import composition
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import prefer_static as ps
 
 
@@ -161,7 +162,7 @@ class Chain(_Chain, bijector_lib.AutoCompositeTensorBijector):
         bijectors = kwargs.get('bijectors')
 
       if bijectors is not None:
-        if not all(isinstance(b, tf.__internal__.CompositeTensor)
+        if not all(auto_composite_tensor.is_composite_tensor(b)
                    for b in bijectors):
           return _Chain(*args, **kwargs)
     return super(Chain, cls).__new__(cls)

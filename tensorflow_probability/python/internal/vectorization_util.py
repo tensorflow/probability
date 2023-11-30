@@ -24,7 +24,7 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.util import SeedStream
-from tensorflow.python.ops import parallel_for  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.ops.parallel_for import control_flow_ops  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
@@ -99,7 +99,7 @@ def iid_sample(sample_fn, sample_shape):
       if static_n == 1:
         draws = pfor_loop_body(0)
       else:
-        draws = parallel_for.pfor(pfor_loop_body, n)
+        draws = control_flow_ops.pfor(pfor_loop_body, n)
       return tf.nest.map_structure(unflatten, draws, expand_composites=True)
 
   return iid_sample_fn

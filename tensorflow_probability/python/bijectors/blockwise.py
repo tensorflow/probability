@@ -24,6 +24,7 @@ from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.bijectors import joint_map
 from tensorflow_probability.python.bijectors import split
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -278,7 +279,7 @@ class Blockwise(_Blockwise, bijector_lib.AutoCompositeTensorBijector):
         raise TypeError(
             '`Blockwise.__new__()` is missing argument `bijectors`.')
 
-      if not all(isinstance(b, tf.__internal__.CompositeTensor)
+      if not all(auto_composite_tensor.is_composite_tensor(b)
                  for b in bijectors):
         return _Blockwise(*args, **kwargs)
     return super(Blockwise, cls).__new__(cls)

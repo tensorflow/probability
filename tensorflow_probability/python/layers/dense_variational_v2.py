@@ -18,13 +18,15 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import kullback_leibler
 
+from tensorflow_probability.python.internal import tf_keras
 
-class DenseVariational(tf.keras.layers.Layer):
+
+class DenseVariational(tf_keras.layers.Layer):
   """Dense layer with random `kernel` and `bias`.
 
   This layer uses variational inference to fit a "surrogate" posterior to the
   distribution over both the `kernel` matrix and the `bias` terms which are
-  otherwise used in a manner similar to `tf.keras.layers.Dense`.
+  otherwise used in a manner similar to `tf_keras.layers.Dense`.
 
   This layer fits the "weights posterior" according to the following generative
   process:
@@ -67,12 +69,12 @@ class DenseVariational(tf.keras.layers.Layer):
       use_bias: Boolean, whether the layer uses a bias vector.
       activity_regularizer: Regularizer function applied to
         the output of the layer (its "activation")..
-      **kwargs: Extra arguments forwarded to `tf.keras.layers.Layer`.
+      **kwargs: Extra arguments forwarded to `tf_keras.layers.Layer`.
     """
     if 'input_shape' not in kwargs and 'input_dim' in kwargs:
       kwargs['input_shape'] = (kwargs.pop('input_dim'),)
     super(DenseVariational, self).__init__(
-        activity_regularizer=tf.keras.regularizers.get(activity_regularizer),
+        activity_regularizer=tf_keras.regularizers.get(activity_regularizer),
         **kwargs)
     self.units = int(units)
 
@@ -81,13 +83,13 @@ class DenseVariational(tf.keras.layers.Layer):
     self._kl_divergence_fn = _make_kl_divergence_penalty(
         kl_use_exact, weight=kl_weight)
 
-    self.activation = tf.keras.activations.get(activation)
+    self.activation = tf_keras.activations.get(activation)
     self.use_bias = use_bias
     self.supports_masking = False
-    self.input_spec = tf.keras.layers.InputSpec(min_ndim=2)
+    self.input_spec = tf_keras.layers.InputSpec(min_ndim=2)
 
   def build(self, input_shape):
-    dtype = tf.as_dtype(self.dtype or tf.keras.backend.floatx())
+    dtype = tf.as_dtype(self.dtype or tf_keras.backend.floatx())
     if not (dtype.is_floating or dtype.is_complex):
       raise TypeError('Unable to build `Dense` layer with non-floating point '
                       'dtype %s' % (dtype,))
@@ -96,7 +98,7 @@ class DenseVariational(tf.keras.layers.Layer):
     if last_dim is None:
       raise ValueError('The last dimension of the inputs to `DenseVariational` '
                        'should be defined. Found `None`.')
-    self.input_spec = tf.keras.layers.InputSpec(
+    self.input_spec = tf_keras.layers.InputSpec(
         min_ndim=2, axes={-1: last_dim})
 
     with tf.name_scope('posterior'):
@@ -113,7 +115,7 @@ class DenseVariational(tf.keras.layers.Layer):
     self.built = True
 
   def call(self, inputs):
-    dtype = tf.as_dtype(self.dtype or tf.keras.backend.floatx())
+    dtype = tf.as_dtype(self.dtype or tf_keras.backend.floatx())
     inputs = tf.cast(inputs, dtype, name='inputs')
 
     q = self._posterior(inputs)

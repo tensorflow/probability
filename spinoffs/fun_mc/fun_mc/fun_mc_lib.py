@@ -732,9 +732,9 @@ def maybe_broadcast_structure(from_structure: Any,
                               to_structure: Any) -> Any:
   """Maybe broadcasts `from_structure` to `to_structure`.
 
-  If `from_structure` is a singleton, it is tiled to match the structure of
-  `to_structure`. Note that the elements in `from_structure` are not copied if
-  this tiling occurs.
+  This assumes that `from_structure` is a shallow version of `to_structure`.
+  Subtrees of `to_structure` are set to the leaf values of `from_structure` that
+  those subtrees correspond to.
 
   Args:
     from_structure: A structure.
@@ -743,11 +743,12 @@ def maybe_broadcast_structure(from_structure: Any,
   Returns:
     new_from_structure: Same structure as `to_structure`.
   """
-  flat_from = util.flatten_tree(from_structure)
-  flat_to = util.flatten_tree(to_structure)
-  if len(flat_from) == 1:
-    flat_from *= len(flat_to)
-  return util.unflatten_tree(to_structure, flat_from)
+  def _broadcast_leaf(from_val, to_subtree):
+    return util.map_tree(lambda _: from_val, to_subtree)
+
+  return util.map_tree_up_to(
+      from_structure, _broadcast_leaf, from_structure, to_structure
+  )
 
 
 def reparameterize_potential_fn(
@@ -3420,8 +3421,11 @@ def annealed_importance_sampling_step(
 
 @util.named_call
 def systematic_resample(
-    particles: State, log_weights: FloatTensor,
-    seed: Any) -> (tuple[tuple[State, FloatTensor], IntTensor]):
+    particles: State,
+    log_weights: FloatTensor,
+    seed: Any,
+    do_resample: Optional[BooleanTensor] = None,
+) -> tuple[tuple[State, FloatTensor], IntTensor]:
   """Systematically resamples particles in proportion to their weights.
 
   This uses the algorithm from [1].
@@ -3430,6 +3434,8 @@ def systematic_resample(
     particles: The particles.
     log_weights: Un-normalized weights.
     seed: PRNG seed.
+    do_resample: Whether to perform the resample. If None, resampling is
+      performed unconditionally.
 
   Returns:
     particles_and_weights: tuple of resampled particles and weights.
@@ -3453,9 +3459,13 @@ def systematic_resample(
   repeats = tf.cast(util.diff(tf.floor(pie), prepend=0), tf.int32)
   parent_idxs = util.repeat(
       tf.range(num_particles), repeats, total_repeat_length=num_particles)
+  if do_resample is not None:
+    parent_idxs = tf.where(do_resample, parent_idxs, tf.range(num_particles))
   new_particles = util.map_tree(lambda x: tf.gather(x, parent_idxs), particles)
   new_log_weights = tf.fill(log_weights.shape,
                             tfp.math.reduce_logmeanexp(log_weights))
+  if do_resample is not None:
+    new_log_weights = tf.where(do_resample, new_log_weights, log_weights)
   return (new_particles, new_log_weights), parent_idxs
 
 
@@ -3463,20 +3473,22 @@ def systematic_resample(
 def annealed_importance_sampling_resample(
     ais_state: AnnealedImportanceSamplingState,
     resample_fn: Callable[
-        [State, FloatTensor, Any], tuple[tuple[State, tf.Tensor], ResampleExtra]
+        [State, FloatTensor, Any, BooleanTensor],
+        tuple[tuple[State, tf.Tensor], ResampleExtra],
     ] = systematic_resample,
     min_ess_threshold: FloatTensor = 0.5,
     seed: Any = None,
 ) -> tuple[AnnealedImportanceSamplingState, ResampleExtra]:
   """Resamples the particles in AnnealedImportanceSamplingState."""
 
-  (state, log_weight), extra = resample_fn(ais_state.state,
-                                           ais_state.log_weight, seed)
-  state, log_weight = choose(
-      ais_state.ess() <
-      tf.cast(log_weight.shape[0], log_weight.dtype) * min_ess_threshold,
-      (state, log_weight),
-      (ais_state.state, ais_state.log_weight),
+  log_weight = tf.convert_to_tensor(ais_state.log_weight)
+  do_resample = (
+      ais_state.ess()
+      < tf.cast(log_weight.shape[0], log_weight.dtype)
+      * min_ess_threshold
+  )
+  (state, log_weight), extra = resample_fn(
+      ais_state.state, ais_state.log_weight, seed, do_resample
   )
   return ais_state._replace(state=state, log_weight=log_weight), extra
 
@@ -3500,7 +3512,7 @@ def geometric_annealing_path(
     initial_target_log_prob_fn: PotentialFn,
     final_target_log_prob_fn: PotentialFn,
     fraction_fn: Optional[Callable[[FloatTensor], tf.Tensor]] = None,
-) -> Callable[[Stage], PotentialFn]:
+) -> PotentialFn:
   """Returns a geometrically interpolated target density function.
 
   This interpolates between `initial_target_log_prob_fn` and

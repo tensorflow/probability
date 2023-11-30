@@ -51,7 +51,7 @@ def _validate_tf_environment(package):
   #
   # Update this whenever we need to depend on a newer TensorFlow release.
   #
-  required_tensorflow_version = '2.11'
+  required_tensorflow_version = '2.14'
 #   required_tensorflow_version = '1.15'  # Needed internally -- DisableOnExport
 
   if (distutils.version.LooseVersion(tf.__version__) <

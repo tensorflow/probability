@@ -56,8 +56,8 @@ from tensorflow_probability.python.internal.backend.numpy import numpy_math as m
 from tensorflow_probability.python.internal.backend.numpy import resource_variable_ops
 from tensorflow_probability.python.internal.backend.numpy import variables
 from tensorflow_probability.python.internal.backend.numpy import linalg_impl as linalg
-from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator_algebra
 from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator_util
+from tensorflow_probability.python.internal.backend.numpy.gen import property_hint_util
 from tensorflow_probability.python.internal.backend.numpy.gen import slicing
 from absl import logging as logging
 from tensorflow_probability.python.internal.backend.numpy import data_structures
@@ -66,6 +66,7 @@ from tensorflow_probability.python.internal.backend.numpy import deprecation
 from tensorflow_probability.python.internal.backend.numpy import nest
 from tensorflow_probability.python.internal.backend.numpy import variable_utils
 # from tensorflow.python.util.tf_export import tf_export
+
 
 __all__ = ["LinearOperator"]
 
@@ -691,7 +692,13 @@ class LinearOperator(
   def _matmul(self, x, adjoint=False, adjoint_arg=False):
     raise NotImplementedError("_matmul is not implemented.")
 
-  def matmul(self, x, adjoint=False, adjoint_arg=False, name="matmul"):
+  def matmul(
+      self,
+      x,
+      adjoint=False,
+      adjoint_arg=False,
+      name="matmul",
+  ):
     """Transform [batch] matrix `x` with left multiplication:  `x --> Ax`.
 
     ```python
@@ -731,8 +738,9 @@ class LinearOperator(
             "Operators are incompatible. Expected `x` to have dimension"
             " {} but got {}.".format(
                 left_operator.domain_dimension, right_operator.range_dimension))
+
       with self._name_scope(name):  # pylint: disable=not-callable
-        return linear_operator_algebra.matmul(left_operator, right_operator)
+        return self._linop_matmul(left_operator, right_operator)
 
     with self._name_scope(name):  # pylint: disable=not-callable
       x = ops.convert_to_tensor(x, name="x")
@@ -745,6 +753,54 @@ class LinearOperator(
               tensor_shape.TensorShape(x.shape)[arg_dim])
 
       return self._matmul(x, adjoint=adjoint, adjoint_arg=adjoint_arg)
+
+  def _linop_matmul(
+      self, left_operator: "LinearOperator", right_operator: "LinearOperator"
+  ) -> "LinearOperator":
+    # instance of linear_operator_identity.LinearOperatorIdentity
+    if hasattr(right_operator, "_ones_diag") and not hasattr(
+        right_operator, "multiplier"
+    ):
+      return left_operator
+
+    # instance of linear_operator_zeros.LinearOperatorZeros
+    elif hasattr(right_operator, "_zeros_diag"):
+      if not right_operator.is_square or not left_operator.is_square:
+        raise ValueError(
+            "Matmul with non-square `LinearOperator`s or "
+            "non-square `LinearOperatorZeros` not supported at this time."
+        )
+      return right_operator
+
+    else:
+      # Generic matmul of two `LinearOperator`s.
+      is_square = property_hint_util.is_square(left_operator, right_operator)
+      is_non_singular = None
+      is_self_adjoint = None
+      is_positive_definite = None
+
+      if is_square:
+        is_non_singular = property_hint_util.combined_non_singular_hint(
+            left_operator, right_operator
+        )
+      # is_square can be None, so the explicit check for False is needed.
+      elif is_square is False:  # pylint:disable=g-bool-id-comparison
+        is_non_singular = False
+        is_self_adjoint = False
+        is_positive_definite = False
+
+      # LinearOperator outputs a LinearOperatorComposition instance, which
+      # inherits from LinearOperator. The inline import is necessary to avoid
+      # errors due to this cyclic dependency.
+      from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator_composition  # pylint: disable=g-import-not-at-top
+
+      return linear_operator_composition.LinearOperatorComposition(
+          operators=[left_operator, right_operator],
+          is_non_singular=is_non_singular,
+          is_self_adjoint=is_self_adjoint,
+          is_positive_definite=is_positive_definite,
+          is_square=is_square,
+      )
 
   def __matmul__(self, other):
     return self.matmul(other)
@@ -925,7 +981,7 @@ class LinearOperator(
             " {} but got {}.".format(
                 left_operator.domain_dimension, right_operator.range_dimension))
       with self._name_scope(name):  # pylint: disable=not-callable
-        return linear_operator_algebra.solve(left_operator, right_operator)
+        return self._linop_solve(left_operator, right_operator)
 
     with self._name_scope(name):  # pylint: disable=not-callable
       rhs = ops.convert_to_tensor(
@@ -940,6 +996,48 @@ class LinearOperator(
               tensor_shape.TensorShape(rhs.shape)[arg_dim])
 
       return self._solve(rhs, adjoint=adjoint, adjoint_arg=adjoint_arg)
+
+  def _linop_solve(
+      self, left_operator: "LinearOperator", right_operator: "LinearOperator"
+    ) -> "LinearOperator":
+    # instance of linear_operator_identity.LinearOperatorIdentity
+    if hasattr(right_operator, "_ones_diag") and not hasattr(
+        right_operator, "multiplier"
+    ):
+      return left_operator.inverse()
+
+    # Generic solve of two `LinearOperator`s.
+    is_square = property_hint_util.is_square(left_operator, right_operator)
+    is_non_singular = None
+    is_self_adjoint = None
+    is_positive_definite = None
+
+    if is_square:
+      is_non_singular = property_hint_util.combined_non_singular_hint(
+          left_operator, right_operator
+      )
+    elif is_square is False:  # pylint:disable=g-bool-id-comparison
+      is_non_singular = False
+      is_self_adjoint = False
+      is_positive_definite = False
+
+    # LinearOperator outputs a LinearOperatorComposition instance that contains
+    # a LinearOperatorInversion instance, both of which
+    # inherit from LinearOperator. The inline import is necessary to avoid
+    # errors due to this cyclic dependency.
+    from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator_composition  # pylint: disable=g-import-not-at-top
+    from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator_inversion  # pylint: disable=g-import-not-at-top
+
+    return linear_operator_composition.LinearOperatorComposition(
+        operators=[
+            linear_operator_inversion.LinearOperatorInversion(left_operator),
+            right_operator,
+        ],
+        is_non_singular=is_non_singular,
+        is_self_adjoint=is_self_adjoint,
+        is_positive_definite=is_positive_definite,
+        is_square=is_square,
+    )
 
   def _solvevec(self, rhs, adjoint=False):
     """Default implementation of _solvevec."""
@@ -997,7 +1095,7 @@ class LinearOperator(
 
       return self._solvevec(rhs, adjoint=adjoint)
 
-  def adjoint(self, name="adjoint"):
+  def adjoint(self, name: str = "adjoint") -> "LinearOperator":
     """Returns the adjoint of the current `LinearOperator`.
 
     Given `A` representing this `LinearOperator`, return `A*`.
@@ -1012,12 +1110,21 @@ class LinearOperator(
     if self.is_self_adjoint is True:  # pylint: disable=g-bool-id-comparison
       return self
     with self._name_scope(name):  # pylint: disable=not-callable
-      return linear_operator_algebra.adjoint(self)
+      return self._linop_adjoint()
 
   # self.H is equivalent to self.adjoint().
   H = property(adjoint, None)
 
-  def inverse(self, name="inverse"):
+  def _linop_adjoint(self) -> "LinearOperator":
+    from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator_adjoint  # pylint: disable=g-import-not-at-top
+    return linear_operator_adjoint.LinearOperatorAdjoint(
+        self,
+        is_non_singular=self.is_non_singular,
+        is_self_adjoint=self.is_self_adjoint,
+        is_positive_definite=self.is_positive_definite,
+        is_square=self.is_square)
+
+  def inverse(self, name: str = "inverse") -> "LinearOperator":
     """Returns the Inverse of this `LinearOperator`.
 
     Given `A` representing this `LinearOperator`, return a `LinearOperator`
@@ -1040,9 +1147,23 @@ class LinearOperator(
                        "a singular matrix.")
 
     with self._name_scope(name):  # pylint: disable=not-callable
-      return linear_operator_algebra.inverse(self)
+      return self._linop_inverse()
 
-  def cholesky(self, name="cholesky"):
+  def _linop_inverse(self) -> "LinearOperator":
+    # The in-line import is necessary because linear_operator_inversion.py
+    # depends on linear_operator.py. The in-line import works because the two
+    # files are now in the same build target, but if the import were at the top
+    # of the file there would be a partially-initialized module error caused by
+    # the code cycle.
+    from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator_inversion  # pylint: disable=g-import-not-at-top
+    return linear_operator_inversion.LinearOperatorInversion(
+        self,
+        is_non_singular=self.is_non_singular,
+        is_self_adjoint=self.is_self_adjoint,
+        is_positive_definite=self.is_positive_definite,
+        is_square=self.is_square)
+
+  def cholesky(self, name: str = "cholesky") -> "LinearOperator":
     """Returns a Cholesky factor as a `LinearOperator`.
 
     Given `A` representing this `LinearOperator`, if `A` is positive definite
@@ -1065,7 +1186,15 @@ class LinearOperator(
       raise ValueError("Cannot take the Cholesky decomposition: "
                        "Not a positive definite self adjoint matrix.")
     with self._name_scope(name):  # pylint: disable=not-callable
-      return linear_operator_algebra.cholesky(self)
+      return self._linop_cholesky()
+
+  def _linop_cholesky(self) -> "LinearOperator":
+    from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator_lower_triangular  # pylint: disable=g-import-not-at-top
+    return linear_operator_lower_triangular.LinearOperatorLowerTriangular(
+        linalg_ops.cholesky(self.to_dense()),
+        is_non_singular=True,
+        is_self_adjoint=False,
+        is_square=True)
 
   def _to_dense(self):
     """Generic and often inefficient implementation.  Override often."""

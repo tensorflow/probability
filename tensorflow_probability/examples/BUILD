@@ -15,6 +15,10 @@
 # Description:
 #   TensorFlow Probability examples.
 
+# Placeholder: py_library
+# Placeholder: py_test
+# Placeholder: py_binary
+
 package(
     # default_applicable_licenses
     default_visibility = [
@@ -80,6 +84,7 @@ py_library(
         # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 

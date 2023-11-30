@@ -15,6 +15,12 @@
 # Description:
 #   Automatic marginalization of latent variables.
 
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_library",
+    "multi_substrate_py_test",
+)
+
 package(
     # default_applicable_licenses
     default_visibility = [
@@ -24,17 +30,18 @@ package(
 
 licenses(["notice"])
 
-py_library(
+multi_substrate_py_library(
     name = "logeinsumexp",
     srcs = ["logeinsumexp.py"],
     deps = [
         # numpy dep,
         # opt_einsum dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "logeinsumexp_test",
     size = "medium",
     srcs = [
@@ -50,7 +57,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "marginalize",
     srcs = ["__init__.py"],
     deps = [
@@ -59,7 +66,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "marginalizable",
     srcs = ["marginalizable.py"],
     deps = [
@@ -69,13 +76,17 @@ py_library(
         "//tensorflow_probability/python/distributions:categorical",
         "//tensorflow_probability/python/distributions:joint_distribution_coroutine",
         "//tensorflow_probability/python/distributions:sample",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:samplers",
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "marginalizable_test",
     size = "medium",
     srcs = ["marginalizable_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         ":marginalize",
         # absl/testing:parameterized dep,
@@ -89,6 +100,7 @@ py_test(
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/distributions:poisson",
         "//tensorflow_probability/python/distributions:sample",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

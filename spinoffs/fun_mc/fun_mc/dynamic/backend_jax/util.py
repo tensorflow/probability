@@ -97,7 +97,9 @@ def make_tensor_seed(seed):
   """Converts a seed to a `Tensor` seed."""
   if seed is None:
     raise ValueError('seed must not be None when using JAX')
-  if isinstance(seed, jax.random.PRNGKeyArray):
+  if hasattr(seed, 'dtype') and jax.dtypes.issubdtype(
+      seed.dtype, jax.dtypes.prng_key
+  ):
     return seed
   return jnp.asarray(seed, jnp.uint32)
 

@@ -163,8 +163,12 @@ class TestCase(*_TEST_BASE_CLASSES):
     def _evaluate(x):
       if x is None:
         return x
-      # TODO(b/223267515): Improve handling of JAX PRNGKeyArray objects.
-      if JAX_MODE and isinstance(x, jax.random.PRNGKeyArray):
+      # TODO(b/223267515): Improve handling of JAX typed PRNG keys.
+      if (
+          JAX_MODE
+          and hasattr(x, 'dtype')
+          and jax.dtypes.issubdtype(x.dtype, jax.dtypes.prng_key)
+      ):
         return x
       return np.array(x)
     return tf.nest.map_structure(_evaluate, x, expand_composites=True)
@@ -177,11 +181,15 @@ class TestCase(*_TEST_BASE_CLASSES):
   def _evaluateTensors(self, a, b):
     if JAX_MODE:
       import jax  # pylint: disable=g-import-not-at-top
-      # HACK: In assertions (like self.assertAllClose), convert PRNGKeyArrays
-      # to "normal" arrays so they can be compared with our existing machinery.
-      if isinstance(a, jax.random.PRNGKeyArray):
+      # HACK: In assertions (like self.assertAllClose), convert typed PRNG keys
+      # to raw arrays so they can be compared with our existing machinery.
+      if hasattr(a, 'dtype') and jax.dtypes.issubdtype(
+          a.dtype, jax.dtypes.prng_key
+      ):
         a = jax.random.key_data(a)
-      if isinstance(b, jax.random.PRNGKeyArray):
+      if hasattr(b, 'dtype') and jax.dtypes.issubdtype(
+          b.dtype, jax.dtypes.prng_key
+      ):
         b = jax.random.key_data(b)
     if tf.is_tensor(a) and tf.is_tensor(b):
       (a, b) = self.evaluate([a, b])
@@ -2010,10 +2018,10 @@ class _TestLoader(absltest.TestLoader):
     return names
 
 
-def main(jax_mode=JAX_MODE):
+def main(jax_mode=JAX_MODE, jax_enable_x64=True):
   """Test main function that injects a custom loader."""
-  if jax_mode:
-    from jax.config import config  # pylint: disable=g-import-not-at-top
+  if jax_mode and jax_enable_x64:
+    from jax import config  # pylint: disable=g-import-not-at-top
     config.update('jax_enable_x64', True)
 
   # This logic is borrowed from TensorFlow.

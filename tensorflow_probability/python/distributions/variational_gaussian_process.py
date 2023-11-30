@@ -558,7 +558,7 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess,
   # For training, we use some simplistic numpy-based minibatching.
   batch_size = 64
 
-  optimizer = tf.optimizers.Adam(learning_rate=.1)
+  optimizer = tf_keras.optimizers.Adam(learning_rate=.1)
 
   @tf.function
   def optimize(x_train_batch, y_train_batch):
@@ -670,7 +670,7 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess,
   # For training, we use some simplistic numpy-based minibatching.
   batch_size = 64
 
-  optimizer = tf.optimizers.Adam(learning_rate=.05, beta_1=.5, beta_2=.99)
+  optimizer = tf_keras.optimizers.Adam(learning_rate=.05, beta_1=.5, beta_2=.99)
 
   @tf.function
   def optimize(x_train_batch, y_train_batch):
@@ -780,9 +780,9 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess,
         points.
       mean_fn: Python `callable` that acts on index points to produce a (batch
         of) vector(s) of mean values at those index points. Takes a `Tensor` of
-        shape `[b1, ..., bB, f1, ..., fF]` and returns a `Tensor` whose shape is
-        (broadcastable with) `[b1, ..., bB]`. Default value: `None` implies
-        constant zero function.
+        shape `[b1, ..., bB, e, f1, ..., fF]` and returns a `Tensor` whose shape
+        is (broadcastable with) `[b1, ..., bB, e]`.
+        Default value: `None` implies constant zero function.
       observation_noise_variance: `float` `Tensor` representing the variance
         of the noise in the Normal likelihood distribution of the model. May be
         batched, in which case the batch shape must be broadcastable with the
@@ -1292,9 +1292,9 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess,
         Default value: `0.`
       mean_fn: Python `callable` that acts on index points to produce a (batch
         of) vector(s) of mean values at those index points. Takes a `Tensor` of
-        shape `[b1, ..., bB, f1, ..., fF]` and returns a `Tensor` whose shape is
-        (broadcastable with) `[b1, ..., bB]`. Default value: `None` implies
-        constant zero function.
+        shape `[b1, ..., bB, e, f1, ..., fF]` and returns a `Tensor` whose shape
+        is (broadcastable with) `[b1, ..., bB, e]`.
+        Default value: `None` implies constant zero function.
       cholesky_fn: Callable which takes a single (batch) matrix argument and
         returns a Cholesky-like lower triangular factor.  Default value: `None`,
         in which case `make_cholesky_with_jitter_fn` is used with the `jitter`

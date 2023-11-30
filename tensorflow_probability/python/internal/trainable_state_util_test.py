@@ -33,6 +33,7 @@ from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.internal import trainable_state_util
 from tensorflow_probability.python.math import gradient
 from tensorflow_probability.python.math.minimize import minimize
@@ -347,7 +348,7 @@ class TestWrapGeneratorAsStateful(test_util.TestCase):
     trainable_dist = build_trainable_normal(
         shape=[],
         seed=test_util.test_seed(sampler_type='stateless'))
-    optimizer = tf.optimizers.Adam(1.0)
+    optimizer = tf_keras.optimizers.Adam(1.0)
     # Find the maximum likelihood distribution given observed data.
     x_observed = [3., -2., 1.7]
     losses = minimize(

@@ -42,6 +42,15 @@ class GeneralizedParetoTest(test_util.TestCase):
         eval_func=self.evaluate,
         rtol=.1)
 
+  def testScalarCongruencyTinyNegativeConcentration(self):
+    bijector_test_util.assert_scalar_congruency(
+        generalized_pareto.GeneralizedPareto(
+            loc=1., scale=8., concentration=-2e-38, validate_args=True),
+        lower_x=-7.,
+        upper_x=7.,
+        eval_func=self.evaluate,
+        rtol=.2)
+
   def testBijectiveAndFinitePositiveConcentration(self):
     loc = 5.
     x = np.linspace(-10., 20., 20).astype(np.float32)

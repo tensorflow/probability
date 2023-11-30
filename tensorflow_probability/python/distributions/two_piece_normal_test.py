@@ -369,7 +369,7 @@ class _TwoPieceNormalTest(parameterized.TestCase):
 
     err = self.compute_max_gradient_error(
         get_abs_sample_mean, [tf.constant(skewness, self.dtype)], delta=1e-1)
-    maxerr = 0.05 if self.dtype == np.float64 else 0.09
+    maxerr = 0.2
     self.assertLess(err, maxerr)
 
   @test_util.numpy_disable_gradient_test

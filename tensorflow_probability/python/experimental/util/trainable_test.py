@@ -35,6 +35,7 @@ from tensorflow_probability.python.distributions import wishart
 from tensorflow_probability.python.experimental.util import trainable
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.math import gradient
 from tensorflow_probability.python.math.minimize import minimize
 from tensorflow_probability.python.math.minimize import minimize_stateless
@@ -198,7 +199,7 @@ class TestStatefulMakeTrainable(test_util.TestCase):
         normal.Normal, seed=test_util.test_seed(sampler_type='stateless'))
     losses = minimize(
         lambda: -model.log_prob(samples),
-        optimizer=tf.optimizers.Adam(0.1),
+        optimizer=tf_keras.optimizers.Adam(0.1),
         num_steps=200)
     self.evaluate(tf1.global_variables_initializer())
     self.evaluate(losses)

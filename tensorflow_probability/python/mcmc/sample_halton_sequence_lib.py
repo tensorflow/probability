@@ -31,7 +31,7 @@ __all__ = [
 
 # The maximum dimension we support. This is limited by the number of primes
 # in the _PRIMES array.
-_MAX_DIMENSION = 1000
+_MAX_DIMENSION = 10000
 
 
 def sample_halton_sequence(dim,
@@ -53,7 +53,7 @@ def sample_halton_sequence(dim,
 
   Computes the members of the low discrepancy Halton sequence in dimension
   `dim`. The `dim`-dimensional sequence takes values in the unit hypercube in
-  `dim` dimensions. Currently, only dimensions up to 1000 are supported. The
+  `dim` dimensions. Currently, only dimensions up to 10000 are supported. The
   prime base for the k-th axes is the k-th prime starting from 2. For example,
   if `dim` = 3, then the bases will be [2, 3, 5] respectively and the first
   element of the non-randomized sequence will be: [0.5, 0.333, 0.2]. For a more
@@ -121,7 +121,7 @@ def sample_halton_sequence(dim,
 
   Args:
     dim: Positive Python `int` representing each sample's `event_size.` Must
-      not be greater than 1000.
+      not be greater than 10000.
     num_results: (Optional) Positive scalar `Tensor` of dtype int32. The number
       of samples to generate. Either this parameter or sequence_indices must
       be specified but not both. If this parameter is None, then the behaviour
@@ -158,7 +158,7 @@ def sample_halton_sequence(dim,
 
   Raises:
     ValueError: if both `sequence_indices` and `num_results` were specified or
-      if dimension `dim` is less than 1 or greater than 1000.
+      if dimension `dim` is less than 1 or greater than 10000.
 
   #### References
 
@@ -182,17 +182,14 @@ def sample_halton_sequence(dim,
     # The coefficient dimension is an intermediate axes which will hold the
     # weights of the starting integer when expressed in the (prime) base for
     # an event dimension.
-    if num_results is not None:
-      num_results = tf.convert_to_tensor(num_results)
     if sequence_indices is not None:
       sequence_indices = tf.convert_to_tensor(sequence_indices)
     indices = _get_indices(num_results, sequence_indices, dtype)
-    radixes = tf.constant(_PRIMES[0:dim], dtype=dtype, shape=[dim, 1])
-
-    max_sizes_by_axes = _base_expansion_size(
-        tf.reduce_max(indices), radixes)
-
-    max_size = tf.reduce_max(max_sizes_by_axes)
+    if num_results is None:
+      num_results = ps.reduce_max(indices)
+    radixes = _PRIMES[0:dim][..., np.newaxis]
+    max_sizes_by_axes = _base_expansion_size(num_results, radixes, dtype)
+    max_size = ps.reduce_max(max_sizes_by_axes)
 
     # The powers of the radixes that we will need. Note that there is a bit
     # of an excess here. Suppose we need the place value coefficients of 7
@@ -204,14 +201,13 @@ def sample_halton_sequence(dim,
     # dimensions, then the 10th prime (29) we will end up computing 29^10 even
     # though we don't need it. We avoid this by setting the exponents for each
     # axes to 0 beyond the maximum value needed for that dimension.
-    exponents_by_axes = tf.tile([tf.range(max_size)], [dim, 1])
+    exponents_by_axes = tf.tile([tf.range(max_size, dtype=dtype)], [dim, 1])
 
     # The mask is true for those coefficients that are irrelevant.
     weight_mask = exponents_by_axes < max_sizes_by_axes
-    capped_exponents = tf.where(weight_mask,
-                                exponents_by_axes,
-                                tf.constant(0, exponents_by_axes.dtype))
-    weights = radixes ** capped_exponents
+    capped_exponents = tf.where(
+        weight_mask, exponents_by_axes, dtype_util.as_numpy_dtype(dtype)(0.))
+    weights = tf.cast(radixes ** capped_exponents, dtype=dtype)
     # The following computes the base b expansion of the indices. Suppose,
     # x = a0 + a1*b + a2*b^2 + ... Then, performing a floor div of x with
     # the vector (1, b, b^2, b^3, ...) will produce
@@ -246,7 +242,7 @@ def sample_halton_sequence(dim,
     zero_correction = samplers.uniform([dim, 1],
                                        seed=zero_correction_seed,
                                        dtype=dtype)
-    zero_correction /= radixes ** max_sizes_by_axes
+    zero_correction /= tf.cast(radixes ** max_sizes_by_axes, dtype)
     return base_values + tf.reshape(zero_correction, [-1])
 
 
@@ -254,14 +250,14 @@ def _randomize(coeffs, radixes, seed=None):
   """Applies the Owen (2017) randomization to the coefficients."""
   given_dtype = coeffs.dtype
   coeffs = tf.cast(coeffs, dtype=tf.int32)
-  num_coeffs = tf.shape(coeffs)[-1]
-  radixes = tf.reshape(tf.cast(radixes, dtype=tf.int32), shape=[-1])
-  perms = _get_permutations(num_coeffs, radixes, seed=seed)
+  num_coeffs = ps.shape(coeffs)[-1]
+  perms = _get_permutations(num_coeffs, np.squeeze(radixes, axis=-1), seed=seed)
   perms = tf.reshape(perms, shape=[-1])
+  radixes = tf.reshape(tf.cast(radixes, dtype=tf.int32), shape=[-1])
   radix_sum = tf.reduce_sum(radixes)
   radix_offsets = tf.reshape(tf.cumsum(radixes, exclusive=True),
                              shape=[-1, 1])
-  offsets = radix_offsets + tf.range(num_coeffs) * radix_sum
+  offsets = radix_offsets + ps.range(num_coeffs, dtype=tf.int32) * radix_sum
   permuted_coeffs = tf.gather(perms, coeffs + offsets)
   return tf.cast(permuted_coeffs, dtype=given_dtype)
 
@@ -280,7 +276,7 @@ def _get_permutations(num_results, dims, seed=None):
   Args:
     num_results: A positive scalar `Tensor` of integral type. The number of
       draws from the discrete uniform distribution over the permutation groups.
-    dims: A 1D `Tensor` of the same dtype as `num_results`. The degree of the
+    dims: A 1D numpy array of the same dtype as `num_results`. The degree of the
       permutation groups from which to sample.
     seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
@@ -288,14 +284,20 @@ def _get_permutations(num_results, dims, seed=None):
     permutations: A `Tensor` of shape `[num_results, sum(dims)]` and the same
     dtype as `dims`.
   """
-  seeds = samplers.split_seed(seed, n=ps.size(dims))
-
-  def generate_one(dim, seed):
-    return tf.argsort(samplers.uniform([num_results, dim], seed=seed), axis=-1)
-
-  return tf.concat([generate_one(dim, seed)
-                    for dim, seed in zip(tf.unstack(dims), tf.unstack(seeds))],
-                   axis=-1)
+  n = dims.size
+  max_size = np.max(dims)
+  samples = samplers.uniform([num_results, n, max_size], seed=seed)
+  should_mask = np.arange(max_size) >= dims[..., np.newaxis]
+  # Choose a number that does not affect the permutation and relative location.
+  samples = tf.where(
+      should_mask,
+      dtype_util.as_numpy_dtype(samples.dtype)(np.arange(max_size) + 10.),
+      samples)
+  samples = tf.argsort(samples, axis=-1)
+  # Generate the set of indices to gather.
+  should_mask = np.tile(should_mask, [num_results, 1, 1])
+  indices = np.stack(np.where(~should_mask), axis=-1)
+  return tf.gather_nd(samples, indices)
 
 
 def _get_indices(num_results, sequence_indices, dtype, name=None):
@@ -325,8 +327,13 @@ def _get_indices(num_results, sequence_indices, dtype, name=None):
   """
   with tf.name_scope(name or 'get_indices'):
     if sequence_indices is None:
-      num_results = tf.cast(num_results, dtype=dtype)
-      sequence_indices = tf.range(num_results, dtype=dtype)
+      np_dtype = dtype_util.as_numpy_dtype(dtype)
+      num_results_ = tf.get_static_value(num_results)
+      if num_results_ is not None:
+        sequence_indices = ps.range(np_dtype(num_results_), dtype=dtype)
+      else:
+        num_results = tf.cast(num_results, dtype=dtype)
+        sequence_indices = ps.range(num_results, dtype=dtype)
     else:
       sequence_indices = tf.cast(sequence_indices, dtype)
 
@@ -338,7 +345,7 @@ def _get_indices(num_results, sequence_indices, dtype, name=None):
     return tf.reshape(indices, [-1, 1, 1])
 
 
-def _base_expansion_size(num, bases):
+def _base_expansion_size(num, bases, dtype):
   """Computes the number of terms in the place value expansion.
 
   Let num = a0 + a1 b + a2 b^2 + ... ak b^k be the place value expansion of
@@ -349,37 +356,36 @@ def _base_expansion_size(num, bases):
     $$k = Floor(log_b (num)) + 1  = Floor( log(num) / log(b)) + 1$$
 
   Args:
-    num: Scalar `Tensor` of dtype either `float32` or `float64`. The number to
+    num: Scalar `Tensor` of dtype either `int32` or `int64`. The number to
       compute the base expansion size of.
     bases: `Tensor` of the same dtype as num. The bases to compute the size
       against.
+    dtype: Return `dtype`.
 
   Returns:
-    Tensor of same dtype and shape as `bases` containing the size of num when
+    Tensor of dtype `dtype` and shape as `bases` containing the size of num when
     written in that base.
   """
-  return tf.floor(tf.math.log(num) / tf.math.log(bases)) + 1
+  num_ = tf.get_static_value(num)
+  if num_ is not None:
+    return (np.floor(np.log(num_) / np.log(bases)) + 1).astype(
+        dtype_util.as_numpy_dtype(dtype))
+
+  return tf.floor(
+      tf.math.log(tf.cast(num, dtype)) / tf.math.log(tf.cast(bases, dtype))) + 1
 
 
 def _primes_less_than(n):
-  # Based on
-  # https://stackoverflow.com/questions/2068372/fastest-way-to-list-all-primes-below-n-in-python/3035188#3035188
   """Returns sorted array of primes such that `2 <= prime < n`."""
-  small_primes = np.array((2, 3, 5))
-  if n <= 6:
-    return small_primes[small_primes < n]
-  sieve = np.ones(n // 3 + (n % 6 == 2), dtype=np.bool_)
-  sieve[0] = False
-  m = int(n ** 0.5) // 3 + 1
-  for i in range(m):
-    if not sieve[i]:
-      continue
-    k = 3 * i + 1 | 1
-    sieve[k ** 2 // 3::2 * k] = False
-    sieve[(k ** 2 + 4 * k - 2 * k * (i & 1)) // 3::2 * k] = False
-  return np.r_[2, 3, 3 * np.nonzero(sieve)[0] + 1 | 1]
+  primes = np.ones((n + 1) // 2, dtype=bool)
+  j = 3
+  while j * j <= n:
+    if primes[j//2]:
+      primes[j*j//2::j] = False
+    j += 2
+  ret = 2 * np.where(primes)[0] + 1
+  ret[0] = 2  # :(
+  return ret
 
-_PRIMES = _primes_less_than(7919 + 1)
-
-
+_PRIMES = _primes_less_than(104729 + 1)
 assert len(_PRIMES) == _MAX_DIMENSION

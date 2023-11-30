@@ -14,6 +14,10 @@
 # ============================================================================
 # Description: JAX backend.
 
+# Placeholder: py_library
+# Placeholder: py_test
+# Placeholder: py_binary
+
 licenses(["notice"])
 
 package(
@@ -75,12 +79,8 @@ FILENAMES = [
 GEN_FILENAMES = [
     "gen/__init__",
     "gen/tensor_shape",
-    "gen/adjoint_registrations",
-    "gen/cholesky_registrations",
-    "gen/inverse_registrations",
     "gen/linear_operator_addition",
     "gen/linear_operator_adjoint",
-    "gen/linear_operator_algebra",
     "gen/linear_operator_block_diag",
     "gen/linear_operator_block_lower_triangular",
     "gen/linear_operator_full_matrix",
@@ -98,10 +98,8 @@ GEN_FILENAMES = [
     "gen/linear_operator_toeplitz",
     "gen/linear_operator_util",
     "gen/linear_operator_zeros",
-    "gen/matmul_registrations",
-    "gen/registrations_util",
+    "gen/property_hint_util",
     "gen/slicing",
-    "gen/solve_registrations",
 ]
 
 [

@@ -14,6 +14,7 @@
 # ============================================================================
 # Adaptive MALT files.
 
+# Placeholder: py_test
 # [internal] load pytype.bzl (pytype_strict_binary, pytype_strict_library)
 
 package(

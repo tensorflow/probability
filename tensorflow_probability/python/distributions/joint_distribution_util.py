@@ -79,6 +79,10 @@ def independent_joint_distribution_from_structure(structure_of_distributions,
     next_level_shallow_structure = nest.get_traverse_shallow_structure(
         traverse_fn=lambda x: min(tf.nest.flatten(x)) <= 1,
         structure=element_depths)
+    if not nest.is_nested(next_level_shallow_structure):  # is a boolean
+      next_level_shallow_structure = nest.get_traverse_shallow_structure(
+          traverse_fn=lambda x: x is element_depths,
+          structure=element_depths)
     structure_of_distributions = nest.map_structure_up_to(
         next_level_shallow_structure,
         functools.partial(independent_joint_distribution_from_structure,

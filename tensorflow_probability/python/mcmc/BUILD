@@ -15,6 +15,8 @@
 # Description:
 #   MCMC methods, diagnostics, and related utilities.
 
+# Placeholder: py_library
+# Placeholder: py_test
 load(
     "//tensorflow_probability/python:build_defs.bzl",
     "multi_substrate_py_library",
@@ -139,6 +141,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:distribute_lib",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/mcmc/internal:leapfrog_integrator",
         "//tensorflow_probability/python/mcmc/internal:util",
         "//tensorflow_probability/python/util:seed_stream",
@@ -173,6 +176,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/math:generic",
         "//tensorflow_probability/python/util:deferred_tensor",
     ],
@@ -492,7 +496,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_library(
     name = "sample_halton_sequence",
-    srcs = ["sample_halton_sequence.py"],
+    srcs = ["sample_halton_sequence_lib.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,

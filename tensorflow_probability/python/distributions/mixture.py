@@ -22,6 +22,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -450,8 +451,8 @@ class Mixture(_Mixture, distribution.AutoCompositeTensorDistribution):
         components = kwargs.get('components')
 
       _validate_cat_and_components(cat, components)
-      if not (isinstance(cat, tf.__internal__.CompositeTensor)
-              and all(isinstance(d, tf.__internal__.CompositeTensor)
+      if not (auto_composite_tensor.is_composite_tensor(cat)
+              and all(auto_composite_tensor.is_composite_tensor(d)
                       for d in components)):
         return _Mixture(*args, **kwargs)
     return super(Mixture, cls).__new__(cls)

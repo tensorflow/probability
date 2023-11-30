@@ -142,7 +142,7 @@ class ImportanceResample(distribution_lib.Distribution):
   importance_weighted_losses = tfp.vi.fit_surrogate_posterior(
     target_log_prob_fn,
     surrogate_posterior=proposal_distribution,
-    optimizer=tf.optimizers.Adam(0.1),
+    optimizer=tf_keras.optimizers.Adam(0.1),
     num_steps=200,
     importance_sample_size=importance_sample_size)
   approximate_posterior = tfed.ImportanceResample(
@@ -167,7 +167,7 @@ class ImportanceResample(distribution_lib.Distribution):
       proposal_distribution=proposal_distribution,
       target_log_prob_fn=target_log_prob_fn,
       importance_sample_size=importance_sample_size),
-    optimizer=tf.optimizers.Adam(0.1),
+    optimizer=tf_keras.optimizers.Adam(0.1),
     num_steps=200)
   ```
 

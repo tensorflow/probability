@@ -1,3 +1,5 @@
+# Placeholder: py_binary
+
 package(default_applicable_licenses = ["//tensorflow_probability:license"])
 
 # Copyright 2019 The TensorFlow Probability Authors.

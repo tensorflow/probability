@@ -15,7 +15,6 @@
 """The GaussianProcess distribution class."""
 
 import functools
-import warnings
 
 # Dependency imports
 import numpy as np
@@ -48,18 +47,6 @@ __all__ = [
 ]
 
 JAX_MODE = False
-
-
-_ALWAYS_YIELD_MVN_DEPRECATION_WARNING = (
-    '`always_yield_multivariate_normal` is deprecated. This arg is now ignored'
-    'and will be removed after 2023-07-01. A `GaussianProcess` evaluated at a'
-    'single index point now always has event shape `[1]` (the previous behavior'
-    'for `always_yield_multivariate_normal=True`). To reproduce the previous '
-    'behavior of `always_yield_multivariate_normal=False`, squeeze the '
-    'rightmost singleton dimension from the output of `mean`, `sample`, etc.')
-
-
-_GET_MARGINAL_DISTRIBUTION_ALREADY_WARNED = False
 
 
 def make_cholesky_factored_marginal_fn(cholesky_fn):
@@ -234,7 +221,7 @@ class GaussianProcess(
 
   gp = tfd.GaussianProcess(kernel, observed_index_points)
 
-  optimizer = tf.optimizers.Adam()
+  optimizer = tf_keras.optimizers.Adam()
 
   @tf.function
   def optimize():
@@ -258,10 +245,6 @@ class GaussianProcess(
       '2021-05-10',
       '`jitter` is deprecated; please use `marginal_fn` directly.',
       'jitter')
-  @deprecation.deprecated_args(
-      '2023-07-01',
-      _ALWAYS_YIELD_MVN_DEPRECATION_WARNING,
-      'always_yield_multivariate_normal')
   def __init__(self,
                kernel,
                index_points=None,
@@ -270,7 +253,6 @@ class GaussianProcess(
                marginal_fn=None,
                cholesky_fn=None,
                jitter=1e-6,
-               always_yield_multivariate_normal=None,
                validate_args=False,
                allow_nan_stats=False,
                parameters=None,
@@ -292,9 +274,9 @@ class GaussianProcess(
         `kernel.batch_shape` and any batch dims yielded by `mean_fn`.
       mean_fn: Python `callable` that acts on `index_points` to produce a (batch
         of) vector(s) of mean values at `index_points`. Takes a (nested)
-        `Tensor` of shape `[b1, ..., bB, f1, ..., fF]` and returns a `Tensor`
-        whose shape is broadcastable with `[b1, ..., bB]`. Default value:
-        `None` implies constant zero function.
+        `Tensor` of shape `[b1, ..., bB, e, f1, ..., fF]` and returns a `Tensor`
+        whose shape is broadcastable with `[b1, ..., bB, e]`.
+        Default value: `None` implies constant zero function.
       observation_noise_variance: `float` `Tensor` representing (batch of)
         scalar variance(s) of the noise in the Normal likelihood
         distribution of the model. If batched, the batch shape must be
@@ -317,7 +299,6 @@ class GaussianProcess(
         `marginal_fn` and `cholesky_fn` is None.
         This argument is ignored if `cholesky_fn` is set.
         Default value: `1e-6`.
-      always_yield_multivariate_normal: Deprecated and ignored.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -338,28 +319,40 @@ class GaussianProcess(
     """
     parameters = dict(locals()) if parameters is None else parameters
     with tf.name_scope(name) as name:
-      if tf.nest.is_nested(kernel.feature_ndims):
-        input_dtype = dtype_util.common_dtype(
+      input_dtype = dtype_util.common_dtype(
+          dict(
+              kernel=kernel,
+              index_points=index_points,
+          ),
+          dtype_hint=nest_util.broadcast_structure(
+              kernel.feature_ndims, tf.float32
+          ),
+      )
+
+      # If the input dtype is non-nested float, we infer a single dtype for the
+      # input and the float parameters, which is also the dtype of the GP's
+      # samples, log_prob, etc. If the input dtype is nested (or not float), we
+      # do not use it to infer the GP's float dtype.
+      if (not tf.nest.is_nested(input_dtype) and
+          dtype_util.is_floating(input_dtype)):
+        dtype = dtype_util.common_dtype(
             dict(
                 kernel=kernel,
                 index_points=index_points,
+                observation_noise_variance=observation_noise_variance,
+                jitter=jitter,
             ),
-            dtype_hint=nest_util.broadcast_structure(
-                kernel.feature_ndims, tf.float32
-            ),
+            dtype_hint=tf.float32,
         )
-        dtype = dtype_util.common_dtype(
-            [observation_noise_variance, jitter], tf.float32)
-      else:
-        # If the index points are not nested, we assume they are of the same
-        # float dtype as the GP.
-        dtype = dtype_util.common_dtype(
-            {
-                'index_points': index_points,
-                'observation_noise_variance': observation_noise_variance,
-                'jitter': jitter
-            }, tf.float32)
         input_dtype = dtype
+      else:
+        dtype = dtype_util.common_dtype(
+            dict(
+                observation_noise_variance=observation_noise_variance,
+                jitter=jitter,
+            ),
+            dtype_hint=tf.float32,
+        )
 
       if index_points is not None:
         index_points = nest_util.convert_to_nested_tensor(
@@ -395,7 +388,6 @@ class GaussianProcess(
       else:
         self._marginal_fn = marginal_fn
 
-      self._always_yield_multivariate_normal = always_yield_multivariate_normal
       with tf.name_scope('init'):
         super(GaussianProcess, self).__init__(
             dtype=dtype,
@@ -424,24 +416,6 @@ class GaussianProcess(
       marginal: a Normal distribution with vector event shape.
     """
     with self._name_and_control_scope('get_marginal_distribution'):
-      global _GET_MARGINAL_DISTRIBUTION_ALREADY_WARNED
-      if (not _GET_MARGINAL_DISTRIBUTION_ALREADY_WARNED and  # pylint: disable=protected-access
-          self._always_yield_multivariate_normal is not None):  # pylint: disable=protected-access
-        warnings.warn(
-            'The `always_yield_multivariate_normal` arg to '
-            '`GaussianProcess.__init__` is now ignored and '
-            '`get_marginal_distribution` always returns a Normal distribution'
-            'with vector event shape. This was the previous behavior of'
-            '`always_yield_multivariate_normal=True`. To recover the behavior'
-            'of `always_yield_multivariate_normal=False` when `index_points`'
-            'contains a single index point, build a scalar `Normal`'
-            'distribution as follows: '
-            '`mvn = get_marginal_distribution(index_points); `'
-            '`norm = tfd.Normal(mvn.loc[..., 0], scale=mvn.stddev()[..., 0])`'
-            '. To suppress these warnings, build the `GaussianProcess` with '
-            '`always_yield_multivariate_normal=True`.',
-            FutureWarning)
-        _GET_MARGINAL_DISTRIBUTION_ALREADY_WARNED = True  # pylint: disable=protected-access
       return self._get_marginal_distribution(index_points=index_points)
 
   def _get_marginal_distribution(self, index_points=None, is_missing=None):
@@ -770,8 +744,6 @@ class GaussianProcess(
         'cholesky_fn': self.cholesky_fn,
         'mean_fn': self.mean_fn,
         'jitter': self.jitter,
-        'always_yield_multivariate_normal':
-            self._always_yield_multivariate_normal,
         'validate_args': self.validate_args,
         'allow_nan_stats': self.allow_nan_stats
     }

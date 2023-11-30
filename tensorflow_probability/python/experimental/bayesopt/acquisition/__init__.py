@@ -21,6 +21,7 @@ from tensorflow_probability.python.experimental.bayesopt.acquisition.expected_im
 from tensorflow_probability.python.experimental.bayesopt.acquisition.expected_improvement import StudentTProcessExpectedImprovement
 from tensorflow_probability.python.experimental.bayesopt.acquisition.max_value_entropy_search import GaussianProcessMaxValueEntropySearch
 from tensorflow_probability.python.experimental.bayesopt.acquisition.probability_of_improvement import GaussianProcessProbabilityOfImprovement
+from tensorflow_probability.python.experimental.bayesopt.acquisition.probability_of_improvement import ParallelProbabilityOfImprovement
 from tensorflow_probability.python.experimental.bayesopt.acquisition.upper_confidence_bound import GaussianProcessUpperConfidenceBound
 from tensorflow_probability.python.experimental.bayesopt.acquisition.upper_confidence_bound import ParallelUpperConfidenceBound
 from tensorflow_probability.python.experimental.bayesopt.acquisition.weighted_power_scalarization import WeightedPowerScalarization
@@ -36,6 +37,7 @@ _allowed_symbols = [
     'GaussianProcessUpperConfidenceBound',
     'MCMCReducer',
     'ParallelExpectedImprovement',
+    'ParallelProbabilityOfImprovement',
     'ParallelUpperConfidenceBound',
     'StudentTProcessExpectedImprovement',
     'WeightedPowerScalarization',

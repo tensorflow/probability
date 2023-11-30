@@ -51,8 +51,9 @@ nptf.register_tensor_conversion_function(
 
 def _prefer_static(original_fn, static_fn, disable_spec_check=False):
   """Wraps original_fn, preferring to call static_fn when inputs are static."""
-  original_spec = tf_inspect.getfullargspec(original_fn)
-  static_spec = tf_inspect.getfullargspec(static_fn)
+  original_spec = (
+      tf_inspect.getfullargspec(original_fn)._replace(annotations={}))
+  static_spec = tf_inspect.getfullargspec(static_fn)._replace(annotations={})
   if not disable_spec_check and original_spec != static_spec:
     raise ValueError(
         'Arg specs do not match: original={}, static={}, fn={}'.format(
@@ -520,7 +521,9 @@ cumprod = _prefer_static(tf.math.cumprod, nptf.math.cumprod)
 cumsum = _prefer_static(tf.math.cumsum, nptf.math.cumsum)
 equal = _prefer_static(tf.equal, nptf.equal)
 not_equal = _prefer_static(tf.not_equal, nptf.not_equal)
+expand_dims = _prefer_static(tf.expand_dims, nptf.expand_dims)
 expm1 = _prefer_static(tf.math.expm1, nptf.math.expm1)
+eye = _prefer_static(tf.eye, nptf.eye)
 floor = _prefer_static(tf.math.floor, nptf.math.floor)
 fill = _prefer_static(tf.fill, nptf.fill, disable_spec_check=True)
 gather = _prefer_static(tf.gather, nptf.gather)

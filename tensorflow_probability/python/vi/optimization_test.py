@@ -33,6 +33,7 @@ from tensorflow_probability.python.distributions import poisson
 from tensorflow_probability.python.experimental.util import trainable
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic
 from tensorflow_probability.python.util import deferred_tensor
 from tensorflow_probability.python.vi import optimization
@@ -79,7 +80,7 @@ class OptimizationTests(test_util.TestCase):
         q,
         num_steps=1000,
         sample_size=10,
-        optimizer=tf.optimizers.Adam(0.1),
+        optimizer=tf_keras.optimizers.Adam(0.1),
         seed=seed)
     self.evaluate(tf1.global_variables_initializer())
     with tf.control_dependencies([loss_curve]):
@@ -112,7 +113,7 @@ class OptimizationTests(test_util.TestCase):
         conditioned_log_prob,
         surrogate_posterior=q_z,
         importance_sample_size=10,
-        optimizer=tf.optimizers.Adam(learning_rate=0.1),
+        optimizer=tf_keras.optimizers.Adam(learning_rate=0.1),
         num_steps=100,
         seed=opt_seed)
     self.evaluate(tf1.global_variables_initializer())
@@ -140,7 +141,7 @@ class OptimizationTests(test_util.TestCase):
         conditioned_log_prob,
         surrogate_posterior=q_z_again,
         importance_sample_size=10,
-        optimizer=tf.optimizers.Adam(learning_rate=0.1),
+        optimizer=tf_keras.optimizers.Adam(learning_rate=0.1),
         num_steps=100,
         seed=opt_seed)
     self.evaluate(tf1.global_variables_initializer())
@@ -172,7 +173,7 @@ class OptimizationTests(test_util.TestCase):
         q,
         num_steps=1000,
         sample_size=100,
-        optimizer=tf.optimizers.Adam(learning_rate=0.1),
+        optimizer=tf_keras.optimizers.Adam(learning_rate=0.1),
         seed=seed)
     self.evaluate(tf1.global_variables_initializer())
     loss_curve_ = self.evaluate((loss_curve))
@@ -230,7 +231,7 @@ class OptimizationTests(test_util.TestCase):
     losses, sample_path = optimization.fit_surrogate_posterior(
         target_log_prob_fn=lambda *args: model.log_prob(args),
         surrogate_posterior=q,
-        optimizer=tf.optimizers.Adam(learning_rate=0.1),
+        optimizer=tf_keras.optimizers.Adam(learning_rate=0.1),
         num_steps=100,
         seed=test_util.test_seed(),
         sample_size=1,
@@ -351,9 +352,14 @@ class StatelessOptimizationTests(test_util.TestCase):
       return
     import optax  # pylint: disable=g-import-not-at-top
 
+    def seeded_target_log_prob_fn(*xs, seed=None):
+      # Add a tiny amount of noise to the target log-prob to see if it works.
+      ret = pinned.unnormalized_log_prob(xs)
+      return ret + samplers.normal(ret.shape, stddev=0.01, seed=seed)
+
     [optimized_parameters,
      (losses, _, sample_path)] = optimization.fit_surrogate_posterior_stateless(
-         target_log_prob_fn=pinned.unnormalized_log_prob,
+         target_log_prob_fn=seeded_target_log_prob_fn,
          build_surrogate_posterior_fn=build_surrogate_posterior_fn,
          initial_parameters=initial_parameters,
          optimizer=optax.adam(learning_rate=0.1),

@@ -25,15 +25,9 @@ JAX_MODE = False  # pylint: disable=g-statement-before-imports
 # installing bazel.
 try:
   # pylint: disable=unused-import
-  from tensorflow_probability.python.internal.backend.numpy.gen import adjoint_registrations as _adjoint_registrations
-  from tensorflow_probability.python.internal.backend.numpy.gen import cholesky_registrations as _cholesky_registrations
-  from tensorflow_probability.python.internal.backend.numpy.gen import inverse_registrations as _inverse_registrations
-  from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator_algebra as _linear_operator_algebra
-  from tensorflow_probability.python.internal.backend.numpy.gen import matmul_registrations as _matmul_registrations
-  from tensorflow_probability.python.internal.backend.numpy.gen import solve_registrations as _solve_registrations
-
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_addition import *
+  from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_adjoint import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_block_diag import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_block_lower_triangular import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_circulant import *
@@ -42,6 +36,7 @@ try:
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_full_matrix import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_householder import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_identity import *
+  from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_inversion import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_kronecker import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_permutation import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_low_rank_update import *
@@ -70,7 +65,8 @@ try:
           'LinearOperatorScaledIdentity': ('multiplier',),
           'LinearOperatorInversion': ('operator',),
           'LinearOperatorKronecker': ('operators',),
-          'LinearOperatorLowRankUpdate': ('base_operator', 'diag_update'),
+          'LinearOperatorLowRankUpdate': (
+              'base_operator', 'diag_update', 'u', 'v'),
           'LinearOperatorLowerTriangular': ('tril',),
           'LinearOperatorPermutation': ('perm',),
           'LinearOperatorToeplitz': ('col', 'row'),

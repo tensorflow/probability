@@ -15,6 +15,8 @@
 # Description:
 #   Models for CIFAR10 BNN example
 
+# Placeholder: py_library
+
 package(
     # default_applicable_licenses
     default_visibility = [

@@ -36,7 +36,7 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math import linalg
 
-from tensorflow.python.ops import parallel_for  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.ops.parallel_for import control_flow_ops  # pylint: disable=g-direct-tensorflow-import
 
 tfl = tf.linalg
 
@@ -61,7 +61,7 @@ def _safe_concat(values):
   for x in values:
     try:
       full_values.append(ps.reshape(x, reference_shape))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, ZeroDivisionError):
       # JAX/numpy don't like `-1`'s in size-zero shapes.
       full_values.append(ps.reshape(x, trivial_shape))
   return ps.concat(full_values, axis=0)
@@ -694,8 +694,8 @@ class LinearGaussianStateSpaceModel(
                                                 sample_shape=(),
                                                 pass_covariance=False):
     """Builds a dict of model parameters across all timesteps."""
-    kwargs = parallel_for.pfor(self._get_time_varying_kwargs,
-                               self.num_timesteps)
+    kwargs = control_flow_ops.pfor(self._get_time_varying_kwargs,
+                                   self.num_timesteps)
 
     # If given a sample shape, encode it as additional batch dimension(s).
     # It is sufficient to do this for one parameter (we use initial_mean),
@@ -1371,7 +1371,7 @@ class LinearGaussianStateSpaceModel(
             t=self.initial_step + t,
             latent_mean=tf.gather(latent_means, t),
             latent_cov=tf.gather(latent_covs, t))
-      observation_means, observation_covs = parallel_for.pfor(
+      observation_means, observation_covs = control_flow_ops.pfor(
           pfor_body, self._num_timesteps)
 
       observation_means = distribution_util.move_dimension(
@@ -1831,7 +1831,7 @@ def linear_gaussian_update(
   #  P* = P - K * H * P
   # but this is prone to numerical issues because it subtracts a
   # value from a PSD matrix.  We choose instead to use the more
-  # expensive Jordan form update
+  # expensive Joseph form update
   #  P* = (I - K H) * P * (I - K H)' + K R K'
   # which always produces a PSD result. This uses
   #  tmp_term = (I - K * H)'

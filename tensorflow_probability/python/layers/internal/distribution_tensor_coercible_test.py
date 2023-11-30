@@ -294,6 +294,9 @@ class DistributionTensorConversionTest(test_util.TestCase):
 class MemoryLeakTest(test_util.TestCase):
 
   def testTypeObjectLeakage(self):
+    # TODO(b/303352281): Reenable this test.
+    self.skipTest('This test does not currently work under Python 3.11.')
+
     if not tf.executing_eagerly():
       self.skipTest('only relevant to eager')
 

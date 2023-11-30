@@ -26,7 +26,6 @@ REQUIRED_PACKAGES = [
     'cloudpickle>=1.3',
     'gast>=0.3.2',  # For autobatching
     'dm-tree',  # For NumPy/JAX backends (hence, also for prefer_static)
-    'typing-extensions<4.6.0',  # TODO(b/284106340): Remove this pin
 ]
 
 if __name__ == '__main__':

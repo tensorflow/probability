@@ -21,13 +21,14 @@ import os
 import types
 # Dependency imports
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.distributions import deterministic as deterministic_lib
 from tensorflow_probability.python.distributions import independent as independent_lib
 from tensorflow_probability.python.distributions import normal as normal_lib
+
+from tensorflow_probability.python.internal import tf_keras
 
 
 __all__ = [
@@ -41,8 +42,8 @@ __all__ = [
 
 def default_loc_scale_fn(
     is_singular=False,
-    loc_initializer=tf1.initializers.random_normal(stddev=0.1),
-    untransformed_scale_initializer=tf1.initializers.random_normal(
+    loc_initializer=tf_keras.initializers.RandomNormal(stddev=0.1),
+    untransformed_scale_initializer=tf_keras.initializers.RandomNormal(
         mean=-3., stddev=0.1),
     loc_regularizer=None,
     untransformed_scale_regularizer=None,
@@ -122,8 +123,8 @@ def default_loc_scale_fn(
 
 def default_mean_field_normal_fn(
     is_singular=False,
-    loc_initializer=tf1.initializers.random_normal(stddev=0.1),
-    untransformed_scale_initializer=tf1.initializers.random_normal(
+    loc_initializer=tf_keras.initializers.RandomNormal(stddev=0.1),
+    untransformed_scale_initializer=tf_keras.initializers.RandomNormal(
         mean=-3., stddev=0.1),
     loc_regularizer=None,
     untransformed_scale_regularizer=None,
@@ -235,7 +236,7 @@ def deserialize_function(serial, function_type):
   Keras-deserialized functions do not perform lexical scoping. Any modules that
   the function requires must be imported within the function itself.
 
-  This serialization mimicks the implementation in `tf.keras.layers.Lambda`.
+  This serialization mimicks the implementation in `tf_keras.layers.Lambda`.
 
   Args:
     serial: Serialized Keras object: typically a dict, string, or bytecode.
@@ -255,7 +256,7 @@ def deserialize_function(serial, function_type):
   """
   if function_type == 'function':
     # Simple lookup in custom objects
-    function = tf.keras.utils.legacy.deserialize_keras_object(serial)
+    function = tf_keras.utils.legacy.deserialize_keras_object(serial)
   elif function_type == 'lambda':
     # Unsafe deserialization from bytecode
     function = _func_load(serial)
@@ -273,7 +274,7 @@ def serialize_function(func):
   us use the Python scope to obtain the function rather than reload it from
   bytecode. (Note that both cases are brittle!)
 
-  This serialization mimicks the implementation in `tf.keras.layers.Lambda`.
+  This serialization mimicks the implementation in `tf_keras.layers.Lambda`.
 
   Args:
     func: Python function to serialize.

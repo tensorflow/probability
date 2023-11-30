@@ -38,13 +38,13 @@ __all__ = [
 
 
 _ALWAYS_YIELD_MVST_DEPRECATION_WARNING = (
-    '`always_yield_multivariate_student_t` is deprecated. After 2023-07-01, '
-    'this arg will be ignored, and behavior will be as though '
-    '`always_yield_multivariate_student_t=True`. This means that a '
-    '`StudentTProcessRegressionModel` evaluated at a single index point will '
-    'have event shape `[1]`. To reproduce the behavior of '
-    '`always_yield_multivariate_student_t=False` squeeze the rightmost '
-    'singleton dimension from the output of `mean`, `sample`, etc.')
+    '`always_yield_multivariate_student_t` is deprecated. This arg is now '
+    'ignored and will be removed after 2023-11-15. A '
+    '`StudentTProcessRegressionModel` evaluated at a single index point now '
+    'always has event shape `[1]` (the previous behavior for '
+    '`always_yield_multivariate_student_t=True`). To reproduce the previous '
+    'behavior of `always_yield_multivariate_student_t=False`, squeeze the '
+    'rightmost singleton dimension from the output of `mean`, `sample`, etc.')
 
 
 class DampedSchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
@@ -69,19 +69,31 @@ class DampedSchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
                name='DampedSchurComplement'):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      if tf.nest.is_nested(schur_complement.feature_ndims):
+      kernel_dtype = schur_complement.dtype
+
+      # If the input dtype is non-nested float, we infer a single dtype for the
+      # input and the float parameters, which is also the dtype of the STP's
+      # samples, log_prob, etc. If the input dtype is nested (or not float), we
+      # do not use it to infer the STP's float dtype.
+      if (not tf.nest.is_nested(kernel_dtype) and
+          dtype_util.is_floating(kernel_dtype)):
         dtype = dtype_util.common_dtype(
-            [df, fixed_inputs_observations],
-            tf.float32)
-        kernel_dtype = schur_complement.dtype
-      else:
-        # If the index points are not nested, we assume they are of the same
-        # dtype as the STPRM.
-        dtype = dtype_util.common_dtype([
-            schur_complement,
-            fixed_inputs_observations,
-            df], tf.float32)
+            dict(
+                schur_complement=schur_complement,
+                fixed_inputs_observations=fixed_inputs_observations,
+                df=df,
+            ),
+            dtype_hint=tf.float32,
+        )
         kernel_dtype = dtype
+      else:
+        dtype = dtype_util.common_dtype(
+            dict(
+                fixed_inputs_observations=fixed_inputs_observations,
+                df=df,
+            ),
+            dtype_hint=tf.float32,
+        )
       self._schur_complement = schur_complement
       self._df = tensor_util.convert_nonref_to_tensor(
           df, name='df', dtype=dtype)
@@ -235,10 +247,10 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
   """
   # pylint:disable=invalid-name
 
-  @deprecation.deprecated_arg_values(
-      '2023-07-01',
+  @deprecation.deprecated_args(
+      '2023-11-15',
       _ALWAYS_YIELD_MVST_DEPRECATION_WARNING,
-      always_yield_multivariate_student_t=False)
+      'always_yield_multivariate_student_t')
   def __init__(
       self,
       df,
@@ -251,7 +263,7 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
       mean_fn=None,
       cholesky_fn=None,
       marginal_fn=None,
-      always_yield_multivariate_student_t=False,
+      always_yield_multivariate_student_t=None,
       validate_args=False,
       allow_nan_stats=False,
       name='StudentTProcessRegressionModel',
@@ -271,7 +283,7 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
         must equal `kernel.feature_ndims` (or its corresponding nested
         component) and `e` is the number (size) of index points in each
         batch. Ultimately this distribution corresponds to an `e`-dimensional
-        multivariate normal. The batch shape must be broadcastable with
+        multivariate Student T. The batch shape must be broadcastable with
         `kernel.batch_shape` and any batch dims yielded by `mean_fn`.
       observation_index_points: (Nested) `Tensor` representing finite
         collection, or batch of collections, of points in the index set for
@@ -308,8 +320,8 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
         observations.
       mean_fn: Python `callable` that acts on `index_points` to produce a
         collection, or batch of collections, of mean values at `index_points`.
-        Takes a (nested) `Tensor` of shape `[b1, ..., bB, f1, ..., fF]` and
-        returns a `Tensor` whose shape is broadcastable with `[b1, ..., bB]`.
+        Takes a (nested) `Tensor` of shape `[b1, ..., bB, e, f1, ..., fF]` and
+        returns a `Tensor` whose shape is broadcastable with `[b1, ..., bB, e]`.
         Default value: `None` implies the constant zero function.
       cholesky_fn: Callable which takes a single (batch) matrix argument and
         returns a Cholesky-like lower triangular factor.  Default value: `None`,
@@ -319,11 +331,7 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
         returns a multivariate Student-T subclass of `tfd.Distribution`.
         Default value: `None`, in which case a Cholesky-factorizing function
         is created using `make_cholesky_with_jitter_fn`.
-      always_yield_multivariate_student_t: Deprecated. If `False` (the default),
-        we produce a scalar `StudentT` distribution when the number of
-        `index_points` is statically known to be `1`. If `True`, we avoid this
-        behavior, ensuring that the event shape will retain the `1` from
-        `index_points`.
+      always_yield_multivariate_student_t: Deprecated and ignored.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -463,10 +471,10 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
         self._parameters = parameters
 
   @staticmethod
-  @deprecation.deprecated_arg_values(
-      '2023-07-01',
+  @deprecation.deprecated_args(
+      '2023-11-15',
       _ALWAYS_YIELD_MVST_DEPRECATION_WARNING,
-      always_yield_multivariate_student_t=False)
+      'always_yield_multivariate_student_t')
   def precompute_regression_model(
       df,
       kernel,
@@ -478,7 +486,7 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
       predictive_noise_variance=None,
       mean_fn=None,
       cholesky_fn=None,
-      always_yield_multivariate_student_t=False,
+      always_yield_multivariate_student_t=None,
       validate_args=False,
       allow_nan_stats=False,
       name='PrecomputedStudentTProcessRegressionModel',
@@ -547,7 +555,7 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
         dimensions and must equal `kernel.feature_ndims` (or its corresponding
         nested component) and `e` is the number (size) of index points in each
         batch. Ultimately this distribution corresponds to an `e`-dimensional
-        multivariate normal. The batch shape must be broadcastable with
+        multivariate Student T. The batch shape must be broadcastable with
         `kernel.batch_shape` and any batch dims yielded by `mean_fn`.
       observation_noise_variance: `float` `Tensor` representing the variance
         of the noise in the Normal likelihood distribution of the model. May be
@@ -564,18 +572,14 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
         observations.
       mean_fn: Python `callable` that acts on `index_points` to produce a
         collection, or batch of collections, of mean values at `index_points`.
-        Takes a (nested) `Tensor` of shape `[b1, ..., bB, f1, ..., fF]` and
-        returns a `Tensor` whose shape is broadcastable with `[b1, ..., bB]`.
+        Takes a (nested) `Tensor` of shape `[b1, ..., bB, e, f1, ..., fF]` and
+        returns a `Tensor` whose shape is broadcastable with `[b1, ..., bB, e]`.
         Default value: `None` implies the constant zero function.
       cholesky_fn: Callable which takes a single (batch) matrix argument and
         returns a Cholesky-like lower triangular factor.  Default value: `None`,
         in which case `make_cholesky_with_jitter_fn` is used with the `jitter`
         parameter.
-      always_yield_multivariate_student_t: Deprecated. If `False` (the default),
-        we produce a scalar `StudentT` distribution when the number of
-        `index_points` is statically known to be `1`. If `True`, we avoid this
-        behavior, ensuring that the event shape will retain the `1` from
-        `index_points`.
+      always_yield_multivariate_student_t: Deprecated and ignored.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect

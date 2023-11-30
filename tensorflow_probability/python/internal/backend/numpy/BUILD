@@ -15,6 +15,9 @@
 # Description:
 #   Numpy backend.
 
+# Placeholder: py_library
+# Placeholder: py_test
+
 licenses(["notice"])
 
 package(
@@ -476,7 +479,9 @@ py_test(
         "--test_mode=xla",
         # TODO(b/168718272): reduce_*([nan, nan], axis=0) (GPU)
         # histogram_fixed_width_bins fails with f32([0.]), [0.0, 0.0], 2
-        "--xla_disabled=math.cumulative_logsumexp,math.reduce_min,math.reduce_max,histogram_fixed_width_bins",
+        ("--xla_disabled=math.cumulative_logsumexp,math.reduce_min,math.reduce_max,histogram_fixed_width_bins," +
+         # TODO(b/298426124): TF floomod GPU bug
+         "math.floormod"),
     ],
     main = "numpy_test.py",
     shard_count = 11,
@@ -532,12 +537,8 @@ py_library(
 )
 
 LINOP_FILES = [
-    "adjoint_registrations",
-    "cholesky_registrations",
-    "inverse_registrations",
     "linear_operator_addition",
     "linear_operator_adjoint",
-    "linear_operator_algebra",
     "linear_operator_block_diag",
     "linear_operator_block_lower_triangular",
     "linear_operator_circulant",
@@ -555,10 +556,8 @@ LINOP_FILES = [
     "linear_operator_toeplitz",
     "linear_operator_util",
     "linear_operator_zeros",
-    "matmul_registrations",
-    "registrations_util",
+    "property_hint_util",
     "slicing",
-    "solve_registrations",
 ]
 
 [genrule(

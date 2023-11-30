@@ -28,22 +28,11 @@ from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import slicing
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.psd_kernels import schur_complement
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
     'GaussianProcessRegressionModel',
 ]
-
-
-_ALWAYS_YIELD_MVN_DEPRECATION_WARNING = (
-    '`always_yield_multivariate_normal` is deprecated. This arg is now ignored'
-    'and will be removed after 2023-07-01. A `GaussianProcessRegressionModel`'
-    'evaluated at a single index point now always has event shape `[1]` (the'
-    'previous behavior for `always_yield_multivariate_normal=True`). To'
-    'reproduce the previous behavior of'
-    '`always_yield_multivariate_normal=False`, squeeze the rightmost singleton'
-    'dimension from the output of `mean`, `sample`, etc.')
 
 
 class GaussianProcessRegressionModel(
@@ -201,7 +190,7 @@ class GaussianProcessRegressionModel(
       index_points=observation_index_points,
       observation_noise_variance=observation_noise_variance)
 
-  optimizer = tf.optimizers.Adam(learning_rate=.05, beta_1=.5, beta_2=.99)
+  optimizer = tf_keras.optimizers.Adam(learning_rate=.05, beta_1=.5, beta_2=.99)
 
   @tf.function
   def optimize():
@@ -326,10 +315,6 @@ class GaussianProcessRegressionModel(
   """
   # pylint:disable=invalid-name
 
-  @deprecation.deprecated_args(
-      '2023-07-01',
-      _ALWAYS_YIELD_MVN_DEPRECATION_WARNING,
-      'always_yield_multivariate_normal')
   def __init__(self,
                kernel,
                index_points=None,
@@ -340,7 +325,6 @@ class GaussianProcessRegressionModel(
                mean_fn=None,
                cholesky_fn=None,
                jitter=1e-6,
-               always_yield_multivariate_normal=None,
                validate_args=False,
                allow_nan_stats=False,
                name='GaussianProcessRegressionModel',
@@ -398,8 +382,8 @@ class GaussianProcessRegressionModel(
         observations.
       mean_fn: Python `callable` that acts on `index_points` to produce a
         collection, or batch of collections, of mean values at `index_points`.
-        Takes a (nested) `Tensor` of shape `[b1, ..., bB, f1, ..., fF]` and
-        returns a `Tensor` whose shape is broadcastable with `[b1, ..., bB]`.
+        Takes a (nested) `Tensor` of shape `[b1, ..., bB, e, f1, ..., fF]` and
+        returns a `Tensor` whose shape is broadcastable with `[b1, ..., bB, e]`.
         Default value: `None` implies the constant zero function.
       cholesky_fn: Callable which takes a single (batch) matrix argument and
         returns a Cholesky-like lower triangular factor.  Default value: `None`,
@@ -409,7 +393,6 @@ class GaussianProcessRegressionModel(
         matrix to ensure positive definiteness of the covariance matrix.
         This argument is ignored if `cholesky_fn` is set.
         Default value: `1e-6`.
-      always_yield_multivariate_normal: Deprecated and ignored.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -432,22 +415,42 @@ class GaussianProcessRegressionModel(
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      if tf.nest.is_nested(kernel.feature_ndims):
-        input_dtype = dtype_util.common_dtype(
-            [kernel, index_points, observation_index_points],
-            dtype_hint=nest_util.broadcast_structure(
-                kernel.feature_ndims, tf.float32))
+      input_dtype = dtype_util.common_dtype(
+          dict(
+              kernel=kernel,
+              index_points=index_points,
+              observation_index_points=observation_index_points,
+          ),
+          dtype_hint=nest_util.broadcast_structure(
+              kernel.feature_ndims, tf.float32))
+
+      # If the input dtype is non-nested float, we infer a single dtype for the
+      # input and the float parameters, which is also the dtype of the GP's
+      # samples, log_prob, etc. If the input dtype is nested (or not float), we
+      # do not use it to infer the GP's float dtype.
+      if (not tf.nest.is_nested(input_dtype) and
+          dtype_util.is_floating(input_dtype)):
         dtype = dtype_util.common_dtype(
-            [observations, observation_noise_variance,
-             predictive_noise_variance, jitter], tf.float32)
-      else:
-        # If the index points are not nested, we assume they are of the same
-        # dtype as the GPRM.
-        dtype = dtype_util.common_dtype([
-            index_points, observation_index_points, observations,
-            observation_noise_variance, predictive_noise_variance, jitter
-        ], tf.float32)
+            dict(
+                kernel=kernel,
+                index_points=index_points,
+                observations=observations,
+                observation_index_points=observation_index_points,
+                observation_noise_variance=observation_noise_variance,
+                predictive_noise_variance=predictive_noise_variance,
+                jitter=jitter,
+            ),
+            dtype_hint=tf.float32,
+        )
         input_dtype = dtype
+      else:
+        dtype = dtype_util.common_dtype(
+            dict(
+                observations=observations,
+                observation_noise_variance=observation_noise_variance,
+                predictive_noise_variance=predictive_noise_variance,
+                jitter=jitter,
+            ), dtype_hint=tf.float32)
 
       if index_points is not None:
         index_points = nest_util.convert_to_nested_tensor(
@@ -541,7 +544,6 @@ class GaussianProcessRegressionModel(
             index_points=index_points,
             cholesky_fn=cholesky_fn,
             jitter=jitter,
-            always_yield_multivariate_normal=always_yield_multivariate_normal,
             # What the GP super class calls "observation noise variance" we call
             # here the "predictive noise variance". We use the observation noise
             # variance for the fit/solve process above, and predictive for
@@ -552,10 +554,6 @@ class GaussianProcessRegressionModel(
         self._parameters = parameters
 
   @staticmethod
-  @deprecation.deprecated_args(
-      '2023-07-01',
-      _ALWAYS_YIELD_MVN_DEPRECATION_WARNING,
-      'always_yield_multivariate_normal')
   def precompute_regression_model(
       kernel,
       observation_index_points,
@@ -567,7 +565,6 @@ class GaussianProcessRegressionModel(
       mean_fn=None,
       cholesky_fn=None,
       jitter=1e-6,
-      always_yield_multivariate_normal=None,
       validate_args=False,
       allow_nan_stats=False,
       name='PrecomputedGaussianProcessRegressionModel',
@@ -651,8 +648,8 @@ class GaussianProcessRegressionModel(
         observations.
       mean_fn: Python `callable` that acts on `index_points` to produce a
         collection, or batch of collections, of mean values at `index_points`.
-        Takes a (nested) `Tensor` of shape `[b1, ..., bB, f1, ..., fF]` and
-        returns a `Tensor` whose shape is broadcastable with `[b1, ..., bB]`.
+        Takes a (nested) `Tensor` of shape `[b1, ..., bB, e, f1, ..., fF]` and
+        returns a `Tensor` whose shape is broadcastable with `[b1, ..., bB, e]`.
         Default value: `None` implies the constant zero function.
       cholesky_fn: Callable which takes a single (batch) matrix argument and
         returns a Cholesky-like lower triangular factor.  Default value: `None`,
@@ -661,7 +658,6 @@ class GaussianProcessRegressionModel(
       jitter: `float` scalar `Tensor` added to the diagonal of the covariance
         matrix to ensure positive definiteness of the covariance matrix.
         Default value: `1e-6`.
-      always_yield_multivariate_normal: Deprecated and ignored.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -773,7 +769,6 @@ class GaussianProcessRegressionModel(
           predictive_noise_variance=predictive_noise_variance,
           cholesky_fn=cholesky_fn,
           jitter=jitter,
-          always_yield_multivariate_normal=always_yield_multivariate_normal,
           _conditional_kernel=conditional_kernel,
           _conditional_mean_fn=conditional_mean_fn,
           validate_args=validate_args,

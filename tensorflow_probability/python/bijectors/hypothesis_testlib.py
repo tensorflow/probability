@@ -565,7 +565,9 @@ def generalized_pareto_constraint(loc, scale, conc):
   def constrain(x):
     conc_ = tf.convert_to_tensor(conc)
     loc_ = tf.convert_to_tensor(loc)
-    return tf.where(conc_ >= 0.,
+    # When conc is very small but negative, the maximum of the support is
+    # infinite, so we treat it as if it were non-negative.
+    return tf.where((conc_ >= 0.) | ~tf.math.is_finite(scale / conc_),
                     tf.math.softplus(x) + loc_,
                     loc_ - tf.math.sigmoid(x) * scale / conc_)
   return constrain

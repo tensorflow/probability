@@ -22,8 +22,8 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import mixture_same_family
 from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.distributions import normal
-from tensorflow_probability.python.distributions.mvn_linear_operator import MultivariateNormalLinearOperator
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
@@ -160,7 +160,7 @@ def factored_joint_mvn(distributions):
     dtype = tf.debugging.assert_same_float_dtype(distributions)
     broadcast_ones = tf.ones(broadcast_batch_shape(distributions),
                              dtype=dtype)[..., tf.newaxis]
-    return MultivariateNormalLinearOperator(
+    return mvn_linear_operator.MultivariateNormalLinearOperator(
         loc=tf.concat([mvn.mean() * broadcast_ones for mvn in distributions],
                       axis=-1),
         scale=tfl.LinearOperatorBlockDiag([mvn.scale for mvn in distributions],
@@ -246,7 +246,7 @@ def empirical_statistics(observed_time_series):
           missing_values_util.moments_of_masked_time_series(
               squeezed_series, broadcast_mask=broadcast_mask))
       try:
-        observed_initial = (
+        observed_initial, _ = (
             missing_values_util.initial_value_of_masked_time_series(
                 squeezed_series, broadcast_mask=broadcast_mask))
       except NotImplementedError:

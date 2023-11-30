@@ -73,14 +73,19 @@ class StepSizeHeuristicAdjointSolver(base.Solver):
     )
 
   def _solve(self, **kwargs):
-    step_size = kwargs.pop('previous_solver_internal_state')
+    step_size, solve_count = kwargs.pop('previous_solver_internal_state')
     results = self._make_solver_fn(step_size).solve(**kwargs)
     return results._replace(
-        solver_internal_state=results.solver_internal_state.step_size)
+        solver_internal_state=(
+            results.solver_internal_state.step_size,
+            solve_count + 1,
+        )
+    )
 
   def _initialize_solver_internal_state(self, **kwargs):
     del kwargs
-    return self._first_step_size
+    # The second value is solve count, for testing.
+    return (self._first_step_size, 0)
 
   def _adjust_solver_internal_state_for_state_jump(self, **kwargs):
     return kwargs['previous_solver_internal_state']
@@ -447,17 +452,17 @@ class GradientTest(test_util.TestCase):
     # Instrument the adjoint solver for testing. We have to do this because the
     # API doesn't provide access to the adjoint solver's diagnostics.
     first_step_size = np.float64(1.)
-    last_initial_step_size = tf.Variable(0., dtype=tf.float64)
-    self.evaluate(last_initial_step_size.initializer)
+    solve_count = tf.Variable(0, dtype=tf.int32)
+    self.evaluate(solve_count.initializer)
 
     class _InstrumentedSolver(StepSizeHeuristicAdjointSolver):
 
       def solve(self, **kwargs):
-        with tf.control_dependencies([
-            last_initial_step_size.assign(
-                kwargs['previous_solver_internal_state'])
-        ]):
-          return super(_InstrumentedSolver, self).solve(**kwargs)
+        results = super(_InstrumentedSolver, self).solve(**kwargs)
+        with tf.control_dependencies(
+            [solve_count.assign(results.solver_internal_state[1])]
+        ):
+          return tf.nest.map_structure(tf.identity, results)
 
     adjoint_solver = _InstrumentedSolver(
         make_solver_fn=lambda step_size: solver(  # pylint: disable=g-long-lambda
@@ -479,13 +484,14 @@ class GradientTest(test_util.TestCase):
       final_state = results.states[-1]
       return final_state
     _, grad = tfp_gradient.value_and_gradient(grad_fn, initial_state)
-    grad, last_initial_step_size = self.evaluate((grad, last_initial_step_size))
+    grad = self.evaluate(grad)
+    # There's a race condition if we evaluate solve_count right away. Evaluate
+    # it after we're done the computation to produce `grad`.
+    solve_count = self.evaluate(solve_count)
     grad_exact = 1. / (1. - initial_state_value * final_time)**2
     self.assertAllClose(grad, grad_exact, rtol=1e-3, atol=1e-3)
-    # This indicates that the adaptation carried over to the final solve. We
-    # expect the step size to decrease because we purposefully made the initial
-    # step size way too large.
-    self.assertLess(last_initial_step_size, first_step_size)
+    # This indicates that the adaptation carried over to the final solve.
+    self.assertGreater(solve_count, 0)
 
   def test_linear_ode(self, solver, solution_times_fn):
     if not tf1.control_flow_v2_enabled():

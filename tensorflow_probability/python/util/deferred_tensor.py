@@ -156,7 +156,7 @@ class DeferredTensor(six.with_metaclass(
   Which we could then fit as:
 
   ```python
-  opt = tf.optimizers.Adam(learning_rate=0.05)
+  opt = tf_keras.optimizers.Adam(learning_rate=0.05)
   loss = tf.function(lambda: -trainable_normal.log_prob(0.5), autograph=True)
   for _ in range(int(1e3)):
     opt.minimize(loss, trainable_normal.trainable_variables)
@@ -477,7 +477,7 @@ class TransformedVariable(DeferredTensor):
   g = tape.gradient(negloglik, trainable_normal.trainable_variables)
   # ==> (-0.5, 0.75)
 
-  opt = tf.optimizers.Adam(learning_rate=0.05)
+  opt = tf_keras.optimizers.Adam(learning_rate=0.05)
   loss = tf.function(lambda: -trainable_normal.log_prob(0.5))
   for _ in range(int(1e3)):
     opt.minimize(loss, trainable_normal.trainable_variables)

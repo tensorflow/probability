@@ -21,9 +21,9 @@ from tensorflow_probability.python.distributions import independent as independe
 from tensorflow_probability.python.distributions import kullback_leibler as kl_lib
 from tensorflow_probability.python.distributions import normal as normal_lib
 from tensorflow_probability.python.internal import docstring_util
+from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.layers import util as tfp_layers_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
-from tensorflow.python.layers import utils as tf_layers_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import nn_ops  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -74,7 +74,7 @@ doc_args = """activation: Activation function. Set it to None to maintain a
     sample is a `Tensor`."""
 
 
-class _ConvVariational(tf.keras.layers.Layer):
+class _ConvVariational(tf_keras.layers.Layer):
   """Abstract nD convolution layer (private, used as implementation base).
 
   This layer creates a convolution kernel that is convolved
@@ -149,15 +149,15 @@ class _ConvVariational(tf.keras.layers.Layer):
         **kwargs)
     self.rank = rank
     self.filters = filters
-    self.kernel_size = tf_layers_util.normalize_tuple(
+    self.kernel_size = normalize_tuple(
         kernel_size, rank, 'kernel_size')
-    self.strides = tf_layers_util.normalize_tuple(strides, rank, 'strides')
-    self.padding = tf_layers_util.normalize_padding(padding)
-    self.data_format = tf_layers_util.normalize_data_format(data_format)
-    self.dilation_rate = tf_layers_util.normalize_tuple(
+    self.strides = normalize_tuple(strides, rank, 'strides')
+    self.padding = normalize_padding(padding)
+    self.data_format = normalize_data_format(data_format)
+    self.dilation_rate = normalize_tuple(
         dilation_rate, rank, 'dilation_rate')
-    self.activation = tf.keras.activations.get(activation)
-    self.input_spec = tf.keras.layers.InputSpec(ndim=self.rank + 2)
+    self.activation = tf_keras.activations.get(activation)
+    self.input_spec = tf_keras.layers.InputSpec(ndim=self.rank + 2)
     self.kernel_posterior_fn = kernel_posterior_fn
     self.kernel_posterior_tensor_fn = kernel_posterior_tensor_fn
     self.kernel_prior_fn = kernel_prior_fn
@@ -180,7 +180,7 @@ class _ConvVariational(tf.keras.layers.Layer):
     kernel_shape = self.kernel_size + (input_dim, self.filters)
 
     # If self.dtype is None, build weights using the default dtype.
-    dtype = tf.as_dtype(self.dtype or tf.keras.backend.floatx())
+    dtype = tf.as_dtype(self.dtype or tf_keras.backend.floatx())
 
     # Must have a posterior kernel.
     self.kernel_posterior = self.kernel_posterior_fn(
@@ -208,7 +208,7 @@ class _ConvVariational(tf.keras.layers.Layer):
           dtype, (self.filters,), 'bias_prior',
           self.trainable, self.add_variable)
 
-    self.input_spec = tf.keras.layers.InputSpec(
+    self.input_spec = tf_keras.layers.InputSpec(
         ndim=self.rank + 2, axes={channel_axis: input_dim})
     self._convolution_op = nn_ops.Convolution(
         input_shape,
@@ -216,7 +216,7 @@ class _ConvVariational(tf.keras.layers.Layer):
         dilation_rate=self.dilation_rate,
         strides=self.strides,
         padding=self.padding.upper(),
-        data_format=tf_layers_util.convert_data_format(
+        data_format=convert_data_format(
             self.data_format, self.rank + 2))
 
     self.built = True
@@ -256,7 +256,7 @@ class _ConvVariational(tf.keras.layers.Layer):
       space = input_shape[1:-1]
       new_space = []
       for i in range(len(space)):
-        new_dim = tf_layers_util.conv_output_length(
+        new_dim = conv_output_length(
             space[i],
             self.kernel_size[i],
             padding=self.padding,
@@ -268,7 +268,7 @@ class _ConvVariational(tf.keras.layers.Layer):
       space = input_shape[2:]
       new_space = []
       for i in range(len(space)):
-        new_dim = tf_layers_util.conv_output_length(
+        new_dim = conv_output_length(
             space[i],
             self.kernel_size[i],
             padding=self.padding,
@@ -295,10 +295,10 @@ class _ConvVariational(tf.keras.layers.Layer):
         'padding': self.padding,
         'data_format': self.data_format,
         'dilation_rate': self.dilation_rate,
-        'activation': (tf.keras.activations.serialize(self.activation)
+        'activation': (tf_keras.activations.serialize(self.activation)
                        if self.activation else None),
         'activity_regularizer':
-            tf.keras.initializers.serialize(self.activity_regularizer),
+            tf_keras.initializers.serialize(self.activity_regularizer),
     }
     function_keys = [
         'kernel_posterior_fn',
@@ -491,7 +491,7 @@ class _ConvReparameterization(_ConvVariational):
         padding=padding,
         data_format=data_format,
         dilation_rate=dilation_rate,
-        activation=tf.keras.activations.get(activation),
+        activation=tf_keras.activations.get(activation),
         activity_regularizer=activity_regularizer,
         kernel_posterior_fn=kernel_posterior_fn,
         kernel_posterior_tensor_fn=kernel_posterior_tensor_fn,
@@ -555,11 +555,11 @@ class Conv1DReparameterization(_ConvReparameterization):
   import tensorflow as tf
   import tensorflow_probability as tfp
 
-  model = tf.keras.Sequential([
-      tf.keras.layers.Reshape([128, 1]),
+  model = tf_keras.Sequential([
+      tf_keras.layers.Reshape([128, 1]),
       tfp.layers.Convolution1DReparameterization(
           64, kernel_size=5, padding='SAME', activation=tf.nn.relu),
-      tf.keras.layers.Flatten(),
+      tf_keras.layers.Flatten(),
       tfp.layers.DenseReparameterization(10),
   ])
 
@@ -639,7 +639,7 @@ class Conv1DReparameterization(_ConvReparameterization):
         padding=padding,
         data_format=data_format,
         dilation_rate=dilation_rate,
-        activation=tf.keras.activations.get(activation),
+        activation=tf_keras.activations.get(activation),
         activity_regularizer=activity_regularizer,
         kernel_posterior_fn=kernel_posterior_fn,
         kernel_posterior_tensor_fn=kernel_posterior_tensor_fn,
@@ -695,14 +695,14 @@ class Conv2DReparameterization(_ConvReparameterization):
   import tensorflow as tf
   import tensorflow_probability as tfp
 
-  model = tf.keras.Sequential([
-      tf.keras.layers.Reshape([32, 32, 3]),
+  model = tf_keras.Sequential([
+      tf_keras.layers.Reshape([32, 32, 3]),
       tfp.layers.Convolution2DReparameterization(
           64, kernel_size=5, padding='SAME', activation=tf.nn.relu),
-      tf.keras.layers.MaxPooling2D(pool_size=[2, 2],
+      tf_keras.layers.MaxPooling2D(pool_size=[2, 2],
                                    strides=[2, 2],
                                    padding='SAME'),
-      tf.keras.layers.Flatten(),
+      tf_keras.layers.Flatten(),
       tfp.layers.DenseReparameterization(10),
   ])
 
@@ -788,7 +788,7 @@ class Conv2DReparameterization(_ConvReparameterization):
         padding=padding,
         data_format=data_format,
         dilation_rate=dilation_rate,
-        activation=tf.keras.activations.get(activation),
+        activation=tf_keras.activations.get(activation),
         activity_regularizer=activity_regularizer,
         kernel_posterior_fn=kernel_posterior_fn,
         kernel_posterior_tensor_fn=kernel_posterior_tensor_fn,
@@ -840,14 +840,14 @@ class Conv3DReparameterization(_ConvReparameterization):
   import tensorflow as tf
   import tensorflow_probability as tfp
 
-  model = tf.keras.Sequential([
-      tf.keras.layers.Reshape([256, 32, 32, 3]),
+  model = tf_keras.Sequential([
+      tf_keras.layers.Reshape([256, 32, 32, 3]),
       tfp.layers.Convolution3DReparameterization(
           64, kernel_size=5, padding='SAME', activation=tf.nn.relu),
-      tf.keras.layers.MaxPooling3D(pool_size=[2, 2, 2],
+      tf_keras.layers.MaxPooling3D(pool_size=[2, 2, 2],
                                    strides=[2, 2, 2],
                                    padding='SAME'),
-      tf.keras.layers.Flatten(),
+      tf_keras.layers.Flatten(),
       tfp.layers.DenseReparameterization(10),
   ])
 
@@ -934,7 +934,7 @@ class Conv3DReparameterization(_ConvReparameterization):
         padding=padding,
         data_format=data_format,
         dilation_rate=dilation_rate,
-        activation=tf.keras.activations.get(activation),
+        activation=tf_keras.activations.get(activation),
         activity_regularizer=activity_regularizer,
         kernel_posterior_fn=kernel_posterior_fn,
         kernel_posterior_tensor_fn=kernel_posterior_tensor_fn,
@@ -1039,7 +1039,7 @@ class _ConvFlipout(_ConvVariational):
         padding=padding,
         data_format=data_format,
         dilation_rate=dilation_rate,
-        activation=tf.keras.activations.get(activation),
+        activation=tf_keras.activations.get(activation),
         activity_regularizer=activity_regularizer,
         kernel_posterior_fn=kernel_posterior_fn,
         kernel_posterior_tensor_fn=kernel_posterior_tensor_fn,
@@ -1166,11 +1166,11 @@ class Conv1DFlipout(_ConvFlipout):
   import tensorflow as tf
   import tensorflow_probability as tfp
 
-  model = tf.keras.Sequential([
-      tf.keras.layers.Reshape([128, 1]),
+  model = tf_keras.Sequential([
+      tf_keras.layers.Reshape([128, 1]),
       tfp.layers.Convolution1DFlipout(
           64, kernel_size=5, padding='SAME', activation=tf.nn.relu),
-      tf.keras.layers.Flatten(),
+      tf_keras.layers.Flatten(),
       tfp.layers.DenseFlipout(10),
   ])
 
@@ -1254,7 +1254,7 @@ class Conv1DFlipout(_ConvFlipout):
         padding=padding,
         data_format=data_format,
         dilation_rate=dilation_rate,
-        activation=tf.keras.activations.get(activation),
+        activation=tf_keras.activations.get(activation),
         activity_regularizer=activity_regularizer,
         kernel_posterior_fn=kernel_posterior_fn,
         kernel_posterior_tensor_fn=kernel_posterior_tensor_fn,
@@ -1309,14 +1309,14 @@ class Conv2DFlipout(_ConvFlipout):
   import tensorflow as tf
   import tensorflow_probability as tfp
 
-  model = tf.keras.Sequential([
-      tf.keras.layers.Reshape([32, 32, 3]),
+  model = tf_keras.Sequential([
+      tf_keras.layers.Reshape([32, 32, 3]),
       tfp.layers.Convolution2DFlipout(
           64, kernel_size=5, padding='SAME', activation=tf.nn.relu),
-      tf.keras.layers.MaxPooling2D(pool_size=[2, 2],
+      tf_keras.layers.MaxPooling2D(pool_size=[2, 2],
                                    strides=[2, 2],
                                    padding='SAME'),
-      tf.keras.layers.Flatten(),
+      tf_keras.layers.Flatten(),
       tfp.layers.DenseFlipout(10),
   ])
 
@@ -1406,7 +1406,7 @@ class Conv2DFlipout(_ConvFlipout):
         padding=padding,
         data_format=data_format,
         dilation_rate=dilation_rate,
-        activation=tf.keras.activations.get(activation),
+        activation=tf_keras.activations.get(activation),
         activity_regularizer=activity_regularizer,
         kernel_posterior_fn=kernel_posterior_fn,
         kernel_posterior_tensor_fn=kernel_posterior_tensor_fn,
@@ -1461,14 +1461,14 @@ class Conv3DFlipout(_ConvFlipout):
   import tensorflow as tf
   import tensorflow_probability as tfp
 
-  model = tf.keras.Sequential([
-      tf.keras.layers.Reshape([256, 32, 32, 3]),
+  model = tf_keras.Sequential([
+      tf_keras.layers.Reshape([256, 32, 32, 3]),
       tfp.layers.Convolution3DFlipout(
           64, kernel_size=5, padding='SAME', activation=tf.nn.relu),
-      tf.keras.layers.MaxPooling3D(pool_size=[2, 2, 2],
+      tf_keras.layers.MaxPooling3D(pool_size=[2, 2, 2],
                                    strides=[2, 2, 2],
                                    padding='SAME'),
-      tf.keras.layers.Flatten(),
+      tf_keras.layers.Flatten(),
       tfp.layers.DenseFlipout(10),
   ])
 
@@ -1559,7 +1559,7 @@ class Conv3DFlipout(_ConvFlipout):
         padding=padding,
         data_format=data_format,
         dilation_rate=dilation_rate,
-        activation=tf.keras.activations.get(activation),
+        activation=tf_keras.activations.get(activation),
         activity_regularizer=activity_regularizer,
         kernel_posterior_fn=kernel_posterior_fn,
         kernel_posterior_tensor_fn=kernel_posterior_tensor_fn,
@@ -1581,3 +1581,113 @@ Convolution3DReparameterization = Conv3DReparameterization
 Convolution1DFlipout = Conv1DFlipout
 Convolution2DFlipout = Conv2DFlipout
 Convolution3DFlipout = Conv3DFlipout
+
+
+def convert_data_format(data_format, ndim):  # pylint: disable=missing-function-docstring
+  if data_format == 'channels_last':
+    if ndim == 3:
+      return 'NWC'
+    elif ndim == 4:
+      return 'NHWC'
+    elif ndim == 5:
+      return 'NDHWC'
+    else:
+      raise ValueError(f'Input rank: {ndim} not supported. We only support '
+                       'input rank 3, 4 or 5.')
+  elif data_format == 'channels_first':
+    if ndim == 3:
+      return 'NCW'
+    elif ndim == 4:
+      return 'NCHW'
+    elif ndim == 5:
+      return 'NCDHW'
+    else:
+      raise ValueError(f'Input rank: {ndim} not supported. We only support '
+                       'input rank 3, 4 or 5.')
+  else:
+    raise ValueError(f'Invalid data_format: {data_format}. We only support '
+                     '"channels_first" or "channels_last"')
+
+
+def normalize_tuple(value, n, name):
+  """Transforms a single integer or iterable of integers into an integer tuple.
+
+  Args:
+    value: The value to validate and convert. Could an int, or any iterable
+      of ints.
+    n: The size of the tuple to be returned.
+    name: The name of the argument being validated, e.g. "strides" or
+      "kernel_size". This is only used to format error messages.
+
+  Returns:
+    A tuple of n integers.
+
+  Raises:
+    ValueError: If something else than an int/long or iterable thereof was
+      passed.
+  """
+  if isinstance(value, int):
+    return (value,) * n
+  else:
+    try:
+      value_tuple = tuple(value)
+    except TypeError:
+      raise ValueError(f'Argument `{name}` must be a tuple of {str(n)} '
+                       f'integers. Received: {str(value)}') from None
+    if len(value_tuple) != n:
+      raise ValueError(f'Argument `{name}` must be a tuple of {str(n)} '
+                       f'integers. Received: {str(value)}')
+    for single_value in value_tuple:
+      try:
+        int(single_value)
+      except (ValueError, TypeError):
+        raise ValueError(f'Argument `{name}` must be a tuple of {str(n)} '
+                         f'integers. Received: {str(value)} including element '
+                         f'{str(single_value)} of type '
+                         f'{str(type(single_value))}') from None
+    return value_tuple
+
+
+def normalize_data_format(value):
+  data_format = value.lower()
+  if data_format not in {'channels_first', 'channels_last'}:
+    raise ValueError('The `data_format` argument must be one of '
+                     '"channels_first", "channels_last". Received: '
+                     f'{str(value)}.')
+  return data_format
+
+
+def normalize_padding(value):
+  padding = value.lower()
+  if padding not in {'valid', 'same'}:
+    raise ValueError('The `padding` argument must be one of "valid", "same". '
+                     f'Received: {str(padding)}.')
+  return padding
+
+
+def conv_output_length(input_length, filter_size, padding, stride, dilation=1):
+  """Determines output length of a convolution given input length.
+
+  Args:
+      input_length: integer.
+      filter_size: integer.
+      padding: one of "same", "valid", "full".
+      stride: integer.
+      dilation: dilation rate, integer.
+
+  Returns:
+      The output length (integer).
+  """
+  if input_length is None:
+    return None
+  assert padding in {'same', 'valid', 'full'}
+  dilated_filter_size = filter_size + (filter_size - 1) * (dilation - 1)
+  if padding == 'same':
+    output_length = input_length
+  elif padding == 'valid':
+    output_length = input_length - dilated_filter_size + 1
+  elif padding == 'full':
+    output_length = input_length + dilated_filter_size - 1
+  else:
+    raise ValueError(f'Invalid padding: {padding}')
+  return (output_length + stride - 1) // stride

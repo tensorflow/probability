@@ -15,6 +15,8 @@
 # Description:
 #   API-unstable code that is part of the TFP package.
 
+# Placeholder: py_library
+
 package(
     # default_applicable_licenses
     default_visibility = [
@@ -45,6 +47,7 @@ py_library(
     tags = ["alt_dep=//tensorflow_probability:jax"],
     deps = [
 #         "//tensorflow_probability/google:google.jax",  # DisableOnExport
+#         "//tensorflow_probability/google/autosts:autosts.jax",  # DisableOnExport
 #         "//tensorflow_probability/google/staging:staging.jax",  # DisableOnExport
 #         "//tensorflow_probability/google/tfp_google:tfp_google.jax",  # DisableOnExport
         "//tensorflow_probability/python:version",

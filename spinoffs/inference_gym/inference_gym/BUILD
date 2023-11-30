@@ -16,8 +16,8 @@
 #   A package for target densities and benchmarking of inference algorithms
 #   against the same.
 
+# Placeholder: py_library
 # [internal] load pytype.bzl (pytype_strict_library)
-# [internal] load dummy dependency
 
 package(
     # default_applicable_licenses
@@ -97,5 +97,3 @@ py_library(
     name = "backend_tensorflow",
     srcs = ["dynamic/backend_tensorflow/__init__.py"],
 )
-
-# third_party_dependency(package = "py/inference_gym")  # DisableOnExport

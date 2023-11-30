@@ -30,6 +30,7 @@ from tensorflow_probability.python.distributions import sample
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import tf_keras
 
 
 @test_util.test_all_tf_execution_regimes
@@ -226,7 +227,7 @@ def _make_gated_bijector_fn():
     else:
       reshape_output = lambda x: x
 
-    out = tf1.layers.dense(inputs=x, units=2 * output_units)
+    out = tf_keras.tf1_layers.dense(inputs=x, units=2 * output_units)
     shift, logit_gate = tf.split(out, 2, axis=-1)
     shift = reshape_output(shift)
     logit_gate = reshape_output(logit_gate)

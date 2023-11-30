@@ -67,9 +67,10 @@ TF_REPLACEMENTS = {
         'from tensorflow_probability.python.internal.backend.numpy.private',
     'from tensorflow.python.ops.linalg':
         'from tensorflow_probability.python.internal.backend.numpy.gen',
-    'from tensorflow.python.ops import parallel_for':
+    ('from tensorflow.python.ops.parallel_for '
+     'import control_flow_ops'):
         'from tensorflow_probability.python.internal.backend.numpy '
-        'import functional_ops as parallel_for',
+        'import functional_ops as control_flow_ops',
     'from tensorflow.python.ops import control_flow_case':
         'from tensorflow_probability.python.internal.backend.numpy '
         'import control_flow as control_flow_case',
@@ -85,7 +86,10 @@ TF_REPLACEMENTS = {
         'pass',
     ('from tensorflow.python '
      'import pywrap_tensorflow as c_api'):
-        'pass'
+        'pass',
+    'from tensorflow_probability.python.internal import tf_keras':
+        ('from tensorflow_probability.python.internal.backend.numpy '
+         'import keras as tf_keras'),
 }
 
 DISABLED_BY_PKG = {
@@ -93,8 +97,8 @@ DISABLED_BY_PKG = {
         ('auto_batching', 'composite_tensor', 'linalg',
          'marginalize', 'nn', 'sequential', 'substrates'),
 }
-LIBS = ('bijectors', 'distributions', 'experimental', 'glm', 'math', 'mcmc',
-        'monte_carlo', 'optimizer', 'random', 'staging', 'stats', 'sts',
+LIBS = ('autosts', 'bijectors', 'distributions', 'experimental', 'glm', 'math',
+        'mcmc', 'monte_carlo', 'optimizer', 'random', 'staging', 'stats', 'sts',
         'tfp_google', 'util', 'vi')
 DISTRIBUTION_INTERNALS = ('stochastic_process_util',)
 INTERNALS = ('assert_util', 'auto_composite_tensor',

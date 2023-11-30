@@ -15,13 +15,15 @@
 # Description:
 #   Internal utilities for TensorFlow probability.
 
+# [internal] load pytype.bzl (pytype_strict_test)
+# [internal] load strict.bzl
+# Placeholder: py_library
+# Placeholder: py_test
 load(
     "//tensorflow_probability/python:build_defs.bzl",
     "multi_substrate_py_library",
     "multi_substrate_py_test",
 )
-# [internal] load pytype.bzl (pytype_strict_test)
-# [internal] load strict.bzl
 
 licenses(["notice"])
 
@@ -69,6 +71,7 @@ py_test(
         # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:bijector",
+        "//tensorflow_probability/python/bijectors:bijector_test_util",
         "//tensorflow_probability/python/bijectors:reshape",
         "//tensorflow_probability/python/bijectors:scale",
         "//tensorflow_probability/python/bijectors:shift",
@@ -650,6 +653,7 @@ multi_substrate_py_test(
     srcs = ["trainable_state_util_test.py"],
     jax_size = "medium",
     numpy_tags = ["notap"],
+    tf_tags = ["no-oss-ci"],  # TODO(b/308579205)
     deps = [
         # optax dep,
         # tensorflow dep,
@@ -663,6 +667,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/experimental/util",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/internal:trainable_state_util",
         "//tensorflow_probability/python/math:gradient",
         "//tensorflow_probability/python/math:minimize",
@@ -916,5 +921,13 @@ exports_files(
     visibility = [
         "//tensorflow_probability:__subpackages__",
 #         "//tensorflow_probability/google:friends",  # DisableOnExport
+    ],
+)
+
+py_library(
+    name = "tf_keras",
+    srcs = ["tf_keras.py"],
+    deps = [
+        # tensorflow dep,
     ],
 )

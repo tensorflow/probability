@@ -24,6 +24,8 @@ from tensorflow_probability.python.distributions import joint_distribution as jd
 from tensorflow_probability.python.distributions import joint_distribution_coroutine as jdc_lib
 from tensorflow_probability.python.distributions import sample as sample_lib
 from tensorflow_probability.python.experimental.marginalize.logeinsumexp import logeinsumexp
+from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import samplers
 
 
 __all__ = [
@@ -117,10 +119,9 @@ def _support(dist):
         dist.sample_shape, 'expand_sample_shape')
     p, rank = _support(dist.distribution)
     product = _power(p, n)
-    new_shape = tf.concat([tf.shape(product)[:-1], sample_shape], axis=-1)
+    new_shape = ps.concat([ps.shape(product)[:-1], sample_shape], axis=-1)
 
-    new_rank = rank + tf.compat.v2.compat.dimension_value(
-        sample_shape.shape[0])
+    new_rank = rank + tf.compat.dimension_value(sample_shape.shape[0])
     return tf.reshape(product, new_shape), new_rank
   else:
     raise ValueError('Unable to find support for distribution ' +
@@ -141,11 +142,11 @@ def _expand_right(a, n, pos):
     Tensor with inserted dimensions.
   """
 
-  axis = tf.rank(a) + pos + 1
-  return tf.reshape(a, tf.concat([
-      tf.shape(a)[:axis],
-      tf.ones([n], dtype=tf.int32),
-      tf.shape(a)[axis:]], axis=0))
+  axis = ps.rank(a) + pos + 1
+  return tf.reshape(a, ps.concat([
+      ps.shape(a)[:axis],
+      ps.ones([n], dtype=tf.int32),
+      ps.shape(a)[axis:]], axis=0))
 
 
 def _letter(i):
@@ -216,7 +217,9 @@ class Marginalizable(object):
 
     with tf.name_scope(name):
       ds = self._call_execute_model(
-          sample_and_trace_fn=jd_lib.trace_distributions_only)
+          sample_and_trace_fn=jd_lib.trace_distributions_only,
+          # Only used for tracing so can be fixed.
+          seed=samplers.zeros_seed())
 
       # Both 'marginalize' and 'tabulate' indicate that
       # instead of using samples provided by the user, this method
@@ -229,7 +232,7 @@ class Marginalizable(object):
       for value, dist in zip(values, ds):
         if value == 'marginalize':
           supp, rank = _support(dist)
-          r = supp.shape.rank
+          r = ps.rank(supp)
           num_new_variables = r - rank
           # We can think of supp as being a tensor containing tensors,
           # each of which is a draw from the distribution.
@@ -251,7 +254,7 @@ class Marginalizable(object):
           formula.append(indices)
         elif value == 'tabulate':
           supp, rank = _support(dist)
-          r = supp.shape.rank
+          r = ps.rank(supp)
           if r is None:
             raise ValueError('Need to be able to statically find rank of'
                              'support of random variable: {}'.format(str(dist)))

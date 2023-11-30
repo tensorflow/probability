@@ -20,6 +20,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import softplus
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.optimizer.convergence_criteria import successive_gradients_are_uncorrelated as sgau
 from tensorflow_probability.python.util import deferred_tensor
 from tensorflow_probability.python.vi import csiszar_divergence
@@ -44,7 +45,7 @@ class SuccessiveGradientsAreUncorrelatedTests(test_util.TestCase):
     trained_dist = normal.Normal(locs, scales)
     target_dist = normal.Normal(loc=-0.4, scale=1.2)
 
-    optimizer = tf.optimizers.Adam(learning_rate=0.1)
+    optimizer = tf_keras.optimizers.Adam(learning_rate=0.1)
     @tf.function(autograph=False)
     def optimization_step():
       with tf.GradientTape() as tape:

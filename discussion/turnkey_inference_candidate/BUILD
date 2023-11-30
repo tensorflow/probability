@@ -15,6 +15,9 @@
 # Description:
 #   Some Turnkey inference candidates
 
+# Placeholder: py_library
+# Placeholder: py_test
+
 licenses(["notice"])
 
 package(
