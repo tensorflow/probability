@@ -483,7 +483,7 @@ def smc_squared(
         initial_state_prior=inner_initial_state_prior(0, initial_state),
         initial_state_proposal=(inner_initial_state_proposal(0, initial_state)
                                 if inner_initial_state_proposal is not None else None),
-        num_inner_particles=num_inner_particles,
+        num_particles=num_inner_particles,
         particles_dim=1,
         seed=seed)
 
@@ -620,7 +620,7 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
               initial_state_prior=inner_initial_state_prior(0, proposed_parameters),
               initial_state_proposal=(inner_initial_state_proposal(0, proposed_parameters)
                                       if inner_initial_state_proposal is not None else None),
-              num_inner_particles=num_inner_particles,
+              num_particles=num_inner_particles,
               particles_dim=1,
               seed=seed)
 
@@ -825,10 +825,9 @@ def particle_filter(observations,
         observation_fn=observation_fn,
         initial_state_prior=initial_state_prior,
         initial_state_proposal=initial_state_proposal,
-        num_inner_particles=num_particles,
+        num_particles=num_particles,
         particles_dim=particles_dim,
         seed=init_seed)
-
     propose_and_update_log_weights_fn = (
         _particle_filter_propose_and_update_log_weights_fn(
             observations=observations,
@@ -884,7 +883,7 @@ def _particle_filter_initial_weighted_particles(observations,
                                                 observation_fn,
                                                 initial_state_prior,
                                                 initial_state_proposal,
-                                                num_inner_particles,
+                                                num_particles,
                                                 particles_dim=0,
                                                 extra=np.nan,
                                                 seed=None):
@@ -892,33 +891,33 @@ def _particle_filter_initial_weighted_particles(observations,
   # Propose an initial state.
   if initial_state_proposal is None:
     if particles_dim == 0:
-      initial_state = initial_state_prior.sample(num_inner_particles, seed=seed)
-      initial_log_weights = ps.zeros_like(initial_state_prior.log_prob(initial_state))
+      initial_state = initial_state_prior.sample(num_particles, seed=seed)
+      initial_log_weights = ps.zeros_like(
+          initial_state_prior.log_prob(initial_state)
+      )
     else:
-      initial_state = sample_at_dim(
-          initial_state_prior,
-          particles_dim,
-          num_inner_particles,
-          seed
+      particles_draw = initial_state_prior.sample(num_particles)
+      initial_state = tf.nest.map_structure(
+          lambda x: dist_util.move_dimension(x,
+                                             source_idx=0,
+                                             dest_idx=particles_dim),
+          particles_draw
       )
-
-      prior_sample = initial_state_prior.sample(num_inner_particles, seed=seed)
-      initial_log_weights = dist_util.move_dimension(
-          initial_state_prior.log_prob(prior_sample),
-          source_idx=0,
-          dest_idx=particles_dim
+      initial_log_weights = ps.zeros_like(
+          dist_util.move_dimension(initial_state_prior.log_prob(particles_draw),
+                                   source_idx=0,
+                                   dest_idx=particles_dim)
       )
-
   else:
-    initial_state = initial_state_proposal.sample(num_inner_particles, seed=seed)
+    initial_state = initial_state_proposal.sample(num_particles, seed=seed)
     initial_log_weights = (initial_state_prior.log_prob(initial_state) -
                            initial_state_proposal.log_prob(initial_state))
   # Normalize the initial weights. If we used a proposal, the weights are
   # normalized in expectation, but actually normalizing them reduces variance.
+  initial_log_weights = tf.nn.log_softmax(initial_log_weights,
+                                          axis=particles_dim)
 
-  initial_log_weights = tf.nn.log_softmax(initial_log_weights, axis=particles_dim)
   # Return particles weighted by the initial observation.
-
   if extra is np.nan:
     if len(ps.shape(initial_log_weights)) == 1:
       # initial extra for particle filter
@@ -949,7 +948,6 @@ def _particle_filter_propose_and_update_log_weights_fn(
   def propose_and_update_log_weights_fn(step, state, seed=None):
     particles, log_weights = state.particles, state.log_weights
     transition_dist = transition_fn(step, particles)
-
     assertions = _assert_batch_shape_matches_weights(
         distribution=transition_dist,
         weights_shape=ps.shape(log_weights),
@@ -1032,14 +1030,17 @@ def _compute_observation_log_weights(step,
                     tf.zeros_like(log_weights))
 
 
-def reconstruct_trajectories(particles, parent_indices, name=None):
+def reconstruct_trajectories(particles,
+                             parent_indices,
+                             particles_dim=0,
+                             name=None):
   """Reconstructs the ancestor trajectory that generated each final particle."""
   with tf.name_scope(name or 'reconstruct_trajectories'):
     # Walk backwards to compute the ancestor of each final particle at time t.
     final_indices = smc_kernel._dummy_indices_like(parent_indices[-1])  # pylint: disable=protected-access
     ancestor_indices = tf.scan(
         fn=lambda ancestor, parent: mcmc_util.index_remapping_gather(  # pylint: disable=g-long-lambda
-            parent, ancestor, axis=0),
+            parent, ancestor, axis=particles_dim, indices_axis=particles_dim),
         elems=parent_indices[1:],
         initializer=final_indices,
         reverse=True)
@@ -1047,7 +1048,10 @@ def reconstruct_trajectories(particles, parent_indices, name=None):
 
   return tf.nest.map_structure(
       lambda part: mcmc_util.index_remapping_gather(  # pylint: disable=g-long-lambda
-          part, ancestor_indices, axis=1, indices_axis=1),
+          part,
+          ancestor_indices,
+          axis=particles_dim + 1,
+          indices_axis=particles_dim + 1),
       particles)
 
 
