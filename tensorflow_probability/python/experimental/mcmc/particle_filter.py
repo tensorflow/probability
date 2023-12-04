@@ -318,21 +318,21 @@ def infer_trajectories(observations,
 
 
 def sequential_monte_carlo(
-        initial_weighted_particles,
-        num_steps,
-        parallel_iterations,
-        trace_criterion_fn,
-        propose_and_update_log_weights_fn,
-        resample_fn,
-        resample_criterion_fn,
-        unbiased_gradients,
-        trace_fn,
-        particles_dim=0,
-        static_trace_allocation_size=None,
-        never_trace=lambda *_: False,
-        seed=None,
-        name=None
-        ):
+    initial_weighted_particles,
+    propose_and_update_log_weights_fn,
+    num_steps,
+    resample_fn,
+    resample_criterion_fn,
+    trace_fn,
+    trace_criterion_fn,
+    particles_dim=0,
+    parallel_iterations=1,
+    unbiased_gradients=True,
+    static_trace_allocation_size=None,
+    never_trace=lambda *_: False,
+    seed=None,
+    name=None,
+):
 
     """Samples a series of particles representing filtered latent states.
 
@@ -382,13 +382,20 @@ def sequential_monte_carlo(
           Filtering without Modifying the Forward Pass. _arXiv preprint
           arXiv:2106.10314_, 2021. https://arxiv.org/abs/2106.10314
       """
+    with tf.name_scope(name or 'sequential_monte_carlo'):
+      seed = samplers.sanitize_seed(seed)
+
     kernel = smc_kernel.SequentialMonteCarlo(
         propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
         resample_fn=resample_fn,
         resample_criterion_fn=resample_criterion_fn,
         particles_dim=particles_dim,
-        unbiased_gradients=unbiased_gradients
-    )
+        unbiased_gradients=unbiased_gradients)
+
+    # If trace criterion is `None`, we'll return only the final results.
+    if trace_criterion_fn is None:
+      static_trace_allocation_size = 0
+      trace_criterion_fn = never_trace
 
     # Use `trace_scan` rather than `sample_chain` directly because the latter
     # would force us to trace the state history (with or without thinning),
