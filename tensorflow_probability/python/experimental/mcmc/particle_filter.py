@@ -151,9 +151,6 @@ Args:
     approximate continuous-time dynamics. The initial and final steps
     (steps `0` and `num_timesteps - 1`) are always observed.
     Default value: `None`.
-  particles_dim: `int` dimension that indexes the particles in the state of
-    this particle filter.
-    Default value: `0`.
 """
 
 
@@ -307,19 +304,20 @@ def infer_trajectories(observations,
     # Resample all steps of the trajectories using the final weights.
     resample_indices = resample_fn(log_probs=log_weights[-1],
                                    event_size=num_particles,
+                                   particles_dim=particles_dim,
                                    sample_shape=(),
                                    seed=resample_seed)
     trajectories = tf.nest.map_structure(
         lambda x: mcmc_util.index_remapping_gather(x,  # pylint: disable=g-long-lambda
                                                    resample_indices,
-                                                   axis=1),
+                                                   axis=particles_dim + 1,
+                                                   indices_axis=particles_dim),
         weighted_trajectories)
 
     return trajectories, incremental_log_marginal_likelihoods
 
 
 def sequential_monte_carlo(
-        seed,
         initial_weighted_particles,
         num_steps,
         parallel_iterations,
@@ -332,6 +330,8 @@ def sequential_monte_carlo(
         particles_dim=0,
         static_trace_allocation_size=None,
         never_trace=lambda *_: False,
+        seed=None,
+        name=None
         ):
 
     """Samples a series of particles representing filtered latent states.
@@ -908,7 +908,8 @@ def _particle_filter_initial_weighted_particles(observations,
           step=0,
           particles=initial_state,
           observations=observations,
-          observation_fn=observation_fn),
+          observation_fn=observation_fn,
+          particles_dim=particles_dim),
       extra=extra)
 
 
@@ -1002,9 +1003,6 @@ def _compute_observation_log_weights(step,
     observation_idx = step // num_transitions_per_observation
     observation = tf.nest.map_structure(
         lambda x, step=step: tf.gather(x, observation_idx), observations)
-
-    observation = tf.nest.map_structure(
-        lambda x: tf.expand_dims(x, axis=particles_dim), observation)
 
     log_weights = observation_fn(step, particles).log_prob(observation)
     return tf.where(step_has_observation,
