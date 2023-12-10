@@ -93,9 +93,11 @@ install_test_only_packages() {
   # The following unofficial dependencies are used only by tests.
   PIP_FLAGS=${1-}
   python -m pip install $PIP_FLAGS \
+    flax \
     hypothesis \
     jax \
     jaxlib \
+    jaxtyping \
     optax \
     matplotlib \
     mock \

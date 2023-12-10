@@ -18,6 +18,8 @@
 #   //tensorflow_probability/python/internal/auto_batching
 #   internally.
 
+# Placeholder: py_library
+# Placeholder: py_test
 load(
     "//tensorflow_probability/python:build_defs.bzl",
     "multi_substrate_py_library",
@@ -546,9 +548,6 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/distributions:batch_reshape",
-        "//tensorflow_probability/python/distributions:batch_broadcast",
-        "//tensorflow_probability/python/distributions:independent"
     ],
 )
 
@@ -575,8 +574,6 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/distributions:sample",
         "//tensorflow_probability/python/distributions:transformed_distribution",
         "//tensorflow_probability/python/distributions:uniform",
-        "//tensorflow_probability/python/distributions:categorical",
-        "//tensorflow_probability/python/distributions:hidden_markov_model",
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math:gradient",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
@@ -655,7 +652,6 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/distributions:mvn_diag",
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/distributions:sample",
-        "//tensorflow_probability/python/experimental/mcmc:sequential_monte_carlo_kernel",
         "//tensorflow_probability/python/distributions:uniform",
         "//tensorflow_probability/python/distributions/internal:statistical_testing",
         "//tensorflow_probability/python/internal:test_util",

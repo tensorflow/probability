@@ -21,7 +21,6 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import shift
 from tensorflow_probability.python.distributions import bernoulli
 from tensorflow_probability.python.distributions import deterministic
-from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import joint_distribution_auto_batched as jdab
 from tensorflow_probability.python.distributions import joint_distribution_named as jdn
 from tensorflow_probability.python.distributions import linear_gaussian_ssm as lgssm
@@ -174,6 +173,128 @@ class _ParticleFilterTest(test_util.TestCase):
     self.assertAllEqual([num_timesteps, num_particles] + batch_shape,
                         trajectories['position'].shape)
     self.assertAllEqual([num_timesteps, num_particles] + batch_shape,
+                        trajectories['velocity'].shape)
+    self.assertAllEqual(incremental_log_marginal_likelihoods.shape,
+                        [num_timesteps] + batch_shape)
+
+  def test_batch_of_filters_particles_dim_1(self):
+
+    batch_shape = [3, 2]
+    num_particles = 1000
+    num_timesteps = 40
+
+    # Batch of priors on object 1D positions and velocities.
+    initial_state_prior = jdn.JointDistributionNamed({
+        'position': normal.Normal(loc=0., scale=tf.ones(batch_shape)),
+        'velocity': normal.Normal(loc=0., scale=tf.ones(batch_shape) * 0.1)
+    })
+
+    def transition_fn(_, previous_state):
+      return jdn.JointDistributionNamed({
+          'position':
+              normal.Normal(
+                  loc=previous_state['position'] + previous_state['velocity'],
+                  scale=0.1),
+          'velocity':
+              normal.Normal(loc=previous_state['velocity'], scale=0.01)
+      })
+
+    def observation_fn(_, state):
+      return normal.Normal(loc=state['position'], scale=0.1)
+
+    # Batch of synthetic observations, .
+    true_initial_positions = np.random.randn(*batch_shape).astype(self.dtype)
+    true_velocities = 0.1 * np.random.randn(
+        *batch_shape).astype(self.dtype)
+    observed_positions = (
+        true_velocities *
+        np.arange(num_timesteps).astype(
+            self.dtype)[..., tf.newaxis, tf.newaxis] +
+        true_initial_positions)
+
+    (particles, log_weights, parent_indices,
+     incremental_log_marginal_likelihoods) = self.evaluate(
+         particle_filter.particle_filter(
+             observations=observed_positions,
+             initial_state_prior=initial_state_prior,
+             transition_fn=transition_fn,
+             observation_fn=observation_fn,
+             num_particles=num_particles,
+             seed=test_util.test_seed(),
+             particles_dim=1))
+
+    self.assertAllEqual(particles['position'].shape,
+                        [num_timesteps,
+                         batch_shape[0],
+                         num_particles,
+                         batch_shape[1]])
+    self.assertAllEqual(particles['velocity'].shape,
+                        [num_timesteps,
+                         batch_shape[0],
+                         num_particles,
+                         batch_shape[1]])
+    self.assertAllEqual(parent_indices.shape,
+                        [num_timesteps,
+                         batch_shape[0],
+                         num_particles,
+                         batch_shape[1]])
+    self.assertAllEqual(incremental_log_marginal_likelihoods.shape,
+                        [num_timesteps] + batch_shape)
+
+    self.assertAllClose(
+        self.evaluate(
+            tf.reduce_sum(tf.exp(log_weights) *
+                          particles['position'], axis=2)),
+        observed_positions,
+        atol=0.3)
+
+    velocity_means = tf.reduce_sum(tf.exp(log_weights) *
+                                   particles['velocity'], axis=2)
+
+    self.assertAllClose(
+        self.evaluate(tf.reduce_mean(velocity_means, axis=0)),
+        true_velocities, atol=0.05)
+
+    # Uncertainty in velocity should decrease over time.
+    velocity_stddev = self.evaluate(
+        tf.math.reduce_std(particles['velocity'], axis=2))
+    self.assertAllLess((velocity_stddev[-1] - velocity_stddev[0]), 0.)
+
+    trajectories = self.evaluate(
+        particle_filter.reconstruct_trajectories(particles,
+                                                 parent_indices,
+                                                 particles_dim=1))
+    self.assertAllEqual([num_timesteps,
+                         batch_shape[0],
+                         num_particles,
+                         batch_shape[1]],
+                        trajectories['position'].shape)
+    self.assertAllEqual([num_timesteps,
+                         batch_shape[0],
+                         num_particles,
+                         batch_shape[1]],
+                        trajectories['velocity'].shape)
+
+    # Verify that `infer_trajectories` also works on batches.
+    trajectories, incremental_log_marginal_likelihoods = self.evaluate(
+        particle_filter.infer_trajectories(
+            observations=observed_positions,
+            initial_state_prior=initial_state_prior,
+            transition_fn=transition_fn,
+            observation_fn=observation_fn,
+            num_particles=num_particles,
+            particles_dim=1,
+            seed=test_util.test_seed()))
+
+    self.assertAllEqual([num_timesteps,
+                         batch_shape[0],
+                         num_particles,
+                         batch_shape[1]],
+                        trajectories['position'].shape)
+    self.assertAllEqual([num_timesteps,
+                         batch_shape[0],
+                         num_particles,
+                         batch_shape[1]],
                         trajectories['velocity'].shape)
     self.assertAllEqual(incremental_log_marginal_likelihoods.shape,
                         [num_timesteps] + batch_shape)
@@ -612,205 +733,6 @@ class _ParticleFilterTest(test_util.TestCase):
     _, grads = gradient.value_and_gradient(marginal_log_likelihood, 1.0, 1.0)
     self.assertAllNotNone(grads)
     self.assertAllAssertsNested(self.assertNotAllZero, grads)
-
-  def test_smc_squared_rejuvenation_parameters(self):
-    def particle_dynamics(params, _, previous_state):
-      reshaped_params = tf.reshape(params, [params.shape[0]] + [1] * (previous_state.shape.rank - 1))
-      broadcasted_params = tf.broadcast_to(reshaped_params, previous_state.shape)
-      return normal.Normal(previous_state + broadcasted_params + 1, 0.1)
-
-    def rejuvenation_criterion(step, state):
-      # Rejuvenation every 2 steps
-      cond = tf.logical_and(
-          tf.equal(tf.math.mod(step, tf.constant(2)), tf.constant(0)),
-          tf.not_equal(state.extra[0], tf.constant(0))
-      )
-      return tf.cond(cond, lambda: tf.constant(True), lambda: tf.constant(False))
-
-    inner_observations = tf.range(30, dtype=tf.float32)
-
-    num_outer_particles = 3
-    num_inner_particles = 7
-
-    loc = tf.broadcast_to([0., 0.], [num_outer_particles, 2])
-    scale_diag = tf.broadcast_to([0.05, 0.05], [num_outer_particles, 2])
-
-    params, inner_pt = self.evaluate(particle_filter.smc_squared(
-        inner_observations=inner_observations,
-        inner_initial_state_prior=lambda _, params: mvn_diag.MultivariateNormalDiag(
-            loc=loc, scale_diag=scale_diag
-        ),
-        initial_parameter_prior=normal.Normal(3., 1.),
-        num_outer_particles=num_outer_particles,
-        num_inner_particles=num_inner_particles,
-        outer_rejuvenation_criterion_fn=rejuvenation_criterion,
-        inner_transition_fn=lambda params: (
-            lambda _, state: independent.Independent(particle_dynamics(params, _, state), 1)),
-        inner_observation_fn=lambda params: (
-            lambda _, state: independent.Independent(normal.Normal(state, 2.), 1)),
-        outer_trace_fn=lambda s, r: (
-            s.particles[0],
-            s.particles[1]
-        ),
-        parameter_proposal_kernel=lambda params: normal.Normal(params, 3),
-        seed=test_util.test_seed()
-    )
-  )
-
-    abs_params = tf.abs(params)
-    differences = abs_params[1:] - abs_params[:-1]
-    mask_parameters = tf.reduce_all(tf.less_equal(differences, 0), axis=0)
-
-    self.assertAllTrue(mask_parameters)
-
-  def test_smc_squared_can_step_dynamics_faster_than_observations(self):
-    initial_state_prior = jdn.JointDistributionNamed({
-        'position': deterministic.Deterministic([1.]),
-        'velocity': deterministic.Deterministic([0.])
-    })
-
-    # Use 100 steps between observations to integrate a simple harmonic
-    # oscillator.
-    dt = 0.01
-    def simple_harmonic_motion_transition_fn(_, state):
-      return jdn.JointDistributionNamed({
-          'position':
-              normal.Normal(
-                  loc=state['position'] + dt * state['velocity'],
-                  scale=dt * 0.01),
-          'velocity':
-              normal.Normal(
-                  loc=state['velocity'] - dt * state['position'],
-                  scale=dt * 0.01)
-      })
-
-    def observe_position(_, state):
-      return normal.Normal(loc=state['position'], scale=0.01)
-
-    particles, lps = self.evaluate(particle_filter.smc_squared(
-        inner_observations=tf.convert_to_tensor(
-            [tf.math.cos(0.), tf.math.cos(1.)]),
-        inner_initial_state_prior=lambda _, params: initial_state_prior,
-        initial_parameter_prior=deterministic.Deterministic(0.),
-        num_outer_particles=1,
-        inner_transition_fn=lambda params: simple_harmonic_motion_transition_fn,
-        inner_observation_fn=lambda params: observe_position,
-        num_inner_particles=1024,
-        outer_trace_fn=lambda s, r: (
-            s.particles[1].particles,
-            s.particles[3]
-        ),
-        num_transitions_per_observation=100,
-        seed=test_util.test_seed())
-    )
-
-    self.assertAllEqual(ps.shape(particles['position']), tf.constant([102, 1, 1024]))
-
-    self.assertAllClose(tf.transpose(np.mean(particles['position'], axis=-1)),
-                        tf.reshape(tf.math.cos(dt * np.arange(102)), [1, -1]),
-                        atol=0.04)
-
-    self.assertAllEqual(ps.shape(lps), [102, 1])
-    self.assertGreater(lps[1][0], 1.)
-    self.assertGreater(lps[-1][0], 3.)
-
-  def test_smc_squared_custom_outer_trace_fn(self):
-    def trace_fn(state, _):
-      # Traces the mean and stddev of the particle population at each step.
-      weights = tf.exp(state[0][1].log_weights[0])
-      mean = tf.reduce_sum(weights * state[0][1].particles[0], axis=0)
-      variance = tf.reduce_sum(
-          weights * (state[0][1].particles[0] - mean[tf.newaxis, ...]) ** 2)
-      return {'mean': mean,
-              'stddev': tf.sqrt(variance),
-              # In real usage we would likely not track the particles and
-              # weights. We keep them here just so we can double-check the
-              # stats, below.
-              'particles': state[0][1].particles[0],
-              'weights': weights}
-
-    results = self.evaluate(particle_filter.smc_squared(
-        inner_observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
-        inner_initial_state_prior=lambda _, params: normal.Normal([0.], 1.),
-        initial_parameter_prior=deterministic.Deterministic(0.),
-        inner_transition_fn=lambda params: (lambda _, state: normal.Normal(state, 1.)),
-        inner_observation_fn=lambda params: (lambda _, state: normal.Normal(state, 1.)),
-        num_inner_particles=1024,
-        num_outer_particles=1,
-        outer_trace_fn=trace_fn,
-        seed=test_util.test_seed())
-    )
-
-    # Verify that posterior means are increasing.
-    self.assertAllGreater(results['mean'][1:] - results['mean'][:-1], 0.)
-
-    # Check that our traced means and scales match values computed
-    # by averaging over particles after the fact.
-    all_means = self.evaluate(tf.reduce_sum(
-        results['weights'] * results['particles'], axis=1))
-    all_variances = self.evaluate(
-        tf.reduce_sum(
-            results['weights'] *
-            (results['particles'] - all_means[..., tf.newaxis])**2,
-            axis=1))
-    self.assertAllClose(results['mean'], all_means)
-    self.assertAllClose(results['stddev'], np.sqrt(all_variances))
-
-  def test_smc_squared_indices_to_trace(self):
-    num_outer_particles = 7
-    num_inner_particles = 13
-
-    def rejuvenation_criterion(step, state):
-      # Rejuvenation every 3 steps
-      cond = tf.logical_and(
-          tf.equal(tf.math.mod(step, tf.constant(3)), tf.constant(0)),
-          tf.not_equal(state.extra[0], tf.constant(0))
-      )
-      return tf.cond(cond, lambda: tf.constant(True), lambda: tf.constant(False))
-
-    (parameters, weight_parameters, inner_particles, inner_log_weights, lp) = self.evaluate(
-        particle_filter.smc_squared(
-            inner_observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
-            initial_parameter_prior=deterministic.Deterministic(0.),
-            inner_initial_state_prior=lambda _, params: normal.Normal([0.] * num_outer_particles, 1.),
-            inner_transition_fn=lambda params: (lambda _, state: normal.Normal(state, 10.)),
-            inner_observation_fn=lambda params: (lambda _, state: normal.Normal(state, 0.1)),
-            num_inner_particles=num_inner_particles,
-            num_outer_particles=num_outer_particles,
-            outer_rejuvenation_criterion_fn=rejuvenation_criterion,
-            outer_trace_fn=lambda s, r: (  # pylint: disable=g-long-lambda
-                s.particles[0],
-                s.log_weights,
-                s.particles[1].particles,
-                s.particles[1].log_weights,
-                r.accumulated_log_marginal_likelihood),
-            seed=test_util.test_seed())
-    )
-
-    # TODO: smc_squared at the moment starts his run with an empty step
-    self.assertAllEqual(ps.shape(parameters), [6, 7])
-    self.assertAllEqual(ps.shape(weight_parameters), [6, 7])
-    self.assertAllEqual(ps.shape(inner_particles), [6, 7, 13])
-    self.assertAllEqual(ps.shape(inner_log_weights), [6, 7, 13])
-    self.assertAllEqual(ps.shape(lp), [6])
-
-  def test_extra(self):
-    def step_hundred(step, state, seed):
-      return step * 2
-
-    results = self.evaluate(
-        particle_filter.particle_filter(
-            observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
-            initial_state_prior=normal.Normal(0., 1.),
-            transition_fn=lambda _, state: normal.Normal(state, 1.),
-            observation_fn=lambda _, state: normal.Normal(state, 1.),
-            num_particles=1024,
-            extra_fn=step_hundred,
-            trace_fn=lambda s, r: s.extra,
-            seed=test_util.test_seed())
-    )
-
-    self.assertAllEqual(results, [0, 0, 2, 4, 6])
 
 
 # TODO(b/186068104): add tests with dynamic shapes.

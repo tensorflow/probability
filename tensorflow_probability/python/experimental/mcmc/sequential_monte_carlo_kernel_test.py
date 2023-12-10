@@ -42,9 +42,7 @@ class _SequentialMonteCarloTest(test_util.TestCase):
       return WeightedParticles(
           particles=proposed_particles,
           log_weights=weighted_particles.log_weights +
-          normal.Normal(loc=-2.6, scale=0.1).log_prob(proposed_particles),
-          extra=tf.constant(np.nan)
-      )
+          normal.Normal(loc=-2.6, scale=0.1).log_prob(proposed_particles))
 
     num_particles = 16
     initial_state = self.evaluate(
@@ -52,9 +50,7 @@ class _SequentialMonteCarloTest(test_util.TestCase):
             particles=tf.random.normal([num_particles],
                                        seed=test_util.test_seed()),
             log_weights=tf.fill([num_particles],
-                                -tf.math.log(float(num_particles))),
-            extra=tf.constant(np.nan)
-    ))
+                                -tf.math.log(float(num_particles)))))
 
     # Run a couple of steps.
     seeds = samplers.split_seed(
@@ -100,9 +96,7 @@ class _SequentialMonteCarloTest(test_util.TestCase):
         WeightedParticles(
             particles=samplers.normal([num_particles], seed=seeds[0]),
             log_weights=tf.fill([num_particles],
-                                -tf.math.log(float(num_particles))),
-            extra=tf.constant(np.nan)
-        ))
+                                -tf.math.log(float(num_particles)))))
 
     def propose_and_update_log_weights_fn(_,
                                           weighted_particles,
@@ -116,9 +110,7 @@ class _SequentialMonteCarloTest(test_util.TestCase):
           particles=proposed_particles,
           log_weights=(weighted_particles.log_weights +
                        transition_dist.log_prob(proposed_particles) -
-                       proposal_dist.log_prob(proposed_particles)),
-          extra=tf.constant(np.nan)
-      )
+                       proposal_dist.log_prob(proposed_particles)))
 
     def marginal_logprob(transition_scale):
       kernel = SequentialMonteCarlo(
