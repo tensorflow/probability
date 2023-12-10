@@ -615,8 +615,11 @@ class _ParticleFilterTest(test_util.TestCase):
 
   def test_smc_squared_rejuvenation_parameters(self):
     def particle_dynamics(params, _, previous_state):
-      reshaped_params = tf.reshape(params, [params.shape[0]] + [1] * (previous_state.shape.rank - 1))
-      broadcasted_params = tf.broadcast_to(reshaped_params, previous_state.shape)
+      reshaped_params = tf.reshape(params,
+                                   [params.shape[0]] +
+                                   [1] * (previous_state.shape.rank - 1))
+      broadcasted_params = tf.broadcast_to(reshaped_params,
+                                           previous_state.shape)
       return normal.Normal(previous_state + broadcasted_params + 1, 0.1)
 
     def rejuvenation_criterion(step, state):
@@ -625,7 +628,8 @@ class _ParticleFilterTest(test_util.TestCase):
           tf.equal(tf.math.mod(step, tf.constant(2)), tf.constant(0)),
           tf.not_equal(state.extra[0], tf.constant(0))
       )
-      return tf.cond(cond, lambda: tf.constant(True), lambda: tf.constant(False))
+      return tf.cond(cond, lambda: tf.constant(True),
+                     lambda: tf.constant(False))
 
     inner_observations = tf.range(30, dtype=tf.float32)
 
@@ -637,7 +641,8 @@ class _ParticleFilterTest(test_util.TestCase):
 
     params, inner_pt = self.evaluate(particle_filter.smc_squared(
         inner_observations=inner_observations,
-        inner_initial_state_prior=lambda _, params: mvn_diag.MultivariateNormalDiag(
+        inner_initial_state_prior=lambda _, params:
+        mvn_diag.MultivariateNormalDiag(
             loc=loc, scale_diag=scale_diag
         ),
         initial_parameter_prior=normal.Normal(3., 1.),
@@ -645,7 +650,9 @@ class _ParticleFilterTest(test_util.TestCase):
         num_inner_particles=num_inner_particles,
         outer_rejuvenation_criterion_fn=rejuvenation_criterion,
         inner_transition_fn=lambda params: (
-            lambda _, state: independent.Independent(particle_dynamics(params, _, state), 1)),
+            lambda _, state: independent.Independent(
+                particle_dynamics(params, _, state), 1)
+        ),
         inner_observation_fn=lambda params: (
             lambda _, state: independent.Independent(normal.Normal(state, 2.), 1)),
         outer_trace_fn=lambda s, r: (
@@ -693,7 +700,8 @@ class _ParticleFilterTest(test_util.TestCase):
         inner_initial_state_prior=lambda _, params: initial_state_prior,
         initial_parameter_prior=deterministic.Deterministic(0.),
         num_outer_particles=1,
-        inner_transition_fn=lambda params: simple_harmonic_motion_transition_fn,
+        inner_transition_fn=lambda params:
+        simple_harmonic_motion_transition_fn,
         inner_observation_fn=lambda params: observe_position,
         num_inner_particles=1024,
         outer_trace_fn=lambda s, r: (
@@ -704,7 +712,9 @@ class _ParticleFilterTest(test_util.TestCase):
         seed=test_util.test_seed())
     )
 
-    self.assertAllEqual(ps.shape(particles['position']), tf.constant([102, 1, 1024]))
+    self.assertAllEqual(ps.shape(particles['position']), tf.constant([102,
+                                                                      1,
+                                                                      1024]))
 
     self.assertAllClose(tf.transpose(np.mean(particles['position'], axis=-1)),
                         tf.reshape(tf.math.cos(dt * np.arange(102)), [1, -1]),
@@ -733,8 +743,10 @@ class _ParticleFilterTest(test_util.TestCase):
         inner_observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
         inner_initial_state_prior=lambda _, params: normal.Normal([0.], 1.),
         initial_parameter_prior=deterministic.Deterministic(0.),
-        inner_transition_fn=lambda params: (lambda _, state: normal.Normal(state, 1.)),
-        inner_observation_fn=lambda params: (lambda _, state: normal.Normal(state, 1.)),
+        inner_transition_fn=lambda params: (lambda _, state:
+                                            normal.Normal(state, 1.)),
+        inner_observation_fn=lambda params: (lambda _, state:
+                                             normal.Normal(state, 1.)),
         num_inner_particles=1024,
         num_outer_particles=1,
         outer_trace_fn=trace_fn,
@@ -766,15 +778,21 @@ class _ParticleFilterTest(test_util.TestCase):
           tf.equal(tf.math.mod(step, tf.constant(3)), tf.constant(0)),
           tf.not_equal(state.extra[0], tf.constant(0))
       )
-      return tf.cond(cond, lambda: tf.constant(True), lambda: tf.constant(False))
+      return tf.cond(cond, lambda: tf.constant(True),
+                     lambda: tf.constant(False))
 
-    (parameters, weight_parameters, inner_particles, inner_log_weights, lp) = self.evaluate(
+    (parameters, weight_parameters,
+     inner_particles, inner_log_weights, lp) = self.evaluate(
         particle_filter.smc_squared(
             inner_observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
             initial_parameter_prior=deterministic.Deterministic(0.),
-            inner_initial_state_prior=lambda _, params: normal.Normal([0.] * num_outer_particles, 1.),
-            inner_transition_fn=lambda params: (lambda _, state: normal.Normal(state, 10.)),
-            inner_observation_fn=lambda params: (lambda _, state: normal.Normal(state, 0.1)),
+            inner_initial_state_prior=lambda _, params: normal.Normal(
+                [0.] * num_outer_particles, 1.
+            ),
+            inner_transition_fn=lambda params:
+            (lambda _, state: normal.Normal(state, 10.)),
+            inner_observation_fn=lambda params:
+            (lambda _, state: normal.Normal(state, 0.1)),
             num_inner_particles=num_inner_particles,
             num_outer_particles=num_outer_particles,
             outer_rejuvenation_criterion_fn=rejuvenation_criterion,
