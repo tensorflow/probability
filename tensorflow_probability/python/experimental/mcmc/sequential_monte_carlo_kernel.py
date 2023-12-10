@@ -34,7 +34,7 @@ __all__ = [
 
 # SequentialMonteCarlo `state` structure.
 class WeightedParticles(collections.namedtuple(
-    'WeightedParticles', ['particles', 'log_weights'])):
+    'WeightedParticles', ['particles', 'log_weights', 'extra'])):
   """Particles with corresponding log weights.
 
   This structure serves as the `state` for the `SequentialMonteCarlo` transition
@@ -50,6 +50,10 @@ class WeightedParticles(collections.namedtuple(
       `exp(reduce_logsumexp(log_weights, axis=0)) == 1.`. These must be used in
       conjunction with `particles` to compute expectations under the target
       distribution.
+    extra: a (structure of) Tensor(s) each of shape
+      `concat([[b1, ..., bN], event_shape])`, where `event_shape`
+      may differ across component `Tensor`s. This represents global state of the
+      sampling process that is not associated with individual particles.
 
   In some contexts, particles may be stacked across multiple inference steps,
   in which case all `Tensor` shapes will be prefixed by an additional dimension
@@ -292,7 +296,7 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
             - tf.gather(normalized_log_weights, 0, axis=self.particles_dim))
 
         do_resample = self.resample_criterion_fn(
-            state, particles_dim=self.particles_dim)
+            state, self.particles_dim)
         # Some batch elements may require resampling and others not, so
         # we first do the resampling for all elements, then select whether to
         # use the resampled values for each batch element according to
@@ -326,7 +330,8 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
               normalized_log_weights))
 
       return (WeightedParticles(particles=resampled_particles,
-                                log_weights=log_weights),
+                                log_weights=log_weights,
+                                extra=state.extra),
               SequentialMonteCarloResults(
                   steps=kernel_results.steps + 1,
                   parent_indices=resample_indices,
