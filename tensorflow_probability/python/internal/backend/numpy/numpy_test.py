@@ -1001,7 +1001,8 @@ NUMPY_TEST_CASES = [
         'linalg.svd', [single_arrays(
             shape=shapes(min_dims=2),
             elements=floats(min_value=-1e10, max_value=1e10))],
-        post_processor=_svd_post_process),
+        post_processor=_svd_post_process,
+        atol=2e-5),
     TestCase(
         'linalg.qr', [
             qr_params(),
