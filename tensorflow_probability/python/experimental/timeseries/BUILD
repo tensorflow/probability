@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # Copyright 2023 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,20 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+# Libraries for working with timeseries in general.
 
-set -v  # print commands as they are executed
-set -e  # fail and exit on any command erroring
+# Placeholder: py_library
+# Placeholder: py_test
 
-user_flag_is_set() {
-  # We could use getopts but it's annoying and arguably overkill here. We should
-  # consider it if ever this script grows more complicated.
-  [[ "$SCRIPT_ARGS" =~ --user ]]
-}
+licenses(["notice"])
 
-if user_flag_set; then
-  PIP_FLAGS="--user"
-else
-  PIP_FLAGS=""
-fi
+package(
+    # default_applicable_licenses
+    default_visibility = ["//visibility:public"],
+)
 
-python -m pip install $PIP_FLAGS bayeux-ml chex flax jaxtyping matplotlib pandas scipy
+py_library(
+    name = "metrics",
+    srcs = ["metrics.py"],
+    deps = [
+        # numpy dep,
+    ],
+)
+
+py_test(
+    name = "metrics_test",
+    srcs = ["metrics_test.py"],
+    deps = [
+        ":metrics",
+        # absl/testing:absltest dep,
+        # google/protobuf:use_fast_cpp_protos dep,
+        # numpy dep,
+    ],
+)

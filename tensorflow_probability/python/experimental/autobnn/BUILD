@@ -51,6 +51,35 @@ py_test(
 )
 
 py_library(
+    name = "bnn_tree",
+    srcs = ["bnn_tree.py"],
+    deps = [
+        ":bnn",
+        ":kernels",
+        ":operators",
+        ":util",
+        # flax:core dep,
+        # jax dep,
+    ],
+)
+
+py_test(
+    name = "bnn_tree_test",
+    timeout = "long",
+    srcs = ["bnn_tree_test.py"],
+    shard_count = 3,
+    deps = [
+        ":bnn_tree",
+        ":kernels",
+        # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
+        # flax dep,
+        # google/protobuf:use_fast_cpp_protos dep,
+        # jax dep,
+    ],
+)
+
+py_library(
     name = "kernels",
     srcs = ["kernels.py"],
     deps = [
@@ -173,31 +202,35 @@ py_test(
 )
 
 py_library(
-    name = "bnn_tree",
-    srcs = ["bnn_tree.py"],
+    name = "training_util",
+    srcs = ["training_util.py"],
     deps = [
-        ":bnn",
-        ":kernels",
-        ":operators",
-        ":util",
-        # flax:core dep,
+        # bayeux dep,
         # jax dep,
+        # jaxtyping dep,
+        # matplotlib dep,
+        # numpy dep,
+        # pandas dep,
+        "//tensorflow_probability:jax",
+        "//tensorflow_probability/python/experimental/autobnn:bnn",
+        "//tensorflow_probability/python/experimental/autobnn:util",
+        "//tensorflow_probability/python/experimental/timeseries:metrics",
     ],
 )
 
 py_test(
-    name = "bnn_tree_test",
-    timeout = "long",
-    srcs = ["bnn_tree_test.py"],
-    shard_count = 3,
+    name = "training_util_test",
+    srcs = ["training_util_test.py"],
     deps = [
-        ":bnn_tree",
-        ":kernels",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # flax dep,
+        ":training_util",
+        # chex dep,
         # google/protobuf:use_fast_cpp_protos dep,
         # jax dep,
+        # numpy dep,
+        "//tensorflow_probability/python/experimental/autobnn:kernels",
+        "//tensorflow_probability/python/experimental/autobnn:operators",
+        "//tensorflow_probability/python/experimental/autobnn:util",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
