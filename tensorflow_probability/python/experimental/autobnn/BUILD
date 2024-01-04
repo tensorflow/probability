@@ -80,6 +80,28 @@ py_test(
 )
 
 py_library(
+    name = "estimators",
+    srcs = ["estimators.py"],
+    deps = [
+        ":bnn",
+        ":likelihoods",
+        ":models",
+        ":training_util",
+        # jax dep,
+        # jaxtyping dep,
+    ],
+)
+
+py_test(
+    name = "estimators_test",
+    srcs = ["estimators_test.py"],
+    deps = [
+        ":estimators",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
     name = "kernels",
     srcs = ["kernels.py"],
     deps = [
