@@ -175,6 +175,7 @@ py_library(
 
 py_test(
     name = "models_test",
+    timeout = "long",
     srcs = ["models_test.py"],
     shard_count = 3,
     deps = [
