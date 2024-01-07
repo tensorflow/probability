@@ -54,11 +54,14 @@ class WeightedParticles(collections.namedtuple(
       `concat([[b1, ..., bN], event_shape])`, where `event_shape`
       may differ across component `Tensor`s. This represents global state of the
       sampling process that is not associated with individual particles.
+      Defaults to an empty tuple.
 
   In some contexts, particles may be stacked across multiple inference steps,
   in which case all `Tensor` shapes will be prefixed by an additional dimension
   of size `num_steps`.
   """
+  def __new__(cls, particles, log_weights, extra=()):
+    return super().__new__(cls, particles, log_weights, extra)
 
 
 # SequentialMonteCarlo `kernel_results` structure.

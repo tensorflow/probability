@@ -985,7 +985,7 @@ def _particle_filter_initial_weighted_particles(observations,
                                                 initial_state_proposal,
                                                 num_particles,
                                                 particles_dim=0,
-                                                extra=np.nan,
+                                                extra=(),
                                                 seed=None):
   """Initialize a set of weighted particles including the first observation."""
   # Propose an initial state.
@@ -1011,7 +1011,7 @@ def _particle_filter_initial_weighted_particles(observations,
                                           axis=particles_dim)
 
   # Return particles weighted by the initial observation.
-  if extra is np.nan:
+  if extra == ():
     if len(ps.shape(initial_log_weights)) == 1:
       # initial extra for particle filter
       extra = tf.constant(0)
