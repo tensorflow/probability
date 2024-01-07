@@ -52,6 +52,7 @@ py_library(
 py_test(
     name = "bayesian_neural_network_test",
     size = "medium",
+    timeout = "long",
     srcs = ["bayesian_neural_network.py"],
     args = [
         "--fake_data",
