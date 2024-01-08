@@ -653,8 +653,7 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
                            if inner_proposal_fn is not None else None),
               observation_fn=inner_observation_fn(outside_parameters),
               particles_dim=1,
-              num_transitions_per_observation=num_transitions_per_observation,
-              extra_fn=extra_fn
+              num_transitions_per_observation=num_transitions_per_observation
           )
       )
 
@@ -731,7 +730,6 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
                 proposal_fn=(inner_proposal_fn(proposed_parameters)
                              if inner_proposal_fn is not None else None),
                 observation_fn=inner_observation_fn(proposed_parameters),
-                extra_fn=extra_fn,
                 particles_dim=1,
                 num_transitions_per_observation=
                 num_transitions_per_observation)
@@ -875,7 +873,6 @@ def particle_filter(observations,
                     transition_fn,
                     observation_fn,
                     num_particles,
-                    extra_fn=_default_extra_fn,
                     initial_state_proposal=None,
                     proposal_fn=None,
                     resample_fn=weighted_resampling.resample_systematic,
@@ -960,8 +957,7 @@ def particle_filter(observations,
             particles_dim=particles_dim,
             proposal_fn=proposal_fn,
             observation_fn=observation_fn,
-            num_transitions_per_observation=num_transitions_per_observation,
-            extra_fn=extra_fn
+            num_transitions_per_observation=num_transitions_per_observation
         ))
 
     return sequential_monte_carlo(
@@ -1010,15 +1006,12 @@ def _particle_filter_initial_weighted_particles(observations,
   initial_log_weights = tf.nn.log_softmax(initial_log_weights,
                                           axis=particles_dim)
 
-  # Return particles weighted by the initial observation.
   if extra == ():
     if len(ps.shape(initial_log_weights)) == 1:
       # initial extra for particle filter
       extra = tf.constant(0)
-    else:
-      # initial extra for inner particles of smc_squared
-      extra = tf.constant(0, shape=ps.shape(initial_log_weights))
 
+  # Return particles weighted by the initial observation.
   return smc_kernel.WeightedParticles(
       particles=initial_state,
       log_weights=initial_log_weights + _compute_observation_log_weights(
@@ -1035,7 +1028,6 @@ def _particle_filter_propose_and_update_log_weights_fn(
     transition_fn,
     proposal_fn,
     observation_fn,
-    extra_fn,
     num_transitions_per_observation=1,
     particles_dim=0):
   """Build a function specifying a particle filter update step."""
@@ -1066,10 +1058,6 @@ def _particle_filter_propose_and_update_log_weights_fn(
     else:
       proposed_particles = transition_dist.sample(seed=seed)
 
-    updated_extra = extra_fn(step,
-                             state,
-                             seed)
-
     with tf.control_dependencies(assertions):
       return smc_kernel.WeightedParticles(
           particles=proposed_particles,
@@ -1077,7 +1065,7 @@ def _particle_filter_propose_and_update_log_weights_fn(
               step + 1, proposed_particles, observations, observation_fn,
               num_transitions_per_observation=num_transitions_per_observation,
           particles_dim=particles_dim),
-          extra=updated_extra)
+          extra=state.extra)
   return propose_and_update_log_weights_fn
 
 

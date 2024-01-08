@@ -934,24 +934,6 @@ class _ParticleFilterTest(test_util.TestCase):
     self.assertAllEqual(ps.shape(inner_log_weights), [6, 7, 13])
     self.assertAllEqual(ps.shape(lp), [6])
 
-  def test_extra(self):
-    def step_hundred(step, state, seed):
-      return step * 2
-
-    results = self.evaluate(
-        particle_filter.particle_filter(
-            observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
-            initial_state_prior=normal.Normal(0., 1.),
-            transition_fn=lambda _, state: normal.Normal(state, 1.),
-            observation_fn=lambda _, state: normal.Normal(state, 1.),
-            num_particles=1024,
-            extra_fn=step_hundred,
-            trace_fn=lambda s, r: s.extra,
-            seed=test_util.test_seed())
-    )
-
-    self.assertAllEqual(results, [0, 0, 2, 4, 6])
-
 
 # TODO(b/186068104): add tests with dynamic shapes.
 class ParticleFilterTestFloat32(_ParticleFilterTest):
