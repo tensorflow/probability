@@ -17,6 +17,7 @@ from scipy import stats
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import normal_inverse_gaussian as nig
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
 
 
 @test_util.test_all_tf_execution_regimes
@@ -217,6 +218,17 @@ class _NormalInverseGaussianTest(object):
     with self.assertRaisesOpError('`tailweight > |skewness|`'):
       with tf.control_dependencies([skewness.assign(-2.)]):
         self.evaluate(normal_inverse_gaussian.mean())
+
+  @test_util.numpy_disable_gradient_test
+  def testDoubleWhere(self):
+    loc = 0.
+
+    def f(x):
+      return nig.NormalInverseGaussian(
+          loc=x, scale=2., tailweight=1., skewness=2.).log_prob(loc)
+
+    _, g = gradient.value_and_gradient(f, loc)
+    self.assertAllNotNan(g)
 
 
 class NormalInverseGaussianTestFloat32(
