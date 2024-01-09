@@ -498,7 +498,7 @@ def smc_squared(
         unbiased_gradients=True,
         seed=None,
 ):
-  _1, loop_seed, _2 = samplers.split_seed(seed, n=3, salt='smc_squared')
+  params_seed, particles_seed, smc_seed = samplers.split_seed(seed, n=3, salt='smc_squared')
 
   num_observation_steps = ps.size0(tf.nest.flatten(inner_observations)[0])
 
@@ -525,12 +525,12 @@ def smc_squared(
 
   if initial_parameter_proposal is None:
       initial_state = initial_parameter_prior.sample(num_outer_particles,
-                                                     seed=seed)
+                                                     seed=params_seed)
       initial_log_weights = ps.zeros_like(
           initial_parameter_prior.log_prob(initial_state))
   else:
       initial_state = initial_parameter_proposal.sample(num_outer_particles,
-                                                        seed=seed)
+                                                        seed=params_seed)
       initial_log_weights = (
               initial_parameter_prior.log_prob(initial_state) -
               initial_parameter_proposal.log_prob(initial_state)
@@ -549,7 +549,7 @@ def smc_squared(
                               else None),
       num_particles=num_inner_particles,
       particles_dim=1,
-      seed=seed
+      seed=particles_seed
   )
 
   init_state = smc_kernel.WeightedParticles(*inner_weighted_particles)
@@ -590,8 +590,7 @@ def smc_squared(
           inner_initial_state_prior=inner_initial_state_prior,
           inner_initial_state_proposal=inner_initial_state_proposal,
           num_inner_particles=num_inner_particles,
-          num_outer_particles=num_outer_particles,
-          extra_fn=extra_fn
+          num_outer_particles=num_outer_particles
       )
   )
 
@@ -608,7 +607,7 @@ def smc_squared(
       num_steps=num_timesteps,
       particles_dim=0,
       trace_fn=outer_trace_fn,
-      seed=loop_seed
+      seed=smc_seed
   )
 
   return traced_results
@@ -629,20 +628,24 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
         unbiased_gradients,
         parameter_proposal_kernel,
         num_inner_particles,
-        num_outer_particles,
-        extra_fn
+        num_outer_particles
 ):
   """Build a function specifying a particle filter update step."""
   def _outer_propose_and_update_log_weights_fn(step, state, seed=None):
       outside_parameters = state.particles[0]
-      inner_weighted_particles, log_weights = state.particles[1], \
-                                              state.log_weights
+      (params,
+       inner_particles,
+       inner_parent_indices,
+       inner_incremental_likelihood,
+       inner_accumulated_likelihood
+       ) = state.particles
+      log_weights = state.log_weights
 
       filter_results = smc_kernel.SequentialMonteCarloResults(
             steps=step,
-            parent_indices=state.particles[2],
-            incremental_log_marginal_likelihood=state.particles[3],
-            accumulated_log_marginal_likelihood=state.particles[4],
+            parent_indices=inner_parent_indices,
+            incremental_log_marginal_likelihood=inner_incremental_likelihood,
+            accumulated_log_marginal_likelihood=inner_accumulated_likelihood,
             seed=state.extra[1])
 
       inner_propose_and_update_log_weights_fn = (
@@ -667,7 +670,7 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
       )
 
       inner_weighted_particles, filter_results = kernel.one_step(
-          inner_weighted_particles,
+          inner_particles,
           filter_results,
           seed=seed
       )
