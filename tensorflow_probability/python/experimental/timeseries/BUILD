@@ -25,6 +25,15 @@ package(
 )
 
 py_library(
+    name = "timeseries",
+    srcs = ["__init__.py"],
+    deps = [
+        ":metrics",
+        "//tensorflow_probability/python/internal:all_util",
+    ],
+)
+
+py_library(
     name = "metrics",
     srcs = ["metrics.py"],
     deps = [

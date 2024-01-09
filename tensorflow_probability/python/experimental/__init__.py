@@ -45,6 +45,7 @@ from tensorflow_probability.python.experimental import stats
 from tensorflow_probability.python.experimental import sts_gibbs
 from tensorflow_probability.python.experimental import substrates
 from tensorflow_probability.python.experimental import tangent_spaces
+from tensorflow_probability.python.experimental import timeseries
 from tensorflow_probability.python.experimental import util
 from tensorflow_probability.python.experimental import vi
 from tensorflow_probability.python.experimental.util.composite_tensor import as_composite
@@ -77,6 +78,7 @@ _allowed_symbols = [
     'stats',
     'substrates',
     'tangent_spaces',
+    'timeseries',
     'unnest',
     'util',
     'vi',
