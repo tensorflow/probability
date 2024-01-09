@@ -570,8 +570,7 @@ def smc_squared(
                  initial_filter_results.incremental_log_marginal_likelihood,
                  initial_filter_results.accumulated_log_marginal_likelihood),
       log_weights=initial_log_weights,
-      extra=(tf.constant(0),
-             initial_filter_results.seed)
+      extra=initial_filter_results.seed
   )
 
   outer_propose_and_update_log_weights_fn = (
@@ -633,12 +632,13 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
   """Build a function specifying a particle filter update step."""
   def _outer_propose_and_update_log_weights_fn(step, state, seed=None):
       outside_parameters = state.particles[0]
-      (params,
-       inner_particles,
-       inner_parent_indices,
-       inner_incremental_likelihood,
-       inner_accumulated_likelihood
-       ) = state.particles
+      (
+          params,
+          inner_particles,
+          inner_parent_indices,
+          inner_incremental_likelihood,
+          inner_accumulated_likelihood
+      ) = state.particles
       log_weights = state.log_weights
 
       filter_results = smc_kernel.SequentialMonteCarloResults(
@@ -646,7 +646,7 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
             parent_indices=inner_parent_indices,
             incremental_log_marginal_likelihood=inner_incremental_likelihood,
             accumulated_log_marginal_likelihood=inner_accumulated_likelihood,
-            seed=state.extra[1])
+            seed=state.extra)
 
       inner_propose_and_update_log_weights_fn = (
           _particle_filter_propose_and_update_log_weights_fn(
@@ -675,8 +675,9 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
           seed=seed
       )
 
-      updated_log_weights = log_weights + \
-                            filter_results.incremental_log_marginal_likelihood
+      updated_log_weights = (
+          log_weights + filter_results.incremental_log_marginal_likelihood
+      )
 
       do_rejuvenation = outer_rejuvenation_criterion_fn(step, state)
 
@@ -864,8 +865,8 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
                      filter_results.incremental_log_marginal_likelihood,
                      filter_results.accumulated_log_marginal_likelihood),
           log_weights=updated_log_weights,
-          extra=(step,
-                 filter_results.seed))
+          extra=filter_results.seed
+      )
   return _outer_propose_and_update_log_weights_fn
 
 
