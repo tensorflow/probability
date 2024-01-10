@@ -177,128 +177,128 @@ class _ParticleFilterTest(test_util.TestCase):
                         trajectories['velocity'].shape)
     self.assertAllEqual(incremental_log_marginal_likelihoods.shape,
                         [num_timesteps] + batch_shape)
-  #
-  # def test_batch_of_filters_particles_dim_1(self):
-  #
-  #   batch_shape = [3, 2]
-  #   num_particles = 1000
-  #   num_timesteps = 40
-  #
-  #   # Batch of priors on object 1D positions and velocities.
-  #   initial_state_prior = jdn.JointDistributionNamed({
-  #       'position': normal.Normal(loc=0., scale=tf.ones(batch_shape)),
-  #       'velocity': normal.Normal(loc=0., scale=tf.ones(batch_shape) * 0.1)
-  #   })
-  #
-  #   def transition_fn(_, previous_state):
-  #     return jdn.JointDistributionNamed({
-  #         'position':
-  #             normal.Normal(
-  #                 loc=previous_state['position'] + previous_state['velocity'],
-  #                 scale=0.1),
-  #         'velocity':
-  #             normal.Normal(loc=previous_state['velocity'], scale=0.01)
-  #     })
-  #
-  #   def observation_fn(_, state):
-  #     return normal.Normal(loc=state['position'], scale=0.1)
-  #
-  #   # Batch of synthetic observations, .
-  #   true_initial_positions = np.random.randn(*batch_shape).astype(self.dtype)
-  #   true_velocities = 0.1 * np.random.randn(
-  #       *batch_shape).astype(self.dtype)
-  #   observed_positions = (
-  #       true_velocities *
-  #       np.arange(num_timesteps).astype(
-  #           self.dtype)[..., tf.newaxis, tf.newaxis] +
-  #       true_initial_positions)
-  #
-  #   (particles, log_weights, parent_indices,
-  #    incremental_log_marginal_likelihoods) = self.evaluate(
-  #        particle_filter.particle_filter(
-  #            observations=observed_positions,
-  #            initial_state_prior=initial_state_prior,
-  #            transition_fn=transition_fn,
-  #            observation_fn=observation_fn,
-  #            num_particles=num_particles,
-  #            seed=test_util.test_seed(),
-  #            particles_dim=1))
-  #
-  #   self.assertAllEqual(particles['position'].shape,
-  #                       [num_timesteps,
-  #                        batch_shape[0],
-  #                        num_particles,
-  #                        batch_shape[1]])
-  #   self.assertAllEqual(particles['velocity'].shape,
-  #                       [num_timesteps,
-  #                        batch_shape[0],
-  #                        num_particles,
-  #                        batch_shape[1]])
-  #   self.assertAllEqual(parent_indices.shape,
-  #                       [num_timesteps,
-  #                        batch_shape[0],
-  #                        num_particles,
-  #                        batch_shape[1]])
-  #   self.assertAllEqual(incremental_log_marginal_likelihoods.shape,
-  #                       [num_timesteps] + batch_shape)
-  #
-  #   self.assertAllClose(
-  #       self.evaluate(
-  #           tf.reduce_sum(tf.exp(log_weights) *
-  #                         particles['position'], axis=2)),
-  #       observed_positions,
-  #       atol=0.3)
-  #
-  #   velocity_means = tf.reduce_sum(tf.exp(log_weights) *
-  #                                  particles['velocity'], axis=2)
-  #
-  #   self.assertAllClose(
-  #       self.evaluate(tf.reduce_mean(velocity_means, axis=0)),
-  #       true_velocities, atol=0.05)
-  #
-  #   # Uncertainty in velocity should decrease over time.
-  #   velocity_stddev = self.evaluate(
-  #       tf.math.reduce_std(particles['velocity'], axis=2))
-  #   self.assertAllLess((velocity_stddev[-1] - velocity_stddev[0]), 0.)
-  #
-  #   trajectories = self.evaluate(
-  #       particle_filter.reconstruct_trajectories(particles,
-  #                                                parent_indices,
-  #                                                particles_dim=1))
-  #   self.assertAllEqual([num_timesteps,
-  #                        batch_shape[0],
-  #                        num_particles,
-  #                        batch_shape[1]],
-  #                       trajectories['position'].shape)
-  #   self.assertAllEqual([num_timesteps,
-  #                        batch_shape[0],
-  #                        num_particles,
-  #                        batch_shape[1]],
-  #                       trajectories['velocity'].shape)
-  #
-  #   # Verify that `infer_trajectories` also works on batches.
-  #   trajectories, incremental_log_marginal_likelihoods = self.evaluate(
-  #       particle_filter.infer_trajectories(
-  #           observations=observed_positions,
-  #           initial_state_prior=initial_state_prior,
-  #           transition_fn=transition_fn,
-  #           observation_fn=observation_fn,
-  #           num_particles=num_particles,
-  #           particles_dim=1,
-  #           seed=test_util.test_seed()))
-  #
-  #   self.assertAllEqual([num_timesteps,
-  #                        batch_shape[0],
-  #                        num_particles,
-  #                        batch_shape[1]],
-  #                       trajectories['position'].shape)
-  #   self.assertAllEqual([num_timesteps,
-  #                        batch_shape[0],
-  #                        num_particles,
-  #                        batch_shape[1]],
-  #                       trajectories['velocity'].shape)
-  #   self.assertAllEqual(incremental_log_marginal_likelihoods.shape,
-  #                       [num_timesteps] + batch_shape)
+
+  def test_batch_of_filters_particles_dim_1(self):
+
+    batch_shape = [3, 2]
+    num_particles = 1000
+    num_timesteps = 40
+
+    # Batch of priors on object 1D positions and velocities.
+    initial_state_prior = jdn.JointDistributionNamed({
+        'position': normal.Normal(loc=0., scale=tf.ones(batch_shape)),
+        'velocity': normal.Normal(loc=0., scale=tf.ones(batch_shape) * 0.1)
+    })
+
+    def transition_fn(_, previous_state):
+      return jdn.JointDistributionNamed({
+          'position':
+              normal.Normal(
+                  loc=previous_state['position'] + previous_state['velocity'],
+                  scale=0.1),
+          'velocity':
+              normal.Normal(loc=previous_state['velocity'], scale=0.01)
+      })
+
+    def observation_fn(_, state):
+      return normal.Normal(loc=state['position'], scale=0.1)
+
+    # Batch of synthetic observations, .
+    true_initial_positions = np.random.randn(*batch_shape).astype(self.dtype)
+    true_velocities = 0.1 * np.random.randn(
+        *batch_shape).astype(self.dtype)
+    observed_positions = (
+        true_velocities *
+        np.arange(num_timesteps).astype(
+            self.dtype)[..., tf.newaxis, tf.newaxis] +
+        true_initial_positions)
+
+    (particles, log_weights, parent_indices,
+     incremental_log_marginal_likelihoods) = self.evaluate(
+         particle_filter.particle_filter(
+             observations=observed_positions,
+             initial_state_prior=initial_state_prior,
+             transition_fn=transition_fn,
+             observation_fn=observation_fn,
+             num_particles=num_particles,
+             seed=test_util.test_seed(),
+             particles_dim=1))
+
+    self.assertAllEqual(particles['position'].shape,
+                        [num_timesteps,
+                         batch_shape[0],
+                         num_particles,
+                         batch_shape[1]])
+    self.assertAllEqual(particles['velocity'].shape,
+                        [num_timesteps,
+                         batch_shape[0],
+                         num_particles,
+                         batch_shape[1]])
+    self.assertAllEqual(parent_indices.shape,
+                        [num_timesteps,
+                         batch_shape[0],
+                         num_particles,
+                         batch_shape[1]])
+    self.assertAllEqual(incremental_log_marginal_likelihoods.shape,
+                        [num_timesteps] + batch_shape)
+
+    self.assertAllClose(
+        self.evaluate(
+            tf.reduce_sum(tf.exp(log_weights) *
+                          particles['position'], axis=2)),
+        observed_positions,
+        atol=0.3)
+
+    velocity_means = tf.reduce_sum(tf.exp(log_weights) *
+                                   particles['velocity'], axis=2)
+
+    self.assertAllClose(
+        self.evaluate(tf.reduce_mean(velocity_means, axis=0)),
+        true_velocities, atol=0.05)
+
+    # Uncertainty in velocity should decrease over time.
+    velocity_stddev = self.evaluate(
+        tf.math.reduce_std(particles['velocity'], axis=2))
+    self.assertAllLess((velocity_stddev[-1] - velocity_stddev[0]), 0.)
+
+    trajectories = self.evaluate(
+        particle_filter.reconstruct_trajectories(particles,
+                                                 parent_indices,
+                                                 particles_dim=1))
+    self.assertAllEqual([num_timesteps,
+                         batch_shape[0],
+                         num_particles,
+                         batch_shape[1]],
+                        trajectories['position'].shape)
+    self.assertAllEqual([num_timesteps,
+                         batch_shape[0],
+                         num_particles,
+                         batch_shape[1]],
+                        trajectories['velocity'].shape)
+
+    # Verify that `infer_trajectories` also works on batches.
+    trajectories, incremental_log_marginal_likelihoods = self.evaluate(
+        particle_filter.infer_trajectories(
+            observations=observed_positions,
+            initial_state_prior=initial_state_prior,
+            transition_fn=transition_fn,
+            observation_fn=observation_fn,
+            num_particles=num_particles,
+            particles_dim=1,
+            seed=test_util.test_seed()))
+
+    self.assertAllEqual([num_timesteps,
+                         batch_shape[0],
+                         num_particles,
+                         batch_shape[1]],
+                        trajectories['position'].shape)
+    self.assertAllEqual([num_timesteps,
+                         batch_shape[0],
+                         num_particles,
+                         batch_shape[1]],
+                        trajectories['velocity'].shape)
+    self.assertAllEqual(incremental_log_marginal_likelihoods.shape,
+                        [num_timesteps] + batch_shape)
 
   def test_reconstruct_trajectories_toy_example(self):
     particles = tf.convert_to_tensor([[1, 2, 3], [4, 5, 6,], [7, 8, 9]])
