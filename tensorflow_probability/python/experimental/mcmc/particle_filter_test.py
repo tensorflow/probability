@@ -761,7 +761,7 @@ class _ParticleFilterTest(test_util.TestCase):
     loc = tf.broadcast_to([0., 0.], [num_outer_particles, 2])
     scale_diag = tf.broadcast_to([0.05, 0.05], [num_outer_particles, 2])
 
-    params, inner_pt = self.evaluate(particle_filter.smc_squared(
+    params, _ = self.evaluate(particle_filter.smc_squared(
         inner_observations=inner_observations,
         inner_initial_state_prior=lambda _, params:
         mvn_diag.MultivariateNormalDiag(
