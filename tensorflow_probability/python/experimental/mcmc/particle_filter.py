@@ -470,7 +470,9 @@ def smc_squared(
     unbiased_gradients=True,
     seed=None,
 ):
-  params_seed, particles_seed, smc_seed = samplers.split_seed(seed, n=3, salt='smc_squared')
+  params_seed, particles_seed, smc_seed = samplers.split_seed(
+      seed, n=3, salt='smc_squared'
+  )
 
   num_observation_steps = ps.size0(tf.nest.flatten(inner_observations)[0])
 
@@ -807,19 +809,25 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
           extra=inner_weighted_particles.extra
       )
 
-      parent_indices, incremental_log_marginal_likelihood, accumulated_log_marginal_likelihood = mcmc_util.choose(
+      parent_indices, \
+      incremental_log_marginal_likelihood, \
+      accumulated_log_marginal_likelihood = mcmc_util.choose(
           accept,
-          (filter_results.parent_indices, filter_results.incremental_log_marginal_likelihood,
+          (filter_results.parent_indices,
+           filter_results.incremental_log_marginal_likelihood,
            filter_results.accumulated_log_marginal_likelihood),
-          (rej_filter_results.parent_indices, rej_filter_results.incremental_log_marginal_likelihood,
+          (rej_filter_results.parent_indices,
+           rej_filter_results.incremental_log_marginal_likelihood,
            rej_filter_results.accumulated_log_marginal_likelihood)
       )
 
       filter_results = smc_kernel.SequentialMonteCarloResults(
           steps=filter_results.steps,
           parent_indices=parent_indices,
-          incremental_log_marginal_likelihood=incremental_log_marginal_likelihood,
-          accumulated_log_marginal_likelihood=accumulated_log_marginal_likelihood,
+          incremental_log_marginal_likelihood=
+          incremental_log_marginal_likelihood,
+          accumulated_log_marginal_likelihood=
+          accumulated_log_marginal_likelihood,
           seed=filter_results.seed
       )
 

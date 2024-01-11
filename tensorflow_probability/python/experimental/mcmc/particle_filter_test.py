@@ -776,7 +776,9 @@ class _ParticleFilterTest(test_util.TestCase):
                 particle_dynamics(params, _, state), 1)
         ),
         inner_observation_fn=lambda params: (
-            lambda _, state: independent.Independent(normal.Normal(state, 2.), 1)),
+            lambda _, state: independent.Independent(
+                normal.Normal(state, 2.), 1)
+        ),
         outer_trace_fn=lambda s, r: (
             s.particles[0],
             s.particles[1]
