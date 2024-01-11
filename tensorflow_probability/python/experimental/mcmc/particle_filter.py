@@ -605,9 +605,8 @@ def _outer_particle_filter_propose_and_update_log_weights_fn(
 ):
   """Build a function specifying a particle filter update step."""
   def _outer_propose_and_update_log_weights_fn(step, state, seed=None):
-    outside_parameters = state.particles[0]
     (
-        params,
+        outside_parameters,
         inner_particles,
         inner_parent_indices,
         inner_incremental_likelihood,
