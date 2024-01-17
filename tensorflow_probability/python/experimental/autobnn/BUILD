@@ -39,6 +39,8 @@ py_library(
 py_test(
     name = "bnn_test",
     srcs = ["bnn_test.py"],
+    # TODO(b/320723712): enable this test in OSS.
+    tags = ["no-oss-ci"],
     deps = [
         ":bnn",
         # absl/testing:absltest dep,
