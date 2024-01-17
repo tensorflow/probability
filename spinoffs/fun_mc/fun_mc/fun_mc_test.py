@@ -21,23 +21,24 @@ import os
 # Dependency imports
 
 from absl.testing import parameterized
-import jax
+import jax as real_jax
 from jax import config as jax_config
 import numpy as np
 import scipy.stats
 import tensorflow.compat.v2 as real_tf
-
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from fun_mc import backend
 from fun_mc import fun_mc_lib as fun_mc
 from fun_mc import prefab
 from fun_mc import test_util
 
-tf = backend.tf
+jnp = backend.jnp
+jax = backend.jax
 tfp = backend.tfp
 util = backend.util
 
 real_tf.enable_v2_behavior()
+real_tf.experimental.numpy.experimental_enable_numpy_behavior()
 jax_config.update('jax_enable_x64', True)
 
 TestNamedTuple = collections.namedtuple('TestNamedTuple', 'x, y')
@@ -45,8 +46,10 @@ TestNamedTuple = collections.namedtuple('TestNamedTuple', 'x, y')
 BACKEND = None  # Rewritten by backends/rewrite.py.
 
 if BACKEND == 'backend_jax':
-  os.environ['XLA_FLAGS'] = (f'{os.environ.get("XLA_FLAGS", "")} '
-                             '--xla_force_host_platform_device_count=4')
+  os.environ['XLA_FLAGS'] = (
+      f'{os.environ.get("XLA_FLAGS", "")} '
+      '--xla_force_host_platform_device_count=4'
+  )
 
 
 def _test_seed():
@@ -66,7 +69,6 @@ def _rev_mclachlan_optimal_4th_order_step(*args, **kwargs):
 
 
 def _skip_on_jax(fn):
-
   @functools.wraps(fn)
   def _wrapper(self, *args, **kwargs):
     if not self._is_on_jax:
@@ -110,16 +112,17 @@ def _gen_cov(data, axis):
   source_1[last_unaggregated_src_dim] = 'x'
   source_2 = list(symbols[:rank])
   source_2[last_unaggregated_src_dim] = 'y'
-  dest = dest[:last_unaggregated_dest_dim] + [
-      'x', 'y'
-  ] + dest[last_unaggregated_dest_dim + 1:]
+  dest = (
+      dest[:last_unaggregated_dest_dim]
+      + ['x', 'y']
+      + dest[last_unaggregated_dest_dim + 1 :]
+  )
   formula = '{source_1},{source_2}->{dest}'.format(
-      source_1=''.join(source_1),
-      source_2=''.join(source_2),
-      dest=''.join(dest))
-  cov = (
-      np.einsum(formula, centered_data, centered_data) /
-      np.prod(np.array(shape)[np.array(axis)]))
+      source_1=''.join(source_1), source_2=''.join(source_2), dest=''.join(dest)
+  )
+  cov = np.einsum(formula, centered_data, centered_data) / np.prod(
+      np.array(shape)[np.array(axis)]
+  )
   return cov
 
 
@@ -135,12 +138,11 @@ class GenCovTest(real_tf.test.TestCase):
 
 
 class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
-
   _is_on_jax = BACKEND == 'backend_jax'
 
   def _make_seed(self, seed):
     if self._is_on_jax:
-      return jax.random.PRNGKey(seed)
+      return real_jax.random.PRNGKey(seed)
     else:
       return util.make_tensor_seed([seed, 0])
 
@@ -149,65 +151,65 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     raise NotImplementedError()
 
   def _constant(self, value):
-    return tf.constant(value, self._dtype)
+    return jnp.array(value, self._dtype)
 
   @parameterized.named_parameters(
       ('Unrolled', True),
       ('NotUnrolled', False),
   )
   def testTraceSingle(self, unroll):
-
     def fun(x):
-      return x + 1., 2 * x
+      return x + 1.0, 2 * x
 
     x, e_trace = fun_mc.trace(
-        state=0.,
+        state=0.0,
         fn=fun,
         num_steps=5,
         trace_fn=lambda _, xp1: xp1,
-        unroll=unroll)
+        unroll=unroll,
+    )
 
-    self.assertAllEqual(5., x)
-    self.assertAllEqual([0., 2., 4., 6., 8.], e_trace)
+    self.assertAllEqual(5.0, x)
+    self.assertAllEqual([0.0, 2.0, 4.0, 6.0, 8.0], e_trace)
 
   @parameterized.named_parameters(
       ('Unrolled', True),
       ('NotUnrolled', False),
   )
   def testTraceNested(self, unroll):
-
     def fun(x, y):
-      return (x + 1., y + 2.), ()
+      return (x + 1.0, y + 2.0), ()
 
     (x, y), (x_trace, y_trace) = fun_mc.trace(
-        state=(0., 0.),
+        state=(0.0, 0.0),
         fn=fun,
         num_steps=5,
         trace_fn=lambda xy, _: xy,
-        unroll=unroll)
+        unroll=unroll,
+    )
 
-    self.assertAllEqual(5., x)
-    self.assertAllEqual(10., y)
-    self.assertAllEqual([1., 2., 3., 4., 5.], x_trace)
-    self.assertAllEqual([2., 4., 6., 8., 10.], y_trace)
+    self.assertAllEqual(5.0, x)
+    self.assertAllEqual(10.0, y)
+    self.assertAllEqual([1.0, 2.0, 3.0, 4.0, 5.0], x_trace)
+    self.assertAllEqual([2.0, 4.0, 6.0, 8.0, 10.0], y_trace)
 
   @parameterized.named_parameters(
       ('Unrolled', True),
       ('NotUnrolled', False),
   )
   def testTraceTrace(self, unroll):
-
     def fun(x):
       return fun_mc.trace(
-          x, lambda x: (x + 1., x + 1.), 2, trace_mask=False, unroll=unroll)
+          x, lambda x: (x + 1.0, x + 1.0), 2, trace_mask=False, unroll=unroll
+      )
 
-    x, trace = fun_mc.trace(0., fun, 2)
-    self.assertAllEqual(4., x)
-    self.assertAllEqual([2., 4.], trace)
+    x, trace = fun_mc.trace(0.0, fun, 2)
+    self.assertAllEqual(4.0, x)
+    self.assertAllEqual([2.0, 4.0], trace)
 
   def testTraceDynamic(self):
 
-    @tf.function
+    @jax.jit
     def trace_n(num_steps):
       return fun_mc.trace(0, lambda x: (x + 1, ()), num_steps)[0]
 
@@ -219,19 +221,20 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
       ('NotUnrolled', False),
   )
   def testTraceMask(self, unroll):
-
     def fun(x):
       return x + 1, (2 * x, 3 * x)
 
     x, (trace_1, trace_2) = fun_mc.trace(
-        state=0, fn=fun, num_steps=3, trace_mask=(True, False), unroll=unroll)
+        state=0, fn=fun, num_steps=3, trace_mask=(True, False), unroll=unroll
+    )
 
     self.assertAllEqual(3, x)
     self.assertAllEqual([0, 2, 4], trace_1)
     self.assertAllEqual(6, trace_2)
 
     x, (trace_1, trace_2) = fun_mc.trace(
-        state=0, fn=fun, num_steps=3, trace_mask=False, unroll=unroll)
+        state=0, fn=fun, num_steps=3, trace_mask=False, unroll=unroll
+    )
 
     self.assertAllEqual(3, x)
     self.assertAllEqual(4, trace_1)
@@ -290,33 +293,34 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
       ('ArgsToList1', (1,), {}, [1]),
       ('ArgsToTuple3', (1, 2, 3), {}, [1, 2, 3]),
       ('ArgsToList3', (1, 2, 3), {}, [1, 2, 3]),
-      ('ArgsToOrdDict3',
-       (1, 2, 3), {}, collections.OrderedDict([('c', 1), ('b', 2), ('a', 3)])),
-      ('ArgsKwargsToOrdDict3', (1, 2), {
-          'a': 3
-      }, collections.OrderedDict([('c', 1), ('b', 2), ('a', 3)])),
-      ('KwargsToOrdDict3', (), {
-          'a': 3,
-          'b': 2,
-          'c': 1
-      }, collections.OrderedDict([('c', 1), ('b', 2), ('a', 3)])),
-      ('KwargsToDict3', (), {
-          'a': 3,
-          'b': 2,
-          'c': 1
-      }, {
-          'c': 1,
-          'b': 2,
-          'a': 3
-      }),
+      (
+          'ArgsToOrdDict3',
+          (1, 2, 3),
+          {},
+          collections.OrderedDict([('c', 1), ('b', 2), ('a', 3)]),
+      ),
+      (
+          'ArgsKwargsToOrdDict3',
+          (1, 2),
+          {'a': 3},
+          collections.OrderedDict([('c', 1), ('b', 2), ('a', 3)]),
+      ),
+      (
+          'KwargsToOrdDict3',
+          (),
+          {'a': 3, 'b': 2, 'c': 1},
+          collections.OrderedDict([('c', 1), ('b', 2), ('a', 3)]),
+      ),
+      ('KwargsToDict3', (), {'a': 3, 'b': 2, 'c': 1}, {'c': 1, 'b': 2, 'a': 3}),
       ('ArgsToNamedTuple', (TestNamedTuple(1, 2),), {}, TestNamedTuple(1, 2)),
-      ('KwargsToNamedTuple', (), {
-          'a': TestNamedTuple(1, 2)
-      }, TestNamedTuple(1, 2)),
+      (
+          'KwargsToNamedTuple',
+          (),
+          {'a': TestNamedTuple(1, 2)},
+          TestNamedTuple(1, 2),
+      ),
       ('ArgsToScalar', (1,), {}, 1),
-      ('KwargsToScalar', (), {
-          'a': 1
-      }, 1),
+      ('KwargsToScalar', (), {'a': 1}, 1),
       ('Tuple0', (), {}, ()),
       ('List0', (), {}, []),
       ('Dict0', (), {}, {}),
@@ -327,28 +331,19 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     self.assertAllEqual(state_structure, state)
 
   @parameterized.named_parameters(
-      ('BadKwargs', (), {
-          'a': 1,
-          'b': 2
-      }, 'c'),
-      ('ArgsOverlap', (1, 2), {
-          'c': 1,
-          'b': 2
-      }, 'a'),
+      ('BadKwargs', (), {'a': 1, 'b': 2}, 'c'),
+      ('ArgsOverlap', (1, 2), {'c': 1, 'b': 2}, 'a'),
   )
   def testRecoverStateFromArgsMissing(self, args, kwargs, missing):
     state_structure = collections.OrderedDict([('c', 1), ('b', 2), ('a', 3)])
-    with self.assertRaisesRegex(ValueError,
-                                'Missing \'{}\' from kwargs.'.format(missing)):
+    with self.assertRaisesRegex(
+        ValueError, "Missing '{}' from kwargs.".format(missing)
+    ):
       fun_mc.recover_state_from_args(args, kwargs, state_structure)
 
   @parameterized.named_parameters(
-      ('Tuple1', {
-          'a': 1
-      }, (1,)),
-      ('List1', {
-          'a': 1
-      }, [1]),
+      ('Tuple1', {'a': 1}, (1,)),
+      ('List1', {'a': 1}, [1]),
   )
   def testRecoverStateFromArgsNoKwargs(self, kwargs, state_structure):
     with self.assertRaisesRegex(ValueError, 'This wrapper does not'):
@@ -365,44 +360,39 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     self.assertEqual([[1, 1], [2, 2, 2]], struct)
 
   def testCallPotentialFn(self):
-
     def potential(x):
       return x, ()
 
-    x, extra = fun_mc.call_potential_fn(potential, 0.)
+    x, extra = fun_mc.call_potential_fn(potential, 0.0)
 
-    self.assertEqual(0., x)
+    self.assertEqual(0.0, x)
     self.assertEqual((), extra)
 
   def testCallPotentialFnMissingExtra(self):
-
     def potential(x):
       return x
 
     with self.assertRaisesRegex(TypeError, 'A common solution is to adjust'):
-      fun_mc.call_potential_fn(potential, 0.)
+      fun_mc.call_potential_fn(potential, 0.0)
 
   def testCallTransitionOperator(self):
-
     def kernel(x, y):
       del y
       return [x, [1]], ()
 
-    [x, [y]], extra = fun_mc.call_transition_operator(kernel, [0., None])
-    self.assertEqual(0., x)
+    [x, [y]], extra = fun_mc.call_transition_operator(kernel, [0.0, None])
+    self.assertEqual(0.0, x)
     self.assertEqual(1, y)
     self.assertEqual((), extra)
 
   def testCallTransitionOperatorMissingExtra(self):
-
     def potential(x):
       return x
 
     with self.assertRaisesRegex(TypeError, 'A common solution is to adjust'):
-      fun_mc.call_transition_operator(potential, 0.)
+      fun_mc.call_transition_operator(potential, 0.0)
 
   def testCallTransitionOperatorBadArgs(self):
-
     def potential(x, y, z):
       del z
       return (x, y), ()
@@ -411,68 +401,79 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
       fun_mc.call_transition_operator(potential, (1, 2, 3))
 
   def testTransformLogProbFn(self):
-
     def log_prob_fn(x, y):
-      return (tfp.distributions.Normal(self._constant(0.), 1.).log_prob(x) +
-              tfp.distributions.Normal(self._constant(1.), 1.).log_prob(y)), ()
+      return (
+          tfp.distributions.Normal(self._constant(0.0), 1.0).log_prob(x)
+          + tfp.distributions.Normal(self._constant(1.0), 1.0).log_prob(y)
+      ), ()
 
     bijectors = [
-        tfp.bijectors.Scale(scale=self._constant(2.)),
-        tfp.bijectors.Scale(scale=self._constant(3.))
+        tfp.bijectors.Scale(scale=self._constant(2.0)),
+        tfp.bijectors.Scale(scale=self._constant(3.0)),
     ]
 
-    (transformed_log_prob_fn,
-     transformed_init_state) = fun_mc.transform_log_prob_fn(
-         log_prob_fn, bijectors,
-         [self._constant(2.), self._constant(3.)])
+    (transformed_log_prob_fn, transformed_init_state) = (
+        fun_mc.transform_log_prob_fn(
+            log_prob_fn, bijectors, [self._constant(2.0), self._constant(3.0)]
+        )
+    )
 
     self.assertIsInstance(transformed_init_state, list)
-    self.assertAllClose([1., 1.], transformed_init_state)
-    tlp, (orig_space, _) = (
-        transformed_log_prob_fn(self._constant(1.), self._constant(1.)))
-    lp = log_prob_fn(self._constant(2.), self._constant(3.))[0] + sum(
-        b.forward_log_det_jacobian(self._constant(1.), event_ndims=0)
-        for b in bijectors)
+    self.assertAllClose([1.0, 1.0], transformed_init_state)
+    tlp, (orig_space, _) = transformed_log_prob_fn(
+        self._constant(1.0), self._constant(1.0)
+    )
+    lp = log_prob_fn(self._constant(2.0), self._constant(3.0))[0] + sum(
+        b.forward_log_det_jacobian(self._constant(1.0), event_ndims=0)
+        for b in bijectors
+    )
 
-    self.assertAllClose([2., 3.], orig_space)
+    self.assertAllClose([2.0, 3.0], orig_space)
     self.assertAllClose(lp, tlp)
 
   def testTransformLogProbFnKwargs(self):
-
     def log_prob_fn(x, y):
-      return (tfp.distributions.Normal(self._constant(0.), 1.).log_prob(x) +
-              tfp.distributions.Normal(self._constant(1.), 1.).log_prob(y)), ()
+      return (
+          tfp.distributions.Normal(self._constant(0.0), 1.0).log_prob(x)
+          + tfp.distributions.Normal(self._constant(1.0), 1.0).log_prob(y)
+      ), ()
 
     bijectors = {
-        'x': tfp.bijectors.Scale(scale=self._constant(2.)),
-        'y': tfp.bijectors.Scale(scale=self._constant(3.))
+        'x': tfp.bijectors.Scale(scale=self._constant(2.0)),
+        'y': tfp.bijectors.Scale(scale=self._constant(3.0)),
     }
 
-    (transformed_log_prob_fn,
-     transformed_init_state) = fun_mc.transform_log_prob_fn(
-         log_prob_fn, bijectors, {
-             'x': self._constant(2.),
-             'y': self._constant(3.),
-         })
+    (transformed_log_prob_fn, transformed_init_state) = (
+        fun_mc.transform_log_prob_fn(
+            log_prob_fn,
+            bijectors,
+            {
+                'x': self._constant(2.0),
+                'y': self._constant(3.0),
+            },
+        )
+    )
 
     self.assertIsInstance(transformed_init_state, dict)
     self.assertAllCloseNested(
         {
-            'x': self._constant(1.),
-            'y': self._constant(1.),
-        }, transformed_init_state)
+            'x': self._constant(1.0),
+            'y': self._constant(1.0),
+        },
+        transformed_init_state,
+    )
 
     tlp, (orig_space, _) = transformed_log_prob_fn(
-        x=self._constant(1.), y=self._constant(1.))
-    lp = log_prob_fn(
-        x=self._constant(2.), y=self._constant(3.))[0] + sum(
-            b.forward_log_det_jacobian(self._constant(1.), event_ndims=0)
-            for b in bijectors.values())
+        x=self._constant(1.0), y=self._constant(1.0)
+    )
+    lp = log_prob_fn(x=self._constant(2.0), y=self._constant(3.0))[0] + sum(
+        b.forward_log_det_jacobian(self._constant(1.0), event_ndims=0)
+        for b in bijectors.values()
+    )
 
-    self.assertAllCloseNested({
-        'x': self._constant(2.),
-        'y': self._constant(3.)
-    }, orig_space)
+    self.assertAllCloseNested(
+        {'x': self._constant(2.0), 'y': self._constant(3.0)}, orig_space
+    )
     self.assertAllClose(lp, tlp)
 
   # The +1's here are because we initialize the `state_grads` at 1, which
@@ -481,27 +482,34 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
       ('Leapfrog', lambda: fun_mc.leapfrog_step, 1 + 1),
       ('Ruth4', lambda: fun_mc.ruth4_step, 3 + 1),
       ('Blanes3', lambda: fun_mc.blanes_3_stage_step, 3 + 1),
-      ('McLachlan4Fwd', lambda: _fwd_mclachlan_optimal_4th_order_step, 4 + 1,
-       9),
-      ('McLachlan4Rev', lambda: _rev_mclachlan_optimal_4th_order_step, 4 + 1,
-       9),
+      (
+          'McLachlan4Fwd',
+          lambda: _fwd_mclachlan_optimal_4th_order_step,
+          4 + 1,
+          9,
+      ),
+      (
+          'McLachlan4Rev',
+          lambda: _rev_mclachlan_optimal_4th_order_step,
+          4 + 1,
+          9,
+      ),
   )
-  def testIntegratorStep(self,
-                         method_fn,
-                         num_tlp_calls,
-                         num_tlp_calls_jax=None):
+  def testIntegratorStep(
+      self, method_fn, num_tlp_calls, num_tlp_calls_jax=None
+  ):
     method = method_fn()
 
     tlp_call_counter = [0]
 
     def target_log_prob_fn(q):
       tlp_call_counter[0] += 1
-      return -q**2, 1.
+      return -(q**2), 1.0
 
     def kinetic_energy_fn(p):
-      return tf.abs(p)**3., 2.
+      return jnp.abs(p) ** 3.0, 2.0
 
-    state = self._constant(1.)
+    state = self._constant(1.0)
     _, _, state_grads = fun_mc.call_potential_fn_with_grads(
         target_log_prob_fn,
         state,
@@ -509,21 +517,27 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
 
     state, extras = method(
         integrator_step_state=fun_mc.IntegratorStepState(
-            state=state, state_grads=state_grads, momentum=self._constant(2.)),
+            state=state, state_grads=state_grads, momentum=self._constant(2.0)
+        ),
         step_size=self._constant(0.1),
         target_log_prob_fn=target_log_prob_fn,
-        kinetic_energy_fn=kinetic_energy_fn)
+        kinetic_energy_fn=kinetic_energy_fn,
+    )
 
     if num_tlp_calls_jax is not None and self._is_on_jax:
       num_tlp_calls = num_tlp_calls_jax
     self.assertEqual(num_tlp_calls, tlp_call_counter[0])
-    self.assertEqual(1., extras.state_extra)
-    self.assertEqual(2., extras.kinetic_energy_extra)
+    self.assertEqual(1.0, extras.state_extra)
+    self.assertEqual(2.0, extras.kinetic_energy_extra)
 
-    initial_hamiltonian = -target_log_prob_fn(
-        self._constant(1.))[0] + kinetic_energy_fn(self._constant(2.))[0]
-    fin_hamiltonian = -target_log_prob_fn(state.state)[0] + kinetic_energy_fn(
-        state.momentum)[0]
+    initial_hamiltonian = (
+        -target_log_prob_fn(self._constant(1.0))[0]
+        + kinetic_energy_fn(self._constant(2.0))[0]
+    )
+    fin_hamiltonian = (
+        -target_log_prob_fn(state.state)[0]
+        + kinetic_energy_fn(state.momentum)[0]
+    )
 
     self.assertAllClose(fin_hamiltonian, initial_hamiltonian, atol=0.2)
 
@@ -533,16 +547,15 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
       ('Blanes3', fun_mc.blanes_3_stage_step),
   )
   def testIntegratorStepReversible(self, method):
-
     def target_log_prob_fn(q):
-      return -q**2, []
+      return -(q**2), []
 
     def kinetic_energy_fn(p):
-      return p**2., []
+      return p**2.0, []
 
     seed = self._make_seed(_test_seed())
 
-    state = self._constant(1.)
+    state = self._constant(1.0)
     _, _, state_grads = fun_mc.call_potential_fn_with_grads(
         target_log_prob_fn,
         state,
@@ -552,30 +565,32 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
         integrator_step_state=fun_mc.IntegratorStepState(
             state=state,
             state_grads=state_grads,
-            momentum=util.random_normal([], self._dtype, seed)),
+            momentum=util.random_normal([], self._dtype, seed),
+        ),
         step_size=self._constant(0.1),
         target_log_prob_fn=target_log_prob_fn,
-        kinetic_energy_fn=kinetic_energy_fn)
+        kinetic_energy_fn=kinetic_energy_fn,
+    )
 
     state_rev, _ = method(
         integrator_step_state=state_fwd._replace(momentum=-state_fwd.momentum),
         step_size=self._constant(0.1),
         target_log_prob_fn=target_log_prob_fn,
-        kinetic_energy_fn=kinetic_energy_fn)
+        kinetic_energy_fn=kinetic_energy_fn,
+    )
 
     self.assertAllClose(state, state_rev.state, atol=1e-6)
 
   def testMclachlanIntegratorStepReversible(self):
-
     def target_log_prob_fn(q):
-      return -q**2, []
+      return -(q**2), []
 
     def kinetic_energy_fn(p):
-      return p**2., []
+      return p**2.0, []
 
     seed = self._make_seed(_test_seed())
 
-    state = self._constant(1.)
+    state = self._constant(1.0)
     _, _, state_grads = fun_mc.call_potential_fn_with_grads(
         target_log_prob_fn,
         state,
@@ -585,45 +600,49 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
         integrator_step_state=fun_mc.IntegratorStepState(
             state=state,
             state_grads=state_grads,
-            momentum=util.random_normal([], self._dtype, seed)),
+            momentum=util.random_normal([], self._dtype, seed),
+        ),
         step_size=self._constant(0.1),
         target_log_prob_fn=target_log_prob_fn,
-        kinetic_energy_fn=kinetic_energy_fn)
+        kinetic_energy_fn=kinetic_energy_fn,
+    )
 
     state_rev, _ = _rev_mclachlan_optimal_4th_order_step(
         integrator_step_state=state_fwd._replace(momentum=-state_fwd.momentum),
         step_size=self._constant(0.1),
         target_log_prob_fn=target_log_prob_fn,
-        kinetic_energy_fn=kinetic_energy_fn)
+        kinetic_energy_fn=kinetic_energy_fn,
+    )
 
     self.assertAllClose(state, state_rev.state, atol=1e-6)
 
   def testMetropolisHastingsStep(self):
     seed = self._make_seed(_test_seed())
 
-    zero = self._constant(0.)
-    one = self._constant(1.)
+    zero = self._constant(0.0)
+    one = self._constant(1.0)
 
     accepted, mh_extra = fun_mc.metropolis_hastings_step(
-        current_state=zero,
-        proposed_state=one,
-        energy_change=-np.inf,
-        seed=seed)
+        current_state=zero, proposed_state=one, energy_change=-np.inf, seed=seed
+    )
     self.assertAllEqual(one, accepted)
     self.assertAllEqual(True, mh_extra.is_accepted)
 
     accepted, mh_extra = fun_mc.metropolis_hastings_step(
-        current_state=zero, proposed_state=one, energy_change=np.inf, seed=seed)
+        current_state=zero, proposed_state=one, energy_change=np.inf, seed=seed
+    )
     self.assertAllEqual(zero, accepted)
     self.assertAllEqual(False, mh_extra.is_accepted)
 
     accepted, mh_extra = fun_mc.metropolis_hastings_step(
-        current_state=zero, proposed_state=one, energy_change=np.nan, seed=seed)
+        current_state=zero, proposed_state=one, energy_change=np.nan, seed=seed
+    )
     self.assertAllEqual(zero, accepted)
     self.assertAllEqual(False, mh_extra.is_accepted)
 
     accepted, mh_extra = fun_mc.metropolis_hastings_step(
-        current_state=zero, proposed_state=one, energy_change=np.nan, seed=seed)
+        current_state=zero, proposed_state=one, energy_change=np.nan, seed=seed
+    )
     self.assertAllEqual(zero, accepted)
     self.assertAllEqual(False, mh_extra.is_accepted)
 
@@ -632,7 +651,8 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
         proposed_state=one,
         log_uniform=-one,
         energy_change=self._constant(-np.log(0.5)),
-        seed=seed)
+        seed=seed,
+    )
     self.assertAllEqual(one, accepted)
     self.assertAllEqual(True, mh_extra.is_accepted)
 
@@ -641,16 +661,18 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
         proposed_state=one,
         log_uniform=zero,
         energy_change=self._constant(-np.log(0.5)),
-        seed=seed)
+        seed=seed,
+    )
     self.assertAllEqual(zero, accepted)
     self.assertAllEqual(False, mh_extra.is_accepted)
 
     accepted, _ = fun_mc.metropolis_hastings_step(
-        current_state=tf.zeros(1000, dtype=self._dtype),
-        proposed_state=tf.ones(1000, dtype=self._dtype),
-        energy_change=-tf.math.log(0.5 * tf.ones(1000, dtype=self._dtype)),
-        seed=seed)
-    self.assertAllClose(0.5, tf.reduce_mean(accepted), rtol=0.1)
+        current_state=jnp.zeros(1000, dtype=self._dtype),
+        proposed_state=jnp.ones(1000, dtype=self._dtype),
+        energy_change=-jnp.log(0.5 * jnp.ones(1000, dtype=self._dtype)),
+        seed=seed,
+    )
+    self.assertAllClose(0.5, jnp.mean(accepted), rtol=0.1)
 
   def testMetropolisHastingsStepStructure(self):
     struct_type = collections.namedtuple('Struct', 'a, b')
@@ -662,10 +684,12 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
         current_state=current,
         proposed_state=proposed,
         energy_change=-np.inf,
-        seed=self._make_seed(_test_seed()))
+        seed=self._make_seed(_test_seed()),
+    )
     self.assertAllEqual(True, mh_extra.is_accepted)
     self.assertAllEqual(
-        util.flatten_tree(proposed), util.flatten_tree(accepted))
+        util.flatten_tree(proposed), util.flatten_tree(accepted)
+    )
 
   @parameterized.named_parameters(
       ('Unrolled', True),
@@ -675,14 +699,13 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     step_size = self._constant(0.2)
     num_steps = 2000
     num_leapfrog_steps = 10
-    state = tf.ones([16, 2], dtype=self._dtype)
+    state = jnp.ones([16, 2], dtype=self._dtype)
 
-    base_mean = self._constant([2., 3.])
-    base_scale = self._constant([2., 0.5])
+    base_mean = self._constant([2.0, 3.0])
+    base_scale = self._constant([2.0, 0.5])
 
     def target_log_prob_fn(x):
-      return -tf.reduce_sum(0.5 * tf.square(
-          (x - base_mean) / base_scale), -1), ()
+      return -jnp.sum(0.5 * jnp.square((x - base_mean) / base_scale), -1), ()
 
     def kernel(hmc_state, seed):
       hmc_seed, seed = util.split_seed(seed, 2)
@@ -692,29 +715,36 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
           num_integrator_steps=num_leapfrog_steps,
           target_log_prob_fn=target_log_prob_fn,
           unroll_integrator=unroll,
-          seed=hmc_seed)
+          seed=hmc_seed,
+      )
       return (hmc_state, seed), hmc_state.state
 
     seed = self._make_seed(_test_seed())
 
-    # Subtle: Unlike TF, JAX needs a data dependency from the inputs to outputs
-    # for the jit to do anything.
-    _, chain = tf.function(lambda state, seed: fun_mc.trace(  # pylint: disable=g-long-lambda
-        state=(fun_mc.hamiltonian_monte_carlo_init(state, target_log_prob_fn),
-               seed),
-        fn=kernel,
-        num_steps=num_steps))(state, seed)
+    _, chain = jax.jit(
+        lambda state, seed: fun_mc.trace(  # pylint: disable=g-long-lambda
+            state=(
+                fun_mc.hamiltonian_monte_carlo_init(state, target_log_prob_fn),
+                seed,
+            ),
+            fn=kernel,
+            num_steps=num_steps,
+        )
+    )(state, seed)
     # Discard the warmup samples.
     chain = chain[1000:]
 
-    sample_mean = tf.reduce_mean(chain, axis=[0, 1])
-    sample_var = tf.math.reduce_variance(chain, axis=[0, 1])
+    sample_mean = jnp.mean(chain, axis=[0, 1])
+    sample_var = jnp.var(chain, axis=[0, 1])
 
-    true_samples = util.random_normal(
-        shape=[4096, 2], dtype=self._dtype, seed=seed) * base_scale + base_mean
+    true_samples = (
+        util.random_normal(shape=[4096, 2], dtype=self._dtype, seed=seed)
+        * base_scale
+        + base_mean
+    )
 
-    true_mean = tf.reduce_mean(true_samples, axis=0)
-    true_var = tf.math.reduce_variance(true_samples, axis=0)
+    true_mean = jnp.mean(true_samples, axis=0)
+    true_var = jnp.var(true_samples, axis=0)
 
     self.assertAllClose(true_mean, sample_mean, rtol=0.1, atol=0.1)
     self.assertAllClose(true_var, sample_var, rtol=0.1, atol=0.1)
@@ -723,21 +753,23 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     step_size = self._constant(0.2)
     num_steps = 2000
     num_leapfrog_steps = 10
-    state = tf.ones([16, 2], dtype=self._dtype)
+    state = jnp.ones([16, 2], dtype=self._dtype)
 
-    base_mean = self._constant([1., 0])
+    base_mean = self._constant([1.0, 0])
     base_cov = self._constant([[1, 0.5], [0.5, 1]])
 
     bijector = tfp.bijectors.Softplus()
     base_dist = tfp.distributions.MultivariateNormalFullCovariance(
-        loc=base_mean, covariance_matrix=base_cov)
+        loc=base_mean, covariance_matrix=base_cov
+    )
     target_dist = bijector(base_dist)
 
     def orig_target_log_prob_fn(x):
       return target_dist.log_prob(x), ()
 
     target_log_prob_fn, state = fun_mc.transform_log_prob_fn(
-        orig_target_log_prob_fn, bijector, state)
+        orig_target_log_prob_fn, bijector, state
+    )
 
     # pylint: disable=g-long-lambda
     def kernel(hmc_state, seed):
@@ -747,152 +779,109 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
           step_size=step_size,
           num_integrator_steps=num_leapfrog_steps,
           target_log_prob_fn=target_log_prob_fn,
-          seed=hmc_seed)
+          seed=hmc_seed,
+      )
       return (hmc_state, seed), hmc_state.state_extra[0]
 
     seed = self._make_seed(_test_seed())
 
-    # Subtle: Unlike TF, JAX needs a data dependency from the inputs to outputs
-    # for the jit to do anything.
-    _, chain = tf.function(lambda state, seed: fun_mc.trace(  # pylint: disable=g-long-lambda
-        state=(fun_mc.hamiltonian_monte_carlo_init(state, target_log_prob_fn),
-               seed),
-        fn=kernel,
-        num_steps=num_steps))(state, seed)
+    _, chain = jax.jit(
+        lambda state, seed: fun_mc.trace(  # pylint: disable=g-long-lambda
+            state=(
+                fun_mc.hamiltonian_monte_carlo_init(state, target_log_prob_fn),
+                seed,
+            ),
+            fn=kernel,
+            num_steps=num_steps,
+        )
+    )(state, seed)
     # Discard the warmup samples.
     chain = chain[1000:]
 
-    sample_mean = tf.reduce_mean(chain, axis=[0, 1])
+    sample_mean = jnp.mean(chain, axis=[0, 1])
     sample_cov = tfp.stats.covariance(chain, sample_axis=[0, 1])
 
     true_samples = target_dist.sample(4096, seed=self._make_seed(_test_seed()))
 
-    true_mean = tf.reduce_mean(true_samples, axis=0)
+    true_mean = jnp.mean(true_samples, axis=0)
     true_cov = tfp.stats.covariance(chain, sample_axis=[0, 1])
 
     self.assertAllClose(true_mean, sample_mean, rtol=0.1, atol=0.1)
     self.assertAllClose(true_cov, sample_cov, rtol=0.1, atol=0.1)
-
-  @parameterized.parameters((tf.function, 1), (_no_compile, 2))
-  @_skip_on_jax  # `trace` doesn't have an efficient path in JAX yet.
-  def testHMCCountTargetLogProb(self, compile_fn, expected_count):
-
-    counter = [0]
-
-    @compile_fn
-    def target_log_prob_fn(x):
-      counter[0] += 1
-      return -tf.square(x), []
-
-    # pylint: disable=g-long-lambda
-    @tf.function
-    def trace():
-      kernel = lambda state: fun_mc.hamiltonian_monte_carlo_step(
-          state,
-          step_size=self._constant(0.1),
-          num_integrator_steps=3,
-          target_log_prob_fn=target_log_prob_fn,
-          seed=_test_seed())
-
-      fun_mc.trace(
-          state=fun_mc.hamiltonian_monte_carlo_init(
-              tf.zeros([1], dtype=self._dtype), target_log_prob_fn),
-          fn=kernel,
-          num_steps=4,
-          trace_fn=lambda *args: ())
-
-    trace()
-
-    self.assertEqual(expected_count, counter[0])
-
-  @_skip_on_jax  # `trace` doesn't have an efficient path in JAX yet.
-  def testHMCCountTargetLogProbEfficient(self):
-
-    counter = [0]
-
-    def target_log_prob_fn(x):
-      counter[0] += 1
-      return -tf.square(x), []
-
-    @tf.function
-    def trace():
-      # pylint: disable=g-long-lambda
-      kernel = lambda state: fun_mc.hamiltonian_monte_carlo_step(
-          state,
-          step_size=self._constant(0.1),
-          num_integrator_steps=3,
-          target_log_prob_fn=target_log_prob_fn,
-          seed=self._make_seed(_test_seed()))
-
-      fun_mc.trace(
-          state=fun_mc.hamiltonian_monte_carlo_init(
-              state=tf.zeros([1], dtype=self._dtype),
-              target_log_prob_fn=target_log_prob_fn),
-          fn=kernel,
-          num_steps=4,
-          trace_fn=lambda *args: ())
-
-    trace()
-
-    self.assertEqual(2, counter[0])
 
   def testAdaptiveStepSize(self):
     step_size = self._constant(0.2)
     num_steps = 200
     num_adapt_steps = 100
     num_leapfrog_steps = 10
-    state = tf.ones([16, 2], dtype=self._dtype)
+    state = jnp.ones([16, 2], dtype=self._dtype)
 
-    base_mean = self._constant([1., 0])
+    base_mean = self._constant([1.0, 0])
     base_cov = self._constant([[1, 0.5], [0.5, 1]])
 
-    @tf.function
+    @jax.jit
     def computation(state, seed):
       bijector = tfp.bijectors.Softplus()
       base_dist = tfp.distributions.MultivariateNormalFullCovariance(
-          loc=base_mean, covariance_matrix=base_cov)
+          loc=base_mean, covariance_matrix=base_cov
+      )
       target_dist = bijector(base_dist)
 
       def orig_target_log_prob_fn(x):
         return target_dist.log_prob(x), ()
 
       target_log_prob_fn, state = fun_mc.transform_log_prob_fn(
-          orig_target_log_prob_fn, bijector, state)
+          orig_target_log_prob_fn, bijector, state
+      )
 
       def kernel(hmc_state, step_size_state, step, seed):
         hmc_seed, seed = util.split_seed(seed, 2)
         hmc_state, hmc_extra = fun_mc.hamiltonian_monte_carlo_step(
             hmc_state,
-            step_size=tf.exp(step_size_state.state),
+            step_size=jnp.exp(step_size_state.state),
             num_integrator_steps=num_leapfrog_steps,
             target_log_prob_fn=target_log_prob_fn,
-            seed=hmc_seed)
+            seed=hmc_seed,
+        )
 
         rate = prefab._polynomial_decay(  # pylint: disable=protected-access
             step=step,
             step_size=self._constant(0.01),
             power=0.5,
             decay_steps=num_adapt_steps,
-            final_step_size=0.)
-        mean_p_accept = tf.reduce_mean(
-            tf.exp(tf.minimum(self._constant(0.), hmc_extra.log_accept_ratio)))
+            final_step_size=0.0,
+        )
+        mean_p_accept = jnp.mean(
+            jnp.exp(
+                jnp.minimum(self._constant(0.0), hmc_extra.log_accept_ratio)
+            )
+        )
 
         loss_fn = fun_mc.make_surrogate_loss_fn(
-            lambda _: (0.9 - mean_p_accept, ()))
+            lambda _: (0.9 - mean_p_accept, ())
+        )
         step_size_state, _ = fun_mc.adam_step(
-            step_size_state, loss_fn, learning_rate=rate)
+            step_size_state, loss_fn, learning_rate=rate
+        )
 
-        return ((hmc_state, step_size_state, step + 1, seed),
-                (hmc_state.state_extra[0], hmc_extra.log_accept_ratio))
+        return (
+            (hmc_state, step_size_state, step + 1, seed),
+            (hmc_state.state_extra[0], hmc_extra.log_accept_ratio),
+        )
 
       _, (chain, log_accept_ratio_trace) = fun_mc.trace(
-          state=(fun_mc.hamiltonian_monte_carlo_init(state, target_log_prob_fn),
-                 fun_mc.adam_init(tf.math.log(step_size)), 0, seed),
+          state=(
+              fun_mc.hamiltonian_monte_carlo_init(state, target_log_prob_fn),
+              fun_mc.adam_init(jnp.log(step_size)),
+              0,
+              seed,
+          ),
           fn=kernel,
           num_steps=num_adapt_steps + num_steps,
       )
       true_samples = target_dist.sample(
-          4096, seed=self._make_seed(_test_seed()))
+          4096, seed=self._make_seed(_test_seed())
+      )
       return chain, log_accept_ratio_trace, true_samples
 
     seed = self._make_seed(_test_seed())
@@ -901,41 +890,43 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     log_accept_ratio_trace = log_accept_ratio_trace[num_adapt_steps:]
     chain = chain[num_adapt_steps:]
 
-    sample_mean = tf.reduce_mean(chain, axis=[0, 1])
+    sample_mean = jnp.mean(chain, axis=[0, 1])
     sample_cov = tfp.stats.covariance(chain, sample_axis=[0, 1])
 
-    true_mean = tf.reduce_mean(true_samples, axis=0)
+    true_mean = jnp.mean(true_samples, axis=0)
     true_cov = tfp.stats.covariance(chain, sample_axis=[0, 1])
 
     self.assertAllClose(true_mean, sample_mean, rtol=0.05, atol=0.05)
     self.assertAllClose(true_cov, sample_cov, rtol=0.05, atol=0.05)
     self.assertAllClose(
-        tf.reduce_mean(tf.exp(tf.minimum(0., log_accept_ratio_trace))),
+        jnp.mean(jnp.exp(jnp.minimum(0.0, log_accept_ratio_trace))),
         0.9,
-        rtol=0.1)
+        rtol=0.1,
+    )
 
   def testSignAdaptation(self):
     new_control = fun_mc.sign_adaptation(
-        control=self._constant(1.),
+        control=self._constant(1.0),
         output=self._constant(0.5),
-        set_point=self._constant(1.),
-        adaptation_rate=self._constant(0.1))
-    self.assertAllClose(new_control, 1. / 1.1)
+        set_point=self._constant(1.0),
+        adaptation_rate=self._constant(0.1),
+    )
+    self.assertAllClose(new_control, 1.0 / 1.1)
 
     new_control = fun_mc.sign_adaptation(
-        control=self._constant(1.),
+        control=self._constant(1.0),
         output=self._constant(0.5),
-        set_point=self._constant(0.),
-        adaptation_rate=self._constant(0.1))
-    self.assertAllClose(new_control, 1. * 1.1)
+        set_point=self._constant(0.0),
+        adaptation_rate=self._constant(0.1),
+    )
+    self.assertAllClose(new_control, 1.0 * 1.1)
 
   def testOBABOLangevinIntegrator(self):
-
     def target_log_prob_fn(q):
-      return -q**2, q
+      return -(q**2), q
 
     def kinetic_energy_fn(p):
-      return p**2., p
+      return p**2.0, p
 
     def momentum_refresh_fn(p, seed):
       del seed
@@ -950,7 +941,8 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
         state,
         step_size=0.1,
         target_log_prob_fn=target_log_prob_fn,
-        kinetic_energy_fn=kinetic_energy_fn)
+        kinetic_energy_fn=kinetic_energy_fn,
+    )
 
     lt_integrator_fn = lambda state: fun_mc.obabo_langevin_integrator(  # pylint: disable=g-long-lambda
         state,
@@ -970,10 +962,11 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
         integrator_trace_fn=lambda state, _: state.state,
     )
 
-    state = tf.zeros([2], dtype=self._dtype)
-    momentum = tf.ones([2], dtype=self._dtype)
+    state = jnp.zeros([2], dtype=self._dtype)
+    momentum = jnp.ones([2], dtype=self._dtype)
     target_log_prob, _, state_grads = fun_mc.call_potential_fn_with_grads(
-        target_log_prob_fn, state)
+        target_log_prob_fn, state
+    )
 
     start_state = fun_mc.IntegratorState(
         target_log_prob=target_log_prob,
@@ -990,17 +983,18 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     # present.
     self.assertAllClose(lt_state, ham_state)
     self.assertAllClose(lt_extra.energy_change, ham_extra.energy_change)
-    self.assertAllClose(lt_extra.energy_change,
-                        ham_extra.final_energy - ham_extra.initial_energy)
+    self.assertAllClose(
+        lt_extra.energy_change,
+        ham_extra.final_energy - ham_extra.initial_energy,
+    )
     self.assertAllClose(lt_extra.integrator_trace, ham_extra.integrator_trace)
 
   def testRaggedIntegrator(self):
-
     def target_log_prob_fn(q):
-      return -q**2, q
+      return -(q**2), q
 
     def kinetic_energy_fn(p):
-      return tf.abs(p)**3., p
+      return jnp.abs(p) ** 3.0, p
 
     integrator_fn = lambda state, num_steps: fun_mc.hamiltonian_integrator(  # pylint: disable=g-long-lambda
         state,
@@ -1009,14 +1003,17 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
             state,
             step_size=0.1,
             target_log_prob_fn=target_log_prob_fn,
-            kinetic_energy_fn=kinetic_energy_fn),
+            kinetic_energy_fn=kinetic_energy_fn,
+        ),
         kinetic_energy_fn=kinetic_energy_fn,
-        integrator_trace_fn=lambda state, extra: (state, extra))
+        integrator_trace_fn=lambda state, extra: (state, extra),
+    )
 
-    state = tf.zeros([2], dtype=self._dtype)
-    momentum = tf.ones([2], dtype=self._dtype)
+    state = jnp.zeros([2], dtype=self._dtype)
+    momentum = jnp.ones([2], dtype=self._dtype)
     target_log_prob, _, state_grads = fun_mc.call_potential_fn_with_grads(
-        target_log_prob_fn, state)
+        target_log_prob_fn, state
+    )
 
     start_state = fun_mc.IntegratorState(
         target_log_prob=target_log_prob,
@@ -1037,7 +1034,8 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     def get_batch(state, idx):
       # For the integrator trace, we'll grab the final value.
       return util.map_tree(
-          lambda x: x[idx] if len(x.shape) == 1 else x[-1, idx], state)
+          lambda x: x[idx] if len(x.shape) == 1 else x[-1, idx], state
+      )
 
     self.assertAllClose(get_batch(state_1, 0), get_batch(state_1_2, 0))
     self.assertAllClose(get_batch(state_2, 0), get_batch(state_1_2, 1))
@@ -1051,12 +1049,11 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     self.assertAllClose(get_slice(state_2, 2, 0), get_slice(state_1_2, 2, 1))
 
   def testRaggedIntegratorMaxSteps(self):
-
     def target_log_prob_fn(q):
-      return -q**2, q
+      return -(q**2), q
 
     def kinetic_energy_fn(p):
-      return tf.abs(p)**3., p
+      return jnp.abs(p) ** 3.0, p
 
     integrator_fn = lambda state, num_steps: fun_mc.hamiltonian_integrator(  # pylint: disable=g-long-lambda
         state,
@@ -1065,15 +1062,18 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
             state,
             step_size=0.1,
             target_log_prob_fn=target_log_prob_fn,
-            kinetic_energy_fn=kinetic_energy_fn),
+            kinetic_energy_fn=kinetic_energy_fn,
+        ),
         kinetic_energy_fn=kinetic_energy_fn,
         max_num_steps=3,
-        integrator_trace_fn=lambda state, extra: (state, extra))
+        integrator_trace_fn=lambda state, extra: (state, extra),
+    )
 
-    state = tf.zeros([2], dtype=self._dtype)
-    momentum = tf.ones([2], dtype=self._dtype)
+    state = jnp.zeros([2], dtype=self._dtype)
+    momentum = jnp.ones([2], dtype=self._dtype)
     target_log_prob, _, state_grads = fun_mc.call_potential_fn_with_grads(
-        target_log_prob_fn, state)
+        target_log_prob_fn, state
+    )
 
     start_state = fun_mc.IntegratorState(
         target_log_prob=target_log_prob,
@@ -1094,7 +1094,8 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     def get_batch(state, idx):
       # For the integrator trace, we'll grab the final value.
       return util.map_tree(
-          lambda x: x[idx] if len(x.shape) == 1 else x[-1, idx], state)
+          lambda x: x[idx] if len(x.shape) == 1 else x[-1, idx], state
+      )
 
     self.assertAllClose(get_batch(state_1, 0), get_batch(state_1_2, 0))
     self.assertAllClose(get_batch(state_2, 0), get_batch(state_1_2, 1))
@@ -1108,121 +1109,122 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     self.assertAllClose(get_slice(state_2, 2, 0), get_slice(state_1_2, 2, 1))
 
     self.assertAllEqual(
-        3,
-        util.flatten_tree(state_1[1].integrator_trace)[0].shape[0])
+        3, util.flatten_tree(state_1[1].integrator_trace)[0].shape[0]
+    )
     self.assertAllEqual(
-        3,
-        util.flatten_tree(state_2[1].integrator_trace)[0].shape[0])
+        3, util.flatten_tree(state_2[1].integrator_trace)[0].shape[0]
+    )
     self.assertAllEqual(
-        3,
-        util.flatten_tree(state_1_2[1].integrator_trace)[0].shape[0])
+        3, util.flatten_tree(state_1_2[1].integrator_trace)[0].shape[0]
+    )
 
   def testAdam(self):
-
     def loss_fn(x, y):
-      return tf.square(x - 1.) + tf.square(y - 2.), []
+      return jnp.square(x - 1.0) + jnp.square(y - 2.0), []
 
     _, [(x, y), loss] = fun_mc.trace(
-        fun_mc.adam_init([self._constant(0.),
-                          self._constant(0.)]),
+        fun_mc.adam_init([self._constant(0.0), self._constant(0.0)]),
         lambda adam_state: fun_mc.adam_step(  # pylint: disable=g-long-lambda
-            adam_state,
-            loss_fn,
-            learning_rate=self._constant(0.01)),
+            adam_state, loss_fn, learning_rate=self._constant(0.01)
+        ),
         num_steps=1000,
-        trace_fn=lambda state, extra: [state.state, extra.loss])
+        trace_fn=lambda state, extra: [state.state, extra.loss],
+    )
 
-    self.assertAllClose(1., x[-1], atol=1e-3)
-    self.assertAllClose(2., y[-1], atol=1e-3)
-    self.assertAllClose(0., loss[-1], atol=1e-3)
+    self.assertAllClose(1.0, x[-1], atol=1e-3)
+    self.assertAllClose(2.0, y[-1], atol=1e-3)
+    self.assertAllClose(0.0, loss[-1], atol=1e-3)
 
   def testGradientDescent(self):
-
     def loss_fn(x, y):
-      return tf.square(x - 1.) + tf.square(y - 2.), []
+      return jnp.square(x - 1.0) + jnp.square(y - 2.0), []
 
     _, [(x, y), loss] = fun_mc.trace(
-        fun_mc.GradientDescentState([self._constant(0.),
-                                     self._constant(0.)]),
+        fun_mc.GradientDescentState([self._constant(0.0), self._constant(0.0)]),
         lambda gd_state: fun_mc.gradient_descent_step(  # pylint: disable=g-long-lambda
-            gd_state,
-            loss_fn,
-            learning_rate=self._constant(0.01)),
+            gd_state, loss_fn, learning_rate=self._constant(0.01)
+        ),
         num_steps=1000,
-        trace_fn=lambda state, extra: [state.state, extra.loss])
+        trace_fn=lambda state, extra: [state.state, extra.loss],
+    )
 
-    self.assertAllClose(1., x[-1], atol=1e-3)
-    self.assertAllClose(2., y[-1], atol=1e-3)
-    self.assertAllClose(0., loss[-1], atol=1e-3)
+    self.assertAllClose(1.0, x[-1], atol=1e-3)
+    self.assertAllClose(2.0, y[-1], atol=1e-3)
+    self.assertAllClose(0.0, loss[-1], atol=1e-3)
 
   def testSimpleDualAverages(self):
-
     def loss_fn(x, y):
-      return tf.square(x - 1.) + tf.square(y - 2.), []
+      return jnp.square(x - 1.0) + jnp.square(y - 2.0), []
 
     def kernel(sda_state, rms_state):
-      sda_state, _ = fun_mc.simple_dual_averages_step(sda_state, loss_fn, 1.)
+      sda_state, _ = fun_mc.simple_dual_averages_step(sda_state, loss_fn, 1.0)
       rms_state, _ = fun_mc.running_mean_step(rms_state, sda_state.state)
       return (sda_state, rms_state), rms_state.mean
 
     _, (x, y) = fun_mc.trace(
         (
             fun_mc.simple_dual_averages_init(
-                [self._constant(0.), self._constant(0.)]),
+                [self._constant(0.0), self._constant(0.0)]
+            ),
             fun_mc.running_mean_init([[], []], [self._dtype, self._dtype]),
         ),
         kernel,
         num_steps=1000,
     )
 
-    self.assertAllClose(1., x[-1], atol=1e-1)
-    self.assertAllClose(2., y[-1], atol=1e-1)
+    self.assertAllClose(1.0, x[-1], atol=1e-1)
+    self.assertAllClose(2.0, y[-1], atol=1e-1)
 
   def testGaussianProposal(self):
     num_samples = 1000
 
     state = {
-        'x':
-            tf.zeros([num_samples, 1], dtype=self._dtype) +
-            self._constant([0., 1.]),
-        'y':
-            tf.zeros([num_samples], dtype=self._dtype) + self._constant(3.)
+        'x': jnp.zeros([num_samples, 1], dtype=self._dtype) + self._constant(
+            [0.0, 1.0]
+        ),
+        'y': jnp.zeros([num_samples], dtype=self._dtype) + self._constant(3.0),
     }
-    scale = 2.
+    scale = 2.0
 
     state_samples, _ = fun_mc.gaussian_proposal(
-        state, scale=scale, seed=self._make_seed(_test_seed()))
+        state, scale=scale, seed=self._make_seed(_test_seed())
+    )
 
     _, p_val_x0 = scipy.stats.kstest(
         state_samples['x'][:, 0],
-        lambda x: scipy.stats.norm.cdf(x, loc=0., scale=2.))
+        lambda x: scipy.stats.norm.cdf(x, loc=0.0, scale=2.0),
+    )
     _, p_val_x1 = scipy.stats.kstest(
         state_samples['x'][:, 1],
-        lambda x: scipy.stats.norm.cdf(x, loc=1., scale=2.))
+        lambda x: scipy.stats.norm.cdf(x, loc=1.0, scale=2.0),
+    )
     _, p_val_y = scipy.stats.kstest(
-        state_samples['y'], lambda x: scipy.stats.norm.cdf(x, loc=3., scale=2.))
+        state_samples['y'],
+        lambda x: scipy.stats.norm.cdf(x, loc=3.0, scale=2.0),
+    )
     self.assertGreater(p_val_x0, 1e-3)
     self.assertGreater(p_val_x1, 1e-3)
     self.assertGreater(p_val_y, 1e-3)
 
-    mean = util.map_tree(lambda x: tf.reduce_mean(x, 0), state_samples)
-    variance = util.map_tree(lambda x: tf.math.reduce_variance(x, 0),
-                             state_samples)
+    mean = util.map_tree(lambda x: jnp.mean(x, 0), state_samples)
+    variance = util.map_tree(lambda x: jnp.var(x, 0), state_samples)
 
     self.assertAllClose(state['x'][0], mean['x'], atol=0.2)
     self.assertAllClose(state['y'][0], mean['y'], atol=0.2)
     self.assertAllClose(
-        scale**2 * tf.ones_like(mean['x']), variance['x'], atol=0.5)
+        scale**2 * jnp.ones_like(mean['x']), variance['x'], atol=0.5
+    )
     self.assertAllClose(
-        scale**2 * tf.ones_like(mean['y']), variance['y'], atol=0.5)
+        scale**2 * jnp.ones_like(mean['y']), variance['y'], atol=0.5
+    )
 
   def testGaussianProposalNamedAxis(self):
     if BACKEND != 'backend_jax':
       self.skipTest('JAX-only')
 
     state = {
-        'sharded': tf.zeros([4], self._dtype),
-        'shared': tf.zeros([], self._dtype),
+        'sharded': jnp.zeros([4], self._dtype),
+        'shared': jnp.zeros([], self._dtype),
     }
     in_axes = {
         'sharded': 0,
@@ -1234,57 +1236,67 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     }
 
     @functools.partial(
-        jax.pmap, in_axes=(in_axes, None), axis_name='named_axis')
+        real_jax.pmap, in_axes=(in_axes, None), axis_name='named_axis'
+    )
     def proposal_fn(state, seed):
       samples, _ = fun_mc.gaussian_proposal(
-          state, scale=1., named_axis=named_axis, seed=seed)
+          state, scale=1.0, named_axis=named_axis, seed=seed
+      )
       return samples
 
     samples = proposal_fn(state, self._make_seed(_test_seed()))
 
     self.assertAllClose(samples['shared'][0], samples['shared'][1])
     self.assertTrue(
-        np.any(np.abs(samples['sharded'][0] - samples['sharded'][1]) > 1e-3))
+        np.any(np.abs(samples['sharded'][0] - samples['sharded'][1]) > 1e-3)
+    )
 
   def testMaximalReflectiveProposal(self):
     state = {
-        'x': self._constant([[0., 1.], [2., 3.]]),
-        'y': self._constant([3., 4.])
+        'x': self._constant([[0.0, 1.0], [2.0, 3.0]]),
+        'y': self._constant([3.0, 4.0]),
     }
-    scale = 2.
+    scale = 2.0
 
     def kernel(seed):
       proposal_seed, seed = util.split_seed(seed, 2)
       new_state, (extra, _) = fun_mc.maximal_reflection_coupling_proposal(
-          state, scale=scale, seed=proposal_seed)
+          state, scale=scale, seed=proposal_seed
+      )
       return seed, (new_state, extra.coupling_proposed)
 
     # Simulate an MCMC run.
     _, (state_samples, coupling_proposed) = fun_mc.trace(
-        self._make_seed(_test_seed()), kernel, 1000)
+        self._make_seed(_test_seed()), kernel, 1000
+    )
 
-    mean = util.map_tree(lambda x: tf.reduce_mean(x, 0), state_samples)
-    variance = util.map_tree(lambda x: tf.math.reduce_variance(x, 0),
-                             state_samples)
+    mean = util.map_tree(lambda x: jnp.mean(x, 0), state_samples)
+    variance = util.map_tree(lambda x: jnp.var(x, 0), state_samples)
 
     _, p_val_x00 = scipy.stats.kstest(
         state_samples['x'][:, 0, 0],
-        lambda x: scipy.stats.norm.cdf(x, loc=0., scale=2.))
+        lambda x: scipy.stats.norm.cdf(x, loc=0.0, scale=2.0),
+    )
     _, p_val_x01 = scipy.stats.kstest(
         state_samples['x'][:, 0, 1],
-        lambda x: scipy.stats.norm.cdf(x, loc=1., scale=2.))
+        lambda x: scipy.stats.norm.cdf(x, loc=1.0, scale=2.0),
+    )
     _, p_val_x10 = scipy.stats.kstest(
         state_samples['x'][:, 1, 0],
-        lambda x: scipy.stats.norm.cdf(x, loc=2., scale=2.))
+        lambda x: scipy.stats.norm.cdf(x, loc=2.0, scale=2.0),
+    )
     _, p_val_x11 = scipy.stats.kstest(
         state_samples['x'][:, 1, 1],
-        lambda x: scipy.stats.norm.cdf(x, loc=3., scale=2.))
+        lambda x: scipy.stats.norm.cdf(x, loc=3.0, scale=2.0),
+    )
     _, p_val_y0 = scipy.stats.kstest(
         state_samples['y'][:, 0],
-        lambda x: scipy.stats.norm.cdf(x, loc=3., scale=2.))
+        lambda x: scipy.stats.norm.cdf(x, loc=3.0, scale=2.0),
+    )
     _, p_val_y1 = scipy.stats.kstest(
         state_samples['y'][:, 1],
-        lambda x: scipy.stats.norm.cdf(x, loc=4., scale=2.))
+        lambda x: scipy.stats.norm.cdf(x, loc=4.0, scale=2.0),
+    )
     self.assertGreater(p_val_x00, 1e-3)
     self.assertGreater(p_val_x01, 1e-3)
     self.assertGreater(p_val_x10, 1e-3)
@@ -1295,16 +1307,22 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     self.assertAllClose(state['x'], mean['x'], atol=0.2)
     self.assertAllClose(state['y'], mean['y'], atol=0.2)
     self.assertAllClose(
-        scale**2 * tf.ones_like(mean['x']), variance['x'], atol=0.5)
+        scale**2 * jnp.ones_like(mean['x']), variance['x'], atol=0.5
+    )
     self.assertAllClose(
-        scale**2 * tf.ones_like(mean['y']), variance['y'], atol=0.5)
+        scale**2 * jnp.ones_like(mean['y']), variance['y'], atol=0.5
+    )
 
     coupled = coupling_proposed & np.array(
         util.flatten_tree(
             util.map_tree(
-                lambda x: tf.math.reduce_all(  # pylint: disable=g-long-lambda
-                    (x[:, :1] == x[:, 1:]), tuple(range(2, len(x.shape)))),
-                state_samples))).all(0)
+                lambda x: jnp.all(  # pylint: disable=g-long-lambda
+                    (x[:, :1] == x[:, 1:]), tuple(range(2, len(x.shape)))
+                ),
+                state_samples,
+            )
+        )
+    ).all(0)
     self.assertAllClose(coupling_proposed, coupled)
 
   def testMaximalReflectiveProposalNamedAxis(self):
@@ -1313,11 +1331,11 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
 
     state = {
         # The trailing shape is [coupled axis, independent chains].
-        'sharded':
-            tf.zeros([4, 2, 1024], self._dtype) +
-            self._constant([0., 1.])[:, tf.newaxis],
-        'shared':
-            tf.zeros([2, 1024], self._dtype),
+        'sharded': (
+            jnp.zeros([4, 2, 1024], self._dtype)
+            + self._constant([0.0, 1.0])[:, jnp.newaxis]
+        ),
+        'shared': jnp.zeros([2, 1024], self._dtype),
     }
     in_axes = {
         'sharded': 0,
@@ -1329,10 +1347,12 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     }
 
     @functools.partial(
-        jax.pmap, in_axes=(in_axes, None), axis_name='named_axis')
+        real_jax.pmap, in_axes=(in_axes, None), axis_name='named_axis'
+    )
     def proposal_fn(state, seed):
       samples, (extra, _) = fun_mc.maximal_reflection_coupling_proposal(
-          state, chain_ndims=1, scale=1., named_axis=named_axis, seed=seed)
+          state, chain_ndims=1, scale=1.0, named_axis=named_axis, seed=seed
+      )
       return samples, extra
 
     samples, extra = proposal_fn(state, self._make_seed(_test_seed()))
@@ -1341,15 +1361,16 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     self.assertAllClose(extra.log_couple_ratio[0], extra.log_couple_ratio[1])
     self.assertAllClose(extra.coupling_proposed[0], extra.coupling_proposed[1])
     self.assertTrue(
-        np.any(np.abs(samples['sharded'][0] - samples['sharded'][1]) > 1e-3))
+        np.any(np.abs(samples['sharded'][0] - samples['sharded'][1]) > 1e-3)
+    )
 
   def testHMCNamedAxis(self):
     if BACKEND != 'backend_jax':
       self.skipTest('JAX-only')
 
     state = {
-        'sharded': tf.zeros([4, 1024], self._dtype),
-        'shared': tf.zeros([1024], self._dtype),
+        'sharded': jnp.zeros([4, 1024], self._dtype),
+        'shared': jnp.zeros([1024], self._dtype),
     }
     in_axes = {
         'sharded': 0,
@@ -1361,50 +1382,68 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     }
 
     def target_log_prob_fn(sharded, shared):
-      return -(backend.distribute_lib.psum(tf.square(sharded), 'named_axis') +
-               tf.square(shared)), ()
+      return (
+          -(
+              backend.distribute_lib.psum(jnp.square(sharded), 'named_axis')
+              + jnp.square(shared)
+          ),
+          (),
+      )
 
     @functools.partial(
-        jax.pmap, in_axes=(in_axes, None), axis_name='named_axis')
+        real_jax.pmap, in_axes=(in_axes, None), axis_name='named_axis'
+    )
     def kernel(state, seed):
       hmc_state = fun_mc.hamiltonian_monte_carlo_init(
-          state, target_log_prob_fn=target_log_prob_fn)
+          state, target_log_prob_fn=target_log_prob_fn
+      )
       hmc_state, hmc_extra = fun_mc.hamiltonian_monte_carlo_step(
           hmc_state,
           step_size=self._constant(0.2),
           num_integrator_steps=4,
           target_log_prob_fn=target_log_prob_fn,
           named_axis=named_axis,
-          seed=seed)
+          seed=seed,
+      )
       return hmc_state, hmc_extra
 
     seed = self._make_seed(_test_seed())
     hmc_state, hmc_extra = kernel(state, seed)
-    self.assertAllClose(hmc_state.state['shared'][0],
-                        hmc_state.state['shared'][1])
+    self.assertAllClose(
+        hmc_state.state['shared'][0], hmc_state.state['shared'][1]
+    )
     self.assertTrue(
         np.any(
-            np.abs(hmc_state.state['sharded'][0] -
-                   hmc_state.state['sharded'][1]) > 1e-3))
+            np.abs(
+                hmc_state.state['sharded'][0] - hmc_state.state['sharded'][1]
+            )
+            > 1e-3
+        )
+    )
     self.assertAllClose(hmc_extra.is_accepted[0], hmc_extra.is_accepted[1])
-    self.assertAllClose(hmc_extra.log_accept_ratio[0],
-                        hmc_extra.log_accept_ratio[1])
+    self.assertAllClose(
+        hmc_extra.log_accept_ratio[0], hmc_extra.log_accept_ratio[1]
+    )
 
   def testRandomWalkMetropolis(self):
     num_steps = 1000
-    state = tf.ones([16], dtype=tf.int32)
-    target_logits = self._constant([1., 2., 3., 4.]) + 2.
-    proposal_logits = self._constant([4., 3., 2., 1.]) + 2.
+    state = jnp.ones([16], dtype=jnp.int32)
+    target_logits = self._constant([1.0, 2.0, 3.0, 4.0]) + 2.0
+    proposal_logits = self._constant([4.0, 3.0, 2.0, 1.0]) + 2.0
 
     def target_log_prob_fn(x):
-      return tf.gather(target_logits, x), ()
+      return jnp.asarray(target_logits)[x], ()
 
     def proposal_fn(x, seed):
-      current_logits = tf.gather(proposal_logits, x)
-      proposal = util.random_categorical(proposal_logits[tf.newaxis],
-                                         x.shape[0], seed)[0]
-      proposed_logits = tf.gather(proposal_logits, proposal)
-      return tf.cast(proposal, x.dtype), ((), proposed_logits - current_logits)
+      current_logits = proposal_logits[x]
+      proposal = util.random_categorical(
+          proposal_logits[jnp.newaxis], x.shape[0], seed
+      )[0]
+      proposed_logits = proposal_logits[proposal]
+      return jnp.array(proposal, x.dtype), (
+          (),
+          proposed_logits - current_logits,
+      )
 
     def kernel(rwm_state, seed):
       rwm_seed, seed = util.split_seed(seed, 2)
@@ -1412,24 +1451,28 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
           rwm_state,
           target_log_prob_fn=target_log_prob_fn,
           proposal_fn=proposal_fn,
-          seed=rwm_seed)
+          seed=rwm_seed,
+      )
       return (rwm_state, seed), rwm_extra
 
     seed = self._make_seed(_test_seed())
 
-    # Subtle: Unlike TF, JAX needs a data dependency from the inputs to outputs
-    # for the jit to do anything.
-    _, chain = tf.function(lambda state, seed: fun_mc.trace(  # pylint: disable=g-long-lambda
-        state=(fun_mc.random_walk_metropolis_init(state, target_log_prob_fn),
-               seed),
-        fn=kernel,
-        num_steps=num_steps,
-        trace_fn=lambda state, extra: state[0].state))(state, seed)
+    _, chain = jax.jit(
+        lambda state, seed: fun_mc.trace(  # pylint: disable=g-long-lambda
+            state=(
+                fun_mc.random_walk_metropolis_init(state, target_log_prob_fn),
+                seed,
+            ),
+            fn=kernel,
+            num_steps=num_steps,
+            trace_fn=lambda state, extra: state[0].state,
+        )
+    )(state, seed)
     # Discard the warmup samples.
     chain = chain[500:]
 
-    sample_mean = tf.reduce_mean(tf.one_hot(chain, 4), axis=[0, 1])
-    self.assertAllClose(tf.nn.softmax(target_logits), sample_mean, atol=0.11)
+    sample_mean = jnp.mean(jax.nn.one_hot(chain, 4), axis=[0, 1])
+    self.assertAllClose(jax.nn.softmax(target_logits), sample_mean, atol=0.11)
 
   @parameterized.named_parameters(
       ('Basic', (10, 3), None),
@@ -1447,15 +1490,19 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
       rms, _ = fun_mc.running_mean_step(rms, data[idx], axis=aggregation)
       return (rms, idx + 1), ()
 
-    true_aggregation = (0,) + (() if aggregation is None else tuple(
-        [a + 1 for a in util.flatten_tree(aggregation)]))
+    true_aggregation = (0,) + (
+        ()
+        if aggregation is None
+        else tuple([a + 1 for a in util.flatten_tree(aggregation)])
+    )
     true_mean = np.mean(data, true_aggregation)
 
     (rms, _), _ = fun_mc.trace(
         state=(fun_mc.running_mean_init(true_mean.shape, data.dtype), 0),
         fn=kernel,
         num_steps=len(data),
-        trace_fn=lambda *args: ())
+        trace_fn=lambda *args: (),
+    )
 
     self.assertAllClose(true_mean, rms.mean)
 
@@ -1464,8 +1511,10 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     rng = np.random.RandomState(_test_seed())
     data = self._constant(
         np.concatenate(
-            [rng.randn(window_size), 1. + 2. * rng.randn(window_size * 10)],
-            axis=0))
+            [rng.randn(window_size), 1.0 + 2.0 * rng.randn(window_size * 10)],
+            axis=0,
+        )
+    )
 
     def kernel(rms, idx):
       rms, _ = fun_mc.running_mean_step(rms, data[idx], window_size=window_size)
@@ -1481,7 +1530,7 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     # After window_size, we're doing exponential moving average, and pick up the
     # mean after the change in the distribution. Since the moving average is
     # computed only over ~window_size points, this test is rather noisy.
-    self.assertAllClose(1., mean[-1], atol=0.2)
+    self.assertAllClose(1.0, mean[-1], atol=0.2)
 
   @parameterized.named_parameters(
       ('Basic', (10, 3), None),
@@ -1495,8 +1544,11 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     rng = np.random.RandomState(_test_seed())
     data = self._constant(rng.randn(*shape))
 
-    true_aggregation = (0,) + (() if aggregation is None else tuple(
-        [a + 1 for a in util.flatten_tree(aggregation)]))
+    true_aggregation = (0,) + (
+        ()
+        if aggregation is None
+        else tuple([a + 1 for a in util.flatten_tree(aggregation)])
+    )
     true_mean = np.mean(data, true_aggregation)
     true_var = np.var(data, true_aggregation)
 
@@ -1508,7 +1560,8 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
         state=(fun_mc.running_variance_init(true_mean.shape, data[0].dtype), 0),
         fn=kernel,
         num_steps=len(data),
-        trace_fn=lambda *args: ())
+        trace_fn=lambda *args: (),
+    )
     self.assertAllClose(true_mean, rvs.mean)
     self.assertAllClose(true_var, rvs.variance)
 
@@ -1517,12 +1570,15 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     rng = np.random.RandomState(_test_seed())
     data = self._constant(
         np.concatenate(
-            [rng.randn(window_size), 1. + 2. * rng.randn(window_size * 10)],
-            axis=0))
+            [rng.randn(window_size), 1.0 + 2.0 * rng.randn(window_size * 10)],
+            axis=0,
+        )
+    )
 
     def kernel(rvs, idx):
       rvs, _ = fun_mc.running_variance_step(
-          rvs, data[idx], window_size=window_size)
+          rvs, data[idx], window_size=window_size
+      )
       return (rvs, idx + 1), (rvs.mean, rvs.variance)
 
     _, (mean, var) = fun_mc.trace(
@@ -1537,8 +1593,8 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     # mean/variance after the change in the distribution. Since the moving
     # average is computed only over ~window_size points, this test is rather
     # noisy.
-    self.assertAllClose(1., mean[-1], atol=0.2)
-    self.assertAllClose(4., var[-1], atol=0.8)
+    self.assertAllClose(1.0, mean[-1], atol=0.2)
+    self.assertAllClose(4.0, var[-1], atol=0.8)
 
   @parameterized.named_parameters(
       ('Basic', (10, 3), None),
@@ -1550,8 +1606,11 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     rng = np.random.RandomState(_test_seed())
     data = self._constant(rng.randn(*shape))
 
-    true_aggregation = (0,) + (() if aggregation is None else tuple(
-        [a + 1 for a in util.flatten_tree(aggregation)]))
+    true_aggregation = (0,) + (
+        ()
+        if aggregation is None
+        else tuple([a + 1 for a in util.flatten_tree(aggregation)])
+    )
     true_mean = np.mean(data, true_aggregation)
     true_cov = _gen_cov(data, true_aggregation)
 
@@ -1560,11 +1619,14 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
       return (rcs, idx + 1), ()
 
     (rcs, _), _ = fun_mc.trace(
-        state=(fun_mc.running_covariance_init(true_mean.shape,
-                                              data[0].dtype), 0),
+        state=(
+            fun_mc.running_covariance_init(true_mean.shape, data[0].dtype),
+            0,
+        ),
         fn=kernel,
         num_steps=len(data),
-        trace_fn=lambda *args: ())
+        trace_fn=lambda *args: (),
+    )
     self.assertAllClose(true_mean, rcs.mean)
     self.assertAllClose(true_cov, rcs.covariance)
 
@@ -1575,15 +1637,17 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
         np.concatenate(
             [
                 rng.randn(window_size, 2),
-                np.array([1., 2.]) +
-                np.array([2., 3.]) * rng.randn(window_size * 10, 2)
+                np.array([1.0, 2.0])
+                + np.array([2.0, 3.0]) * rng.randn(window_size * 10, 2),
             ],
             axis=0,
-        ))
+        )
+    )
 
     def kernel(rvs, idx):
       rvs, _ = fun_mc.running_covariance_step(
-          rvs, data[idx], window_size=window_size)
+          rvs, data[idx], window_size=window_size
+      )
       return (rvs, idx + 1), (rvs.mean, rvs.covariance)
 
     _, (mean, cov) = fun_mc.trace(
@@ -1593,15 +1657,17 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     )
     # Up to window_size, we compute the running mean/variance exactly.
     self.assertAllClose(
-        np.mean(data[:window_size], axis=0), mean[window_size - 1])
+        np.mean(data[:window_size], axis=0), mean[window_size - 1]
+    )
     self.assertAllClose(
-        _gen_cov(data[:window_size], axis=0), cov[window_size - 1])
+        _gen_cov(data[:window_size], axis=0), cov[window_size - 1]
+    )
     # After window_size, we're doing exponential moving average, and pick up the
     # mean/variance after the change in the distribution. Since the moving
     # average is computed only over ~window_size points, this test is rather
     # noisy.
-    self.assertAllClose(np.array([1., 2.]), mean[-1], atol=0.2)
-    self.assertAllClose(np.array([[4., 0.], [0., 9.]]), cov[-1], atol=1.)
+    self.assertAllClose(np.array([1.0, 2.0]), mean[-1], atol=0.2)
+    self.assertAllClose(np.array([[4.0, 0.0], [0.0, 9.0]]), cov[-1], atol=1.0)
 
   @parameterized.named_parameters(
       ('BasicScalar', (10, 20), 1),
@@ -1615,19 +1681,24 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     chains = 0.4 * rng.randn(*chain_shape).astype(np.float32) + chain_means
 
     true_rhat = tfp.mcmc.potential_scale_reduction(
-        chains, independent_chain_ndims=independent_chain_ndims)
+        chains, independent_chain_ndims=independent_chain_ndims
+    )
 
     chains = self._constant(chains)
     psrs, _ = fun_mc.trace(
-        state=fun_mc.potential_scale_reduction_init(chain_shape[1:],
-                                                    self._dtype),
+        state=fun_mc.potential_scale_reduction_init(
+            chain_shape[1:], self._dtype
+        ),
         fn=lambda psrs: fun_mc.potential_scale_reduction_step(  # pylint: disable=g-long-lambda
-            psrs, chains[psrs.num_points]),
+            psrs, chains[psrs.num_points]
+        ),
         num_steps=chain_shape[0],
-        trace_fn=lambda *_: ())
+        trace_fn=lambda *_: (),
+    )
 
     running_rhat = fun_mc.potential_scale_reduction_extract(
-        psrs, independent_chain_ndims=independent_chain_ndims)
+        psrs, independent_chain_ndims=independent_chain_ndims
+    )
     self.assertAllClose(true_rhat, running_rhat)
 
   @parameterized.named_parameters(
@@ -1637,8 +1708,9 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
       ('Aggregated0', (3, 2), 1, 0),
       ('Aggregated01', (3, 4, 2), 1, (0, 1)),
   )
-  def testRunningApproximateAutoCovariance(self, state_shape, event_ndims,
-                                           aggregation):
+  def testRunningApproximateAutoCovariance(
+      self, state_shape, event_ndims, aggregation
+  ):
     # We'll use HMC as the source of our chain.
     # While HMC is being sampled, we also compute the running autocovariance.
     step_size = 0.2
@@ -1646,14 +1718,14 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     num_leapfrog_steps = 10
     max_lags = 300
 
-    state = tf.zeros(state_shape, dtype=self._dtype)
+    state = jnp.zeros(state_shape, dtype=self._dtype)
 
     def target_log_prob_fn(x):
-      lp = -0.5 * tf.square(x)
+      lp = -0.5 * jnp.square(x)
       if event_ndims is None:
         return lp, ()
       else:
-        return tf.reduce_sum(lp, -1), ()
+        return jnp.sum(lp, -1), ()
 
     def kernel(hmc_state, raac_state, seed):
       hmc_seed, seed = util.split_seed(seed, 2)
@@ -1662,123 +1734,129 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
           step_size=step_size,
           num_integrator_steps=num_leapfrog_steps,
           target_log_prob_fn=target_log_prob_fn,
-          seed=hmc_seed)
+          seed=hmc_seed,
+      )
       raac_state, _ = fun_mc.running_approximate_auto_covariance_step(
-          raac_state, hmc_state.state, axis=aggregation)
+          raac_state, hmc_state.state, axis=aggregation
+      )
       return (hmc_state, raac_state, seed), hmc_extra
 
     seed = self._make_seed(_test_seed())
 
     # Subtle: Unlike TF, JAX needs a data dependency from the inputs to outputs
     # for the jit to do anything.
-    (_, raac_state, _), chain = tf.function(lambda state, seed: fun_mc.trace(  # pylint: disable=g-long-lambda
-        state=(
-            fun_mc.hamiltonian_monte_carlo_init(state, target_log_prob_fn),
-            fun_mc.running_approximate_auto_covariance_init(
-                max_lags=max_lags,
-                state_shape=state_shape,
-                dtype=state.dtype,
-                axis=aggregation),
-            seed,
-        ),
-        fn=kernel,
-        num_steps=num_steps,
-        trace_fn=lambda state, extra: state[0].state))(state, seed)
+    (_, raac_state, _), chain = jax.jit(
+        lambda state, seed: fun_mc.trace(  # pylint: disable=g-long-lambda
+            state=(
+                fun_mc.hamiltonian_monte_carlo_init(state, target_log_prob_fn),
+                fun_mc.running_approximate_auto_covariance_init(
+                    max_lags=max_lags,
+                    state_shape=state_shape,
+                    dtype=state.dtype,
+                    axis=aggregation,
+                ),
+                seed,
+            ),
+            fn=kernel,
+            num_steps=num_steps,
+            trace_fn=lambda state, extra: state[0].state,
+        )
+    )(state, seed)
 
-    true_aggregation = (0,) + (() if aggregation is None else tuple(
-        [a + 1 for a in util.flatten_tree(aggregation)]))
-    true_variance = np.array(
-        tf.math.reduce_variance(np.array(chain), true_aggregation))
+    true_aggregation = (0,) + (
+        ()
+        if aggregation is None
+        else tuple([a + 1 for a in util.flatten_tree(aggregation)])
+    )
+    true_variance = np.array(jnp.var(np.array(chain), true_aggregation))
     true_autocov = np.array(
-        tfp.stats.auto_correlation(np.array(chain), axis=0, max_lags=max_lags))
+        tfp.stats.auto_correlation(np.array(chain), axis=0, max_lags=max_lags)
+    )
     if aggregation is not None:
-      true_autocov = tf.reduce_mean(
-          true_autocov, [a + 1 for a in util.flatten_tree(aggregation)])
+      true_autocov = jnp.mean(
+          true_autocov, [a + 1 for a in util.flatten_tree(aggregation)]
+      )
 
     self.assertAllClose(true_variance, raac_state.auto_covariance[0], 1e-5)
     self.assertAllClose(
         true_autocov,
         raac_state.auto_covariance / raac_state.auto_covariance[0],
-        atol=0.1)
+        atol=0.1,
+    )
 
   @parameterized.named_parameters(
-      ('Positional1', 0.),
-      ('Positional2', (0., 1.)),
-      ('Named1', {
-          'a': 0.
-      }),
-      ('Named2', {
-          'a': 0.,
-          'b': 1.
-      }),
+      ('Positional1', 0.0),
+      ('Positional2', (0.0, 1.0)),
+      ('Named1', {'a': 0.0}),
+      ('Named2', {'a': 0.0, 'b': 1.0}),
   )
   def testSurrogateLossFn(self, state):
-
     def grad_fn(*args, **kwargs):
       # This is uglier than user code due to the parameterized test...
       new_state = util.unflatten_tree(state, util.flatten_tree((args, kwargs)))
-      return util.map_tree(lambda x: x + 1., new_state), new_state
+      return util.map_tree(lambda x: x + 1.0, new_state), new_state
 
     loss_fn = fun_mc.make_surrogate_loss_fn(grad_fn)
 
     # Mutate the state to make sure we didn't capture anything.
-    state = util.map_tree(lambda x: self._constant(x + 1.), state)
+    state = util.map_tree(lambda x: self._constant(x + 1.0), state)
     ret, extra, grads = fun_mc.call_potential_fn_with_grads(loss_fn, state)
     # The default is 0.
-    self.assertAllClose(0., ret)
+    self.assertAllClose(0.0, ret)
     # The gradients of the surrogate loss are state + 1.
-    self.assertAllCloseNested(util.map_tree(lambda x: x + 1., state), grads)
+    self.assertAllCloseNested(util.map_tree(lambda x: x + 1.0, state), grads)
     self.assertAllCloseNested(state, extra)
 
   def testSurrogateLossFnDecorator(self):
-
-    @fun_mc.make_surrogate_loss_fn(loss_value=1.)
+    @fun_mc.make_surrogate_loss_fn(loss_value=1.0)
     def loss_fn(_):
-      return 3., 2.
+      return 3.0, 2.0
 
-    ret, extra, grads = fun_mc.call_potential_fn_with_grads(loss_fn, 0.)
-    self.assertAllClose(1., ret)
-    self.assertAllClose(2., extra)
-    self.assertAllClose(3., grads)
+    ret, extra, grads = fun_mc.call_potential_fn_with_grads(loss_fn, 0.0)
+    self.assertAllClose(1.0, ret)
+    self.assertAllClose(2.0, extra)
+    self.assertAllClose(3.0, grads)
 
   @parameterized.named_parameters(
       ('Probability', True),
       ('Loss', False),
   )
   def testReparameterizeFn(self, track_volume):
-
     def potential_fn(x, y):
-      return -x**2 + -y**2, ()
+      return -(x**2) + -(y**2), ()
 
     def transport_map_fn(x, y):
-      return [2 * x, 3 * y], ((), tf.math.log(2.) + tf.math.log(3.))
+      return [2 * x, 3 * y], ((), jnp.log(2.0) + jnp.log(3.0))
 
     def inverse_map_fn(x, y):
-      return [x / 2, y / 3], ((), -tf.math.log(2.) - tf.math.log(3.))
+      return [x / 2, y / 3], ((), -jnp.log(2.0) - jnp.log(3.0))
 
     transport_map_fn.inverse = inverse_map_fn
 
-    (transformed_potential_fn,
-     transformed_init_state) = fun_mc.reparameterize_potential_fn(
-         potential_fn,
-         transport_map_fn,
-         [self._constant(2.), self._constant(3.)],
-         track_volume=track_volume)
+    (transformed_potential_fn, transformed_init_state) = (
+        fun_mc.reparameterize_potential_fn(
+            potential_fn,
+            transport_map_fn,
+            [self._constant(2.0), self._constant(3.0)],
+            track_volume=track_volume,
+        )
+    )
 
     self.assertIsInstance(transformed_init_state, list)
-    self.assertAllClose([1., 1.], transformed_init_state)
-    transformed_potential, (orig_space, _, _) = transformed_potential_fn(1., 1.)
-    potential = potential_fn(2., 3.)[0]
+    self.assertAllClose([1.0, 1.0], transformed_init_state)
+    transformed_potential, (orig_space, _, _) = transformed_potential_fn(
+        1.0, 1.0
+    )
+    potential = potential_fn(2.0, 3.0)[0]
     if track_volume:
-      potential += tf.math.log(2.) + tf.math.log(3.)
+      potential += jnp.log(2.0) + jnp.log(3.0)
 
-    self.assertAllClose([2., 3.], orig_space)
+    self.assertAllClose([2.0, 3.0], orig_space)
     self.assertAllClose(potential, transformed_potential)
 
   def testPersistentMH(self):
-
     def target_log_prob_fn(x):
-      return -x**2 / 2, ()
+      return -(x**2) / 2, ()
 
     def kernel(pmh_state, rwm_state, seed):
       seed, rwm_seed = util.split_seed(seed, 2)
@@ -1789,71 +1867,110 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
           rwm_state,
           target_log_prob_fn=target_log_prob_fn,
           proposal_fn=lambda state, seed: fun_mc.gaussian_proposal(  # pylint: disable=g-long-lambda
-              state, seed=seed),
-          seed=rwm_seed)
+              state, seed=seed
+          ),
+          seed=rwm_seed,
+      )
       pmh_state, pmh_extra = fun_mc.persistent_metropolis_hastings_step(
           pmh_state,
           # Use dummy states for testing.
-          current_state=self._constant(0.),
-          proposed_state=self._constant(1.),
+          current_state=self._constant(0.0),
+          proposed_state=self._constant(1.0),
           # Coprime with 1000 below.
           drift=0.127,
-          energy_change=-rwm_extra.log_accept_ratio)
-      return (pmh_state, rwm_state,
-              seed), (pmh_extra.is_accepted, pmh_extra.accepted_state,
-                      rwm_extra.is_accepted)
+          energy_change=-rwm_extra.log_accept_ratio,
+      )
+      return (pmh_state, rwm_state, seed), (
+          pmh_extra.is_accepted,
+          pmh_extra.accepted_state,
+          rwm_extra.is_accepted,
+      )
 
     _, (pmh_is_accepted, pmh_accepted_state, rwm_is_accepted) = fun_mc.trace(
-        (fun_mc.persistent_metropolis_hastings_init([], self._dtype),
-         fun_mc.random_walk_metropolis_init(
-             self._constant(0.),
-             target_log_prob_fn), self._make_seed(_test_seed())), kernel, 1000)
+        (
+            fun_mc.persistent_metropolis_hastings_init([], self._dtype),
+            fun_mc.random_walk_metropolis_init(
+                self._constant(0.0), target_log_prob_fn
+            ),
+            self._make_seed(_test_seed()),
+        ),
+        kernel,
+        1000,
+    )
 
-    pmh_is_accepted = tf.cast(pmh_is_accepted, self._dtype)
-    rwm_is_accepted = tf.cast(rwm_is_accepted, self._dtype)
+    pmh_is_accepted = jnp.array(pmh_is_accepted, self._dtype)
+    rwm_is_accepted = jnp.array(rwm_is_accepted, self._dtype)
     self.assertAllClose(
-        tf.reduce_mean(rwm_is_accepted),
-        tf.reduce_mean(pmh_is_accepted),
-        atol=0.05)
+        jnp.mean(rwm_is_accepted), jnp.mean(pmh_is_accepted), atol=0.05
+    )
     self.assertAllClose(pmh_is_accepted, pmh_accepted_state)
 
   @parameterized.named_parameters(
-      ('ScalarLarge', -1., lambda x: x**2, True, -1.),
+      ('ScalarLarge', -1.0, lambda x: x**2, True, -1.0),
       ('ScalarSmall', -0.1, lambda x: x**2, True, -0.2),
-      ('Vector', np.array([-3, -4.]), lambda x: tf.reduce_sum(x**2), True,
-       np.array([-3. / 5., -4. / 5.])),
-      ('List', [
-          -3,
-          -4.,
-      ], lambda x: x[0]**2 + x[1]**2, True, [
-          -3. / 5.,
-          -4. / 5.,
-      ]),
-      ('Dict', {
-          'a': -3,
-          'b': -4.,
-      }, lambda x: x['a']**2 + x['b']**2, True, {
-          'a': -3. / 5.,
-          'b': -4. / 5.,
-      }),
-      ('NaNToZero', [
-          -3,
-          np.float32('nan'),
-      ], lambda x: x[0]**2 + x[1]**2, True, [
-          -1.,
-          0.,
-      ]),
-      ('NaNKept', [-3, np.float32('nan')], lambda x: x[0]**2 + x[1]**2, False,
-       [np.float32('nan'), np.float32('nan')]),
+      (
+          'Vector',
+          np.array([-3, -4.0]),
+          lambda x: jnp.sum(x**2),
+          True,
+          np.array([-3.0 / 5.0, -4.0 / 5.0]),
+      ),
+      (
+          'List',
+          [
+              -3,
+              -4.0,
+          ],
+          lambda x: x[0] ** 2 + x[1] ** 2,
+          True,
+          [
+              -3.0 / 5.0,
+              -4.0 / 5.0,
+          ],
+      ),
+      (
+          'Dict',
+          {
+              'a': -3,
+              'b': -4.0,
+          },
+          lambda x: x['a'] ** 2 + x['b'] ** 2,
+          True,
+          {
+              'a': -3.0 / 5.0,
+              'b': -4.0 / 5.0,
+          },
+      ),
+      (
+          'NaNToZero',
+          [
+              -3,
+              np.float32('nan'),
+          ],
+          lambda x: x[0] ** 2 + x[1] ** 2,
+          True,
+          [
+              -1.0,
+              0.0,
+          ],
+      ),
+      (
+          'NaNKept',
+          [-3, np.float32('nan')],
+          lambda x: x[0] ** 2 + x[1] ** 2,
+          False,
+          [np.float32('nan'), np.float32('nan')],
+      ),
   )
   def testClipGradients(self, x, fn, zero_out_nan, expected_grad):
     x = util.map_tree(self._constant, x)
-    max_global_norm = self._constant(1.)
+    max_global_norm = self._constant(1.0)
     expected_grad = util.map_tree(self._constant, expected_grad)
 
     def eval_fn(x):
       x = fun_mc.clip_grads(
-          x, max_global_norm=max_global_norm, zero_out_nan=zero_out_nan)
+          x, max_global_norm=max_global_norm, zero_out_nan=zero_out_nan
+      )
       return fn(x), ()
 
     value, _, (grad,) = fun_mc.call_potential_fn_with_grads(eval_fn, (x,))
@@ -1862,54 +1979,53 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     self.assertAllCloseNested(expected_grad, grad)
 
   def testSystematicResample(self):
-    probs = self._constant([0., 0.5, 0.2, 0.3, 0.])
-    log_weights = tf.math.log(probs)
-    particles = tf.range(probs.shape[0])
+    probs = self._constant([0.0, 0.5, 0.2, 0.3, 0.0])
+    log_weights = jnp.log(probs)
+    particles = jnp.arange(probs.shape[0])
 
-    @tf.function
+    @jax.jit
     def body(seed):
       seed, resample_seed = util.split_seed(seed, 2)
-      (new_particles,
-       new_log_weights), _ = fun_mc.systematic_resample(particles, log_weights,
-                                                        resample_seed)
+      (new_particles, new_log_weights), _ = fun_mc.systematic_resample(
+          particles, log_weights, resample_seed
+      )
       return seed, (new_particles, new_log_weights)
 
     _, (new_particles, new_log_weights) = fun_mc.trace(
-        self._make_seed(_test_seed()), body, 1000, trace_mask=(True, False))
+        self._make_seed(_test_seed()), body, 1000, trace_mask=(True, False)
+    )
 
-    new_particles_probs = tf.reduce_mean(
-        tf.cast(new_particles[..., tf.newaxis] == particles, tf.float32),
-        (0, 1))
+    new_particles_probs = jnp.mean(
+        jnp.array(new_particles[..., jnp.newaxis] == particles, jnp.float32),
+        (0, 1),
+    )
 
     self.assertAllClose(new_particles_probs, probs, atol=0.05)
-    self.assertEqual(new_particles_probs[0], 0.)
-    self.assertEqual(new_particles_probs[-1], 0.)
+    self.assertEqual(new_particles_probs[0], 0.0)
+    self.assertEqual(new_particles_probs[-1], 0.0)
     self.assertAllClose(
         new_log_weights,
-        tf.fill(probs.shape, tfp.math.reduce_logmeanexp(log_weights)))
+        jnp.full(probs.shape, tfp.math.reduce_logmeanexp(log_weights)),
+    )
 
   def testSystematicResampleAncestors(self):
-    log_weights = self._constant([-float('inf'), 0.])
-    particles = tf.range(log_weights.shape[0])
+    log_weights = self._constant([-float('inf'), 0.0])
+    particles = jnp.arange(log_weights.shape[0])
     seed = self._make_seed(_test_seed())
 
     (new_particles, new_log_weights), ancestors = fun_mc.systematic_resample(
         particles, log_weights, seed=seed
     )
-    self.assertAllEqual(new_particles, tf.ones_like(particles))
-    self.assertAllEqual(
-        new_log_weights, tf.math.log(self._constant([0.5, 0.5]))
-    )
-    self.assertAllEqual(ancestors, tf.ones_like(particles))
+    self.assertAllEqual(new_particles, jnp.ones_like(particles))
+    self.assertAllEqual(new_log_weights, jnp.log(self._constant([0.5, 0.5])))
+    self.assertAllEqual(ancestors, jnp.ones_like(particles))
 
     (new_particles, new_log_weights), ancestors = fun_mc.systematic_resample(
         particles, log_weights, do_resample=True, seed=seed
     )
-    self.assertAllEqual(new_particles, tf.ones_like(particles))
-    self.assertAllEqual(
-        new_log_weights, tf.math.log(self._constant([0.5, 0.5]))
-    )
-    self.assertAllEqual(ancestors, tf.ones_like(particles))
+    self.assertAllEqual(new_particles, jnp.ones_like(particles))
+    self.assertAllEqual(new_log_weights, jnp.log(self._constant([0.5, 0.5])))
+    self.assertAllEqual(ancestors, jnp.ones_like(particles))
 
     (new_particles, new_log_weights), ancestors = fun_mc.systematic_resample(
         particles, log_weights, do_resample=False, seed=seed
@@ -1919,41 +2035,42 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     self.assertAllEqual(ancestors, particles)
 
   def testAIS(self):
-
     def tlp_1(x):
-      return -x**2 / 2., ()
+      return -(x**2) / 2.0, ()
 
     def tlp_2(x):
-      return -(x - 2)**2 / 2 / 16., ()
+      return -((x - 2) ** 2) / 2 / 16.0, ()
 
-    @tf.function
+    @jax.jit
     def kernel(ais_state, seed):
-
       hmc_seed, resample_seed, seed = util.split_seed(seed, 3)
 
       ais_state, _ = fun_mc.annealed_importance_sampling_resample(
-          ais_state,
-          seed=resample_seed)
+          ais_state, seed=resample_seed
+      )
 
       def transition_operator(state, stage, tlp_fn):
-        f = tf.cast(stage, state.dtype) / num_stages
+        f = jnp.array(stage, state.dtype) / num_stages
         hmc_state = fun_mc.hamiltonian_monte_carlo_init(state, tlp_fn)
         hmc_state, _ = fun_mc.hamiltonian_monte_carlo_step(
             hmc_state,
             tlp_fn,
-            step_size=f * 4. + (1. - f) * 1.,
+            step_size=f * 4.0 + (1.0 - f) * 1.0,
             num_integrator_steps=1,
-            seed=hmc_seed)
+            seed=hmc_seed,
+        )
         return hmc_state.state, ()
 
       ais_state, _ = fun_mc.annealed_importance_sampling_step(
-          ais_state, transition_operator,
+          ais_state,
+          transition_operator,
           functools.partial(
               fun_mc.geometric_annealing_path,
               num_stages=num_stages,
               initial_target_log_prob_fn=tlp_1,
               final_target_log_prob_fn=tlp_2,
-          ))
+          ),
+      )
 
       return (ais_state, seed), ()
 
@@ -1963,18 +2080,23 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     init_state = util.random_normal([num_particles], self._dtype, init_seed)
 
     (ais_state, _), _ = fun_mc.trace(
-        (fun_mc.annealed_importance_sampling_init(init_state, tf.zeros(
-            [num_particles], self._dtype)), seed),
+        (
+            fun_mc.annealed_importance_sampling_init(
+                init_state, jnp.zeros([num_particles], self._dtype)
+            ),
+            seed,
+        ),
         kernel,
         num_stages,
     )
 
-    weights = tf.exp(ais_state.log_weight)
-    self.assertAllClose(4., tf.reduce_mean(weights), atol=0.7)
+    weights = jnp.exp(ais_state.log_weight)
+    self.assertAllClose(4.0, jnp.mean(weights), atol=0.7)
     self.assertAllClose(
-        2.,
-        tf.reduce_sum(tf.nn.softmax(ais_state.log_weight) * ais_state.state),
-        atol=0.8)
+        2.0,
+        jnp.sum(jax.nn.softmax(ais_state.log_weight) * ais_state.state),
+        atol=0.8,
+    )
 
 
 @test_util.multi_backend_test(globals(), 'fun_mc_test')
@@ -1982,7 +2104,7 @@ class FunMCTest32(FunMCTest):
 
   @property
   def _dtype(self):
-    return tf.float32
+    return jnp.float32
 
 
 @test_util.multi_backend_test(globals(), 'fun_mc_test')
@@ -1990,7 +2112,7 @@ class FunMCTest64(FunMCTest):
 
   @property
   def _dtype(self):
-    return tf.float64
+    return jnp.float64
 
 
 del FunMCTest

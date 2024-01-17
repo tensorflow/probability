@@ -27,7 +27,8 @@ from typing import Any, Callable, NamedTuple, Optional, Tuple
 from fun_mc import backend
 from fun_mc import fun_mc_lib as fun_mc
 
-tf = backend.tf
+jax = backend.jax
+jnp = backend.jnp
 tfp = backend.tfp
 util = backend.util
 distribute_lib = backend.distribute_lib
@@ -40,66 +41,84 @@ __all__ = [
 ]
 
 
-def _gaussian_momentum_refresh_fn(old_momentum: fun_mc.State,
-                                  damping: Optional[fun_mc.FloatTensor] = 0.,
-                                  step_size: Optional[fun_mc.FloatTensor] = 1.,
-                                  named_axis: Optional[
-                                      fun_mc.StringNest] = None,
-                                  seed: Optional[Any] = None) -> fun_mc.State:
+def _gaussian_momentum_refresh_fn(
+    old_momentum: fun_mc.State,
+    damping: Optional[float | fun_mc.FloatArray] = 0.0,
+    step_size: Optional[float | fun_mc.FloatArray] = 1.0,
+    named_axis: Optional[fun_mc.StringNest] = None,
+    seed: Optional[Any] = None,
+) -> fun_mc.State:
   """Momentum refresh function for Gaussian momentum distribution."""
   if named_axis is None:
     named_axis = util.map_tree(lambda _: [], old_momentum)
   damping = fun_mc.maybe_broadcast_structure(damping, old_momentum)
   step_size = fun_mc.maybe_broadcast_structure(step_size, old_momentum)
-  decay_fraction = util.map_tree(lambda d, s: tf.exp(-d * s), damping,
-                                 step_size)
-  noise_fraction = util.map_tree(lambda df: tf.sqrt(1. - tf.square(df)),
-                                 decay_fraction)
+  decay_fraction = util.map_tree(
+      lambda d, s: jnp.exp(-d * s), damping, step_size
+  )
+  noise_fraction = util.map_tree(
+      lambda df: jnp.sqrt(1.0 - jnp.square(df)), decay_fraction
+  )
 
-  def _sample_part(old_momentum, seed, named_axis, decay_fraction,
-                   noise_fraction):
+  def _sample_part(
+      old_momentum, seed, named_axis, decay_fraction, noise_fraction
+  ):
     seed = backend.distribute_lib.fold_in_axis_index(seed, named_axis)
-    return (decay_fraction * old_momentum + noise_fraction *
-            util.random_normal(old_momentum.shape, old_momentum.dtype, seed))
+    return decay_fraction * old_momentum + noise_fraction * util.random_normal(
+        old_momentum.shape, old_momentum.dtype, seed
+    )
 
   seeds = util.unflatten_tree(
-      old_momentum, util.split_seed(seed, len(util.flatten_tree(old_momentum))))
-  new_momentum = util.map_tree_up_to(old_momentum, _sample_part, old_momentum,
-                                     seeds, named_axis, decay_fraction,
-                                     noise_fraction)
+      old_momentum, util.split_seed(seed, len(util.flatten_tree(old_momentum)))
+  )
+  new_momentum = util.map_tree_up_to(
+      old_momentum,
+      _sample_part,
+      old_momentum,
+      seeds,
+      named_axis,
+      decay_fraction,
+      noise_fraction,
+  )
   return new_momentum
 
 
 def _default_energy_change_fn(
-    old_int_state: fun_mc.State,
-    new_int_state: fun_mc.State,
+    old_int_state: fun_mc.IntegratorState,
+    new_int_state: fun_mc.IntegratorState,
     kinetic_energy_fn: Optional[fun_mc.PotentialFn],
-) -> Tuple[fun_mc.FloatTensor, Tuple[Any, Any]]:
+) -> Tuple[fun_mc.FloatArray, Tuple[Any, Any]]:
   """Default energy change function."""
   old_kinetic_energy, old_kinetic_energy_extra = fun_mc.call_potential_fn(
-      kinetic_energy_fn, old_int_state.momentum)
+      kinetic_energy_fn, old_int_state.momentum
+  )
   new_kinetic_energy, new_kinetic_energy_extra = fun_mc.call_potential_fn(
-      kinetic_energy_fn, new_int_state.momentum)
+      kinetic_energy_fn, new_int_state.momentum
+  )
 
   old_energy = -old_int_state.target_log_prob + old_kinetic_energy
   new_energy = -new_int_state.target_log_prob + new_kinetic_energy
 
-  return new_energy - old_energy, (old_kinetic_energy_extra,
-                                   new_kinetic_energy_extra)
+  return new_energy - old_energy, (
+      old_kinetic_energy_extra,
+      new_kinetic_energy_extra,
+  )
 
 
 class MetropolisAdjustedLangevinTrajectoriesState(NamedTuple):
   """Integrator state."""
+
   state: fun_mc.State
   state_extra: Any
   state_grads: fun_mc.State
-  target_log_prob: fun_mc.FloatTensor
+  target_log_prob: fun_mc.FloatArray
 
 
 class MetropolisAdjustedLangevinTrajectoriesExtra(NamedTuple):
   """Hamiltonian Monte Carlo extra outputs."""
-  is_accepted: fun_mc.BooleanTensor
-  log_accept_ratio: fun_mc.FloatTensor
+
+  is_accepted: fun_mc.BooleanArray
+  log_accept_ratio: fun_mc.FloatArray
   proposed_malt_state: fun_mc.State
   integrator_state: fun_mc.IntegratorState
   integrator_extra: fun_mc.IntegratorExtras
@@ -119,45 +138,61 @@ def metropolis_adjusted_langevin_trajectories_init(
     malt_state: State of the `metropolis_adjusted_langevin_trajectories_step`
       `TransitionOperator`.
   """
-  state = util.map_tree(tf.convert_to_tensor, state)
+  state = util.map_tree(jnp.array, state)
   target_log_prob, state_extra, state_grads = util.map_tree(
-      tf.convert_to_tensor,
+      jnp.array,
       fun_mc.call_potential_fn_with_grads(target_log_prob_fn, state),
   )
   return MetropolisAdjustedLangevinTrajectoriesState(
       state=state,
       state_grads=state_grads,
       target_log_prob=target_log_prob,
-      state_extra=state_extra)
+      state_extra=state_extra,
+  )
 
 
 def metropolis_adjusted_langevin_trajectories_step(
     malt_state: MetropolisAdjustedLangevinTrajectoriesState,
     target_log_prob_fn: fun_mc.PotentialFn,
     step_size: Optional[Any] = None,
-    num_integrator_steps: Optional[fun_mc.IntTensor] = None,
-    damping: Optional[fun_mc.FloatTensor] = None,
+    num_integrator_steps: Optional[fun_mc.IntArray] = None,
+    damping: Optional[fun_mc.FloatArray] = None,
     momentum: Optional[fun_mc.State] = None,
-    integrator_trace_fn: Optional[Callable[[
-        fun_mc.IntegratorState, fun_mc.IntegratorStepState, fun_mc
-        .IntegratorStepExtras
-    ], fun_mc.TensorNest]] = None,
+    integrator_trace_fn: Optional[
+        Callable[
+            [
+                fun_mc.IntegratorState,
+                fun_mc.IntegratorStepState,
+                fun_mc.IntegratorStepExtras,
+            ],
+            fun_mc.ArrayNest,
+        ]
+    ] = None,
     unroll_integrator: bool = False,
-    log_uniform: Optional[fun_mc.FloatTensor] = None,
+    log_uniform: Optional[fun_mc.FloatArray] = None,
     kinetic_energy_fn: Optional[fun_mc.PotentialFn] = None,
     momentum_sample_fn: Optional[fun_mc.MomentumSampleFn] = None,
-    momentum_refresh_fn: Optional[Callable[[fun_mc.State, Any],
-                                           fun_mc.State]] = None,
+    momentum_refresh_fn: Optional[
+        Callable[[fun_mc.State, Any], fun_mc.State]
+    ] = None,
     energy_change_fn: Optional[
-        Callable[[fun_mc.IntegratorState, fun_mc.IntegratorState],
-                 Tuple[fun_mc.FloatTensor, Any]]] = None,
-    integrator_fn: Optional[Callable[[fun_mc.IntegratorState, Any],
-                                     Tuple[fun_mc.IntegratorState,
-                                           fun_mc.IntegratorExtras]]] = None,
+        Callable[
+            [fun_mc.IntegratorState, fun_mc.IntegratorState],
+            Tuple[fun_mc.FloatArray, Any],
+        ]
+    ] = None,
+    integrator_fn: Optional[
+        Callable[
+            [fun_mc.IntegratorState, Any],
+            Tuple[fun_mc.IntegratorState, fun_mc.IntegratorExtras],
+        ]
+    ] = None,
     named_axis: Optional[fun_mc.StringNest] = None,
-    seed: Any = None
-) -> Tuple[MetropolisAdjustedLangevinTrajectoriesState,
-           MetropolisAdjustedLangevinTrajectoriesExtra]:
+    seed: Any = None,
+) -> Tuple[
+    MetropolisAdjustedLangevinTrajectoriesState,
+    MetropolisAdjustedLangevinTrajectoriesExtra,
+]:
   """MALT `TransitionOperator`.
 
   This implements the Metropolis Adjusted Langevin Trajectories (MALT) algorithm
@@ -246,24 +281,29 @@ def metropolis_adjusted_langevin_trajectories_step(
   if integrator_fn is None:
     if kinetic_energy_fn is None:
       kinetic_energy_fn = fun_mc.make_gaussian_kinetic_energy_fn(
-          (len(target_log_prob.shape)
-           if target_log_prob.shape is not None else tf.rank(target_log_prob)),  # pytype: disable=attribute-error
-          named_axis=named_axis)
+          (
+              len(target_log_prob.shape)
+              if target_log_prob.shape is not None
+              else len(target_log_prob.shape)
+          ),  # pytype: disable=attribute-error
+          named_axis=named_axis,
+      )
     if energy_change_fn is None:
       energy_change_fn = lambda old_is, new_is: _default_energy_change_fn(  # pylint: disable=g-long-lambda
-          old_is, new_is, kinetic_energy_fn)
+          old_is, new_is, kinetic_energy_fn
+      )
     if momentum_sample_fn is None:
       momentum_sample_fn = lambda seed: fun_mc.gaussian_momentum_sample(  # pylint: disable=g-long-lambda
-          state=malt_state.state,
-          seed=seed,
-          named_axis=named_axis)
+          state=malt_state.state, seed=seed, named_axis=named_axis
+      )
     if momentum_refresh_fn is None:
       momentum_refresh_fn = lambda m, seed: _gaussian_momentum_refresh_fn(  # pylint: disable=g-long-lambda
           m,
           seed=seed,
-          step_size=step_size / 2.,
+          step_size=step_size / 2.0,
           damping=damping,
-          named_axis=named_axis)
+          named_axis=named_axis,
+      )
     integrator_fn = lambda int_state, seed: fun_mc.obabo_langevin_integrator(  # pylint: disable=g-long-lambda
         int_state=int_state,
         num_steps=num_integrator_steps,
@@ -271,12 +311,14 @@ def metropolis_adjusted_langevin_trajectories_step(
             fun_mc.leapfrog_step,
             step_size=step_size,
             target_log_prob_fn=target_log_prob_fn,
-            kinetic_energy_fn=kinetic_energy_fn),
+            kinetic_energy_fn=kinetic_energy_fn,
+        ),
         momentum_refresh_fn=momentum_refresh_fn,
         integrator_trace_fn=integrator_trace_fn,
         energy_change_fn=energy_change_fn,
         unroll=unroll_integrator,
-        seed=seed)
+        seed=seed,
+    )
 
   mh_seed, sample_seed, integrator_seed = util.split_seed(seed, 3)
   if momentum is None:
@@ -290,21 +332,24 @@ def metropolis_adjusted_langevin_trajectories_step(
       momentum=momentum,
   )
 
-  integrator_state, integrator_extra = integrator_fn(initial_integrator_state,
-                                                     integrator_seed)
+  integrator_state, integrator_extra = integrator_fn(
+      initial_integrator_state, integrator_seed
+  )
 
   proposed_state = MetropolisAdjustedLangevinTrajectoriesState(
       state=integrator_state.state,
       state_grads=integrator_state.state_grads,
       target_log_prob=integrator_state.target_log_prob,
-      state_extra=integrator_state.state_extra)
+      state_extra=integrator_state.state_extra,
+  )
 
   malt_state, mh_extra = fun_mc.metropolis_hastings_step(
       malt_state,
       proposed_state,
       integrator_extra.energy_change,
       log_uniform=log_uniform,
-      seed=mh_seed)
+      seed=mh_seed,
+  )
 
   return malt_state, MetropolisAdjustedLangevinTrajectoriesExtra(
       is_accepted=mh_extra.is_accepted,
@@ -312,4 +357,5 @@ def metropolis_adjusted_langevin_trajectories_step(
       log_accept_ratio=-integrator_extra.energy_change,
       integrator_state=integrator_state,
       integrator_extra=integrator_extra,
-      initial_momentum=momentum)
+      initial_momentum=momentum,
+  )

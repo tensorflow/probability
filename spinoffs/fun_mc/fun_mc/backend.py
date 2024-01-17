@@ -14,4 +14,4 @@
 # ============================================================================
 """Default backend implementation."""
 
-from fun_mc.dynamic.backend_tensorflow.backend import *  # pylint: disable=wildcard-import
+from fun_mc.dynamic.backend_jax.backend import *  # pylint: disable=wildcard-import
