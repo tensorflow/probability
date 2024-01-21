@@ -746,7 +746,6 @@ class _ParticleFilterTest(test_util.TestCase):
           normal.Normal(previous_state + broadcasted_params + 1, 0.1),
           reinterpreted_batch_ndims=1
       )
-
       return reshaped_dist
 
     def rejuvenation_criterion(step, state):
@@ -758,14 +757,14 @@ class _ParticleFilterTest(test_util.TestCase):
       return tf.cond(cond, lambda: tf.constant(True),
                      lambda: tf.constant(False))
 
-    observations = tf.stack([tf.range(30, dtype=tf.float32),
-                             tf.range(30, dtype=tf.float32)], axis=1)
+    observations = tf.stack([tf.range(15, dtype=tf.float32),
+                             tf.range(15, dtype=tf.float32)], axis=1)
 
     num_outer_particles = 3
-    num_inner_particles = 7
+    num_inner_particles = 5
 
     loc = tf.broadcast_to([0., 0.], [num_outer_particles, 2])
-    scale_diag = tf.broadcast_to([0.05, 0.05], [num_outer_particles, 2])
+    scale_diag = tf.broadcast_to([0.01, 0.01], [num_outer_particles, 2])
 
     params, _ = self.evaluate(particle_filter.smc_squared(
         observations=observations,
@@ -773,7 +772,7 @@ class _ParticleFilterTest(test_util.TestCase):
         mvn_diag.MultivariateNormalDiag(
             loc=loc, scale_diag=scale_diag
         ),
-        initial_parameter_prior=normal.Normal(3., 1.),
+        initial_parameter_prior=normal.Normal(5., 0.5),
         num_outer_particles=num_outer_particles,
         num_inner_particles=num_inner_particles,
         outer_rejuvenation_criterion_fn=rejuvenation_criterion,
