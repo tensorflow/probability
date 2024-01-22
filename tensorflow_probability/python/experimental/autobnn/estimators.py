@@ -14,7 +14,7 @@
 # ============================================================================
 """Estimator classes for training BNN models using Bayeux."""
 
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any, Mapping, Optional, Sequence, Union
 
 import jax
 import jax.numpy as jnp
@@ -33,14 +33,14 @@ class _AutoBnnEstimator:
 
   def __init__(
       self,
-      model_name: str,
+      model_or_name: Union[str, bnn.BNN],
       likelihood_model: str,
       seed: jax.Array,
       width: int = 50,
       periods: Sequence[ArrayLike] = (12.0,),
       likelihood_kwargs: Optional[Mapping[str, Any]] = None,
   ):
-    self.model_name = model_name
+    self.model_or_name = model_or_name
     self.likelihood_model = likelihood_model
     self.width = width
     self.periods = periods
@@ -91,7 +91,7 @@ class _AutoBnnEstimator:
         self.likelihood_model, self.likelihood_kwargs
     )
     self.net_ = models.make_model(
-        model_name=self.model_name,
+        model_name=self.model_or_name,
         likelihood_model=self.likelihood_,
         time_series_xs=X,
         width=self.width,
@@ -172,11 +172,34 @@ class _AutoBnnEstimator:
 
 
 class AutoBnnMapEstimator(_AutoBnnEstimator):
-  """Implementation of a MAP estimator for the BNN."""
+  """Implementation of a MAP estimator for the BNN.
+
+  Example usage:
+
+  estimator = estimators.AutoBnnMapEstimator(
+        model_or_name='linear_plus_periodic',
+        likelihood_model='normal_likelihood_logistic_noise',
+        seed=jax.random.PRNGKey(42),
+        width=25,
+        num_particles=32,
+        num_iters=1000,
+  )
+  estimator.fit(x_train, y_train)
+  low, mid, high = estimator.predict_quantiles(x_train)
+
+  Or:
+
+  estimator = estimators.AutoBnnMapEstimator(
+        model_or_name=operators.Add(
+            bnns=(kernels.LinearBNN(width=50),
+                  kernels.PeriodicBNN(width=50, period=12))),
+        likelihood_model='normal_likelihood_lognormal_noise',
+        seed=jax.random.PRNGKey(123))
+  """
 
   def __init__(
       self,
-      model_name: str,
+      model_or_name: Union[str, bnn.BNN],
       likelihood_model: str,
       seed: jax.Array,
       width: int = 50,
@@ -188,7 +211,7 @@ class AutoBnnMapEstimator(_AutoBnnEstimator):
       **unused_kwargs,
   ):
     super().__init__(
-        model_name=model_name,
+        model_or_name=model_or_name,
         likelihood_model=likelihood_model,
         seed=seed,
         width=width,
@@ -213,7 +236,7 @@ class AutoBnnMCMCEstimator(_AutoBnnEstimator):
 
   def __init__(
       self,
-      model_name: str,
+      model_or_name: Union[str, bnn.BNN],
       likelihood_model: str,
       seed: jax.Array,
       width: int = 50,
@@ -224,7 +247,7 @@ class AutoBnnMCMCEstimator(_AutoBnnEstimator):
       **unused_kwargs,
   ):
     super().__init__(
-        model_name=model_name,
+        model_or_name=model_or_name,
         likelihood_model=likelihood_model,
         seed=seed,
         width=width,
@@ -244,7 +267,7 @@ class AutoBnnVIEstimator(_AutoBnnEstimator):
 
   def __init__(
       self,
-      model_name: str,
+      model_or_name: Union[str, bnn.BNN],
       likelihood_model: str,
       seed: jax.Array,
       width: int = 50,
@@ -255,7 +278,7 @@ class AutoBnnVIEstimator(_AutoBnnEstimator):
       **unused_kwargs,
   ):
     super().__init__(
-        model_name=model_name,
+        model_or_name=model_or_name,
         likelihood_model=likelihood_model,
         seed=seed,
         width=width,

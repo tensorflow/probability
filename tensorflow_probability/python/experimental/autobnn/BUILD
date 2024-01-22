@@ -99,6 +99,8 @@ py_test(
     srcs = ["estimators_test.py"],
     deps = [
         ":estimators",
+        ":kernels",
+        ":operators",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

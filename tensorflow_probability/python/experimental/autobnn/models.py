@@ -20,7 +20,7 @@ where each leaf is a continuous relaxiation (using WeightedSum) of periodic and
 linear components.
 """
 import functools
-from typing import Sequence
+from typing import Sequence, Union
 import jax.numpy as jnp
 from tensorflow_probability.python.experimental.autobnn import bnn
 from tensorflow_probability.python.experimental.autobnn import bnn_tree
@@ -292,18 +292,22 @@ MODEL_NAME_TO_MAKE_FUNCTION = {
 
 
 def make_model(
-    model_name: str,
+    model_name: Union[str, bnn.BNN],
     likelihood_model: likelihoods.LikelihoodModel,
     time_series_xs: Array,
     width: int = 5,
     periods: Sequence[float] = (0.1,),
 ) -> bnn.BNN:
   """Create a BNN model by name."""
-  m = MODEL_NAME_TO_MAKE_FUNCTION[model_name](
-      time_series_xs=time_series_xs,
-      width=width,
-      periods=periods,
-      num_outputs=likelihood_model.num_outputs(),
-  )
+  if isinstance(model_name, str):
+    m = MODEL_NAME_TO_MAKE_FUNCTION[model_name](
+        time_series_xs=time_series_xs,
+        width=width,
+        periods=periods,
+        num_outputs=likelihood_model.num_outputs(),
+    )
+  else:
+    m = model_name
+
   m.set_likelihood_model(likelihood_model)
   return m

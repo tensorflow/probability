@@ -17,6 +17,8 @@
 import jax
 import numpy as np
 from tensorflow_probability.python.experimental.autobnn import estimators
+from tensorflow_probability.python.experimental.autobnn import kernels
+from tensorflow_probability.python.experimental.autobnn import operators
 from tensorflow_probability.python.experimental.autobnn import util
 from tensorflow_probability.python.internal import test_util
 
@@ -28,7 +30,7 @@ class AutoBNNTest(test_util.TestCase):
     x_train, y_train = util.load_fake_dataset()
 
     autobnn = estimators.AutoBnnMapEstimator(
-        model_name='linear_plus_periodic',
+        model_or_name='linear_plus_periodic',
         likelihood_model='normal_likelihood_logistic_noise',
         seed=seed,
         width=5,
@@ -51,7 +53,7 @@ class AutoBNNTest(test_util.TestCase):
     x_train, y_train = util.load_fake_dataset()
 
     autobnn = estimators.AutoBnnMCMCEstimator(
-        model_name='linear_plus_periodic',
+        model_or_name='linear_plus_periodic',
         likelihood_model='normal_likelihood_logistic_noise',
         seed=seed,
         width=5,
@@ -68,12 +70,41 @@ class AutoBNNTest(test_util.TestCase):
 
   # TODO(colcarroll): Add test for AutoBnnVIEstimator.
 
+  def test_custom_model(self):
+    seed = jax.random.PRNGKey(20231018)
+    x_train, y_train = util.load_fake_dataset()
+
+    model = operators.Add(
+        bnns=(kernels.PeriodicBNN(width=50, period=12),
+              kernels.LinearBNN(width=50),
+              kernels.MaternBNN(width=50)))
+
+    autobnn = estimators.AutoBnnMapEstimator(
+        model_or_name=model,
+        likelihood_model='normal_likelihood_logistic_noise',
+        seed=seed,
+        width=5,
+        num_particles=8,
+        num_iters=100,
+    )
+    self.assertFalse(autobnn.check_is_fitted())
+    autobnn.fit(x_train, y_train)
+    self.assertTrue(autobnn.check_is_fitted())
+    self.assertEqual(autobnn.diagnostics_['loss'].shape, (8, 100))
+    lo, mid, hi = autobnn.predict_quantiles(x_train)
+    np.testing.assert_array_less(lo, mid)
+    np.testing.assert_array_less(mid, hi)
+    self.assertEqual(
+        autobnn.summary(),
+        '\n'.join(['(Periodic(period=12.00)#Linear#Matern(2.5))'] * 8)
+    )
+
   def test_summary(self):
     seed = jax.random.PRNGKey(20231018)
     x_train, y_train = util.load_fake_dataset()
 
     autobnn = estimators.AutoBnnMapEstimator(
-        model_name='sum_of_stumps',
+        model_or_name='sum_of_stumps',
         likelihood_model='normal_likelihood_logistic_noise',
         seed=seed,
         width=5,
