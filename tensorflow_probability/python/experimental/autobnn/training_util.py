@@ -27,10 +27,6 @@ import pandas as pd
 from tensorflow_probability.python.experimental.autobnn import bnn
 from tensorflow_probability.python.experimental.autobnn import util
 from tensorflow_probability.python.experimental.timeseries import metrics
-import tensorflow_probability.substrates.jax as tfp
-
-tfd = tfp.distributions
-tfb = tfp.bijectors
 
 
 def _make_bayeux_model(

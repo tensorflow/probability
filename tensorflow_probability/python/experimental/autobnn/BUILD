@@ -25,6 +25,23 @@ package(
 )
 
 py_library(
+    name = "autobnn.jax",
+    srcs = ["__init__.py"],
+    deps = [
+        ":bnn",
+        ":bnn_tree",
+        ":estimators",
+        ":kernels",
+        ":likelihoods",
+        ":models",
+        ":operators",
+        ":training_util",
+        ":util",
+        "//tensorflow_probability/python/internal:all_util",
+    ],
+)
+
+py_library(
     name = "bnn",
     srcs = ["bnn.py"],
     deps = [
@@ -97,6 +114,8 @@ py_library(
 py_test(
     name = "estimators_test",
     srcs = ["estimators_test.py"],
+    # TODO(b/322864412): enable this test in OSS.
+    tags = ["no-oss-ci"],
     deps = [
         ":estimators",
         ":kernels",
@@ -141,7 +160,6 @@ py_library(
         # flax:core dep,
         # jax dep,
         # jaxtyping dep,
-        "//tensorflow_probability:jax",
         "//tensorflow_probability/python/bijectors:softplus.jax",
         "//tensorflow_probability/python/distributions:distribution.jax",
         "//tensorflow_probability/python/distributions:inflated.jax",
@@ -200,7 +218,6 @@ py_library(
         ":likelihoods",
         # flax:core dep,
         # jax dep,
-        "//tensorflow_probability:jax",
         "//tensorflow_probability/python/bijectors:chain.jax",
         "//tensorflow_probability/python/bijectors:scale.jax",
         "//tensorflow_probability/python/bijectors:shift.jax",
@@ -238,7 +255,6 @@ py_library(
         # matplotlib dep,
         # numpy dep,
         # pandas dep,
-        "//tensorflow_probability:jax",
         "//tensorflow_probability/python/experimental/autobnn:bnn",
         "//tensorflow_probability/python/experimental/autobnn:util",
         "//tensorflow_probability/python/experimental/timeseries:metrics",
@@ -248,6 +264,8 @@ py_library(
 py_test(
     name = "training_util_test",
     srcs = ["training_util_test.py"],
+    # TODO(b/322864412): enable this test in OSS.
+    tags = ["no-oss-ci"],
     deps = [
         ":training_util",
         # chex dep,
