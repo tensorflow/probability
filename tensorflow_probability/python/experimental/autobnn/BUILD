@@ -56,8 +56,6 @@ py_library(
 py_test(
     name = "bnn_test",
     srcs = ["bnn_test.py"],
-    # TODO(b/320723712): enable this test in OSS.
-    tags = ["no-oss-ci"],
     deps = [
         ":bnn",
         # absl/testing:absltest dep,
@@ -232,12 +230,15 @@ py_library(
 py_test(
     name = "operators_test",
     srcs = ["operators_test.py"],
+    # TODO(b/322864412): enable this test in OSS.
+    tags = ["no-oss-ci"],
     deps = [
         ":kernels",
         ":operators",
         ":util",
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
+        # bayeux dep,
         # google/protobuf:use_fast_cpp_protos dep,
         # jax dep,
         # numpy dep,

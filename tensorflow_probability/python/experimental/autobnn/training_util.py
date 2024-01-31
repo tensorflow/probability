@@ -17,7 +17,6 @@
 import functools
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
-import bayeux as bx
 import jax
 import jax.numpy as jnp
 from jaxtyping import PyTree  # pylint: disable=g-importing-member
@@ -38,6 +37,11 @@ def _make_bayeux_model(
     for_vi: bool = False,
 ):
   """Use a MAP estimator to fit a BNN."""
+  # We can't import bayeux at the file level because it would create a
+  # circular dependency:  autobnn imports bayeux imports tfp:jax
+  # which in turn imports (through __init__.py files) autobnn.
+  import bayeux as bx  # pylint:disable=g-bad-import-order,g-import-not-at-top
+
   test_seed, init_seed = jax.random.split(seed)
   test_point = net.init(test_seed, x_train)
   transform, inverse_transform, ildj = util.make_transforms(net)

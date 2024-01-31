@@ -15,6 +15,7 @@
 """Tests for operators.py."""
 
 from absl.testing import parameterized
+import bayeux as bx
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -186,7 +187,6 @@ class OperatorsTest(parameterized.TestCase):
     self.assertEqual((50,), h.shape)
 
   def test_multiply_can_be_trained(self):
-    # TODO(thomaswc): Restore this test when bayeux is available.
     seed = jax.random.PRNGKey(20231018)
     x_train, y_train = util.load_fake_dataset()
 
@@ -202,16 +202,16 @@ class OperatorsTest(parameterized.TestCase):
       return bnn.log_prob(params, x_train, y_train)
 
     transform, inverse_transform, _ = util.make_transforms(bnn)
-    del transform
-    del inverse_transform
-    del init_params
-    del train_density
-    # mix_model = bx.Model(train_density, init_params,
-    #                     transform_fn=transform,
-    #                     inverse_transform_fn=inverse_transform)
+    mix_model = bx.Model(
+        train_density,
+        init_params,
+        transform_fn=transform,
+        inverse_transform_fn=inverse_transform,
+    )
 
-    # self.assertTrue(
-    #    mix_model.optimize.optax_adam.debug(seed=seed, verbosity=10))
+    self.assertTrue(
+        mix_model.optimize.optax_adam.debug(seed=seed, verbosity=10)
+    )
 
 
 if __name__ == "__main__":
