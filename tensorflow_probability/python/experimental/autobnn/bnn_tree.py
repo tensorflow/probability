@@ -30,6 +30,7 @@ Array = jnp.ndarray
 LEAVES = [
     kernels.ExponentiatedQuadraticBNN,
     kernels.MaternBNN,
+    kernels.ExponentialBNN,
     kernels.LinearBNN,
     kernels.QuadraticBNN,
     kernels.PeriodicBNN,
@@ -49,6 +50,7 @@ OPERATORS = [
 NON_PERIODIC_KERNELS = [
     kernels.ExponentiatedQuadraticBNN,
     kernels.MaternBNN,
+    kernels.ExponentialBNN,
     kernels.LinearBNN,
     kernels.QuadraticBNN,
     kernels.OneLayerBNN,
@@ -86,7 +88,7 @@ def list_of_all(
   # Abelian operators that aren't Multiply.
   if include_sums:
     for i, c1 in enumerate(non_multiply_children):
-      for j in range(i + 1):
+      for j in range(i):
         c2 = non_multiply_children[j]
         # Add is also abelian, but WeightedSum is more general.
         all_bnns.append(

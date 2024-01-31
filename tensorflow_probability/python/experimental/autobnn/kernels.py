@@ -162,9 +162,23 @@ class MaternBNN(ExponentiatedQuadraticBNN):
     self.kernel_init = kernel_init
     super().setup()
 
+  def distributions(self):
+    d = super().distributions()
+    d['dense1']['kernel'] = student_t_lib.StudentT(
+        df=2.0 * self.degrees_of_freedom, loc=0.0, scale=1.0)
+    return d
+
   def summarize(self, params=None, full: bool = False) -> str:
     """Return a string summarizing the structure of the BNN."""
     return f'{self.shortname()}({self.degrees_of_freedom})'
+
+
+class ExponentialBNN(MaternBNN):
+  """Matern(0.5), also known as the absolute exponential kernel."""
+  degrees_of_freedom: float = 0.5
+
+  def summarize(self, params=None, full: bool = False) -> str:
+    return self.shortname()
 
 
 class PolynomialBNN(OneLayerBNN):

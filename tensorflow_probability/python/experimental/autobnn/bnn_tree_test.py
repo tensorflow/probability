@@ -25,24 +25,25 @@ from absl.testing import absltest
 
 class TreeTest(parameterized.TestCase):
 
-  def test_list_of_all(self):
+  def test_list_of_all_depth0(self):
     l0 = bnn_tree.list_of_all(jnp.linspace(0.0, 100.0, 100), 0)
-    # With no periods, there should be five kernels.
-    self.assertLen(l0, 5)
+    # With no periods, there should be six kernels.
+    self.assertLen(l0, 6)
     for k in l0:
       self.assertFalse(k.going_to_be_multiplied)
 
     l0 = bnn_tree.list_of_all(100, 0, 50, [20.0, 40.0], parent_is_multiply=True)
-    self.assertLen(l0, 7)
+    self.assertLen(l0, 8)
     for k in l0:
       self.assertTrue(k.going_to_be_multiplied)
 
+  def test_list_of_all_depth1(self):
     l1 = bnn_tree.list_of_all(jnp.linspace(0.0, 100.0, 100), 1)
     # With no periods, there should be
-    # 15 trees with a Multiply top node,
-    # 15 trees with a WeightedSum top node, and
-    # 25 trees with a LearnableChangePoint top node.
-    self.assertLen(l1, 55)
+    # choose(6+1, 2) = 21 trees with a Multiply top node,
+    # choose(6, 2) = 15 trees with a WeightedSum top node, and
+    # 6*6 = 36 trees with a LearnableChangePoint top node.
+    self.assertLen(l1, 72)
 
     # Check that all of the BNNs in the tree can be trained.
     for k in l1:
@@ -63,12 +64,13 @@ class TreeTest(parameterized.TestCase):
     # nodes, with 7*8/2 = 28 trees.
     self.assertLen(l1, 28)
 
+  def test_list_of_all_depth2(self):
     l2 = bnn_tree.list_of_all(jnp.linspace(0.0, 100.0, 100), 2)
-    # With no periods, there should be
-    # 15*16/2 = 120 trees with a Multiply top node,
-    # 55*56/2 = 1540 trees with a WeightedSum top node, and
-    # 55*55 = 3025 trees with a LearnableChangePoint top node.
-    self.assertLen(l2, 4685)
+    # There are 66 trees of depth 1, of which 15 are safe to multiply.
+    # choose(15+1, 2) = 120 trees with a Multiply top node,
+    # choose(66, 2) = 2145 trees with a WeightedSum top node, and
+    # 66*66 = 4356 trees with a LearnableChangePoint top node.
+    self.assertLen(l2, 7860)
 
   @parameterized.parameters(0, 1)  # depth=2 segfaults on my desktop :(
   def test_weighted_sum_of_all(self, depth):
