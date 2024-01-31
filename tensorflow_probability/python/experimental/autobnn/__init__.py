@@ -16,16 +16,11 @@
 
 from tensorflow_probability.python.experimental.autobnn import bnn
 from tensorflow_probability.python.experimental.autobnn import bnn_tree
-# estimators causes vectorized_stochastic_volatility_test to fail
-# because it imports training_util
 from tensorflow_probability.python.experimental.autobnn import estimators
 from tensorflow_probability.python.experimental.autobnn import kernels
 from tensorflow_probability.python.experimental.autobnn import likelihoods
 from tensorflow_probability.python.experimental.autobnn import models
 from tensorflow_probability.python.experimental.autobnn import operators
-# training_util causes vectorized_stochastic_volatility_test to fail
-# Suspects: JaxTyping, bayeux, matplotlib, pandas.
-# And the culprit is ... bayeux.
 from tensorflow_probability.python.experimental.autobnn import training_util
 from tensorflow_probability.python.experimental.autobnn import util
 from tensorflow_probability.python.internal import all_util
