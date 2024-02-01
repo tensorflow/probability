@@ -22,4 +22,4 @@ Structure Discovery_. ICML 2023.
 
 AutoBNN has three additional dependencies beyond those used by the core
 Tensorflow Probability package:  flax, scipy and jaxtyping.  These
-can be installed by running `setup\_autobnn.sh`.
+can be installed by running `setup_autobnn.sh`.
