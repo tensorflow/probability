@@ -725,7 +725,9 @@ class _ParticleFilterTest(test_util.TestCase):
       broadcasted_params = tf.broadcast_to(reshaped_params,
                                            previous_state.shape)
       reshaped_dist = independent.Independent(
-          normal.Normal(previous_state + params[..., tf.newaxis, tf.newaxis] + 1, 0.1),
+          normal.Normal(
+              previous_state + params[..., tf.newaxis, tf.newaxis] + 1, 0.1
+          ),
           reinterpreted_batch_ndims=1
       )
       return reshaped_dist
