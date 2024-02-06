@@ -14,6 +14,7 @@
 # ============================================================================
 """`Leaf` BNNs, most of which correspond to some known GP kernel."""
 
+import functools
 from flax import linen as nn
 from flax.linen import initializers
 import jax
@@ -104,10 +105,12 @@ class OneLayerBNN(MultipliableBNN):
       }
     return super().distributions() | d
 
+  @functools.partial(jax.named_call, name='OneLayer::penultimate')
   def penultimate(self, inputs):
     y = self.input_warping(inputs)
     return self.activation_function(self.dense1(y))
 
+  @functools.partial(jax.named_call, name='OneLayer::__call__')
   def __call__(self, inputs, deterministic=True):
     return self.dense2(self.penultimate(inputs))
 
@@ -142,6 +145,7 @@ class ExponentiatedQuadraticBNN(OneLayerBNN):
         },
     }
 
+  @functools.partial(jax.named_call, name='RBF::__call__')
   def __call__(self, inputs, deterministic=True):
     return self.amplitude * self.dense2(self.penultimate(inputs))
 
@@ -214,6 +218,7 @@ class PolynomialBNN(OneLayerBNN):
         for _ in range(self.degree)]
     super().setup()
 
+  @functools.partial(jax.named_call, name='Polynomial::penultimate')
   def penultimate(self, inputs):
     x = inputs - self.shift
     ys = jnp.stack([h(x) for h in self.hiddens], axis=-1)

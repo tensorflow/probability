@@ -130,6 +130,7 @@ class _AutoBnnEstimator:
     summaries = [self.net_.summarize(p) for p in params_per_particle]
     return '\n'.join(summaries)
 
+  @jax.named_call
   def predict_quantiles(
       self, X: jax.Array, q=(2.5, 50.0, 97.5), axis: tuple[int, ...] = (0,)  # pylint: disable=invalid-name
   ) -> jax.Array:

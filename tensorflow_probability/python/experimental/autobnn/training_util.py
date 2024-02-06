@@ -75,6 +75,7 @@ def _make_bayeux_model(
       inverse_log_det_jacobian=ildj)
 
 
+@jax.named_call
 def fit_bnn_map(
     net: bnn.BNN,
     seed: jax.Array,
@@ -125,6 +126,7 @@ def _filter_stuck_chains(params):
   return jax.tree_map(lambda x: x[best_two], params)
 
 
+@jax.named_call
 def fit_bnn_vi(
     net: bnn.BNN,
     seed: jax.Array,
@@ -148,6 +150,7 @@ def fit_bnn_vi(
   return params, {'loss': loss}
 
 
+@jax.named_call
 def fit_bnn_mcmc(
     net: bnn.BNN,
     seed: jax.Array,

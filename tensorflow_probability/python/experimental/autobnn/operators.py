@@ -14,8 +14,10 @@
 # ============================================================================
 """Flax.linen modules for combining BNNs."""
 
+import functools
 from typing import Optional
 from flax import linen as nn
+import jax
 import jax.numpy as jnp
 from tensorflow_probability.python.experimental.autobnn import bnn
 from tensorflow_probability.python.experimental.autobnn import likelihoods
@@ -54,6 +56,7 @@ class BnnOperator(bnn.BNN):
     for b in self.bnns:
       b.set_likelihood_model(dummy_ll_model)
 
+  @jax.named_call
   def log_prior(self, params):
     if 'params' in params:
       params = params['params']
@@ -114,6 +117,7 @@ class MultipliableBnnOperator(BnnOperator):
 class Add(MultipliableBnnOperator):
   """Add two or more BNNs."""
 
+  @functools.partial(jax.named_call, name='Add::penultimate')
   def penultimate(self, inputs):
     penultimates = [b.penultimate(inputs) for b in self.bnns]
     return jnp.sum(jnp.stack(penultimates, axis=-1), axis=-1)
@@ -147,6 +151,7 @@ class WeightedSum(MultipliableBnnOperator):
         'bnn_weights': dirichlet_lib.Dirichlet(concentration=concentration)
     }
 
+  @functools.partial(jax.named_call, name='WeightedSum::penultimate')
   def penultimate(self, inputs):
     penultimates = [
         b.penultimate(inputs) * self.bnn_weights[0, i]
@@ -154,6 +159,7 @@ class WeightedSum(MultipliableBnnOperator):
     ]
     return jnp.sum(jnp.stack(penultimates, axis=-1), axis=-1)
 
+  @functools.partial(jax.named_call, name='WeightedSum::__call__')
   def __call__(self, inputs, deterministic=True):
     return jnp.sum(
         jnp.stack(
@@ -217,6 +223,7 @@ class Multiply(BnnOperator):
         }
     }
 
+  @functools.partial(jax.named_call, name='Multiply::__call__')
   def __call__(self, inputs, deterministic=True):
     penultimates = [b.penultimate(inputs) for b in self.bnns]
     return self.dense(jnp.prod(jnp.stack(penultimates, axis=-1), axis=-1))
@@ -235,6 +242,7 @@ class ChangePoint(BnnOperator):
     assert len(self.bnns) == 2
     super().setup()
 
+  @jax.named_call
   def __call__(self, inputs, deterministic=True):
     time = inputs[..., self.change_index, jnp.newaxis]
     y = (time - self.change_point) / self.slope
@@ -274,6 +282,7 @@ class LearnableChangePoint(BnnOperator):
     assert len(self.time_series_xs) >= 2
     super().setup()
 
+  @functools.partial(jax.named_call, name='LearnableChangePoint::__call__')
   def __call__(self, inputs, deterministic=True):
     time = inputs[..., self.change_index, jnp.newaxis]
     y = (time - self.change_point) / self.change_slope

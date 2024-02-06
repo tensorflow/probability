@@ -49,6 +49,7 @@ class LikelihoodModel:
     """Like BayesianModule::distributions but for the model's parameters."""
     return {}
 
+  @jax.named_call
   def log_likelihood(
       self, params, nn_out: jax.Array, observations: jax.Array
   ) -> jax.Array:
