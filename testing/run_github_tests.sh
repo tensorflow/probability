@@ -23,6 +23,9 @@ set -u  # fail and exit on any undefined variable reference
 # Get the absolute path to the directory containing this script.
 DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
 
+# TODO(b/316225328): Remove this line and use the latest version of Bazel.
+export USE_BAZEL_VERSION=6.4.0
+
 # Make sure the environment variables are set.
 if [ -z "${SHARD+x}" ]; then
   echo "SHARD is unset."
@@ -47,7 +50,8 @@ install_bazel() {
 
   # Update apt and install bazel (use -qq to minimize log cruft)
   sudo apt-get update
-  sudo apt-get install bazel
+  # TODO(b/316225328): Use the latest version of Bazel.
+  sudo apt-get install bazel-6.4.0
 }
 
 install_python_packages() {
