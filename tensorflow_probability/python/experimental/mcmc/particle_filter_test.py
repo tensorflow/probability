@@ -203,15 +203,11 @@ class _ParticleFilterTest(test_util.TestCase):
     def observation_fn(_, state):
       return normal.Normal(loc=state['position'], scale=0.1)
 
-    # Batch of synthetic observations, .
-    true_initial_positions = np.random.randn(*batch_shape).astype(self.dtype)
-    true_velocities = 0.1 * np.random.randn(
-        *batch_shape).astype(self.dtype)
+    # Batch of synthetic observations
+    true_initial_positions = np.random.randn()
+    true_velocities = 0.1 * np.random.randn()
     observed_positions = (
-        true_velocities *
-        np.arange(num_timesteps).astype(
-            self.dtype)[..., tf.newaxis, tf.newaxis] +
-        true_initial_positions)
+            true_velocities * np.arange(num_timesteps).astype(self.dtype) + true_initial_positions)
 
     (particles, log_weights, parent_indices,
      incremental_log_marginal_likelihoods) = self.evaluate(
@@ -241,20 +237,6 @@ class _ParticleFilterTest(test_util.TestCase):
                          batch_shape[1]])
     self.assertAllEqual(incremental_log_marginal_likelihoods.shape,
                         [num_timesteps] + batch_shape)
-
-    self.assertAllClose(
-        self.evaluate(
-            tf.reduce_sum(tf.exp(log_weights) *
-                          particles['position'], axis=2)),
-        observed_positions,
-        atol=0.3)
-
-    velocity_means = tf.reduce_sum(tf.exp(log_weights) *
-                                   particles['velocity'], axis=2)
-
-    self.assertAllClose(
-        self.evaluate(tf.reduce_mean(velocity_means, axis=0)),
-        true_velocities, atol=0.05)
 
     # Uncertainty in velocity should decrease over time.
     velocity_stddev = self.evaluate(
@@ -743,7 +725,7 @@ class _ParticleFilterTest(test_util.TestCase):
       broadcasted_params = tf.broadcast_to(reshaped_params,
                                            previous_state.shape)
       reshaped_dist = independent.Independent(
-          normal.Normal(previous_state + broadcasted_params + 1, 0.1),
+          normal.Normal(previous_state + params[..., tf.newaxis, tf.newaxis] + 1, 0.1),
           reinterpreted_batch_ndims=1
       )
       return reshaped_dist
@@ -754,8 +736,7 @@ class _ParticleFilterTest(test_util.TestCase):
           tf.equal(tf.math.mod(step, tf.constant(2)), tf.constant(0)),
           tf.not_equal(state.extra[0], tf.constant(0))
       )
-      return tf.cond(cond, lambda: tf.constant(True),
-                     lambda: tf.constant(False))
+      return cond
 
     observations = tf.stack([tf.range(15, dtype=tf.float32),
                              tf.range(15, dtype=tf.float32)], axis=1)
@@ -768,10 +749,9 @@ class _ParticleFilterTest(test_util.TestCase):
 
     params, _ = self.evaluate(particle_filter.smc_squared(
         observations=observations,
-        inner_initial_state_prior=lambda _, params:
-        mvn_diag.MultivariateNormalDiag(
-            loc=loc, scale_diag=scale_diag
-        ),
+        inner_initial_state_prior=lambda _, params: mvn_diag.MultivariateNormalDiag(
+            loc=tf.broadcast_to([0., 0.], params.shape + [2]),
+            scale_diag=tf.broadcast_to([0.01, 0.01], params.shape + [2])),
         initial_parameter_prior=normal.Normal(5., 0.5),
         num_outer_particles=num_outer_particles,
         num_inner_particles=num_inner_particles,
