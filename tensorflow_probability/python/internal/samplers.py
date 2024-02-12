@@ -51,7 +51,7 @@ SEED_DTYPE = np.uint32 if JAX_MODE else np.int32
 def zeros_seed():
   if JAX_MODE:
     import jax  # pylint: disable=g-import-not-at-top
-    return jax.random.PRNGKey(0)
+    return jax.random.key(0)
   return tf.constant([0, 0], dtype=SEED_DTYPE)
 
 
@@ -143,8 +143,12 @@ def sanitize_seed(seed, salt=None, name=None):
       seed = fold_in(seed, salt)
 
     if JAX_MODE:
-      # Seed must be a jax.PRNGKey -- so just return it.
-      return seed
+      import jax  # pylint: disable=g-import-not-at-top
+      # Typed keys are returned as is, otherwise wrap them.
+      if jax.dtypes.issubdtype(seed.dtype, jax.dtypes.prng_key):
+        return seed
+      else:
+        return jax.random.wrap_key_data(seed)
     return tf.convert_to_tensor(seed, dtype=SEED_DTYPE, name='seed')
 
 

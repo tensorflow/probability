@@ -16,6 +16,7 @@
 
 import enum
 import functools
+import traceback
 import warnings
 
 # Dependency imports
@@ -58,13 +59,29 @@ __all__ = [
 
 
 def _call_fn_maybe_with_seed(fn, args, *, seed=None):
+  """Try calling `fn` with or without a `seed` arg."""
   try:
     return nest_util.call_fn(functools.partial(fn, seed=seed), args)
-  except (TypeError, ValueError) as e:
-    if ("'seed'" in str(e) or ('one of *args or **kwargs' in str(e))):
-      return nest_util.call_fn(fn, args)
-    else:
-      raise e
+  except Exception as e1_:  # pylint: disable=broad-exception-caught
+    e1 = e1_
+
+  # Don't call this inside the above except, so we don't get e1 to be in the
+  # context of e2, which is confusing.
+  try:
+    return nest_util.call_fn(fn, args)
+  except Exception as e2:  # pylint: disable=broad-exception-caught
+    # For Python 3.9 compatibility, we call format_exception in this odd way.
+    tb1 = ''.join(
+        traceback.format_exception(None, value=e1, tb=e1.__traceback__)
+    )
+    tb2 = ''.join(
+        traceback.format_exception(None, value=e2, tb=e2.__traceback__)
+    )
+    raise RuntimeError(
+        f'Attempted to detect if {fn} requires a `seed`, but failed.\n'
+        f'Calling it with seed raised:\n\n{tb1}\n\n'
+        f'Calling it without the seed raised:\n\n{tb2}'
+    ) from None
 
 
 class GradientEstimators(enum.Enum):

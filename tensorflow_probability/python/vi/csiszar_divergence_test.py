@@ -15,6 +15,7 @@
 """Tests for Csiszar divergences."""
 
 import functools
+import re
 
 # Dependency imports
 from absl.testing import parameterized
@@ -926,6 +927,63 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
         sample_size=sample_size,
         seed=seed)
     self.assertAllClose(iwae_loss, loss, atol=0.03)
+
+  def test_seeded_target_log_prob_fn(self):
+    """Call a tlp_fn that requires a seed."""
+    def target_log_prob_fn(x, seed):
+      del x, seed
+      return 0.
+
+    seed = test_util.test_seed(sampler_type='stateless')
+    cd.monte_carlo_variational_loss(
+        target_log_prob_fn,
+        surrogate_posterior=normal.Normal(loc=0.0, scale=1.0),
+        gradient_estimator=cd.GradientEstimators.REPARAMETERIZATION,
+        importance_sample_size=1,
+        sample_size=1,
+        seed=seed,
+    )
+
+  def test_seeded_target_log_prob_fn_with_seed_error(self):
+    """Call a tlp_fn that takes a seed, but errors if it is set."""
+    def target_log_prob_fn(x, seed=None):
+      del x
+      if seed is not None:
+        raise ValueError('Inscrutable error.')
+      return 0.
+
+    seed = test_util.test_seed(sampler_type='stateless')
+    cd.monte_carlo_variational_loss(
+        target_log_prob_fn,
+        surrogate_posterior=normal.Normal(loc=0.0, scale=1.0),
+        gradient_estimator=cd.GradientEstimators.REPARAMETERIZATION,
+        importance_sample_size=1,
+        sample_size=1,
+        seed=seed,
+    )
+
+  def test_seeded_target_log_prob_fn_with_impl_error(self):
+    """Call a tlp_fn that doesn't take a seed, but fails even without it."""
+    def target_log_prob_fn(x):
+      del x
+      raise ValueError('Implementation mistake.')
+
+    seed = test_util.test_seed(sampler_type='stateless')
+    with self.assertRaisesRegex(
+        RuntimeError,
+        re.compile(
+            r"unexpected keyword argument 'seed'.*Implementation mistake",
+            re.MULTILINE | re.DOTALL,
+        ),
+    ):
+      cd.monte_carlo_variational_loss(
+          target_log_prob_fn,
+          surrogate_posterior=normal.Normal(loc=0.0, scale=1.0),
+          gradient_estimator=cd.GradientEstimators.REPARAMETERIZATION,
+          importance_sample_size=1,
+          sample_size=1,
+          seed=seed,
+      )
 
 
 @test_util.test_all_tf_execution_regimes

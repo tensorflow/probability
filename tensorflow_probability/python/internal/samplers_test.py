@@ -40,6 +40,14 @@ class RandomTest(test_util.TestCase):
       from jax import config  # pylint: disable=g-import-not-at-top
       config.update('jax_default_prng_impl', FLAGS.test_tfp_jax_prng)
 
+  def test_new_style_jax_keys(self):
+    if not JAX_MODE:
+      self.skipTest('JAX-only distinction')
+    import jax  # pylint: disable=g-import-not-at-top
+    seed1 = samplers.sanitize_seed(jax.random.PRNGKey(0))
+    seed2 = samplers.sanitize_seed(jax.random.key(0))
+    self.assertAllEqual(seed1, seed2)
+
   @test_util.substrate_disable_stateful_random_test
   def test_sanitize_int(self):
     seed1 = samplers.sanitize_seed(seed=123)

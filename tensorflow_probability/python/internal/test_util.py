@@ -1532,7 +1532,7 @@ def test_seed(hardcoded_seed=None,
     answer = answer % (2**32 - 1)
     if JAX_MODE:
       import jax  # pylint: disable=g-import-not-at-top
-      answer = jax.random.PRNGKey(answer)
+      answer = jax.random.key(answer)
     else:
       answer = tf.constant([0, answer], dtype=tf.uint32)
       answer = tf.bitcast(answer, tf.int32)
