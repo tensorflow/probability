@@ -43,49 +43,49 @@ import jax.numpy as jnp
 from jaxtyping import Float
 from tensorflow_probability.python.experimental.fastgp import linalg
 from tensorflow_probability.python.experimental.fastgp import linear_operator_sum
-from tensorflow_probability.substrates import jax as tfp
+from tensorflow_probability.python.internal.backend import jax as tf2jax
+from tensorflow_probability.substrates.jax.math import linalg as tfp_math
 
-jtf = tfp.tf2jax
 
 # pylint: disable=invalid-name
 
 
 @jax.named_call
-def promote_to_operator(M) -> jtf.linalg.LinearOperator:
-  if isinstance(M, jtf.linalg.LinearOperator):
+def promote_to_operator(M) -> tf2jax.linalg.LinearOperator:
+  if isinstance(M, tf2jax.linalg.LinearOperator):
     return M
-  return jtf.linalg.LinearOperatorFullMatrix(M, is_non_singular=True)
+  return tf2jax.linalg.LinearOperatorFullMatrix(M, is_non_singular=True)
 
 
 def _diag_part(M) -> jax.Array:
-  if isinstance(M, jtf.linalg.LinearOperator):
+  if isinstance(M, tf2jax.linalg.LinearOperator):
     return M.diag_part()
-  return jtf.linalg.diag_part(M)
+  return tf2jax.linalg.diag_part(M)
 
 
 class Preconditioner:
   """Base class for preconditioners."""
 
-  def __init__(self, M: jtf.linalg.LinearOperator):
+  def __init__(self, M: tf2jax.linalg.LinearOperator):
     self.M = M
 
-  def full_preconditioner(self) -> jtf.linalg.LinearOperator:
+  def full_preconditioner(self) -> tf2jax.linalg.LinearOperator:
     """Returns the preconditioner."""
     raise NotImplementedError('Base classes must override full_preconditioner.')
 
-  def preconditioned_operator(self) -> jtf.linalg.LinearOperator:
+  def preconditioned_operator(self) -> tf2jax.linalg.LinearOperator:
     """Returns the combined action of M and the preconditioner."""
     raise NotImplementedError(
         'Base classes must override preconditioned_operator.')
 
-  def log_det(self) -> jtf.linalg.LinearOperator:
+  def log_det(self) -> tf2jax.linalg.LinearOperator:
     """The log absolute value of the determinant of the preconditioner."""
     return self.full_preconditioner().log_abs_determinant()
 
   def trace_of_inverse_product(self, A: jax.Array) -> Float:
     """Returns tr( P^(-1) A ) for a n x n, non-batched A."""
     result = self.full_preconditioner().solve(A)
-    if isinstance(result, jtf.linalg.LinearOperator):
+    if isinstance(result, tf2jax.linalg.LinearOperator):
       return result.trace()
     return jnp.trace(result)
 
@@ -94,15 +94,15 @@ class Preconditioner:
 class IdentityPreconditioner(Preconditioner):
   """The do-nothing preconditioner."""
 
-  def __init__(self, M: jtf.linalg.LinearOperator, **unused_kwargs):
+  def __init__(self, M: tf2jax.linalg.LinearOperator, **unused_kwargs):
     n = M.shape[-1]
-    self.id = jtf.linalg.LinearOperatorIdentity(n, dtype=M.dtype)
+    self.id = tf2jax.linalg.LinearOperatorIdentity(n, dtype=M.dtype)
     super().__init__(M)
 
-  def full_preconditioner(self) -> jtf.linalg.LinearOperator:
+  def full_preconditioner(self) -> tf2jax.linalg.LinearOperator:
     return self.id
 
-  def preconditioned_operator(self) -> jtf.linalg.LinearOperator:
+  def preconditioned_operator(self) -> tf2jax.linalg.LinearOperator:
     return promote_to_operator(self.M)
 
   def log_det(self) -> Float:
@@ -123,17 +123,17 @@ class IdentityPreconditioner(Preconditioner):
 class DiagonalPreconditioner(Preconditioner):
   """The best diagonal preconditioner; aka the Jacobi preconditioner."""
 
-  def __init__(self, M: jtf.linalg.LinearOperator, **unused_kwargs):
+  def __init__(self, M: tf2jax.linalg.LinearOperator, **unused_kwargs):
     self.d = jnp.maximum(_diag_part(M), 1e-6)
     super().__init__(M)
 
-  def full_preconditioner(self) -> jtf.linalg.LinearOperator:
-    return jtf.linalg.LinearOperatorDiag(
+  def full_preconditioner(self) -> tf2jax.linalg.LinearOperator:
+    return tf2jax.linalg.LinearOperatorDiag(
         self.d, is_non_singular=True, is_positive_definite=True
     )
 
-  def preconditioned_operator(self) -> jtf.linalg.LinearOperator:
-    return jtf.linalg.LinearOperatorComposition(
+  def preconditioned_operator(self) -> tf2jax.linalg.LinearOperator:
+    return tf2jax.linalg.LinearOperatorComposition(
         [promote_to_operator(self.M), self.full_preconditioner().inverse()]
     )
 
@@ -157,7 +157,7 @@ class LowRankPreconditioner(Preconditioner):
 
   def __init__(
       self,
-      M: jtf.linalg.LinearOperator,
+      M: tf2jax.linalg.LinearOperator,
       low_rank: jax.Array,
       residual_diag: jax.Array = None,
   ):
@@ -177,17 +177,19 @@ class LowRankPreconditioner(Preconditioner):
 
     self.residual_diag = jnp.maximum(1e-6, self.residual_diag)
 
-    diag_op = jtf.linalg.LinearOperatorDiag(
-        self.residual_diag, is_non_singular=True, is_positive_definite=True)
-    self.pre = jtf.linalg.LinearOperatorLowRankUpdate(
-        diag_op, self.low_rank, is_positive_definite=True)
+    diag_op = tf2jax.linalg.LinearOperatorDiag(
+        self.residual_diag, is_non_singular=True, is_positive_definite=True
+    )
+    self.pre = tf2jax.linalg.LinearOperatorLowRankUpdate(
+        diag_op, self.low_rank, is_positive_definite=True
+    )
     super().__init__(M)
 
-  def full_preconditioner(self) -> jtf.linalg.LinearOperator:
+  def full_preconditioner(self) -> tf2jax.linalg.LinearOperator:
     return self.pre
 
-  def preconditioned_operator(self) -> jtf.linalg.LinearOperator:
-    return jtf.linalg.LinearOperatorComposition(
+  def preconditioned_operator(self) -> tf2jax.linalg.LinearOperator:
+    return tf2jax.linalg.LinearOperatorComposition(
         [promote_to_operator(self.M), self.pre.inverse()]
     )
 
@@ -212,7 +214,7 @@ class RankOnePreconditioner(LowRankPreconditioner):
 
   def __init__(
       self,
-      M: jtf.linalg.LinearOperator,
+      M: tf2jax.linalg.LinearOperator,
       key: jax.Array,
       num_iters: int = 10,
       **unused_kwargs,
@@ -229,13 +231,13 @@ class PartialCholeskyPreconditioner(LowRankPreconditioner):
 
   def __init__(
       self,
-      M: jtf.linalg.LinearOperator,
+      M: tf2jax.linalg.LinearOperator,
       rank: int = 20,
       **unused_kwargs,
   ):
     n = M.shape[-1]
     rank = min(n, rank)
-    low_rank, _, residual_diag = tfp.math.low_rank_cholesky(M, rank)
+    low_rank, _, residual_diag = tfp_math.low_rank_cholesky(M, rank)
     super().__init__(M, low_rank, residual_diag)
 
 
@@ -245,7 +247,7 @@ class PartialLanczosPreconditioner(LowRankPreconditioner):
 
   def __init__(
       self,
-      M: jtf.linalg.LinearOperator,
+      M: tf2jax.linalg.LinearOperator,
       key: jax.Array,
       rank: int = 20,
       **unused_kwargs,
@@ -263,7 +265,7 @@ class TruncatedSvdPreconditioner(LowRankPreconditioner):
 
   def __init__(
       self,
-      M: jtf.linalg.LinearOperator,
+      M: tf2jax.linalg.LinearOperator,
       key: jax.Array,
       rank: int = 20,
       num_iters: int = 10,
@@ -282,7 +284,7 @@ class TruncatedRandomizedSvdPreconditioner(LowRankPreconditioner):
 
   def __init__(
       self,
-      M: jtf.linalg.LinearOperator,
+      M: tf2jax.linalg.LinearOperator,
       key: jax.Array,
       rank: int = 20,
       num_iters: int = 10,
@@ -298,7 +300,7 @@ class LowRankPlusScalingPreconditioner(Preconditioner):
 
   def __init__(
       self,
-      M: jtf.linalg.LinearOperator,
+      M: tf2jax.linalg.LinearOperator,
       low_rank: jax.Array,
       scaling: jax.Array,
   ):
@@ -309,30 +311,35 @@ class LowRankPlusScalingPreconditioner(Preconditioner):
         f' ({M.shape[-1]}, r)'
     )
     self.scaling = scaling
-    identity_op = jtf.linalg.LinearOperatorScaledIdentity(
+    identity_op = tf2jax.linalg.LinearOperatorScaledIdentity(
         num_rows=M.shape[-1],
         multiplier=self.scaling,
         is_non_singular=True,
-        is_positive_definite=True)
-    self.pre = jtf.linalg.LinearOperatorLowRankUpdate(
+        is_positive_definite=True,
+    )
+    self.pre = tf2jax.linalg.LinearOperatorLowRankUpdate(
         identity_op,
         self.low_rank,
         is_positive_definite=True,
         is_self_adjoint=True,
-        is_non_singular=True)
+        is_non_singular=True,
+    )
     super().__init__(M)
 
-  def full_preconditioner(self) -> jtf.linalg.LinearOperator:
+  def full_preconditioner(self) -> tf2jax.linalg.LinearOperator:
     return self.pre
 
-  def preconditioned_operator(self) -> jtf.linalg.LinearOperator:
+  def preconditioned_operator(self) -> tf2jax.linalg.LinearOperator:
     linop = promote_to_operator(self.M)
-    operator = linear_operator_sum.LinearOperatorSum(
-        [linop,
-         jtf.linalg.LinearOperatorScaledIdentity(
-             num_rows=self.M.shape[-1],
-             multiplier=self.scaling)])
-    return jtf.linalg.LinearOperatorComposition([self.pre.inverse(), operator])
+    operator = linear_operator_sum.LinearOperatorSum([
+        linop,
+        tf2jax.linalg.LinearOperatorScaledIdentity(
+            num_rows=self.M.shape[-1], multiplier=self.scaling
+        ),
+    ])
+    return tf2jax.linalg.LinearOperatorComposition(
+        [self.pre.inverse(), operator]
+    )
 
   @classmethod
   def from_lowrank(cls, M, low_rank, scaling):
@@ -356,14 +363,14 @@ class PartialCholeskyPlusScalingPreconditioner(
 
   def __init__(
       self,
-      M: jtf.linalg.LinearOperator,
+      M: tf2jax.linalg.LinearOperator,
       scaling: jax.Array,
       rank: int = 20,
       **unused_kwargs,
   ):
     n = M.shape[-1]
     rank = min(n, rank)
-    low_rank, _, _ = tfp.math.low_rank_cholesky(M, rank)
+    low_rank, _, _ = tfp_math.low_rank_cholesky(M, rank)
     super().__init__(M, low_rank, scaling)
 
 
@@ -374,7 +381,7 @@ class PartialPivotedCholeskyPlusScalingPreconditioner(
 
   def __init__(
       self,
-      M: jtf.linalg.LinearOperator,
+      M: tf2jax.linalg.LinearOperator,
       scaling: jax.Array,
       rank: int = 20,
       **unused_kwargs,
@@ -392,7 +399,7 @@ class PartialLanczosPlusScalingPreconditioner(
 
   def __init__(
       self,
-      M: jtf.linalg.LinearOperator,
+      M: tf2jax.linalg.LinearOperator,
       scaling: jax.Array,
       key: jax.Array,
       rank: int = 20,
@@ -411,7 +418,7 @@ class TruncatedSvdPlusScalingPreconditioner(LowRankPlusScalingPreconditioner):
 
   def __init__(
       self,
-      M: jtf.linalg.LinearOperator,
+      M: tf2jax.linalg.LinearOperator,
       scaling: jax.Array,
       key: jax.Array,
       rank: int = 20,
@@ -432,7 +439,7 @@ class TruncatedRandomizedSvdPlusScalingPreconditioner(
 
   def __init__(
       self,
-      M: jtf.linalg.LinearOperator,
+      M: tf2jax.linalg.LinearOperator,
       scaling: jax.Array,
       key: jax.Array,
       rank: int = 20,
@@ -447,28 +454,28 @@ class SplitPreconditioner(Preconditioner):
   """Base class for symmetric split preconditioners."""
 
   # pylint: disable-next=useless-parent-delegation
-  def __init__(self, M: jtf.linalg.LinearOperator):
+  def __init__(self, M: tf2jax.linalg.LinearOperator):
     super().__init__(M)
 
-  def right_half(self) -> jtf.linalg.LinearOperator:
+  def right_half(self) -> tf2jax.linalg.LinearOperator:
     """Returns R, where the preconditioner is P = R^T R."""
     raise NotImplementedError('Base classes must override right_half method.')
 
-  def full_preconditioner(self) -> jtf.linalg.LinearOperator:
+  def full_preconditioner(self) -> tf2jax.linalg.LinearOperator:
     """Returns P = R^T R, the preconditioner's approximation to M."""
     rh = self.right_half()
     lh = rh.adjoint()
-    return jtf.linalg.LinearOperatorComposition(
+    return tf2jax.linalg.LinearOperatorComposition(
         [lh, rh],
         is_self_adjoint=True,
         is_positive_definite=True,
     )
 
-  def preconditioned_operator(self) -> jtf.linalg.LinearOperator:
+  def preconditioned_operator(self) -> tf2jax.linalg.LinearOperator:
     """Returns R^(-T) M R^(-1)."""
     rhi = self.right_half().inverse()
     lhi = rhi.adjoint()
-    return jtf.linalg.LinearOperatorComposition(
+    return tf2jax.linalg.LinearOperatorComposition(
         [lhi, promote_to_operator(self.M), rhi],
         is_self_adjoint=True,
         is_positive_definite=True,
@@ -488,18 +495,18 @@ class SplitPreconditioner(Preconditioner):
 class DiagonalSplitPreconditioner(SplitPreconditioner):
   """The split conditioner which pre and post multiplies by a diagonal."""
 
-  def __init__(self, M: jtf.linalg.LinearOperator, **unused_kwargs):
+  def __init__(self, M: tf2jax.linalg.LinearOperator, **unused_kwargs):
     self.d = jnp.maximum(_diag_part(M), 1e-6)
     self.sqrt_d = jnp.sqrt(self.d)
     super().__init__(M)
 
-  def right_half(self) -> jtf.linalg.LinearOperator:
-    return jtf.linalg.LinearOperatorDiag(
+  def right_half(self) -> tf2jax.linalg.LinearOperator:
+    return tf2jax.linalg.LinearOperatorDiag(
         self.sqrt_d, is_non_singular=True, is_positive_definite=True
     )
 
-  def full_preconditioner(self) -> jtf.linalg.LinearOperator:
-    return jtf.linalg.LinearOperatorDiag(
+  def full_preconditioner(self) -> tf2jax.linalg.LinearOperator:
+    return tf2jax.linalg.LinearOperatorDiag(
         self.d, is_non_singular=True, is_positive_definite=True
     )
 
@@ -523,7 +530,7 @@ class LowRankSplitPreconditioner(SplitPreconditioner):
 
   def __init__(
       self,
-      M: jtf.linalg.LinearOperator,
+      M: tf2jax.linalg.LinearOperator,
       low_rank: jax.Array,
       residual_diag: jax.Array = None,
   ):
@@ -556,14 +563,14 @@ class LowRankSplitPreconditioner(SplitPreconditioner):
     # Turn off Pyformat because it puts spaces between a slice bound and its
     # colon.
     # fmt: off
-    self.B = jtf.linalg.LinearOperatorFullMatrix(
+    self.B = tf2jax.linalg.LinearOperatorFullMatrix(
         self.low_rank[:self.r, :], is_non_singular=True
     )
-    self.C = jtf.linalg.LinearOperatorFullMatrix(self.low_rank[self.r:, :])
+    self.C = tf2jax.linalg.LinearOperatorFullMatrix(self.low_rank[self.r:, :])
     sqrt_d = jnp.sqrt(self.residual_diag[self.r:])
     # fmt: on
-    self.D = jtf.linalg.LinearOperatorDiag(sqrt_d, is_non_singular=True)
-    P = tfp.tf2jax.linalg.LinearOperatorBlockLowerTriangular(
+    self.D = tf2jax.linalg.LinearOperatorDiag(sqrt_d, is_non_singular=True)
+    P = tf2jax.linalg.LinearOperatorBlockLowerTriangular(
         [[self.B], [self.C, self.D]], is_non_singular=True
     )
     # We started from M ~ low_rank low_rank^t (because low_rank is n by r),
@@ -572,7 +579,7 @@ class LowRankSplitPreconditioner(SplitPreconditioner):
 
     super().__init__(M)
 
-  def right_half(self) -> jtf.linalg.LinearOperator:
+  def right_half(self) -> tf2jax.linalg.LinearOperator:
     return self.P
 
   def trace_of_inverse_product(self, A: jax.Array) -> Float:
@@ -627,7 +634,7 @@ class RankOneSplitPreconditioner(LowRankSplitPreconditioner):
 
   def __init__(
       self,
-      M: jtf.linalg.LinearOperator,
+      M: tf2jax.linalg.LinearOperator,
       key: jax.Array,
       num_iters: int = 10,
       **unused_kwargs,
@@ -644,13 +651,13 @@ class PartialCholeskySplitPreconditioner(LowRankSplitPreconditioner):
 
   def __init__(
       self,
-      M: jtf.linalg.LinearOperator,
+      M: tf2jax.linalg.LinearOperator,
       rank: int = 20,
       **unused_kwargs,
   ):
     n = M.shape[-1]
     rank = min(n, rank)
-    low_rank, _, residual_diag = tfp.math.low_rank_cholesky(M, rank)
+    low_rank, _, residual_diag = tfp_math.low_rank_cholesky(M, rank)
     super().__init__(M, low_rank, residual_diag)
 
 
@@ -660,7 +667,7 @@ class PartialLanczosSplitPreconditioner(LowRankSplitPreconditioner):
 
   def __init__(
       self,
-      M: jtf.linalg.LinearOperator,
+      M: tf2jax.linalg.LinearOperator,
       key: jax.Array,
       rank: int = 20,
       **unused_kwargs,
@@ -678,7 +685,7 @@ class TruncatedSvdSplitPreconditioner(LowRankSplitPreconditioner):
 
   def __init__(
       self,
-      M: jtf.linalg.LinearOperator,
+      M: tf2jax.linalg.LinearOperator,
       key: jax.Array,
       rank: int = 20,
       num_iters: int = 10,
@@ -716,7 +723,7 @@ PRECONDITIONER_REGISTRY = {
 
 @jax.named_call
 def get_preconditioner(
-    preconditioner_name: str, M: jtf.linalg.LinearOperator, **kwargs
+    preconditioner_name: str, M: tf2jax.linalg.LinearOperator, **kwargs
 ) -> SplitPreconditioner:
   """Return the preconditioner of the given type for the given matrix."""
   if preconditioner_name == 'auto':

@@ -21,12 +21,11 @@ from tensorflow_probability.python.experimental.fastgp import fast_gp
 from tensorflow_probability.python.experimental.fastgp import mbcg
 from tensorflow_probability.python.experimental.fastgp import preconditioners
 from tensorflow_probability.python.experimental.fastgp import schur_complement
-from tensorflow_probability.substrates import jax as tfp
-
-parameter_properties = tfp.internal.parameter_properties
-tfd = tfp.distributions
-jtf = tfp.tf2jax
-
+from tensorflow_probability.substrates.jax.bijectors import softplus
+from tensorflow_probability.substrates.jax.distributions.internal import stochastic_process_util
+from tensorflow_probability.substrates.jax.internal import dtype_util
+from tensorflow_probability.substrates.jax.internal import nest_util
+from tensorflow_probability.substrates.jax.internal import parameter_properties
 
 __all__ = [
     'GaussianProcessRegressionModel',
@@ -123,23 +122,25 @@ class GaussianProcessRegressionModel(fast_gp.GaussianProcess):
     # TODO(srvasude): Add support for masking observations. In addition, cache
     # the observation matrix so that it isn't recomputed every iteration.
     parameters = dict(locals())
-    input_dtype = tfp.internal.dtype_util.common_dtype(
+    input_dtype = dtype_util.common_dtype(
         dict(
             kernel=kernel,
             index_points=index_points,
             observation_index_points=observation_index_points,
         ),
-        dtype_hint=tfp.internal.nest_util.broadcast_structure(
-            kernel.feature_ndims, np.float32))
+        dtype_hint=nest_util.broadcast_structure(
+            kernel.feature_ndims, np.float32
+        ),
+    )
 
     # If the input dtype is non-nested float, we infer a single dtype for the
     # input and the float parameters, which is also the dtype of the GP's
     # samples, log_prob, etc. If the input dtype is nested (or not float), we
     # do not use it to infer the GP's float dtype.
-    if (not jax.tree_util.treedef_is_leaf(
-        jax.tree_util.tree_structure(input_dtype)) and
-        tfp.internal.dtype_util.is_floating(input_dtype)):
-      dtype = tfp.internal.dtype_util.common_dtype(
+    if not jax.tree_util.treedef_is_leaf(
+        jax.tree_util.tree_structure(input_dtype)
+    ) and dtype_util.is_floating(input_dtype):
+      dtype = dtype_util.common_dtype(
           dict(
               kernel=kernel,
               index_points=index_points,
@@ -153,13 +154,15 @@ class GaussianProcessRegressionModel(fast_gp.GaussianProcess):
       )
       input_dtype = dtype
     else:
-      dtype = tfp.internal.dtype_util.common_dtype(
+      dtype = dtype_util.common_dtype(
           dict(
               observations=observations,
               observation_noise_variance=observation_noise_variance,
               predictive_noise_variance=predictive_noise_variance,
               jitter=jitter,
-          ), dtype_hint=np.float32)
+          ),
+          dtype_hint=np.float32,
+      )
 
     if predictive_noise_variance is None:
       predictive_noise_variance = observation_noise_variance
@@ -170,8 +173,7 @@ class GaussianProcessRegressionModel(fast_gp.GaussianProcess):
               observations, observation_index_points))
     # Default to a constant zero function, borrowing the dtype from
     # index_points to ensure consistency.
-    mean_fn = tfd.internal.stochastic_process_util.maybe_create_mean_fn(
-        mean_fn, dtype)
+    mean_fn = stochastic_process_util.maybe_create_mean_fn(mean_fn, dtype)
 
     self._observation_index_points = observation_index_points
     self._observations = observations
@@ -231,14 +233,16 @@ class GaussianProcessRegressionModel(fast_gp.GaussianProcess):
 
     # Special logic for mean_fn only; SchurComplement already handles the
     # case of empty observations (ie, falls back to base_kernel).
-    if not tfd.internal.stochastic_process_util.is_empty_observation_data(
+    if not stochastic_process_util.is_empty_observation_data(
         feature_ndims=kernel.feature_ndims,
         observation_index_points=observation_index_points,
-        observations=observations):
-      tfd.internal.stochastic_process_util.validate_observation_data(
+        observations=observations,
+    ):
+      stochastic_process_util.validate_observation_data(
           kernel=kernel,
           observation_index_points=observation_index_points,
-          observations=observations)
+          observations=observations,
+      )
 
     super(GaussianProcessRegressionModel, self).__init__(
         index_points=index_points,
@@ -272,31 +276,39 @@ class GaussianProcessRegressionModel(fast_gp.GaussianProcess):
       return jax.tree_util.treep_map(
           lambda nd: nd + 1, self.kernel.feature_ndims)
     return dict(
-        index_points=tfp.util.ParameterProperties(
+        index_points=parameter_properties.ParameterProperties(
             event_ndims=_event_ndims_fn,
             shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
         ),
-        observations=tfp.util.ParameterProperties(
+        observations=parameter_properties.ParameterProperties(
             event_ndims=1,
-            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED),
-        observation_index_points=tfp.util.ParameterProperties(
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
+        ),
+        observation_index_points=parameter_properties.ParameterProperties(
             event_ndims=_event_ndims_fn,
             shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
         ),
-        observations_is_missing=tfp.util.ParameterProperties(
+        observations_is_missing=parameter_properties.ParameterProperties(
             event_ndims=1,
             shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
         ),
-        kernel=tfp.util.BatchedComponentProperties(),
-        observation_noise_variance=tfp.util.ParameterProperties(
+        kernel=parameter_properties.BatchedComponentProperties(),
+        observation_noise_variance=parameter_properties.ParameterProperties(
             event_ndims=0,
             shape_fn=lambda sample_shape: sample_shape[:-1],
             default_constraining_bijector_fn=(
-                lambda: tfp.bijectors.Softplus(  # pylint:disable=g-long-lambda
-                    low=tfp.internal.dtype_util.eps(dtype)))),
-        predictive_noise_variance=tfp.util.ParameterProperties(
+                lambda: softplus.Softplus(  # pylint:disable=g-long-lambda
+                    low=dtype_util.eps(dtype)
+                )
+            ),
+        ),
+        predictive_noise_variance=parameter_properties.ParameterProperties(
             event_ndims=0,
             shape_fn=lambda sample_shape: sample_shape[:-1],
             default_constraining_bijector_fn=(
-                lambda: tfp.bijectors.Softplus(  # pylint:disable=g-long-lambda
-                    low=tfp.internal.dtype_util.eps(dtype)))))
+                lambda: softplus.Softplus(  # pylint:disable=g-long-lambda
+                    low=dtype_util.eps(dtype)
+                )
+            ),
+        ),
+    )

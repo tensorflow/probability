@@ -21,22 +21,21 @@ import jax.numpy as jnp
 from jaxtyping import Float
 import numpy as np
 from tensorflow_probability.python.experimental.fastgp import partial_lanczos
-from tensorflow_probability.substrates import jax as tfp
+from tensorflow_probability.python.internal.backend import jax as tf2jax
 
-jtf = tfp.tf2jax
 Array = jnp.ndarray
 
 # pylint: disable=invalid-name
 
 
 def _matvec(M, x) -> jax.Array:
-  if isinstance(M, jtf.linalg.LinearOperator):
+  if isinstance(M, tf2jax.linalg.LinearOperator):
     return M.matvec(x)
   return M @ x
 
 
 def largest_eigenvector(
-    M: jtf.linalg.LinearOperator, key: jax.Array, num_iters: int = 10
+    M: tf2jax.linalg.LinearOperator, key: jax.Array, num_iters: int = 10
 ) -> tuple[Float, Array]:
   """Returns the largest (eigenvalue, eigenvector) of M."""
   n = M.shape[-1]
@@ -52,10 +51,11 @@ def largest_eigenvector(
 
 def make_randomized_truncated_svd(
     key: jax.Array,
-    M: jtf.linalg.LinearOperator,
+    M: tf2jax.linalg.LinearOperator,
     rank: int = 20,
     oversampling: int = 10,
-    num_iters: int = 4) -> tuple[Float, Array]:
+    num_iters: int = 4,
+) -> tuple[Float, Array]:
   """Returns approximate SVD for symmetric `M`."""
   # This is based on:
   # N. Halko, P.G. Martinsson, J. A. Tropp
@@ -91,7 +91,8 @@ def make_randomized_truncated_svd(
 
 
 def make_partial_lanczos(
-    key: jax.Array, M: jtf.linalg.LinearOperator, rank: int) -> Array:
+    key: jax.Array, M: tf2jax.linalg.LinearOperator, rank: int
+) -> Array:
   """Return low rank approximation to M based on the partial Lancozs alg."""
   n = M.shape[-1]
   key1, key2 = jax.random.split(key)
@@ -118,7 +119,8 @@ def make_partial_lanczos(
 
 
 def make_truncated_svd(
-    key, M: jtf.linalg.LinearOperator, rank: int, num_iters: int) -> Array:
+    key, M: tf2jax.linalg.LinearOperator, rank: int, num_iters: int
+) -> Array:
   """Return low rank approximation to M based on the partial SVD alg."""
   n = M.shape[-1]
   if 5 * rank >= n:
@@ -138,7 +140,8 @@ def make_truncated_svd(
 
 @functools.partial(jax.jit, static_argnums=1)
 def make_partial_pivoted_cholesky(
-    M: jtf.linalg.LinearOperator, rank: int) -> Array:
+    M: tf2jax.linalg.LinearOperator, rank: int
+) -> Array:
   """Return low rank approximation to M based on partial pivoted Cholesky."""
   n = M.shape[-1]
 

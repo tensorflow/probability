@@ -29,6 +29,36 @@ package(
 )
 
 py_library(
+    name = "fastgp.jax",
+    srcs = ["__init__.py"],
+    deps = [
+        ":fast_gp",
+        ":fast_gprm",
+        ":fast_log_det",
+        ":fast_mtgp",
+        ":linalg",
+        ":linear_operator_sum",
+        ":mbcg",
+        ":partial_lanczos",
+        ":preconditioners",
+        ":schur_complement",
+        "//tensorflow_probability/python/internal:all_util",
+    ],
+)
+
+# Dummy libraries to satisfy the multi_substrate_py_library deps of
+# tfp/python/experimental:experimental.
+py_library(
+    name = "fastgp",
+    deps = [],
+)
+
+py_library(
+    name = "fastgp.numpy",
+    deps = [],
+)
+
+py_library(
     name = "mbcg",
     srcs = ["mbcg.py"],
     deps = [
@@ -55,7 +85,16 @@ py_library(
         ":mbcg",
         ":preconditioners",
         # jax dep,
-        "//tensorflow_probability/substrates:jax",
+        "//tensorflow_probability/python/bijectors:softplus.jax",
+        "//tensorflow_probability/python/distributions:distribution.jax",
+        "//tensorflow_probability/python/distributions:gaussian_process_regression_model.jax",
+        "//tensorflow_probability/python/distributions/internal:stochastic_process_util.jax",
+        "//tensorflow_probability/python/internal:dtype_util.jax",
+        "//tensorflow_probability/python/internal:parameter_properties.jax",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util.jax",
+        "//tensorflow_probability/python/internal/backend/jax",
+        "//tensorflow_probability/python/mcmc:sample_halton_sequence.jax",
     ],
 )
 
@@ -83,7 +122,14 @@ py_library(
         ":mbcg",
         ":preconditioners",
         # jax dep,
-        "//tensorflow_probability/substrates:jax",
+        "//tensorflow_probability/python/distributions:distribution.jax",
+        "//tensorflow_probability/python/distributions/internal:stochastic_process_util.jax",
+        "//tensorflow_probability/python/experimental/psd_kernels:multitask_kernel.jax",
+        "//tensorflow_probability/python/internal:dtype_util.jax",
+        "//tensorflow_probability/python/internal:prefer_static.jax",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util.jax",
+        "//tensorflow_probability/python/internal/backend/jax",
     ],
 )
 
@@ -108,7 +154,11 @@ py_library(
         ":preconditioners",
         ":schur_complement",
         # jax dep,
-        "//tensorflow_probability/substrates:jax",
+        "//tensorflow_probability/python/bijectors:softplus.jax",
+        "//tensorflow_probability/python/distributions/internal:stochastic_process_util.jax",
+        "//tensorflow_probability/python/internal:dtype_util.jax",
+        "//tensorflow_probability/python/internal:nest_util.jax",
+        "//tensorflow_probability/python/internal:parameter_properties.jax",
     ],
 )
 
@@ -133,7 +183,7 @@ py_library(
         # jax dep,
         # jax:experimental_sparse dep,
         # jaxtyping dep,
-        "//tensorflow_probability/substrates:jax",
+        "//tensorflow_probability/python/internal/backend/jax",
     ],
 )
 
@@ -157,7 +207,7 @@ py_library(
         ":mbcg",
         # jax dep,
         # scipy dep,
-        "//tensorflow_probability/substrates:jax",
+        "//tensorflow_probability/python/internal/backend/jax",
     ],
 )
 
@@ -165,10 +215,12 @@ py_test(
     name = "partial_lanczos_test",
     srcs = ["partial_lanczos_test.py"],
     deps = [
+        ":mbcg",
         ":partial_lanczos",
         # absl/testing:absltest dep,
         # jax dep,
         # numpy dep,
+        "//tensorflow_probability/substrates:jax",
     ],
 )
 
@@ -183,7 +235,6 @@ py_library(
         # jaxtyping dep,
         # numpy dep,
         # scipy dep,
-        "//tensorflow_probability/substrates:jax",
     ],
 )
 
@@ -206,7 +257,6 @@ py_library(
     name = "linear_operator_sum",
     srcs = ["linear_operator_sum.py"],
     deps = [
-        "//tensorflow_probability/substrates:jax",
     ],
 )
 
@@ -219,7 +269,8 @@ py_library(
         # jax dep,
         # jax:experimental_sparse dep,
         # jaxtyping dep,
-        "//tensorflow_probability/substrates:jax",
+        "//tensorflow_probability/python/internal/backend/jax",
+        "//tensorflow_probability/python/math:linalg.jax",
     ],
 )
 
@@ -232,7 +283,7 @@ py_test(
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
         # jax dep,
-        "//tensorflow_probability/substrates:jax",
+        "//tensorflow_probability/python/internal/backend/jax",
     ],
 )
 
@@ -242,7 +293,10 @@ py_library(
     deps = [
         ":preconditioners",
         # jax dep,
-        "//tensorflow_probability/substrates:jax",
+        "//tensorflow_probability/python/bijectors:softplus.jax",
+        "//tensorflow_probability/python/internal:distribution_util.jax",
+        "//tensorflow_probability/python/internal:dtype_util.jax",
+        "//tensorflow_probability/python/internal:nest_util.jax",
     ],
 )
 

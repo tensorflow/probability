@@ -20,13 +20,16 @@ from tensorflow_probability.python.experimental.fastgp import fast_gp
 from tensorflow_probability.python.experimental.fastgp import fast_log_det
 from tensorflow_probability.python.experimental.fastgp import linear_operator_sum
 from tensorflow_probability.python.experimental.fastgp import preconditioners
-from tensorflow_probability.substrates import jax as tfp
+from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal.backend import jax as tf2jax
+from tensorflow_probability.substrates.jax.distributions import distribution
+from tensorflow_probability.substrates.jax.distributions.internal import stochastic_process_util
+from tensorflow_probability.substrates.jax.experimental.psd_kernels import multitask_kernel
+from tensorflow_probability.substrates.jax.internal import dtype_util
+from tensorflow_probability.substrates.jax.internal import prefer_static as ps
+from tensorflow_probability.substrates.jax.internal import tensor_util
 
-ps = tfp.internal.prefer_static
-tfd = tfp.distributions
-tfed = tfp.experimental.distributions
-tfek = tfp.experimental.psd_kernels
-jtf = tfp.tf2jax
+
 Array = jnp.ndarray
 
 
@@ -43,11 +46,11 @@ def _unvec(x, matrix_shape):
   return jnp.reshape(x, ps.concat([ps.shape(x)[:-1], matrix_shape], axis=0))
 
 
-class MultiTaskGaussianProcess(tfd.AutoCompositeTensorDistribution):
+class MultiTaskGaussianProcess(distribution.AutoCompositeTensorDistribution):
   """Fast, JAX-only implementation of a MTGP distribution class.
 
-  See tfed.distributions.MultiTaskGaussianProcess for a description and
-  parameter documentation.
+  See tfp.experimental.distributions.MultiTaskGaussianProcess for a description
+  and parameter documentation.
   """
 
   def __init__(
@@ -87,24 +90,26 @@ class MultiTaskGaussianProcess(tfd.AutoCompositeTensorDistribution):
         jax.tree_util.tree_structure(kernel.feature_ndims)):
       # If the index points are not nested, we assume they are of the same
       # float dtype as the GP.
-      dtype = tfp.internal.dtype_util.common_dtype(
-          {'index_points': index_points,
-           'observation_noise_variance': observation_noise_variance},
-          jnp.float32)
+      dtype = dtype_util.common_dtype(
+          {
+              'index_points': index_points,
+              'observation_noise_variance': observation_noise_variance,
+          },
+          jnp.float32,
+      )
     else:
-      dtype = tfp.internal.dtype_util.common_dtype(
+      dtype = dtype_util.common_dtype(
           {'observation_noise_variance': observation_noise_variance},
-          jnp.float32)
+          jnp.float32,
+      )
 
     self._kernel = kernel
     self._index_points = index_points
-    self._mean_fn = (
-        tfd.internal.stochastic_process_util.maybe_create_multitask_mean_fn(
-            mean_fn, kernel, dtype))
-    self._observation_noise_variance = (
-        tfp.internal.tensor_util.convert_nonref_to_tensor(
-            observation_noise_variance
-        )
+    self._mean_fn = stochastic_process_util.maybe_create_multitask_mean_fn(
+        mean_fn, kernel, dtype
+    )
+    self._observation_noise_variance = tensor_util.convert_nonref_to_tensor(
+        observation_noise_variance
     )
     self._config = config
     self._probe_vector_type = fast_log_det.ProbeVectorType[
@@ -114,11 +119,12 @@ class MultiTaskGaussianProcess(tfd.AutoCompositeTensorDistribution):
 
     super(MultiTaskGaussianProcess, self).__init__(
         dtype=dtype,
-        reparameterization_type=tfd.FULLY_REPARAMETERIZED,
+        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,
-        name='MultiTaskGaussianProcess')
+        name='MultiTaskGaussianProcess',
+    )
 
   @property
   def kernel(self):
@@ -138,8 +144,9 @@ class MultiTaskGaussianProcess(tfd.AutoCompositeTensorDistribution):
 
   @property
   def event_shape(self):
-    return tfd.internal.stochastic_process_util.multitask_event_shape(
-        self._kernel, self.index_points)
+    return stochastic_process_util.multitask_event_shape(
+        self._kernel, self.index_points
+    )
 
   def _mean(self):
     loc = self._mean_fn(self._index_points)
@@ -151,7 +158,7 @@ class MultiTaskGaussianProcess(tfd.AutoCompositeTensorDistribution):
         index_points, index_points)
     observation_noise_variance = self.observation_noise_variance
     # We can add the observation noise to each block.
-    if isinstance(self.kernel, tfek.Independent):
+    if isinstance(self.kernel, multitask_kernel.Independent):
       single_task_variance = kernel_matrix.operators[0].diag_part()
       if observation_noise_variance is not None:
         single_task_variance = (
@@ -217,11 +224,13 @@ class MultiTaskGaussianProcess(tfd.AutoCompositeTensorDistribution):
     if is_scaling_preconditioner:
       preconditioner = get_preconditioner(covariance)
 
-    covariance = linear_operator_sum.LinearOperatorSum(
-        [covariance,
-         jtf.linalg.LinearOperatorScaledIdentity(
-             num_rows=covariance.range_dimension,
-             multiplier=self._observation_noise_variance)])
+    covariance = linear_operator_sum.LinearOperatorSum([
+        covariance,
+        tf2jax.linalg.LinearOperatorScaledIdentity(
+            num_rows=covariance.range_dimension,
+            multiplier=self._observation_noise_variance,
+        ),
+    ])
 
     if not is_scaling_preconditioner:
       preconditioner = get_preconditioner(covariance)

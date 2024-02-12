@@ -27,9 +27,9 @@ import numpy as np
 from tensorflow_probability.python.experimental.fastgp import mbcg
 from tensorflow_probability.python.experimental.fastgp import partial_lanczos
 from tensorflow_probability.python.experimental.fastgp import preconditioners
-from tensorflow_probability.substrates import jax as tfp
+from tensorflow_probability.python.internal.backend import jax as tf2jax
+from tensorflow_probability.substrates.jax.mcmc import sample_halton_sequence_lib
 
-jtf = tfp.tf2jax
 Array = jnp.ndarray
 
 # pylint: disable=invalid-name
@@ -75,11 +75,9 @@ def make_probe_vectors(
     return q * norm
 
   if probe_vector_type == ProbeVectorType.NORMAL_QMC:
-    uniforms = tfp.mcmc.sample_halton_sequence(
-        dim=n,
-        num_results=num_probe_vectors,
-        dtype=dtype,
-        seed=key)
+    uniforms = sample_halton_sequence_lib.sample_halton_sequence(
+        dim=n, num_results=num_probe_vectors, dtype=dtype, seed=key
+    )
     return jnp.transpose(jax.scipy.special.ndtri(uniforms))
 
   raise ValueError(
@@ -292,7 +290,7 @@ R6_COEFFICIENTS = np.array(
 
 @functools.partial(jax.custom_jvp, nondiff_argnums=(4,))
 def _r1(
-    unused_M: jtf.linalg.LinearOperator,
+    unused_M: tf2jax.linalg.LinearOperator,
     preconditioner: preconditioners.Preconditioner,
     probe_vectors: Array,
     key: jax.Array,
@@ -312,7 +310,7 @@ def _r1(
 
 @functools.partial(jax.custom_jvp, nondiff_argnums=(4,))
 def _r2(
-    unused_M: jtf.linalg.LinearOperator,
+    unused_M: tf2jax.linalg.LinearOperator,
     preconditioner: preconditioners.Preconditioner,
     probe_vectors: Array,
     key: jax.Array,
@@ -332,7 +330,7 @@ def _r2(
 
 @functools.partial(jax.custom_jvp, nondiff_argnums=(4,))
 def _r3(
-    unused_M: jtf.linalg.LinearOperator,
+    unused_M: tf2jax.linalg.LinearOperator,
     preconditioner: preconditioners.Preconditioner,
     probe_vectors: Array,
     key: jax.Array,
@@ -352,7 +350,7 @@ def _r3(
 
 @functools.partial(jax.custom_jvp, nondiff_argnums=(4,))
 def _r4(
-    unused_M: jtf.linalg.LinearOperator,
+    unused_M: tf2jax.linalg.LinearOperator,
     preconditioner: preconditioners.Preconditioner,
     probe_vectors: Array,
     key: jax.Array,
@@ -372,7 +370,7 @@ def _r4(
 
 @functools.partial(jax.custom_jvp, nondiff_argnums=(4,))
 def _r5(
-    unused_M: jtf.linalg.LinearOperator,
+    unused_M: tf2jax.linalg.LinearOperator,
     preconditioner: preconditioners.Preconditioner,
     probe_vectors: Array,
     key: jax.Array,
@@ -392,7 +390,7 @@ def _r5(
 
 @functools.partial(jax.custom_jvp, nondiff_argnums=(4,))
 def _r6(
-    unused_M: jtf.linalg.LinearOperator,
+    unused_M: tf2jax.linalg.LinearOperator,
     preconditioner: preconditioners.Preconditioner,
     probe_vectors: Array,
     key: jax.Array,
@@ -448,7 +446,7 @@ def _r6_jvp(num_iters, primals, tangents):
 
 @jax.named_call
 def r1(
-    M: jtf.linalg.LinearOperator,
+    M: tf2jax.linalg.LinearOperator,
     preconditioner: preconditioners.Preconditioner,
     key: jax.Array,
     num_probe_vectors: int = 25,
@@ -468,7 +466,7 @@ def r1(
 
 @jax.named_call
 def r2(
-    M: jtf.linalg.LinearOperator,
+    M: tf2jax.linalg.LinearOperator,
     preconditioner: preconditioners.Preconditioner,
     key: jax.Array,
     num_probe_vectors: int = 25,
@@ -488,7 +486,7 @@ def r2(
 
 @jax.named_call
 def r3(
-    M: jtf.linalg.LinearOperator,
+    M: tf2jax.linalg.LinearOperator,
     preconditioner: preconditioners.Preconditioner,
     key: jax.Array,
     num_probe_vectors: int = 25,
@@ -508,7 +506,7 @@ def r3(
 
 @jax.named_call
 def r4(
-    M: jtf.linalg.LinearOperator,
+    M: tf2jax.linalg.LinearOperator,
     preconditioner: preconditioners.Preconditioner,
     key: jax.Array,
     num_probe_vectors: int = 25,
@@ -528,7 +526,7 @@ def r4(
 
 @jax.named_call
 def r5(
-    M: jtf.linalg.LinearOperator,
+    M: tf2jax.linalg.LinearOperator,
     preconditioner: preconditioners.Preconditioner,
     key: jax.Array,
     num_probe_vectors: int = 25,
@@ -548,7 +546,7 @@ def r5(
 
 @jax.named_call
 def r6(
-    M: jtf.linalg.LinearOperator,
+    M: tf2jax.linalg.LinearOperator,
     preconditioner: preconditioners.Preconditioner,
     key: jax.Array,
     num_probe_vectors: int = 25,
@@ -593,7 +591,7 @@ def batch_log00(ts: mbcg.SymmetricTridiagonalMatrix) -> Array:
     jax.jit, static_argnames=['probe_vectors_are_rademacher', 'num_iters']
 )
 def _stochastic_lanczos_quadrature_log_det(
-    M: jtf.linalg.LinearOperator,
+    M: tf2jax.linalg.LinearOperator,
     preconditioner: preconditioners.Preconditioner,
     probe_vectors: Array,
     unused_key,
@@ -634,7 +632,7 @@ def _stochastic_lanczos_quadrature_log_det(
 
 @jax.named_call
 def stochastic_lanczos_quadrature_log_det(
-    M: jtf.linalg.LinearOperator,
+    M: tf2jax.linalg.LinearOperator,
     preconditioner: preconditioners.Preconditioner,
     key: jax.Array,
     num_probe_vectors: int = 25,
@@ -701,7 +699,7 @@ def get_log_det_algorithm(alg_name: str):
 
 
 def log_det_taylor_series_with_hutchinson(
-    M: jtf.linalg.LinearOperator,
+    M: tf2jax.linalg.LinearOperator,
     num_probe_vectors: int,
     key: jax.Array,
     num_taylor_series_iterations: int = 10,

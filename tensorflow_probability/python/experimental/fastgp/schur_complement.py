@@ -17,11 +17,13 @@
 import jax
 import jax.numpy as jnp
 from tensorflow_probability.python.experimental.fastgp import mbcg
-from tensorflow_probability.substrates import jax as tfp
+from tensorflow_probability.substrates.jax.bijectors import softplus
+from tensorflow_probability.substrates.jax.internal import distribution_util
+from tensorflow_probability.substrates.jax.internal import dtype_util
+from tensorflow_probability.substrates.jax.internal import nest_util
+from tensorflow_probability.substrates.jax.internal import parameter_properties
+from tensorflow_probability.substrates.jax.math.psd_kernels import positive_semidefinite_kernel
 from tensorflow_probability.substrates.jax.math.psd_kernels.internal import util
-
-jtf = tfp.tf2jax
-parameter_properties = tfp.internal.parameter_properties
 
 
 __all__ = [
@@ -39,15 +41,18 @@ def _compute_divisor_matrix(
   """Compute the modified kernel with respect to the fixed inputs."""
   divisor_matrix = base_kernel.matrix(fixed_inputs, fixed_inputs)
   if diag_shift is not None:
-    broadcast_shape = tfp.internal.distribution_util.get_broadcast_shape(
-        divisor_matrix, diag_shift[..., jnp.newaxis, jnp.newaxis])
+    broadcast_shape = distribution_util.get_broadcast_shape(
+        divisor_matrix, diag_shift[..., jnp.newaxis, jnp.newaxis]
+    )
     divisor_matrix = jnp.broadcast_to(divisor_matrix, broadcast_shape)
     divisor_matrix = _add_diagonal_shift(
         divisor_matrix, diag_shift[..., jnp.newaxis])
   return divisor_matrix
 
 
-class SchurComplement(tfp.math.psd_kernels.AutoCompositeTensorPsdKernel):
+class SchurComplement(
+    positive_semidefinite_kernel.AutoCompositeTensorPsdKernel
+):
   """The fast SchurComplement kernel.
 
   See tfp.math.psd_kernels.SchurComplement for more details.
@@ -93,17 +98,18 @@ class SchurComplement(tfp.math.psd_kernels.AutoCompositeTensorPsdKernel):
 
     if jax.tree_util.treedef_is_leaf(
         jax.tree_util.tree_structure(base_kernel.feature_ndims)):
-      dtype = tfp.internal.dtype_util.common_dtype(
+      dtype = dtype_util.common_dtype(
           [base_kernel, fixed_inputs],
-          dtype_hint=tfp.internal.nest_util.broadcast_structure(
-              base_kernel.feature_ndims, jnp.float32))
+          dtype_hint=nest_util.broadcast_structure(
+              base_kernel.feature_ndims, jnp.float32
+          ),
+      )
     else:
       # If the fixed inputs are not nested, we assume they are of the same
       # float dtype as the remaining parameters.
-      dtype = tfp.internal.dtype_util.common_dtype(
-          [base_kernel,
-           fixed_inputs,
-           diag_shift], jnp.float32)
+      dtype = dtype_util.common_dtype(
+          [base_kernel, fixed_inputs, diag_shift], jnp.float32
+      )
 
     self._base_kernel = base_kernel
     self._diag_shift = diag_shift
@@ -215,11 +221,17 @@ class SchurComplement(tfp.math.psd_kernels.AutoCompositeTensorPsdKernel):
         base_kernel=parameter_properties.BatchedComponentProperties(),
         fixed_inputs=parameter_properties.ParameterProperties(
             event_ndims=lambda self: jax.tree_util.tree_map(  # pylint: disable=g-long-lambda
-                lambda nd: nd + 1, self.base_kernel.feature_ndims)),
+                lambda nd: nd + 1, self.base_kernel.feature_ndims
+            )
+        ),
         diag_shift=parameter_properties.ParameterProperties(
             default_constraining_bijector_fn=(
-                lambda: tfp.bijectors.Softplus(  # pylint: disable=g-long-lambda
-                    low=tfp.internal.dtype_util.eps(dtype)))))
+                lambda: softplus.Softplus(  # pylint: disable=g-long-lambda
+                    low=dtype_util.eps(dtype)
+                )
+            )
+        ),
+    )
 
   def _divisor_matrix(self, fixed_inputs=None):
     fixed_inputs = self._fixed_inputs if fixed_inputs is None else fixed_inputs

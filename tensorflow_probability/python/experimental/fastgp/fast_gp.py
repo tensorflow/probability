@@ -25,11 +25,16 @@ import jax.numpy as jnp
 from tensorflow_probability.python.experimental.fastgp import fast_log_det
 from tensorflow_probability.python.experimental.fastgp import mbcg
 from tensorflow_probability.python.experimental.fastgp import preconditioners
-from tensorflow_probability.substrates import jax as tfp
+from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal.backend import jax as tf2jax
+from tensorflow_probability.substrates.jax.bijectors import softplus
+from tensorflow_probability.substrates.jax.distributions import distribution
+from tensorflow_probability.substrates.jax.distributions import gaussian_process_regression_model
+from tensorflow_probability.substrates.jax.distributions.internal import stochastic_process_util
+from tensorflow_probability.substrates.jax.internal import dtype_util
+from tensorflow_probability.substrates.jax.internal import parameter_properties
+from tensorflow_probability.substrates.jax.internal import tensor_util
 
-tfb = tfp.bijectors
-tfd = tfp.distributions
-jtf = tfp.tf2jax
 Array = jnp.ndarray
 
 LOG_TWO_PI = 1.8378770664093453
@@ -76,7 +81,7 @@ class GaussianProcessConfig:
   log_det_iters: int = 20
 
 
-class GaussianProcess(tfp.distributions.Distribution):
+class GaussianProcess(distribution.Distribution):
   """Fast, JAX-only implementation of a GP distribution class.
 
   See tfd.distributions.GaussianProcess for a description and parameter
@@ -131,26 +136,28 @@ class GaussianProcess(tfp.distributions.Distribution):
         jax.tree_util.tree_structure(kernel.feature_ndims)):
       # If the index points are not nested, we assume they are of the same
       # float dtype as the GP.
-      dtype = tfp.internal.dtype_util.common_dtype(
-          {'index_points': index_points,
-           'observation_noise_variance': observation_noise_variance,
-           'jitter': jitter},
-          jnp.float32)
+      dtype = dtype_util.common_dtype(
+          {
+              'index_points': index_points,
+              'observation_noise_variance': observation_noise_variance,
+              'jitter': jitter,
+          },
+          jnp.float32,
+      )
     else:
-      dtype = tfp.internal.dtype_util.common_dtype(
-          {'observation_noise_variance': observation_noise_variance,
-           'jitter': jitter},
-          jnp.float32)
+      dtype = dtype_util.common_dtype(
+          {
+              'observation_noise_variance': observation_noise_variance,
+              'jitter': jitter,
+          },
+          jnp.float32,
+      )
 
     self._kernel = kernel
     self._index_points = index_points
-    self._mean_fn = tfd.internal.stochastic_process_util.maybe_create_mean_fn(
-        mean_fn, dtype
-    )
-    self._observation_noise_variance = (
-        tfp.internal.tensor_util.convert_nonref_to_tensor(
-            observation_noise_variance
-        )
+    self._mean_fn = stochastic_process_util.maybe_create_mean_fn(mean_fn, dtype)
+    self._observation_noise_variance = tensor_util.convert_nonref_to_tensor(
+        observation_noise_variance
     )
     self._jitter = jitter
     self._config = config
@@ -162,11 +169,12 @@ class GaussianProcess(tfp.distributions.Distribution):
 
     super(GaussianProcess, self).__init__(
         dtype=dtype,
-        reparameterization_type=tfd.FULLY_REPARAMETERIZED,
+        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,
-        name='GaussianProcess')
+        name='GaussianProcess',
+    )
 
   @property
   def kernel(self):
@@ -191,24 +199,29 @@ class GaussianProcess(tfp.distributions.Distribution):
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):
     return dict(
-        index_points=tfp.util.ParameterProperties(
+        index_points=parameter_properties.ParameterProperties(
             event_ndims=lambda self: jax.tree_util.tree_map(  # pylint: disable=g-long-lambda
-                lambda nd: nd + 1, self.kernel.feature_ndims),
-            shape_fn=tfp.internal.parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
+                lambda nd: nd + 1, self.kernel.feature_ndims
+            ),
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
         ),
-        kernel=tfp.util.BatchedComponentProperties(),
+        kernel=parameter_properties.BatchedComponentProperties(),
         observation_noise_variance=(
-            tfp.util.ParameterProperties(
+            parameter_properties.ParameterProperties(
                 event_ndims=0,
                 shape_fn=lambda sample_shape: sample_shape[:-1],
                 default_constraining_bijector_fn=(
-                    lambda: tfb.Softplus(  # pylint: disable=g-long-lambda
-                        low=tfp.internal.dtype_util.eps(dtype))))))
+                    lambda: softplus.Softplus(  # pylint: disable=g-long-lambda
+                        low=dtype_util.eps(dtype)
+                    )
+                ),
+            )
+        ),
+    )
 
   @property
   def event_shape(self):
-    return tfd.internal.stochastic_process_util.event_shape(
-        self._kernel, self.index_points)
+    return stochastic_process_util.event_shape(self._kernel, self.index_points)
 
   def _mean(self):
     mean = self._mean_fn(self._index_points)
@@ -217,12 +230,12 @@ class GaussianProcess(tfp.distributions.Distribution):
 
   def _covariance(self):
     index_points = self._index_points
-    _, covariance = (
-        tfd.internal.stochastic_process_util.get_loc_and_kernel_matrix(
-            kernel=self.kernel,
-            mean_fn=self._mean_fn,
-            observation_noise_variance=self.observation_noise_variance,
-            index_points=index_points))
+    _, covariance = stochastic_process_util.get_loc_and_kernel_matrix(
+        kernel=self.kernel,
+        mean_fn=self._mean_fn,
+        observation_noise_variance=self.observation_noise_variance,
+        index_points=index_points,
+    )
     return covariance
 
   def _variance(self):
@@ -236,15 +249,13 @@ class GaussianProcess(tfp.distributions.Distribution):
 
     # TODO(thomaswc): Considering caching loc and covariance for a given
     # is_missing.
-    loc, covariance = (
-        tfd.internal.stochastic_process_util.get_loc_and_kernel_matrix(
-            kernel=self._kernel,
-            mean_fn=self._mean_fn,
-            observation_noise_variance=self.dtype(0.),
-            index_points=self._index_points,
-            is_missing=is_missing,
-            mask_loc=False,
-        )
+    loc, covariance = stochastic_process_util.get_loc_and_kernel_matrix(
+        kernel=self._kernel,
+        mean_fn=self._mean_fn,
+        observation_noise_variance=self.dtype(0.0),
+        index_points=self._index_points,
+        is_missing=is_missing,
+        mask_loc=False,
     )
 
     is_scaling_preconditioner = self._config.preconditioner.endswith('scaling')
@@ -340,7 +351,7 @@ class GaussianProcess(tfp.distributions.Distribution):
       **kwargs
   ):
     # TODO(thomaswc): Speed this up, if possible.
-    return tfd.GaussianProcessRegressionModel.precompute_regression_model(
+    return gaussian_process_regression_model.GaussianProcessRegressionModel.precompute_regression_model(
         kernel=self._kernel,
         observation_index_points=self._index_points,
         observations=observations,
@@ -350,7 +361,7 @@ class GaussianProcess(tfp.distributions.Distribution):
         mean_fn=self._mean_fn,
         cholesky_fn=None,
         jitter=self._jitter,
-        **kwargs
+        **kwargs,
     )
 
 
@@ -359,18 +370,18 @@ class GaussianProcess(tfp.distributions.Distribution):
 
 @functools.partial(jax.custom_jvp, nondiff_argnums=(3,))
 def yt_inv_y(
-    kernel: jtf.linalg.LinearOperator,
-    preconditioner: jtf.linalg.LinearOperator,
+    kernel: tf2jax.linalg.LinearOperator,
+    preconditioner: tf2jax.linalg.LinearOperator,
     y: Array,
     max_iters: int = 20,
 ) -> Array:
   """Compute y^t (kernel)^(-1) y.
 
   Args:
-    kernel: A matrix or jtf.LinearOperator representing a linear map from R^n to
-      itself.
-    preconditioner: An operator on R^n that when applied before kernel,
-      reduces the condition number of the system.
+    kernel: A matrix or linalg.LinearOperator representing a linear map from R^n
+      to itself.
+    preconditioner: An operator on R^n that when applied before kernel, reduces
+      the condition number of the system.
     y: A matrix of shape (n, m).
     max_iters: The maximum number of iterations to perform the modified batched
       conjugate gradients algorithm for.
@@ -410,7 +421,7 @@ def yt_inv_y_jvp(max_iters, primals, tangents):
   primal_out = jnp.einsum('ij,ij->j', y, inv_y)
   tangent_out = 2.0 * jnp.einsum('ik,ik->k', inv_y, dy)
 
-  if isinstance(dkernel, jtf.linalg.LinearOperator):
+  if isinstance(dkernel, tf2jax.linalg.LinearOperator):
     tangent_out = tangent_out - jnp.einsum('ik,ik->k', inv_y, dkernel @ inv_y)
   else:
     tangent_out = tangent_out - jnp.einsum('ik,ij,jk->k', inv_y, dkernel, inv_y)

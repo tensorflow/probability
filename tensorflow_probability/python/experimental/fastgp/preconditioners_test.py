@@ -20,10 +20,8 @@ from jax import config
 import jax.numpy as jnp
 import numpy as np
 from tensorflow_probability.python.experimental.fastgp import preconditioners
-import tensorflow_probability.substrates.jax as tfp
+from tensorflow_probability.python.internal.backend import jax as tf2jax
 from absl.testing import absltest
-
-jtf = tfp.tf2jax
 
 
 # pylint: disable=invalid-name
@@ -679,7 +677,7 @@ class _PreconditionersTest(parameterized.TestCase):
     A = jax.random.uniform(jax.random.PRNGKey(8), shape=(2, 2),
                            minval=-1.0, maxval=1.0).astype(self.dtype)
     M = A.T @ A + 0.6 * jnp.eye(2).astype(self.dtype)
-    M = jtf.linalg.LinearOperatorFullMatrix(M)
+    M = tf2jax.linalg.LinearOperatorFullMatrix(M)
     # There are no errors.
     _ = preconditioners.get_preconditioner(
         preconditioner, M, key=jax.random.PRNGKey(9), rank=5)

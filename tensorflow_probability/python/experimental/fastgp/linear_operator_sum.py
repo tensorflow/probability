@@ -15,13 +15,11 @@
 """Expresses a sum of operators."""
 
 import jax
-from tensorflow_probability.substrates import jax as tfp
-
-jtf = tfp.tf2jax
+from tensorflow_probability.python.internal.backend import jax as tf2jax
 
 
 @jax.tree_util.register_pytree_node_class
-class LinearOperatorSum(jtf.linalg.LinearOperator):
+class LinearOperatorSum(tf2jax.linalg.LinearOperator):
   """Encapsulates a sum of linear operators."""
 
   def __init__(self,

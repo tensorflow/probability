@@ -20,9 +20,9 @@ import jax
 import jax.numpy as jnp
 import scipy
 from tensorflow_probability.python.experimental.fastgp import mbcg
-from tensorflow_probability.substrates import jax as tfp
+from tensorflow_probability.python.internal.backend import jax as tf2jax
 
-jtf = tfp.tf2jax
+
 Array = jnp.ndarray
 
 # pylint: disable=invalid-name
@@ -155,9 +155,8 @@ def partial_lanczos(
 
 
 def make_lanczos_preconditioner(
-    kernel: jtf.linalg.LinearOperator,
-    key: jax.Array,
-    num_iters: int = 20):
+    kernel: tf2jax.linalg.LinearOperator, key: jax.Array, num_iters: int = 20
+):
   """Return a preconditioner as a linear operator."""
   n = kernel.shape[-1]
   key1, key2 = jax.random.split(key)
@@ -166,8 +165,9 @@ def make_lanczos_preconditioner(
   Q, T = partial_lanczos(lambda x: kernel @ x, v, key2, num_iters)
 
   # Now diagonalize T as Q^t D Q
-  # TODO(thomaswc): Replace this scipy call with jnp.linalg.eigh so that
-  # it can be jit-ed.
+  # TODO(thomaswc): Once jax.scipy.linalg.eigh_tridiagonal supports
+  # eigenvectors (https://github.com/google/jax/issues/14019), replace
+  # this with that so that it can be jit-ed.
   evalues, evectors = scipy.linalg.eigh_tridiagonal(
       T.diag[0, :], T.off_diag[0, :])
   sqrt_evalues = jnp.sqrt(evalues)
@@ -176,17 +176,17 @@ def make_lanczos_preconditioner(
 
   # diag(F^t F)_i = sum_k (F^t)_{i, k} F_{k, i} = sum_k F_{k, i}^2
   diag_Ft_F = jnp.sum(F * F, axis=0)
-  residual_diag = jtf.linalg.diag_part(kernel) - diag_Ft_F
+  residual_diag = tf2jax.linalg.diag_part(kernel) - diag_Ft_F
 
   eps = jnp.finfo(kernel.dtype).eps
 
   # TODO(srvasude): Modify this when residual_diag is near zero. This means that
   # we captured the diagonal appropriately, and modifying with a shift of eps
   # can alter the preconditioner greatly.
-  diag_linop = tfp.tf2jax.linalg.LinearOperatorDiag(
-      jnp.maximum(residual_diag, 0.0) + 10. * eps, is_positive_definite=True
+  diag_linop = tf2jax.linalg.LinearOperatorDiag(
+      jnp.maximum(residual_diag, 0.0) + 10.0 * eps, is_positive_definite=True
   )
-  return tfp.tf2jax.linalg.LinearOperatorLowRankUpdate(
+  return tf2jax.linalg.LinearOperatorLowRankUpdate(
       diag_linop, jnp.transpose(F), is_positive_definite=True
   )
 
