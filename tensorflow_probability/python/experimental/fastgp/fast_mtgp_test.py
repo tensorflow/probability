@@ -186,7 +186,7 @@ class _FastMultiTaskGpTest(absltest.TestCase):
 
     fast_ll = jnp.sum(fgp.log_prob(samples, key=jax.random.PRNGKey(1)))
     slow_ll = jnp.sum(sgp.log_prob(samples))
-    np.testing.assert_allclose(fast_ll, slow_ll, rtol=2e-4)
+    np.testing.assert_allclose(fast_ll, slow_ll, rtol=4e-4)
 
   def test_gaussian_process_log_prob_jits(self):
     kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
@@ -345,12 +345,12 @@ class _FastMultiTaskGpTest(absltest.TestCase):
         self.dtype(1.0), self.dtype(1.0), self.dtype(1e-3))
     direct_slow_value = slow_log_prob(
         self.dtype(1.0), self.dtype(1.0), self.dtype(1e-3))
-    np.testing.assert_allclose(direct_value, direct_slow_value, rtol=4e-4)
+    np.testing.assert_allclose(direct_value, direct_slow_value, rtol=1e-3)
 
     slow_value, slow_gradient = jax.value_and_grad(
         slow_log_prob, argnums=[0, 1, 2]
     )(self.dtype(1.0), self.dtype(1.0), self.dtype(1e-3))
-    np.testing.assert_allclose(value, slow_value, rtol=4e-4)
+    np.testing.assert_allclose(value, slow_value, rtol=1e-3)
     slow_d_amp, slow_d_length_scale, slow_d_noise = slow_gradient
     np.testing.assert_allclose(d_amp, slow_d_amp, rtol=1e-4)
     np.testing.assert_allclose(d_length_scale, slow_d_length_scale, rtol=1e-4)

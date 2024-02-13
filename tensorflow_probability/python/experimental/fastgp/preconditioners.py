@@ -721,18 +721,27 @@ PRECONDITIONER_REGISTRY = {
 }
 
 
+def resolve_preconditioner(
+    preconditioner_name: str,
+    M: tf2jax.linalg.LinearOperator,
+    rank: int) -> str:
+  """Return the resolved preconditioner_name."""
+  if preconditioner_name == 'auto':
+    n = M.shape[-1]
+    if 5 * rank >= n:
+      return 'partial_cholesky_split'
+    else:
+      return 'truncated_randomized_svd_plus_scaling'
+  return preconditioner_name
+
+
 @jax.named_call
 def get_preconditioner(
     preconditioner_name: str, M: tf2jax.linalg.LinearOperator, **kwargs
 ) -> SplitPreconditioner:
   """Return the preconditioner of the given type for the given matrix."""
-  if preconditioner_name == 'auto':
-    n = M.shape[-1]
-    rank = kwargs.get('rank', 20)
-    if 5 * rank >= n:
-      preconditioner_name = 'partial_cholesky_split'
-    else:
-      preconditioner_name = 'truncated_svd'
+  preconditioner_name = resolve_preconditioner(
+      preconditioner_name, M, kwargs.get('rank', 20))
   try:
     return PRECONDITIONER_REGISTRY[preconditioner_name](M, **kwargs)
   except KeyError as key_error:

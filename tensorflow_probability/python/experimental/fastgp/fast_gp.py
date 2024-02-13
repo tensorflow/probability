@@ -46,15 +46,15 @@ class GaussianProcessConfig:
 
   # The maximum number of iterations to run conjugate gradients
   # for when calculating the yt_inv_y part of the log prob.
-  cg_iters: int = 20
+  cg_iters: int = 25
   # The name of a preconditioner in the preconditioner.PRECONDITIONER_REGISTRY
-  # or 'auto' which will used truncated_svd when n is large and
-  # partial_cholesky_split when is small.
+  # or 'auto' which will used truncated_randomized_svd_plus_scaling when n is
+  # large and partial_cholesky_split when is small.
   preconditioner: str = 'auto'
   # Use a preconditioner based on a low rank
   # approximation of this rank.  Note that not all preconditioners have
   # adjustable ranks.
-  preconditioner_rank: int = 20
+  preconditioner_rank: int = 25
   # Some preconditioners (like `truncated_svd`) can
   # get better approximation accuracy for running for more iterations (even
   # at a fixed rank size).  This parameter controls that.  Note that the
@@ -69,9 +69,9 @@ class GaussianProcessConfig:
   precondition_before_jitter: str = 'auto'
   # Either `normal`, `normal_qmc`, `normal_orthogonal` or
   # `rademacher`.  `normal_qmc` is only valid for n <= 10000
-  probe_vector_type: str = 'normal_orthogonal'
+  probe_vector_type: str = 'rademacher'
   # The number of probe vectors to use when estimating the log det.
-  num_probe_vectors: int = 30
+  num_probe_vectors: int = 35
   # One of 'slq' (for stochastic Lancos quadrature) or
   # 'r1', 'r2', 'r3', 'r4', 'r5', or 'r6' for the rational function
   # approximation of the given order.
@@ -258,7 +258,9 @@ class GaussianProcess(distribution.Distribution):
         mask_loc=False,
     )
 
-    is_scaling_preconditioner = self._config.preconditioner.endswith('scaling')
+    is_scaling_preconditioner = preconditioners.resolve_preconditioner(
+        self._config.preconditioner, covariance,
+        self._config.preconditioner_rank).endswith('scaling')
     precondition_before_jitter = (
         self._config.precondition_before_jitter == 'true'
         or (

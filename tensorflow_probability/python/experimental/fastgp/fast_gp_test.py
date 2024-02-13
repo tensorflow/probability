@@ -450,7 +450,7 @@ class _FastGpTest(parameterized.TestCase):
         self.dtype(1.0), self.dtype(1.0), self.dtype(1e-3), self.dtype(1e-3))
     direct_slow_value = slow_log_prob(
         self.dtype(1.0), self.dtype(1.0), self.dtype(1e-3), self.dtype(1e-3))
-    self.assertAlmostEqual(direct_value, direct_slow_value, delta=3e-4)
+    self.assertAlmostEqual(direct_value, direct_slow_value, delta=4e-4)
 
     slow_value, slow_gradient = jax.value_and_grad(
         slow_log_prob, argnums=[0, 1, 2, 3]
