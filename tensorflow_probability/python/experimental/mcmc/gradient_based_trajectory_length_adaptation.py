@@ -834,7 +834,8 @@ class GradientBasedTrajectoryLengthAdaptation(kernel_base.TransitionKernel):
       new_kernel_results = new_kernel_results._replace(
           inner_results=new_inner_results,
           step=previous_kernel_results.step + 1,
-          criterion=criterion)
+          criterion=criterion,
+          seed=seed)
 
       return new_state, new_kernel_results
 

@@ -67,6 +67,7 @@ class SNAPERHamiltonianMonteCarloResults(
         'inner_results',
         'ema_mean',
         'ema_variance',
+        'max_ema_variance',
         'state_ema_points',
         'ema_principal_component',
         'principal_component_ema_points',
@@ -80,6 +81,7 @@ class SNAPERHamiltonianMonteCarloResults(
       `GradientBasedTrajectoryLengthAdaptationResults`.
     ema_mean: Exponential moving average cross-chain state mean.
     ema_variance: Exponential moving average cross-chain state variance.
+    max_ema_variance: Maximum of `ema_variance`.
     state_ema_points: Approximate number of points used to compute the
       exponential moving averages.
     ema_principal_component: Exponential moving average cross-chain state
@@ -422,7 +424,7 @@ class SNAPERHamiltonianMonteCarlo(kernel_base.TransitionKernel):
         validate_args=self.validate_args,
         **gbtla_kwargs,
     )
-    return kernel
+    return kernel, max_variance
 
   def _update_state_ema(
       self,
@@ -539,7 +541,7 @@ class SNAPERHamiltonianMonteCarlo(kernel_base.TransitionKernel):
       step = inner_results.step
       state_ema_points = previous_kernel_results.state_ema_points
 
-      kernel = self._make_kernel(
+      kernel, max_variance = self._make_kernel(
           batch_shape=batch_shape,
           step=step,
           state_ema_points=state_ema_points,
@@ -588,6 +590,7 @@ class SNAPERHamiltonianMonteCarlo(kernel_base.TransitionKernel):
           inner_results=inner_results,
           ema_mean=ema_mean,
           ema_variance=ema_variance,
+          max_ema_variance=max_variance,
           state_ema_points=state_ema_points,
           ema_principal_component=ema_principal_component,
           principal_component_ema_points=principal_component_ema_points,
@@ -659,7 +662,7 @@ class SNAPERHamiltonianMonteCarlo(kernel_base.TransitionKernel):
       state_ema_points = tf.ones([], tf.int32)
       principal_component_ema_points = tf.ones([], tf.int32)
 
-      kernel = self._make_kernel(
+      kernel, max_variance = self._make_kernel(
           batch_shape=batch_shape,
           step=tf.zeros([], tf.int32),
           state_ema_points=state_ema_points,
@@ -675,6 +678,7 @@ class SNAPERHamiltonianMonteCarlo(kernel_base.TransitionKernel):
           inner_results=inner_results,
           ema_mean=ema_mean,
           ema_variance=ema_variance,
+          max_ema_variance=max_variance,
           state_ema_points=state_ema_points,
           ema_principal_component=ema_principal_component,
           principal_component_ema_points=principal_component_ema_points,
@@ -1009,23 +1013,27 @@ def default_snaper_trace_fn(state, is_burnin, kernel_results, reducer,
   # The ~ is here to catch NaNs.
   has_divergence = ~(tf.math.abs(energy_diff) < 500.)
   return state, {
-      'step_size':
-          unnest.get_innermost(kr, 'step_size'),
-      'n_steps':
-          unnest.get_innermost(kr, 'num_leapfrog_steps'),
-      'tune':
-          is_burnin,
-      'max_trajectory_length':
-          unnest.get_innermost(kr, 'max_trajectory_length'),
-      'variance_scaling':
-          tf.nest.map_structure(lambda x: 1. / x,
-                                unnest.get_innermost(kr, 'ema_variance')),
-      'diverging':
-          has_divergence,
-      'accept_ratio':
-          tf.minimum(tf.ones_like(energy_diff), tf.exp(energy_diff)),
-      'is_accepted':
-          unnest.get_innermost(kr, 'is_accepted'),
+      # SNAPER rescales the inner HMC kernel by max_ema_variance, so to aid
+      # comparisons with other algorithms which typically don't do this
+      # rescaling, we undo the rescaling here. This makes the step size
+      # consistent with the target_log_prob_fn scale implied by
+      # `variance_scaling` below.
+      'step_size': unnest.get_innermost(kr, 'step_size') / tf.sqrt(
+          unnest.get_innermost(kr, 'max_ema_variance')
+      ),
+      'n_steps': unnest.get_innermost(kr, 'num_leapfrog_steps'),
+      'tune': is_burnin,
+      'max_trajectory_length': unnest.get_innermost(
+          kr, 'max_trajectory_length'
+      ),
+      'variance_scaling': tf.nest.map_structure(
+          lambda x: 1.0 / x, unnest.get_innermost(kr, 'ema_variance')
+      ),
+      'diverging': has_divergence,
+      'accept_ratio': tf.minimum(
+          tf.ones_like(energy_diff), tf.exp(energy_diff)
+      ),
+      'is_accepted': unnest.get_innermost(kr, 'is_accepted'),
   }
 
 

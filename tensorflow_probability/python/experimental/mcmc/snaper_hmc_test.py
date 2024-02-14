@@ -81,7 +81,7 @@ class _SNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
     num_mala_steps = 100
 
     eigenvalues = np.exp(np.linspace(0., 3., num_dims))
-    q, r = np.linalg.qr(np.random.randn(num_dims, num_dims))
+    q, r = np.linalg.qr(np.random.RandomState(0).randn(num_dims, num_dims))
     q *= np.sign(np.diag(r))
     covariance = (q * eigenvalues).dot(q.T).astype(self.dtype)
 
@@ -100,20 +100,24 @@ class _SNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
         num_mala_steps=num_mala_steps,
     )
     kernel = dassa.DualAveragingStepSizeAdaptation(
-        kernel, num_adaptation_steps=num_adaptation_steps)
+        kernel,
+        num_adaptation_steps=num_adaptation_steps,
+        target_accept_prob=0.8,
+    )
 
     def trace_fn(_, pkr):
       return {
-          'step_size':
-              unnest.get_innermost(pkr, 'step_size'),
-          'mean_trajectory_length':
-              unnest.get_innermost(pkr, 'max_trajectory_length') / 2.,
-          'principal_component':
-              unnest.get_innermost(pkr, 'ema_principal_component'),
-          'variance':
-              unnest.get_innermost(pkr, 'ema_variance'),
-          'num_leapfrog_steps':
-              unnest.get_innermost(pkr, 'num_leapfrog_steps'),
+          'step_size': unnest.get_innermost(pkr, 'step_size') / tf.sqrt(
+              unnest.get_innermost(pkr, 'max_ema_variance')
+          ),
+          'mean_trajectory_length': (
+              unnest.get_innermost(pkr, 'max_trajectory_length') / 2.0
+          ),
+          'principal_component': unnest.get_innermost(
+              pkr, 'ema_principal_component'
+          ),
+          'variance': unnest.get_innermost(pkr, 'ema_variance'),
+          'num_leapfrog_steps': unnest.get_innermost(pkr, 'num_leapfrog_steps'),
       }
 
     init_x = tf.zeros([num_chains, num_dims], self.dtype)
@@ -137,7 +141,8 @@ class _SNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
     self.assertEqual(self.dtype, trace['principal_component'].dtype)
 
     # Adaptation results.
-    self.assertAllClose(1.75, trace['step_size'][-1], rtol=0.2)
+    # Obtained via a separate run of `windowed_adaptive_nuts`.
+    self.assertAllClose(0.45, trace['step_size'][-1], rtol=0.25)
     self.assertAllClose(4., trace['mean_trajectory_length'][-1], atol=1.)
     self.assertAllClose(np.diag(covariance), trace['variance'][-1], rtol=0.2)
     self.assertAllClose(
@@ -280,7 +285,7 @@ class _SampleSNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
     num_dims = 8
 
     eigenvalues = np.exp(np.linspace(0., 3., num_dims))
-    q, r = np.linalg.qr(np.random.randn(num_dims, num_dims))
+    q, r = np.linalg.qr(np.random.RandomState(0).randn(num_dims, num_dims))
     q *= np.sign(np.diag(r))
     covariance = (q * eigenvalues).dot(q.T).astype(self.dtype)
 
@@ -305,7 +310,8 @@ class _SampleSNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
         run(test_util.test_seed(sampler_type='stateless')))
 
     self.assertEqual(self.dtype, chain.dtype)
-    self.assertAllClose(1.4, trace['step_size'][-1], rtol=0.2)
+    # Obtained via a separate run of `windowed_adaptive_nuts`.
+    self.assertAllClose(0.45, trace['step_size'][-1], rtol=0.25)
     self.assertAllClose(8., trace['max_trajectory_length'][-1], atol=2.)
     self.assertAllClose(chain.var((0, 1)), np.diag(covariance), rtol=0.2)
     self.assertAllClose(
@@ -518,7 +524,7 @@ class DistributedSampleSNAPERHMCTest(distribute_test_lib.DistributedTest):
     num_dims = 8
 
     eigenvalues = np.exp(np.linspace(0., 3., num_dims))
-    q, r = np.linalg.qr(np.random.randn(num_dims, num_dims))
+    q, r = np.linalg.qr(np.random.RandomState(0).randn(num_dims, num_dims))
     q *= np.sign(np.diag(r))
     covariance = (q * eigenvalues).dot(q.T).astype(np.float32)
 
@@ -549,7 +555,8 @@ class DistributedSampleSNAPERHMCTest(distribute_test_lib.DistributedTest):
             )))
 
     # Adaptation results.
-    self.assertAllClose(1.4, trace['step_size'][0, -1], rtol=0.2)
+    # Obtained via a separate run of `windowed_adaptive_nuts`.
+    self.assertAllClose(0.45, trace['step_size'][0, -1], rtol=0.25)
     self.assertAllClose(chain.var((0, 1, 2)), np.diag(covariance), rtol=0.2)
 
     # Shard consistency.
