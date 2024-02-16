@@ -394,7 +394,8 @@ broadcast_static_shape = utils.copy_docstring(
 
 broadcast_to = utils.copy_docstring(
     'tf.broadcast_to',
-    lambda input, shape, name=None: np.broadcast_to(input, shape))
+    lambda input, shape, name=None: np.broadcast_to(
+        _convert_to_tensor(input), shape))
 
 
 def _cast(x, dtype):
