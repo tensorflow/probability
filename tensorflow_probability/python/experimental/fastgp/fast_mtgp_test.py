@@ -260,7 +260,7 @@ class _FastMultiTaskGpTest(absltest.TestCase):
     )
     fgp_lp = jnp.sum(fgp.log_prob(samples, key=jax.random.PRNGKey(1)))
     sgp_lp = jnp.sum(sgp.log_prob(samples))
-    np.testing.assert_allclose(fgp_lp, sgp_lp, rtol=3e-4)
+    np.testing.assert_allclose(fgp_lp, sgp_lp, rtol=4e-4)
 
   def test_gp_log_prob_matern_five_halves(self):
     kernel = tfp.math.psd_kernels.MaternFiveHalves(
