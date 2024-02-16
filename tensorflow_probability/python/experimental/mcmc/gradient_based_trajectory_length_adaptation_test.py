@@ -159,9 +159,13 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
         num_leapfrog_steps=1,
     )
     kernel = gbtla.GradientBasedTrajectoryLengthAdaptation(
-        kernel, num_adaptation_steps=num_adaptation_steps, validate_args=True)
+        kernel, num_adaptation_steps=num_adaptation_steps, validate_args=True,
+        use_reverse_estimator=True)
     kernel = dassa.DualAveragingStepSizeAdaptation(
-        kernel, num_adaptation_steps=num_adaptation_steps)
+        kernel,
+        num_adaptation_steps=num_adaptation_steps,
+        reduce_fn=generic.reduce_log_harmonic_mean_exp,
+    )
     kernel = transformed_kernel.TransformedTransitionKernel(
         kernel, [identity.Identity(), exp.Exp()])
 
@@ -192,9 +196,9 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
     mean_step_size = tf.reduce_mean(step_size)
     mean_max_trajectory_length = tf.reduce_mean(max_trajectory_length)
 
-    self.assertAllClose(0.75, p_accept, atol=0.1)
-    self.assertAllClose(0.52, mean_step_size, atol=0.2)
-    self.assertAllClose(46., mean_max_trajectory_length, atol=15)
+    self.assertAllClose(0.95, p_accept, rtol=0.2)
+    self.assertAllClose(0.3, mean_step_size, rtol=0.2)
+    self.assertAllClose(43., mean_max_trajectory_length, rtol=0.2)
     self.assertAllClose(
         target.mean(), [tf.reduce_mean(x, axis=[0, 1]) for x in chain],
         atol=1.5)
@@ -328,10 +332,12 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
                final_kernel_results.max_trajectory_length), 0.0005)
 
   @parameterized.named_parameters(
-      ('ChEES', gbtla.chees_rate_criterion),
-      ('SNAPER', snaper_criterion_2d_direction),
+      ('ChEES', gbtla.chees_rate_criterion, False),
+      ('SNAPER', snaper_criterion_2d_direction, False),
+      ('ChEES_reverse', gbtla.chees_rate_criterion, True),
+      ('SNAPER_reverse', snaper_criterion_2d_direction, True),
   )
-  def testAdaptation(self, criterion_fn):
+  def testAdaptation(self, criterion_fn, use_reverse_estimator):
     if tf.executing_eagerly() and not JAX_MODE:
       self.skipTest('Too slow for TF Eager.')
 
@@ -353,6 +359,7 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
         kernel,
         num_adaptation_steps=num_adaptation_steps,
         criterion_fn=criterion_fn,
+        use_reverse_estimator=use_reverse_estimator,
         validate_args=True)
     kernel = dassa.DualAveragingStepSizeAdaptation(
         kernel, num_adaptation_steps=num_adaptation_steps)

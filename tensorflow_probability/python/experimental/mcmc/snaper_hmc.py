@@ -406,6 +406,7 @@ class SNAPERHamiltonianMonteCarlo(kernel_base.TransitionKernel):
     gbtla_kwargs = (
         self.gradient_based_trajectory_length_adaptation_kwargs.copy())
     gbtla_kwargs.setdefault('averaged_sq_grad_adaptation_rate', 0.5)
+    gbtla_kwargs.setdefault('use_reverse_estimator', True)
     kernel = gbtla.GradientBasedTrajectoryLengthAdaptation(
         kernel,
         num_adaptation_steps=self.num_adaptation_steps,
