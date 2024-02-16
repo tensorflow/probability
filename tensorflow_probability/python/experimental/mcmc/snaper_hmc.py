@@ -1005,26 +1005,26 @@ def _sample_snaper_loop(
     return unconstrained_state, kernel_results, trace
 
 
-def default_snaper_trace_fn(state, is_burnin, kernel_results, reducer,
-                            reducer_state):
+def default_snaper_trace_fn(
+    state, is_burnin, kernel_results, reducer, reducer_state
+):
+  """Default trace function for SNAPER."""
   del reducer, reducer_state
   kr = kernel_results
   energy_diff = unnest.get_innermost(kr, 'log_accept_ratio')
   # The ~ is here to catch NaNs.
-  has_divergence = ~(tf.math.abs(energy_diff) < 500.)
+  has_divergence = ~(tf.math.abs(energy_diff) < 500.0)
+  # SNAPER rescales the inner HMC kernel by max_ema_variance, so to aid
+  # comparisons with other algorithms which typically don't do this rescaling,
+  # we undo the rescaling here. This makes the step size consistent with the
+  # target_log_prob_fn scale implied by `variance_scaling` below.
+  scale = 1.0 / tf.sqrt(unnest.get_innermost(kr, 'max_ema_variance'))
   return state, {
-      # SNAPER rescales the inner HMC kernel by max_ema_variance, so to aid
-      # comparisons with other algorithms which typically don't do this
-      # rescaling, we undo the rescaling here. This makes the step size
-      # consistent with the target_log_prob_fn scale implied by
-      # `variance_scaling` below.
-      'step_size': unnest.get_innermost(kr, 'step_size') / tf.sqrt(
-          unnest.get_innermost(kr, 'max_ema_variance')
-      ),
+      'step_size': unnest.get_innermost(kr, 'step_size') * scale,
       'n_steps': unnest.get_innermost(kr, 'num_leapfrog_steps'),
       'tune': is_burnin,
-      'max_trajectory_length': unnest.get_innermost(
-          kr, 'max_trajectory_length'
+      'max_trajectory_length': (
+          unnest.get_innermost(kr, 'max_trajectory_length') * scale
       ),
       'variance_scaling': tf.nest.map_structure(
           lambda x: 1.0 / x, unnest.get_innermost(kr, 'ema_variance')

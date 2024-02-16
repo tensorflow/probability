@@ -106,12 +106,11 @@ class _SNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
     )
 
     def trace_fn(_, pkr):
+      scale = 1.0 / tf.sqrt(unnest.get_innermost(pkr, 'max_ema_variance'))
       return {
-          'step_size': unnest.get_innermost(pkr, 'step_size') / tf.sqrt(
-              unnest.get_innermost(pkr, 'max_ema_variance')
-          ),
+          'step_size': scale * unnest.get_innermost(pkr, 'step_size'),
           'mean_trajectory_length': (
-              unnest.get_innermost(pkr, 'max_trajectory_length') / 2.0
+              scale * unnest.get_innermost(pkr, 'max_trajectory_length') / 2.0
           ),
           'principal_component': unnest.get_innermost(
               pkr, 'ema_principal_component'
@@ -143,7 +142,7 @@ class _SNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
     # Adaptation results.
     # Obtained via a separate run of `windowed_adaptive_nuts`.
     self.assertAllClose(0.45, trace['step_size'][-1], rtol=0.25)
-    self.assertAllClose(4., trace['mean_trajectory_length'][-1], atol=1.)
+    self.assertAllClose(1.25, trace['mean_trajectory_length'][-1], rtol=0.3)
     self.assertAllClose(np.diag(covariance), trace['variance'][-1], rtol=0.2)
     self.assertAllClose(
         principal_component / np.sign(principal_component[0]),
@@ -312,7 +311,7 @@ class _SampleSNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
     self.assertEqual(self.dtype, chain.dtype)
     # Obtained via a separate run of `windowed_adaptive_nuts`.
     self.assertAllClose(0.45, trace['step_size'][-1], rtol=0.25)
-    self.assertAllClose(8., trace['max_trajectory_length'][-1], atol=2.)
+    self.assertAllClose(2.5, trace['max_trajectory_length'][-1], rtol=0.3)
     self.assertAllClose(chain.var((0, 1)), np.diag(covariance), rtol=0.2)
     self.assertAllClose(
         np.ones(num_dims, self.dtype), reduction_results, atol=0.1)
