@@ -15,10 +15,14 @@
 """Tests for Sample Stats Ops."""
 
 # Dependency imports
+import itertools
 
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
+from absl.testing import parameterized
+from tensorflow.python.framework.errors_impl import InvalidArgumentError
+
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.stats import sample_stats
 
@@ -677,6 +681,129 @@ class MeanTest(test_util.TestCase):
     y = [0., 1., 2., 3.]
     self.assertAllClose([0., 1., 1.5, 2.5],
                         self.evaluate(sample_stats.windowed_mean(y)))
+
+
+@test_util.test_all_tf_execution_regimes
+class WindowedStatsTest(test_util.TestCase):
+
+  def _maybe_expand_dims_to_make_broadcastable(self, x, shape, axis):
+    if len(shape) > len(x.shape):
+      if len(x.shape) == 1:
+        bc_shape = np.ones(len(shape), dtype=np.int32)
+        bc_shape[axis] = x.shape[0]
+        return x.reshape(bc_shape)
+      else:
+        extra_dims = len(shape) - len(x.shape)
+        bc_shape = x.shape + (1,) * extra_dims
+        return x.reshape(bc_shape)
+    return x
+
+  def apply_slice_along_axis(self, func, arr, low, high, axis):
+    """Applies `func` over slices of `arr` along `axis`. Slices intervals are
+    specified through `low` and `high`. Support broadcasting.
+    """
+    np.testing.assert_equal(low.shape, high.shape)
+
+    def apply_func(vector, l, h):
+      return func(vector[l:h])
+
+    apply_func_1d = np.vectorize(apply_func, signature='(n), (), ()->()')
+    vectorized_func = np.vectorize(apply_func_1d,
+                                   signature='(n), (k), (k)->(m)')
+
+    # Put `axis` at the innermost dimension
+    dims = list(range(arr.ndim))
+    dims[-1] = axis
+    dims[axis] = arr.ndim - 1
+    t_arr = np.transpose(arr, axes=dims)
+    t_low = np.transpose(low, axes=dims)
+    t_high = np.transpose(high, axes=dims)
+
+    t_out = vectorized_func(t_arr, t_low, t_high)
+
+    # Replace `axis` at its place
+    out = np.transpose(t_out, axes=dims)
+    return out
+
+  def check_gaussian_windowed_func(self, shape, indice_shape, axis,
+                                   window_func, np_func):
+    stat_shape = np.array(shape).astype(np.int32)
+    stat_shape[axis] = 1
+    loc = np.arange(np.prod(stat_shape)).reshape(stat_shape)
+    scale = 0.1 * np.arange(np.prod(stat_shape)).reshape(stat_shape)
+    rng = test_util.test_np_rng()
+    x = rng.normal(loc=loc, scale=scale, size=shape)
+    indice_shape = [2] + list(indice_shape)
+    indices = rng.randint(shape[axis] + 1, size=indice_shape)
+    indices = np.sort(indices, axis=0)
+    low_indices, high_indices = indices[0], indices[1]
+
+    tf_low_indices = self._make_dynamic_shape(low_indices)
+    tf_high_indices = self._make_dynamic_shape(high_indices)
+    tf_x = self._make_dynamic_shape(x)
+
+    a = window_func(tf_x, low_indices=tf_low_indices,
+                    high_indices=tf_high_indices, axis=axis)
+
+    low_indices = self._maybe_expand_dims_to_make_broadcastable(
+      low_indices, x.shape, axis)
+    high_indices = self._maybe_expand_dims_to_make_broadcastable(
+      high_indices, x.shape, axis)
+    b = self.apply_slice_along_axis(np_func, x, low_indices, high_indices,
+                               axis=axis)
+    b[np.isnan(b)] = 0  # We treat stats computed on empty sets as zeros
+    self.assertAllClose(a, b)
+
+  def _make_dynamic_shape(self, x):
+    return tf1.placeholder_with_default(x, shape=(None,)*len(x.shape))
+
+  @parameterized.named_parameters(*[(
+    f"{np_func.__name__} shape={s} indices_shape={i} axis={axis}", s, i, axis,
+    tf_func, np_func) for s, (i, axis), (tf_func, np_func) in
+    itertools.product([(64, 4, 8)],
+                      [((128, 1, 1), 0),
+                       ((32, 1, 1), 0),
+                       ((32, 4, 1), 0),
+                       ((32, 4, 8), 0),
+                       ((64, 4, 8), 0),
+                       ((128, 1), 0),
+                       ((32,), 0),
+                       ((32, 4), 0),
+
+                       ((64, 64, 1), 1),
+                       ((1, 64, 1), 1),
+                       ((64, 2, 8), 1),
+                       ((64, 4, 8), 1),
+                       ((16,), 1),
+                       ((1, 64), 1),
+
+                       ((64, 4, 64), 2),
+                       ((1, 1, 64), 2),
+                       ((64, 4, 4), 2),
+                       ((1, 1, 4), 2),
+                       ((64, 4, 8), 2),
+                       ((16,), 2),
+                       ((1, 4), 2),
+                       ((64, 4), 2)],
+                      [(sample_stats.windowed_mean, np.mean),
+                       (sample_stats.windowed_variance, np.var)])])
+  def test_windowed(self, shape, indice_shape, axis, window_func, np_func):
+    self.check_gaussian_windowed_func(shape, indice_shape, axis, window_func,
+                                      np_func)
+
+  @parameterized.named_parameters(*[(
+    f"{np_func.__name__} shape={s} indices_shape={i} axis={axis}", s, i, axis,
+    tf_func, np_func) for s, (i, axis), (tf_func, np_func) in
+    itertools.product([(64, 4, 8)],
+                      [((4, 1, 4), 2), ((2, 4), 2)],
+                      [(sample_stats.windowed_mean, np.mean),
+                       (sample_stats.windowed_variance, np.var)])])
+  def test_non_broadcastable_shapes(self, shape, indice_shape, axis,
+                                    window_func, np_func):
+    with self.assertRaisesRegexp((IndexError, ValueError, InvalidArgumentError),
+                                 '^shape mismatch|Incompatible shapes'):
+      self.check_gaussian_windowed_func(shape, indice_shape, axis, window_func,
+                                        np_func)
 
 
 @test_util.test_all_tf_execution_regimes
