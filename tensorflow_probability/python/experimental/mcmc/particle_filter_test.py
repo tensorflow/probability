@@ -21,6 +21,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import shift
 from tensorflow_probability.python.distributions import bernoulli
 from tensorflow_probability.python.distributions import deterministic
+from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import joint_distribution_auto_batched as jdab
 from tensorflow_probability.python.distributions import joint_distribution_named as jdn
 from tensorflow_probability.python.distributions import linear_gaussian_ssm as lgssm
@@ -32,6 +33,7 @@ from tensorflow_probability.python.distributions import sample as sample_dist_li
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.experimental.mcmc import particle_filter
+from tensorflow_probability.python.experimental.mcmc import sequential_monte_carlo_kernel as smc_kernel
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import gradient
@@ -202,15 +204,12 @@ class _ParticleFilterTest(test_util.TestCase):
     def observation_fn(_, state):
       return normal.Normal(loc=state['position'], scale=0.1)
 
-    # Batch of synthetic observations, .
-    true_initial_positions = np.random.randn(*batch_shape).astype(self.dtype)
-    true_velocities = 0.1 * np.random.randn(
-        *batch_shape).astype(self.dtype)
+    # Batch of synthetic observations
+    true_initial_positions = np.random.randn()
+    true_velocities = 0.1 * np.random.randn()
     observed_positions = (
-        true_velocities *
-        np.arange(num_timesteps).astype(
-            self.dtype)[..., tf.newaxis, tf.newaxis] +
-        true_initial_positions)
+        true_velocities * np.arange(num_timesteps).astype(self.dtype)
+        + true_initial_positions)
 
     (particles, log_weights, parent_indices,
      incremental_log_marginal_likelihoods) = self.evaluate(
@@ -238,6 +237,11 @@ class _ParticleFilterTest(test_util.TestCase):
                          batch_shape[0],
                          num_particles,
                          batch_shape[1]])
+    self.assertAllEqual(log_weights.shape,
+                        [num_timesteps,
+                         batch_shape[0],
+                         num_particles,
+                         batch_shape[1]])
     self.assertAllEqual(incremental_log_marginal_likelihoods.shape,
                         [num_timesteps] + batch_shape)
 
@@ -245,14 +249,15 @@ class _ParticleFilterTest(test_util.TestCase):
         self.evaluate(
             tf.reduce_sum(tf.exp(log_weights) *
                           particles['position'], axis=2)),
-        observed_positions,
+        tf.broadcast_to(observed_positions[..., tf.newaxis, tf.newaxis],
+                        [num_timesteps, batch_shape[0], batch_shape[1]]),
         atol=0.3)
 
     velocity_means = tf.reduce_sum(tf.exp(log_weights) *
                                    particles['velocity'], axis=2)
 
     self.assertAllClose(
-        self.evaluate(tf.reduce_mean(velocity_means, axis=0)),
+        self.evaluate(tf.reduce_mean(velocity_means)),
         true_velocities, atol=0.05)
 
     # Uncertainty in velocity should decrease over time.
@@ -733,6 +738,55 @@ class _ParticleFilterTest(test_util.TestCase):
     _, grads = gradient.value_and_gradient(marginal_log_likelihood, 1.0, 1.0)
     self.assertAllNotNone(grads)
     self.assertAllAssertsNested(self.assertNotAllZero, grads)
+
+  def test_smc_squared_rejuvenation_parameters(self):
+    def particle_dynamics(params, previous_state):
+      return independent.Independent(
+          normal.Normal(
+              previous_state + params[..., tf.newaxis, tf.newaxis] + 1, 0.1),
+          reinterpreted_batch_ndims=1)
+
+    num_outer_particles = 10
+    num_inner_particles = 16
+    num_steps = 45
+    observations = tf.stack([tf.range(num_steps, dtype=tf.float32),
+                             tf.range(num_steps, dtype=tf.float32)], axis=1)
+
+    @tf.function(jit_compile=True)
+    def _run(observations):
+      return particle_filter.smc_squared(
+          observations=observations,
+          inner_initial_state_prior=(lambda _, params: sample_dist_lib.Sample(
+              normal.Normal(loc=tf.zeros_like(params),
+                            scale=0.01 * tf.ones_like(params)),
+              sample_shape=[2])),
+          initial_parameter_prior=normal.Normal(5., 0.5),
+          num_outer_particles=num_outer_particles,
+          num_inner_particles=num_inner_particles,
+          inner_transition_fn=lambda params: (
+              lambda _, state: particle_dynamics(params, state)),
+          observation_fn=lambda params: (
+              lambda _, state: independent.Independent(
+                  normal.Normal(state, 2.), 1)),
+          parameter_proposal_kernel=(
+              lambda *_: lambda p: normal.Normal(p, scale=1.)),
+          outer_trace_fn=lambda s, _: (s.particles[0], s.log_weights),
+          seed=test_util.test_seed())
+
+    params, log_weights = self.evaluate(_run(observations))
+
+    self.assertAllEqual([num_steps, num_outer_particles], params.shape)
+    self.assertAllEqual([num_steps, num_outer_particles], log_weights.shape)
+
+    # Without rejuvenation, we could only estimate our single outer parameter
+    # from the computed weights of the 10 samples from the prior N(5.0, 0.5).
+    # But rejuvenation should allow us to correctly estimate that the parameter
+    # is close to zero.
+    self.assertAllClose(
+        0.0, tf.reduce_sum(tf.exp(log_weights[-1]) * params[-1]), atol=0.1)
+    self.assertAllGreater(
+        tf.exp(smc_kernel.log_ess_from_log_weights(log_weights[-1])),
+        0.5 * num_outer_particles)
 
 
 # TODO(b/186068104): add tests with dynamic shapes.

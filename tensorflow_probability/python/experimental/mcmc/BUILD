@@ -559,11 +559,13 @@ multi_substrate_py_test(
     shard_count = 3,
     deps = [
         ":particle_filter",
+        ":sequential_monte_carlo_kernel",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:shift",
         "//tensorflow_probability/python/distributions:bernoulli",
         "//tensorflow_probability/python/distributions:deterministic",
+        "//tensorflow_probability/python/distributions:independent",
         "//tensorflow_probability/python/distributions:joint_distribution_auto_batched",
         "//tensorflow_probability/python/distributions:joint_distribution_named",
         "//tensorflow_probability/python/distributions:linear_gaussian_ssm",
