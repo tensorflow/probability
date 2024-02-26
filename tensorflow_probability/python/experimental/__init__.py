@@ -43,7 +43,6 @@ from tensorflow_probability.python.experimental import psd_kernels
 from tensorflow_probability.python.experimental import sequential
 from tensorflow_probability.python.experimental import stats
 from tensorflow_probability.python.experimental import sts_gibbs
-from tensorflow_probability.python.experimental import substrates
 from tensorflow_probability.python.experimental import tangent_spaces
 from tensorflow_probability.python.experimental import timeseries
 from tensorflow_probability.python.experimental import util
@@ -76,7 +75,6 @@ _allowed_symbols = [
     'sequential',
     'sts_gibbs',
     'stats',
-    'substrates',
     'tangent_spaces',
     'timeseries',
     'unnest',
