@@ -165,8 +165,10 @@ def get_integer_seed(seed):
   if isinstance(seed, six.integer_types):
     return seed % (2**31)
   seed = sanitize_seed(seed)
+  # maxval is exclusive, so technically this doesn't generate all possible
+  # non-negative integers, but it's good enough for our purposes.
   integer_seed = tf.random.stateless_uniform(
-      shape=[], seed=seed, minval=0, maxval=2**31, dtype=tf.int32)
+      shape=[], seed=seed, minval=0, maxval=2**31 - 1, dtype=tf.int32)
   if JAX_MODE:
     # This function isn't ever used in a jit context, so we can eagerly convert
     # it to an integer to simplify caller's code.

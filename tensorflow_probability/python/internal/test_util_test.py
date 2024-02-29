@@ -45,13 +45,20 @@ def _maybe_jax(x):
 
 
 @test_util.test_all_tf_execution_regimes
-class SeedSettingTest(test_util.TestCase):
+class SeedTest(test_util.TestCase):
 
   def testTypeCorrectness(self):
-    assert isinstance(test_util.test_seed_stream(), SeedStream)
-    assert isinstance(
+    self.assertIsInstance(test_util.test_seed_stream(), SeedStream)
+    self.assertIsInstance(
         test_util.test_seed_stream(hardcoded_seed=7), SeedStream)
-    assert isinstance(test_util.test_seed_stream(salt='foo'), SeedStream)
+    self.assertIsInstance(test_util.test_seed_stream(salt='foo'), SeedStream)
+
+    self.assertIsInstance(test_util.test_seed(sampler_type='integer'), int)
+    if not JAX_MODE:
+      self.assertIsInstance(test_util.test_seed(sampler_type='stateful'), int)
+    self.assertIsInstance(
+        test_util.test_seed(sampler_type='stateless'), tf.Tensor
+    )
 
   def testSameness(self):
     with flagsaver.flagsaver(vary_seed=False):
