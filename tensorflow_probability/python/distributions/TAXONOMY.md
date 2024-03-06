@@ -180,6 +180,7 @@ ZeroInflatedNegativeBinomial,
 ### Distributions over Unit Simplex in R^n
 
 [Dirichlet](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/Dirichlet)
+[FlatDirichlet](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/FlatDirichlet)
 [RelaxedOneHotCategorical](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/RelaxedOneHotCategorical)
 
 ### Distributions over Matrices

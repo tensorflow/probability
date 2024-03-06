@@ -14,10 +14,10 @@
 # ============================================================================
 
 # Dependency imports
+from absl.testing import parameterized
 import numpy as np
 from scipy import special as sp_special
 from scipy import stats as sp_stats
-
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import exp
 from tensorflow_probability.python.distributions import dirichlet
@@ -337,6 +337,78 @@ class DirichletFromVariableTest(test_util.TestCase):
       d = dirichlet.Dirichlet(concentration=x, validate_args=True)
       self.evaluate([v.initializer for v in d.variables])
       self.evaluate(d.entropy())
+
+
+@test_util.test_all_tf_execution_regimes
+class FlatDirichletTest(test_util.TestCase):
+
+  @parameterized.parameters(
+      {'tshape': (3,)}, {'tshape': (2, 3)}, {'tshape': (5, 1, 10)}
+  )
+  def testSamplesHaveRightShape(self, tshape):
+    fd = dirichlet.FlatDirichlet(concentration_shape=tshape)
+    self.assertAllEqual(fd.batch_shape, tshape[:-1])
+    self.assertAllEqual(fd.event_shape, tshape[-1:])
+    sample = fd.sample(1, seed=test_util.test_seed())
+    self.assertAllEqual([1] + list(tshape), sample.shape)
+    sample2 = fd.sample([4, 5], seed=test_util.test_seed())
+    self.assertAllEqual([4, 5] + list(tshape), sample2.shape)
+
+  @parameterized.parameters(
+      {'tshape': (3,)}, {'tshape': (2, 3)}, {'tshape': (5, 1, 10)}
+  )
+  def testSamplesSumToOne(self, tshape):
+    fd = dirichlet.FlatDirichlet(concentration_shape=tshape)
+    sample = fd.sample(1, seed=test_util.test_seed())
+    self.assertAllClose(
+        tf.math.reduce_sum(sample, axis=-1),
+        tf.ones(shape=[1] + list(tshape)[:-1]),
+    )
+
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, reason='Uses jit_compile'
+  )
+  def testSampleNJits(self):
+    @tf.function(jit_compile=True)
+    def f(x):
+      fd = dirichlet.FlatDirichlet(concentration_shape=(5,))
+      sample = fd.sample(1, seed=test_util.test_seed())
+      return sample + x
+
+    self.assertAllEqual([1, 5], f(0.1).shape)
+
+  def testSampleMoments(self):
+    fd = dirichlet.FlatDirichlet(concentration_shape=(3,))
+    samples = fd.sample(1000, seed=test_util.test_seed())
+    mean = tf.math.reduce_mean(samples, axis=0)
+    self.assertAllClose(mean, [1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0], atol=2e-2)
+    centered = samples - tf.ones(shape=(1, 3)) / 3.0
+    var = tf.math.reduce_mean(centered * centered, axis=0)
+    # https://en.wikipedia.org/wiki/Dirichlet_distribution#Properties says
+    # Var = alpha_i (alpha_0 - alpha_i) / ( alpha_0^2 (alpha_0 + 1))
+    #     = (n - 1) / (n^2 (n+1))
+    self.assertAllClose(var, [1.0 / 18.0, 1.0 / 18.0, 1.0 / 18.0], atol=2e-2)
+
+  def testLogProb(self):
+    fd = dirichlet.FlatDirichlet(concentration_shape=(5,))
+    self.assertAllClose(
+        fd.log_prob(tf.constant([0.2, 0.2, 0.2, 0.2, 0.2])),
+        tf.math.log(24.0)
+    )
+
+  def testLogProbOutsideSupport(self):
+    fd = dirichlet.FlatDirichlet(concentration_shape=(5,),
+                                 force_probs_to_zero_outside_support=True)
+    self.assertAllEqual(fd.log_prob(tf.ones(shape=(5,))), -float('inf'))
+
+  @parameterized.parameters(
+      {'n': 2}, {'n': 3}, {'n': 4}, {'n': 5}, {'n': 6},
+  )
+  def testLogProbSameAsDirichlet(self, n):
+    fd = dirichlet.FlatDirichlet(concentration_shape=(n,))
+    d = dirichlet.Dirichlet(concentration=tf.ones(shape=(n,)))
+    p = tf.ones(shape=n) / float(n)
+    self.assertAllClose(d.log_prob(p), fd.log_prob(p))
 
 
 if __name__ == '__main__':

@@ -36,6 +36,7 @@ from tensorflow_probability.python.distributions.continuous_bernoulli import Con
 from tensorflow_probability.python.distributions.deterministic import Deterministic
 from tensorflow_probability.python.distributions.deterministic import VectorDeterministic
 from tensorflow_probability.python.distributions.dirichlet import Dirichlet
+from tensorflow_probability.python.distributions.dirichlet import FlatDirichlet
 from tensorflow_probability.python.distributions.dirichlet_multinomial import DirichletMultinomial
 from tensorflow_probability.python.distributions.distribution import AutoCompositeTensorDistribution
 from tensorflow_probability.python.distributions.distribution import Distribution
@@ -197,6 +198,7 @@ __all__ = [
     'ExponentiallyModifiedGaussian',
     'ExpRelaxedOneHotCategorical',
     'FiniteDiscrete',
+    'FlatDirichlet',
     'FULLY_REPARAMETERIZED',
     'Gamma',
     'GammaGamma',

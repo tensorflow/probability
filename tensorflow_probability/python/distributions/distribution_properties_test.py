@@ -431,9 +431,11 @@ class ParameterPropertiesTest(test_util.TestCase):
         'rtol',
         'eigenvectors',  # TODO(b/171872834): DeterminantalPointProcess
         'total_count',
+        'concentration_shape',
         'num_samples',
         'df',  # Can't represent constraint that Wishart df > dimension.
-        'mean_direction')  # TODO(b/118492439): Add `UnitVector` bijector.
+        'mean_direction',
+    )  # TODO(b/118492439): Add `UnitVector` bijector.
     non_trainable_non_tensor_params = (
         'batch_shape',  # SphericalUniform, at least, has explicit batch shape
         'dimension',
