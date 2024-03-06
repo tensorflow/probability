@@ -274,7 +274,7 @@ CONSTRAINTS = {
     'tailweight': tfp_hps.softplus_plus_eps(),
     'temperature': tfp_hps.softplus_plus_eps(),
     'total_count': lambda x: tf.floor(tf.sigmoid(x / 100) * 100) + 1,
-    'total_shape': tfp_hps.shapes(min_ndims=1, min_lastdimsize=2),
+    'concentration_shape': tfp_hps.shapes(min_ndims=1, min_lastdimsize=2),
     'Bates': fix_bates,
     'Bernoulli': lambda d: dict(d, dtype=tf.float32),
     'CholeskyLKJ': fix_lkj,
