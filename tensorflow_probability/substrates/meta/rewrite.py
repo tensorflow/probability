@@ -36,8 +36,7 @@ TF_REPLACEMENTS = {
         'from tensorflow_probability.python.internal.backend.numpy.compat '
         'import v2',
     'import tensorflow_probability as tfp':
-        'import tensorflow_probability as tfp; '
-        'tfp = tfp.substrates.numpy',
+        'from tensorflow_probability.substrates import numpy as tfp',
     ('from tensorflow.python.framework '
      'import composite_tensor'):
         ('from tensorflow_probability.python.internal.backend.numpy '
