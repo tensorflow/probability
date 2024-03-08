@@ -93,6 +93,7 @@ class RandomTest(test_util.TestCase):
   def test_split(self):
     seed = test_util.test_seed(sampler_type='stateless')
     seed1, seed2 = samplers.split_seed(seed)
+    seed = test_util.clone_seed(seed)
     seed3, seed4 = samplers.split_seed(seed)
     seed, seed1, seed2, seed3, seed4 = self.evaluate(
         [seed, seed1, seed2, seed3, seed4])
@@ -142,6 +143,7 @@ class RandomTest(test_util.TestCase):
       self.skipTest('gamma sampler not implemented for rbg PRNG.')
     seed = test_util.test_seed(sampler_type='stateless')
     s1 = sampler(seed=seed, **kwargs)
+    seed = test_util.clone_seed(seed)
     s2 = sampler(seed=seed, **kwargs)
     self.assertAllEqual(s1, s2)
 

@@ -140,9 +140,11 @@ class TestWrapGeneratorAsStateless(test_util.TestCase):
     init_fn, _ = trainable_state_util.as_stateless_builder(
         seed_generator)()
     self.assertLen(init_fn(seed=seed), 5)
+    seed = test_util.clone_seed(seed)
+    seed2 = test_util.clone_seed(seed)
     # Check that we can invoke init_fn with an arg or kwarg seed,
     # regardless of how the inner functions are parameterized.
-    self.assertAllCloseNested(init_fn(seed), init_fn(seed=seed))
+    self.assertAllCloseNested(init_fn(seed), init_fn(seed=seed2))
 
     if not JAX_MODE:
       # Check that we can initialize with no seed.
@@ -165,6 +167,7 @@ class TestWrapGeneratorAsStateless(test_util.TestCase):
 
     # Check that the distribution's samples have the expected shape.
     dist = apply_fn(params)
+    seed = test_util.clone_seed(seed)
     x = dist.sample(seed=seed)
     self.assertAllEqualNested(shape, tf.nest.map_structure(ps.shape, x))
 
@@ -311,6 +314,7 @@ class TestWrapGeneratorAsStateful(test_util.TestCase):
     variables1 = trainable_jd1.trainable_variables
     self.assertLen(variables1, 5)
 
+    seed = test_util.clone_seed(seed)
     trainable_jd2 = make_trainable_jd(seed=seed)
     variables2 = trainable_jd2.trainable_variables
     self.evaluate([v.initializer for v in variables1 + variables2])

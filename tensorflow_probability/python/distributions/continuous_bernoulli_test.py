@@ -342,7 +342,7 @@ class ContinuousBernoulliTest(test_util.TestCase):
       seed = test_util.test_seed() if seed is None else seed
       if tf.executing_eagerly():
         tf1.set_random_seed(seed)
-      return seed
+      return test_util.clone_seed(seed)
 
     seed = _seed()
     self.assertAllClose(

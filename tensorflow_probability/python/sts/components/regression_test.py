@@ -191,8 +191,12 @@ class _SparseLinearRegressionTest(test_util.TestCase):
     sparse_regression = SparseLinearRegression(
         design_matrix=design_matrix,
         weights_batch_shape=weights_batch_shape)
-    prior_params = [param.prior.sample(seed=prior_seed)
-                    for param in sparse_regression.parameters]
+    prior_seeds = samplers.split_seed(
+        prior_seed, len(sparse_regression.parameters))
+    prior_params = [
+        param.prior.sample(seed=seed)
+        for param, seed in zip(sparse_regression.parameters, prior_seeds)
+    ]
 
     ssm = sparse_regression.make_state_space_model(
         num_timesteps=num_timesteps,

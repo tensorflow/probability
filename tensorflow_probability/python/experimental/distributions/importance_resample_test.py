@@ -111,7 +111,7 @@ class ImportanceResampleTest(test_util.TestCase):
     xs = self.evaluate(target.sample(num_samples, seed=seeds[0]))
     xs2 = self.evaluate(resampled2.sample(num_samples, seed=seeds[1]))
     xs20 = self.evaluate(resampled20.sample(num_samples, seed=seeds[2]))
-    for statistic_fn in (lambda x: x, lambda x: x**2):
+    for statistic_fn, seed in zip([lambda x: x, lambda x: x**2], seeds[3:]):
       true_statistic = tf.reduce_mean(statistic_fn(xs))
       # Statistics should approach those of the target distribution as
       # `importance_sample_size` increases.
@@ -120,7 +120,7 @@ class ImportanceResampleTest(test_util.TestCase):
           tf.abs(tf.reduce_mean(statistic_fn(xs20)) - true_statistic))
 
       expectation_no_resampling = resampled2.self_normalized_expectation(
-          statistic_fn, importance_sample_size=10000, seed=seeds[3])
+          statistic_fn, importance_sample_size=10000, seed=seed)
       self.assertAllClose(true_statistic, expectation_no_resampling, atol=0.15)
 
   def test_log_prob_approaches_target_distribution(self):
@@ -237,32 +237,33 @@ class ImportanceResampleTest(test_util.TestCase):
       return prior + likelihood
 
     # Use importance sampling to infer an approximate posterior.
-    seed = test_util.test_seed(sampler_type='stateless')
+    seed = lambda: test_util.test_seed(sampler_type='stateless')
     approximate_posterior = importance_resample.ImportanceResample(
         proposal_distribution=normal.Normal(loc=0., scale=2.),
         target_log_prob_fn=target_log_prob_fn,
         importance_sample_size=3,
-        stochastic_approximation_seed=seed)
+        stochastic_approximation_seed=seed())
 
     # Directly compute expectations under the posterior via importance weights.
     posterior_mean = approximate_posterior.self_normalized_expectation(
-        lambda x: x, seed=seed)
+        lambda x: x, seed=seed())
     approximate_posterior.self_normalized_expectation(
-        lambda x: (x - posterior_mean)**2, seed=seed)
+        lambda x: (x - posterior_mean)**2, seed=seed())
 
-    posterior_samples = approximate_posterior.sample(5, seed=seed)
+    posterior_samples = approximate_posterior.sample(5, seed=seed())
     tf.reduce_mean(posterior_samples)
     tf.math.reduce_variance(posterior_samples)
 
     posterior_mean_efficient = (
         approximate_posterior.self_normalized_expectation(
-            lambda x: x, sample_size=10, seed=seed))
+            lambda x: x, sample_size=10, seed=seed()))
     approximate_posterior.self_normalized_expectation(
-        lambda x: (x - posterior_mean_efficient)**2, sample_size=10, seed=seed)
+        lambda x: (
+            x - posterior_mean_efficient)**2, sample_size=10, seed=seed())
 
     # Approximate the posterior density.
     xs = tf.linspace(-3., 3., 101)
-    approximate_posterior.prob(xs, sample_size=10, seed=seed)
+    approximate_posterior.prob(xs, sample_size=10, seed=seed())
 
   def test_log_prob_independence_per_x(self):
     dist = importance_resample.ImportanceResample(

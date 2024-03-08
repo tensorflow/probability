@@ -477,10 +477,14 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
     state = tf.zeros([64], self.dtype)
     seed = test_util.test_seed(sampler_type='stateless')
     step_0_kernel_results = kernel.bootstrap_results(state)
+
+    seed, step_seed = samplers.split_seed(seed)
     state, step_1_kernel_results = kernel.one_step(
-        state, step_0_kernel_results, seed=seed)
+        state, step_0_kernel_results, seed=step_seed)
+
+    seed, step_seed = samplers.split_seed(seed)
     _, step_2_kernel_results = kernel.one_step(
-        state, step_1_kernel_results, seed=seed)
+        state, step_1_kernel_results, seed=step_seed)
 
     (step_0_kernel_results, step_1_kernel_results,
      step_2_kernel_results) = self.evaluate([

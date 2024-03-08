@@ -325,6 +325,7 @@ class SpikeAndSlabTest(test_util.TestCase):
       return sampler.sample_noise_variance_and_weights(
           targets, initial_nonzeros, seed=seed)
     variance1, weights1 = self.evaluate(do_sample(seed))
+    seed = test_util.clone_seed(seed)
     variance2, weights2 = self.evaluate(do_sample(seed))
     self.assertAllFinite(variance1)
     self.assertAllClose(variance1, variance2)

@@ -171,6 +171,7 @@ class HighwayFlowTests(test_util.TestCase):
     seed = test_util.test_seed(sampler_type='stateless')
     bijector1 = highway_flow.build_trainable_highway_flow(
         width, activation_fn=tf.nn.softplus, seed=seed)
+    seed = test_util.clone_seed(seed)
     bijector2 = highway_flow.build_trainable_highway_flow(
         width, activation_fn=tf.nn.softplus, seed=seed)
     self.evaluate([v.initializer for v in bijector1.trainable_variables])

@@ -70,6 +70,7 @@ class _SequentialMonteCarloTest(test_util.TestCase):
          tf.nest.map_structure(tf.convert_to_tensor, results)))
 
     # Re-initialize and run the same steps with the same seed.
+    seeds = test_util.clone_seed(seeds)
     kernel2 = SequentialMonteCarlo(
         propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
         resample_fn=weighted_resampling.resample_systematic,

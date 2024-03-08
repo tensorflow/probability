@@ -1544,6 +1544,17 @@ def test_seed(hardcoded_seed=None,
   return answer
 
 
+def clone_seed(seed):
+  """Clone a seed: this is useful for JAX's experimental key reuse checking."""
+  # TODO(b/328085305): switch to standard clone API when possible.
+  if JAX_MODE:
+    import jax  # pylint: disable=g-import-not-at-top
+    return jax.random.wrap_key_data(
+        jax.random.key_data(seed), impl=jax.random.key_impl(seed)
+    )
+  return seed
+
+
 def test_seed_stream(salt='Salt of the Earth', hardcoded_seed=None):
   """Returns a command-line-controllable SeedStream PRNG for unit tests.
 

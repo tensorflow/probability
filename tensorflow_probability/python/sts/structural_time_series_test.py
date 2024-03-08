@@ -71,7 +71,9 @@ class _StructuralTimeSeriesTests(object):
                         initial_effect_prior=loc_prior)
     model = Sum([linear_trend, seasonal],
                 observation_noise_scale_prior=partial_scale_prior)
-    param_samples = [p.prior.sample(seed=seed) for p in model.parameters]
+    seeds = samplers.split_seed(seed, n=len(model.parameters))
+    param_samples = [
+        p.prior.sample(seed=s) for p, s in zip(model.parameters, seeds)]
     ssm = model.make_state_space_model(num_timesteps=2,
                                        param_vals=param_samples)
 
@@ -108,7 +110,7 @@ class _StructuralTimeSeriesTests(object):
 
     seed = test_util.test_seed(sampler_type='stateless')
     def observation_noise_scale_prior_sample(s):
-      return s.parameters[0].prior.sample(seed=seed)
+      return s.parameters[0].prior.sample(seed=test_util.clone_seed(seed))
     self.assertAllEqual(observation_noise_scale_prior_sample(s3),
                         observation_noise_scale_prior_sample(s1))
     self.assertAllEqual(observation_noise_scale_prior_sample(s3),
@@ -179,7 +181,10 @@ class _StsTestHarness(object):
     seed = test_util.test_seed(sampler_type='stateless')
     model = self._build_sts()
 
-    dummy_param_vals = [p.prior.sample(seed=seed) for p in model.parameters]
+    seeds = samplers.split_seed(seed, n=len(model.parameters))
+    dummy_param_vals = [
+        p.prior.sample(seed=s) for p, s in zip(model.parameters, seeds)
+    ]
     initial_state_prior = mvn_diag.MultivariateNormalDiag(
         loc=-2. + tf.zeros([model.latent_size]),
         scale_diag=3. * tf.ones([model.latent_size]))

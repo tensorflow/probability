@@ -481,6 +481,7 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
         sample_size=int(4e5),
         seed=seed)
 
+    seed = test_util.clone_seed(seed)
     approx_kl_self_normalized = cd.monte_carlo_variational_loss(
         discrepancy_fn=(lambda logu: cd.kl_forward(logu, self_normalized=True)),
         target_log_prob_fn=p.log_prob,
@@ -514,6 +515,7 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
         sample_size=int(4.5e5),
         seed=seed)
 
+    seed = test_util.clone_seed(seed)
     approx_kl_self_normalized = cd.monte_carlo_variational_loss(
         target_log_prob_fn=p.log_prob,
         surrogate_posterior=q,
@@ -552,6 +554,8 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
         discrepancy_fn=cd.kl_forward,
         sample_size=int(6e5),
         seed=seed)
+
+    seed = test_util.test_seed()
 
     approx_kl_self_normalized = cd.monte_carlo_variational_loss(
         target_log_prob_fn=p.log_prob,
@@ -592,6 +596,8 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
         discrepancy_fn=cd.kl_reverse,
         sample_size=int(6e5),
         seed=seed)
+
+    seed = test_util.test_seed()
 
     approx_kl_self_normalized = cd.monte_carlo_variational_loss(
         target_log_prob_fn=p.log_prob,
@@ -637,6 +643,8 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
         sample_size=int(3e5),
         seed=seed)
 
+    seed = test_util.test_seed()
+
     reverse_kl_named = cd.monte_carlo_variational_loss(
         target_log_prob_fn=target_log_prob_fn,
         surrogate_posterior=q_named,
@@ -669,6 +677,7 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
     self.assertAllGreater(elbo_loss, 0.)
 
     # Check that importance sampling reduces the loss towards zero.
+    seed = test_util.clone_seed(seed)
     iwae_10_loss = cd.monte_carlo_variational_loss(
         target_log_prob_fn=target.log_prob,
         surrogate_posterior=proposal,
@@ -679,6 +688,7 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
     self.assertAllGreater(elbo_loss, iwae_10_loss)
     self.assertAllGreater(iwae_10_loss, 0)
 
+    seed = test_util.clone_seed(seed)
     iwae_100_loss = cd.monte_carlo_variational_loss(
         target_log_prob_fn=target.log_prob,
         surrogate_posterior=proposal,
@@ -690,6 +700,7 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
     self.assertAllClose(iwae_100_loss, 0, atol=0.1)
 
     # Check reproducibility
+    seed = test_util.clone_seed(seed)
     elbo_loss_again = cd.monte_carlo_variational_loss(
         target_log_prob_fn=target.log_prob,
         surrogate_posterior=proposal,
@@ -699,6 +710,7 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
         seed=seed)
     self.assertAllClose(elbo_loss_again, elbo_loss)
 
+    seed = test_util.clone_seed(seed)
     iwae_10_loss_again = cd.monte_carlo_variational_loss(
         target_log_prob_fn=target.log_prob,
         surrogate_posterior=proposal,
@@ -712,7 +724,6 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
   def test_score_trick(self):
     d = 5  # Dimension
     sample_size = int(4.5e5)
-    seed = test_util.test_seed()
 
     # Variance is very high when approximating Forward KL, so we make
     # scale_diag large. This ensures q "covers" p and thus Var_q[p/q] is
@@ -731,7 +742,7 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
             discrepancy_fn=func,
             sample_size=sample_size,
             gradient_estimator=gradient_estimator,
-            seed=seed)
+            seed=test_util.test_seed())
       return _fn
 
     approx_kl = construct_monte_carlo_csiszar_f_divergence(
@@ -866,6 +877,7 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
               loss,
               gradient_estimator=cd.GradientEstimators.REPARAMETERIZATION,
               seed=seed), [initial_params])
+      seed = test_util.clone_seed(seed)
       dreg_loss, dreg_grad = gradient.value_and_gradient(
           functools.partial(
               loss,
@@ -918,6 +930,7 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
             tf.cast(importance_sample_size, dtype=log_weights.dtype)),
         axis=0)
 
+    seed = test_util.clone_seed(seed)
     loss = cd.monte_carlo_variational_loss(
         target_log_prob_fn,
         surrogate_posterior=surrogate_posterior,
@@ -1023,7 +1036,6 @@ class CsiszarVIMCOTest(test_util.TestCase):
     dims = 5  # Dimension
     num_draws = int(1e3)
     num_batch_draws = int(3)
-    seed = test_util.test_seed(sampler_type='stateless')
 
     f = lambda logu: cd.kl_reverse(logu, self_normalized=False)
     np_f = lambda logu: -logu
@@ -1038,6 +1050,7 @@ class CsiszarVIMCOTest(test_util.TestCase):
             scale_diag=tf.tile([s], [dims])))
 
     def vimco_loss(s):
+      seed = test_util.test_seed(sampler_type='stateless')
       return cd.monte_carlo_variational_loss(
           p.log_prob,
           surrogate_posterior=build_q(s),
@@ -1048,6 +1061,7 @@ class CsiszarVIMCOTest(test_util.TestCase):
           seed=seed)
 
     def logu(s):
+      seed = test_util.test_seed(sampler_type='stateless')
       q = build_q(s)
       x = q.sample(sample_shape=[num_draws, num_batch_draws],
                    # Brittle hack to ensure that the q samples match those
@@ -1060,6 +1074,7 @@ class CsiszarVIMCOTest(test_util.TestCase):
       return f(leave_one_out.log_soomean_exp(logu(s), axis=0)[::-1][0])
 
     def q_log_prob_x(s):
+      seed = test_util.test_seed(sampler_type='stateless')
       q = build_q(s)
       x = q.sample(sample_shape=[num_draws, num_batch_draws],
                    # Brittle hack to ensure that the q samples match those
@@ -1144,6 +1159,7 @@ class CsiszarVIMCOTest(test_util.TestCase):
         gradient_estimator=cd.GradientEstimators.VIMCO,
         seed=seed)
 
+    seed = test_util.clone_seed(seed)
     reverse_kl_named = cd.monte_carlo_variational_loss(
         p_log_prob,
         surrogate_posterior=q_named,
@@ -1178,6 +1194,7 @@ class CsiszarVIMCOTest(test_util.TestCase):
         gradient_estimator=cd.GradientEstimators.VIMCO,
         seed=seed)
 
+    seed = test_util.clone_seed(seed)
     reverse_kl_again = cd.monte_carlo_variational_loss(
         p_log_prob,
         surrogate_posterior=q,

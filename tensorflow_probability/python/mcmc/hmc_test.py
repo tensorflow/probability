@@ -1160,7 +1160,8 @@ class ReproducibleFromSeedTest(test_util.TestCase):
         tr_nm1.accepted_results.target_log_prob)
 
     # Rerun the kernel with the seed that it reported it used
-    state, kr = k.one_step(states[n - 1], tr_nm1, seed=tr_n.seed)
+    state, kr = k.one_step(
+        states[n - 1], tr_nm1, seed=test_util.clone_seed(tr_n.seed))
     # Check that the results are the same
     self.assertAllClose(state, states[n])
     self.assertAllClose(kr, tr_n)

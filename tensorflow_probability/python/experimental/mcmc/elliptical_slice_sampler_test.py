@@ -18,6 +18,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.experimental.mcmc import elliptical_slice_sampler
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.mcmc import sample
 
@@ -166,9 +167,11 @@ class _EllipticalSliceSamplerTest(test_util.TestCase):
   def testTupleShapes(self):
 
     def normal_sampler(seed):
+      shapes = [(8, 31, 3), (8,)]
+      seeds = samplers.split_seed(seed, len(shapes))
       return tuple(
           normal.Normal(0, 1).sample(shp, seed=seed)
-          for shp in [(8, 31, 3), (8,)])
+          for shp, seed in zip(shapes, seeds))
     params = normal_sampler(test_util.test_seed())
 
     def normal_log_likelihood(p0, p1):

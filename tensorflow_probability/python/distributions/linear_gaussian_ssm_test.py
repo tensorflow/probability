@@ -971,11 +971,12 @@ class _MissingObservationsTests(test_util.TestCase):
         model_with_mask.posterior_marginals(observed_time_series),
         model.posterior_marginals(observed_time_series, mask=observation_mask))
     seed = test_util.test_seed(sampler_type='stateless')
+    seed2 = test_util.clone_seed(seed)
     self.assertAllEqual(
         model_with_mask.posterior_sample(
             observed_time_series, seed=seed),
         model.posterior_sample(
-            observed_time_series, mask=observation_mask, seed=seed))
+            observed_time_series, mask=observation_mask, seed=seed2))
 
 
 class MissingObservationsTestsSequential(_MissingObservationsTests):

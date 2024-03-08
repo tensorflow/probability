@@ -297,7 +297,10 @@ class TestStatelessTrainableDistributionsAndBijectors(test_util.TestCase):
     seed = test_util.test_seed(sampler_type='stateless')
     init_fn, _ = trainable.make_trainable_stateless(
         normal.Normal, validate_args=True)
-    self.assertAllCloseNested(init_fn(seed=seed), init_fn(seed=seed))
+    result1 = init_fn(seed=seed)
+    seed = test_util.clone_seed(seed)
+    result2 = init_fn(seed=seed)
+    self.assertAllCloseNested(result1, result2)
 
   def test_can_specify_parameter_dtype(self):
     init_fn, apply_fn = trainable.make_trainable_stateless(

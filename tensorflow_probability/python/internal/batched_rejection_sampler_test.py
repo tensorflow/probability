@@ -47,6 +47,7 @@ class BatchedRejectionSamplerTest(test_util.TestCase):
     self.assertAllClose(-values, negative_values)
 
     # Check for reproducibility.
+    seed = test_util.clone_seed(seed)
     ((negative_values_2, values_2), _, _) = self.evaluate(
         brs.batched_las_vegas_algorithm(
             uniform_less_than_point_five,
@@ -115,6 +116,7 @@ class BatchedRejectionSamplerTest(test_util.TestCase):
       self.assertLess(ks, 0.02)
 
     # Check for reproducibility.
+    seed = test_util.clone_seed(seed)
     all_samples_2, _ = self.evaluate(brs.batched_rejection_sampler(
         proposal_fn, target_fn, seed=seed, dtype=dtype))
     self.assertAllEqual(all_samples, all_samples_2)

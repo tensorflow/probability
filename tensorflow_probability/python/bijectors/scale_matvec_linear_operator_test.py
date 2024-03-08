@@ -234,15 +234,16 @@ class ScaleMatvecLinearOperatorBlockTrilTest(
          tf.linalg.LinearOperatorIdentity(2)]], is_non_singular=True)
 
   def build_batched_operator(self):
-    seed = test_util.test_seed()
+    seed1 = test_util.test_seed()
+    seed2 = test_util.test_seed()
     return tf.linalg.LinearOperatorBlockLowerTriangular([
         [tf.linalg.LinearOperatorFullMatrix(
-            tf.random.normal((3, 4, 4), dtype=tf.float32, seed=seed),
+            tf.random.normal((3, 4, 4), dtype=tf.float32, seed=seed1),
             is_non_singular=True)],
         [tf.linalg.LinearOperatorZeros(
             3, 4, is_square=False, is_self_adjoint=False),
          tf.linalg.LinearOperatorFullMatrix(
-             tf.random.normal((3, 3), dtype=tf.float32, seed=seed),
+             tf.random.normal((3, 3), dtype=tf.float32, seed=seed2),
              is_non_singular=True)]
     ], is_non_singular=True)
 

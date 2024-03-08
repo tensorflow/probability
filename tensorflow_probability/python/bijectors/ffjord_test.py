@@ -159,7 +159,6 @@ class FFJORDBijectorTest(test_util.TestCase):
     )
 
   def testHutchinsonsNormalEstimator(self, dtype):
-    seed = test_util.test_seed()
     tf_dtype = tf.as_dtype(dtype)
     num_dims = 10
     np.random.seed(seed=test_util.test_seed(sampler_type='integer'))
@@ -170,7 +169,7 @@ class FFJORDBijectorTest(test_util.TestCase):
 
     def trace_augmentation_fn(ode_fn, z_shape, dtype):
       return ffjord.trace_jacobian_hutchinson(
-          ode_fn, z_shape, dtype, num_samples=128, seed=seed)
+          ode_fn, z_shape, dtype, num_samples=128, seed=test_util.test_seed())
 
     bijector = ffjord.FFJORD(
         trace_augmentation_fn=trace_augmentation_fn,

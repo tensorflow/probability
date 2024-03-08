@@ -160,6 +160,7 @@ class JitTest(test_util.TestCase):
     seed = test_util.test_seed()
     result = jax.jit(_sample)(seed)
     if not FLAGS.execute_only:
+      seed = test_util.clone_seed(seed)
       self.assertAllClose(_sample(seed), result, rtol=1e-6,
                           atol=1e-6)
 
