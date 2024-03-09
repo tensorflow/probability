@@ -48,6 +48,13 @@ if release:
 else:
   TFDS_PACKAGE = 'tfds-nightly'
 
+if release:
+  TF_PACKAGE = 'tensorflow >= 2.15'
+  KERAS_PACKAGE = 'tf-keras >= 2.15'
+else:
+  TF_PACKAGE = 'tf-nightly'
+  KERAS_PACKAGE = 'tf-keras-nightly'
+
 
 class BinaryDistribution(Distribution):
   """This class is needed in order to create OS specific wheels."""
@@ -91,6 +98,7 @@ setup(
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
         'Topic :: Scientific/Engineering',
         'Topic :: Scientific/Engineering :: Mathematics',
         'Topic :: Scientific/Engineering :: Artificial Intelligence',
@@ -101,6 +109,7 @@ setup(
     keywords='tensorflow probability statistics bayesian machine learning',
     extras_require={  # e.g. `pip install tfp-nightly[jax]`
         'jax': ['jax', 'jaxlib'],
+        'tf': [TF_PACKAGE, KERAS_PACKAGE],
         'tfds': [TFDS_PACKAGE],
     }
 )
