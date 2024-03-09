@@ -294,11 +294,18 @@ class Autoregressive(distribution.Distribution):
     if num_steps_static is not None:
       for _ in range(num_steps_static):
         # pylint: disable=not-callable
-        samples = self.distribution_fn(samples).sample(seed=seed)
+        samples = self.distribution_fn(samples).sample(
+            seed=samplers.clone_seed(seed)
+        )
     else:
       # pylint: disable=not-callable
-      samples = tf.foldl(lambda s, _: self.distribution_fn(s).sample(seed=seed),
-                         elems=tf.range(0, num_steps), initializer=samples)
+      samples = tf.foldl(
+          lambda s, _: self.distribution_fn(s).sample(
+              seed=samplers.clone_seed(seed)
+          ),
+          elems=tf.range(0, num_steps),
+          initializer=samples,
+      )
     return samples
 
   def _log_prob(self, value):

@@ -31,6 +31,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 
 __all__ = [
     'categorical',
+    'clone_seed',
     'fold_in',
     'gamma',
     'is_stateful_seed',
@@ -227,6 +228,16 @@ def split_seed(seed, n=2, salt=None, name=None):
     if isinstance(n, six.integer_types):
       seeds = tf.unstack(seeds)
     return seeds
+
+
+def clone_seed(seed):
+  """Clones a seed so it can be reused without causing a JAX KeyReuseError."""
+  if JAX_MODE:
+    from jax import random as jaxrand  # pylint: disable=g-import-not-at-top
+    if hasattr(jaxrand, 'clone'):
+      # JAX v0.4.26+
+      return jaxrand.clone(seed)
+  return seed
 
 
 def categorical(
