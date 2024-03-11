@@ -110,7 +110,7 @@ class _TransposeBijectorTest(object):
   def testInvalidPermException(self):
     msg = '`perm` must be a valid permutation vector.'
     if self.is_static or tf.executing_eagerly():
-      with self.assertRaisesRegexp(ValueError, msg):
+      with self.assertRaisesRegex(ValueError, msg):
         bijector = transpose.Transpose(perm=[1, 2], validate_args=True)
     else:
       with self.assertRaisesOpError(msg):
@@ -121,7 +121,7 @@ class _TransposeBijectorTest(object):
 
   def testInvalidEventNdimsException(self):
     msg = '`rightmost_transposed_ndims` must be non-negative.'
-    with self.assertRaisesRegexp(ValueError, msg):
+    with self.assertRaisesRegex(ValueError, msg):
       transpose.Transpose(rightmost_transposed_ndims=-1, validate_args=True)
 
   def testTransformedDist(self):
@@ -214,7 +214,7 @@ class _TransposeBijectorTest(object):
 
   def testNonNegativeAssertion(self):
     message = '`rightmost_transposed_ndims` must be non-negative'
-    with self.assertRaisesRegexp(Exception, message):
+    with self.assertRaisesRegex(Exception, message):
       ndims = np.int32(-3)
       bijector = transpose.Transpose(
           rightmost_transposed_ndims=ndims, validate_args=True)
@@ -223,7 +223,7 @@ class _TransposeBijectorTest(object):
 
   def testNonPermutationAssertion(self):
     message = '`perm` must be a valid permutation vector'
-    with self.assertRaisesRegexp(Exception, message):
+    with self.assertRaisesRegex(Exception, message):
       permutation = np.int32([1, 0, 1])
       bijector = transpose.Transpose(perm=permutation, validate_args=True)
       x = np.random.randn(4, 2, 3)
@@ -233,7 +233,7 @@ class _TransposeBijectorTest(object):
     message = '`perm` must be a valid permutation vector'
     permutation = tf.Variable(np.int32([1, 0, 1]))
     self.evaluate(permutation.initializer)
-    with self.assertRaisesRegexp(Exception, message):
+    with self.assertRaisesRegex(Exception, message):
       bijector = transpose.Transpose(perm=permutation, validate_args=True)
       x = np.random.randn(4, 2, 3)
       _ = self.evaluate(bijector.forward(x))
@@ -243,7 +243,7 @@ class _TransposeBijectorTest(object):
     permutation = tf.Variable(np.int32([1, 0, 2]))
     self.evaluate(permutation.initializer)
     bijector = transpose.Transpose(perm=permutation, validate_args=True)
-    with self.assertRaisesRegexp(Exception, message):
+    with self.assertRaisesRegex(Exception, message):
       with tf.control_dependencies([permutation.assign([1, 0, 1])]):
         x = np.random.randn(4, 2, 3)
         _ = self.evaluate(bijector.forward(x))

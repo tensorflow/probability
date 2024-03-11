@@ -372,7 +372,7 @@ class _EffectiveSampleSizeTest(object):
     if not self.use_static_shape:
       cross_chain_dims = tf1.placeholder_with_default(
           cross_chain_dims, shape=[])
-    with self.assertRaisesRegexp(Exception, 'there must be > 1 chain'):
+    with self.assertRaisesRegex(Exception, 'there must be > 1 chain'):
       self.evaluate(
           diagnostic.effective_sample_size(
               x, cross_chain_dims=cross_chain_dims, validate_args=True))
@@ -629,10 +629,10 @@ class PotentialScaleReductionStaticTest(test_util.TestCase,
     return True
 
   def assertRaisesError(self, msg):
-    return self.assertRaisesRegexp(Exception, msg)
+    return self.assertRaisesRegex(Exception, msg)
 
   def testIndependentNdimsLessThanOneRaises(self):
-    with self.assertRaisesRegexp(ValueError, 'independent_chain_ndims'):
+    with self.assertRaisesRegex(ValueError, 'independent_chain_ndims'):
       diagnostic.potential_scale_reduction(
           np.random.rand(2, 3, 4), independent_chain_ndims=0)
 
@@ -647,7 +647,7 @@ class PotentialScaleReductionDynamicTest(test_util.TestCase,
 
   def assertRaisesError(self, msg):
     if tf.executing_eagerly():
-      return self.assertRaisesRegexp(Exception, msg)
+      return self.assertRaisesRegex(Exception, msg)
     return self.assertRaisesOpError(msg)
 
 

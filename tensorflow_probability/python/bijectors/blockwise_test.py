@@ -240,11 +240,11 @@ class BlockwiseBijectorTest(test_util.TestCase):
     self.assertStartsWith(bijector.name, 'blockwise_of_exp')
 
   def testRaisesEmptyBijectors(self):
-    with self.assertRaisesRegexp(ValueError, '`bijectors` must not be empty'):
+    with self.assertRaisesRegex(ValueError, '`bijectors` must not be empty'):
       blockwise.Blockwise(bijectors=[])
 
   def testRaisesBadBlocks(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         r'`block_sizes` must be `None`, or a vector of the same length as '
         r'`bijectors`. Got a `Tensor` with shape \(2L?,\) and `bijectors` of '

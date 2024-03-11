@@ -654,7 +654,7 @@ class CategoricalFromVariableTest(test_util.TestCase):
 
   def testAssertionsLogits(self):
     x = deferred_tensor.TransformedVariable(0., identity.Identity(), shape=None)
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Argument `logits` must have rank at least 1.'):
       d = categorical.Categorical(logits=x, validate_args=True)
       self.evaluate([v.initializer for v in d.variables])

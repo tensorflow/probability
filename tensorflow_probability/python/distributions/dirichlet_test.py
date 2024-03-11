@@ -332,7 +332,7 @@ class DirichletFromVariableTest(test_util.TestCase):
 
   def testAssertions(self):
     x = deferred_tensor.TransformedVariable(0.3679, exp.Exp(), shape=None)
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Argument `concentration` must have rank at least 1.'):
       d = dirichlet.Dirichlet(concentration=x, validate_args=True)
       self.evaluate([v.initializer for v in d.variables])

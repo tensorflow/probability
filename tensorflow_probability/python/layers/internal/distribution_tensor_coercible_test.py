@@ -254,7 +254,7 @@ class DistributionTensorConversionTest(test_util.TestCase):
         error_regex = r'Tensor.*must be from the same graph as Tensor.*'
       else:
         error_regex = 'Cannot use.*in a while loop'
-      with self.assertRaisesRegexp(ValueError, error_regex):
+      with self.assertRaisesRegex(ValueError, error_regex):
         _ = x + tf.constant(3.)
       return
 

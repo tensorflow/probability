@@ -288,7 +288,7 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     # This model's broadcasting behavior is a footgun (it can break inference
     # routines and cause silently incorrect optimization); it should be
     # disallowed by `validate_args`.
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         Exception,
         ('Component batch shapes are inconsistent|'
          'Broadcasting probably indicates an error in model specification')):

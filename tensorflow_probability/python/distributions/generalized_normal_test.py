@@ -449,7 +449,7 @@ class _GeneralizedNormalTest(object):
     power = tf.Variable(tf.ones([2, 3], dtype=self.dtype),
                         shape=tf.TensorShape(None), name='pow')
     self.evaluate(power.initializer)
-    with self.assertRaisesRegexp(Exception, r'compatible shapes'):
+    with self.assertRaisesRegex(Exception, r'compatible shapes'):
       d = generalized_normal.GeneralizedNormal(
           loc=tf.zeros([4, 1], dtype=self.dtype),
           scale=tf.ones([4, 1], dtype=self.dtype),

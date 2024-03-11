@@ -437,7 +437,7 @@ class _MaskedAutoregressiveFlowTest(test_util.VectorDistributionTestHelpers,
         rtol=0.03)
 
   def testVectorBijectorRaises(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         "Bijectors with `forward_min_event_ndims` > 0 are not supported"):
 
@@ -450,7 +450,7 @@ class _MaskedAutoregressiveFlowTest(test_util.VectorDistributionTestHelpers,
       maf.forward([1., 2.])
 
   def testRankChangingBijectorRaises(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, "Bijectors which alter `event_ndims` are not supported."):
 
       def bijector_fn(*args, **kwargs):
@@ -931,7 +931,7 @@ class AutoregressiveNetworkTest(test_util.TestCase):
 class ConditionalTests(test_util.TestCase):
 
   def test_conditional_missing_event_shape(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         "`event_shape` must be provided when `conditional` is True"):
 
@@ -939,7 +939,7 @@ class ConditionalTests(test_util.TestCase):
           params=2, conditional=True, conditional_event_shape=[4])
 
   def test_conditional_missing_conditional_shape(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         "`conditional_event_shape` must be provided when `conditional` is True"
     ):
@@ -948,7 +948,7 @@ class ConditionalTests(test_util.TestCase):
           params=2, conditional=True, event_shape=[4])
 
   def test_conditional_incorrect_layers(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         "`conditional_input_layers` must be \"first_layers\" or \"all_layers\""
     ):
@@ -961,7 +961,7 @@ class ConditionalTests(test_util.TestCase):
           conditional_input_layers="non-existent-option")
 
   def test_conditional_false_with_shape(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         "`conditional_event_shape` passed but `conditional` is set to False."):
 
@@ -969,7 +969,7 @@ class ConditionalTests(test_util.TestCase):
           params=2, conditional_event_shape=[4])
 
   def test_conditional_wrong_shape(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         "Parameter `conditional_event_shape` must describe a rank-1 shape"):
 
@@ -980,7 +980,7 @@ class ConditionalTests(test_util.TestCase):
           conditional_event_shape=[10, 4])
 
   def test_conditional_missing_tensor(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, "`conditional_input` must be passed as a named argument"):
 
       made = masked_autoregressive.AutoregressiveNetwork(

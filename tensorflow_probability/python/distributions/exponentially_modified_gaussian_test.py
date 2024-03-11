@@ -232,7 +232,7 @@ class _ExponentiallyModifiedGaussianTest(object):
         self.evaluate(d.mean())
 
   def testIncompatibleArgShapes(self):
-    with self.assertRaisesRegexp(Exception, r'compatible shapes'):
+    with self.assertRaisesRegex(Exception, r'compatible shapes'):
       d = emg.ExponentiallyModifiedGaussian(
           loc=tf.zeros([2, 3], dtype=self.dtype),
           scale=tf.ones([4, 1], dtype=self.dtype),

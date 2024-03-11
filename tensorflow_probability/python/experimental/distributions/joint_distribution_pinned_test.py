@@ -143,9 +143,9 @@ class JointDistributionPinnedParameterizedTest(test_util.TestCase):
     if jd_factory is jd_named or jd_factory is jd_named_autobatched:
       # JDNamed does not support unnamed args unless model is ordered.
       for args in tuple_args:
-        with self.assertRaisesRegexp(ValueError, r'unordered'):
+        with self.assertRaisesRegex(ValueError, r'unordered'):
           jdp.JointDistributionPinned(underlying, args)
-        with self.assertRaisesRegexp(ValueError, r'unordered'):
+        with self.assertRaisesRegex(ValueError, r'unordered'):
           jdp.JointDistributionPinned(underlying, *args)
       tuple_args = ()
 

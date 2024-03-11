@@ -491,7 +491,7 @@ class GibbsSamplerTests(test_util.TestCase):
   def test_invalid_model_spec_raises_error(self):
     observed_time_series = tf.ones([2])
     design_matrix = tf.eye(2)
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Weights prior must be a normal distribution'):
       gibbs_sampler.build_model_for_gibbs_fitting(
           observed_time_series,
@@ -501,7 +501,7 @@ class GibbsSamplerTests(test_util.TestCase):
           observation_noise_variance_prior=inverse_gamma.InverseGamma(
               0.01, 0.01))
 
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Level variance prior must be an inverse gamma'):
       gibbs_sampler.build_model_for_gibbs_fitting(
           observed_time_series,
@@ -511,7 +511,7 @@ class GibbsSamplerTests(test_util.TestCase):
           observation_noise_variance_prior=inverse_gamma.InverseGamma(
               0.01, 0.01))
 
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'noise variance prior must be an inverse gamma'):
       gibbs_sampler.build_model_for_gibbs_fitting(
           observed_time_series,

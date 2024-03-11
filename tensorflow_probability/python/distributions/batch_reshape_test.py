@@ -467,7 +467,7 @@ class _BatchReshapeTest(object):
         scale_diag=scale_ph, validate_args=True)
 
     if self.is_static_shape or tf.executing_eagerly():
-      with self.assertRaisesRegexp(
+      with self.assertRaisesRegex(
           ValueError, (r'`batch_shape` size \(6\) must match '
                        r'`distribution\.batch_shape` size \(2\)')):
         batch_reshape.BatchReshape(
@@ -504,7 +504,7 @@ class _BatchReshapeTest(object):
         scale_diag=scale_ph, validate_args=True)
 
     if self.is_static_shape or tf.executing_eagerly():
-      with self.assertRaisesRegexp(ValueError, r'.*must be >=(-1| 0).*'):
+      with self.assertRaisesRegex(ValueError, r'.*must be >=(-1| 0).*'):
         batch_reshape.BatchReshape(
             distribution=mvn,
             batch_shape=new_batch_shape_ph,
@@ -539,7 +539,7 @@ class _BatchReshapeTest(object):
         scale_diag=scale_ph, validate_args=True)
 
     if self.is_static_shape:
-      with self.assertRaisesRegexp(ValueError, r'.*must be a vector.*'):
+      with self.assertRaisesRegex(ValueError, r'.*must be a vector.*'):
         batch_reshape.BatchReshape(
             distribution=mvn,
             batch_shape=new_batch_shape_ph,
@@ -571,11 +571,11 @@ class _BatchReshapeTest(object):
     x_114 = self.dtype([2, 12, 3, 23]).reshape(1, 1, 4)
 
     if self.is_static_shape or tf.executing_eagerly():
-      with self.assertRaisesRegexp(NotImplementedError,
-                                   'too few batch and event dims'):
+      with self.assertRaisesRegex(NotImplementedError,
+                                  'too few batch and event dims'):
         poisson_141_reshaped.log_prob(x_4)
-      with self.assertRaisesRegexp(NotImplementedError,
-                                   'unexpected batch and event shape'):
+      with self.assertRaisesRegex(NotImplementedError,
+                                  'unexpected batch and event shape'):
         poisson_141_reshaped.log_prob(x_114)
       return
 

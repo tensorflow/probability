@@ -240,14 +240,14 @@ class DeterministicTest(test_util.TestCase):
     self.evaluate(dist.log_prob(1.))
 
     self.evaluate(atol.assign(-1.))
-    with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
-                                 'Condition x >= 0'):
+    with self.assertRaisesRegex((ValueError, tf.errors.InvalidArgumentError),
+                                'Condition x >= 0'):
       self.evaluate(dist.log_prob(1.))
 
     self.evaluate(atol.assign(0.1))
     self.evaluate(rtol.assign(-1.))
-    with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
-                                 'Condition x >= 0'):
+    with self.assertRaisesRegex((ValueError, tf.errors.InvalidArgumentError),
+                                'Condition x >= 0'):
       self.evaluate(dist.log_prob(1.))
 
 
@@ -282,15 +282,15 @@ class VectorDeterministicTest(test_util.TestCase):
 
   def testInvalidTolRaises(self):
     loc = rng.rand(2, 3, 4).astype(np.float32)
-    with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
-                                 'Condition x >= 0'):
+    with self.assertRaisesRegex((ValueError, tf.errors.InvalidArgumentError),
+                                'Condition x >= 0'):
       dist = det.VectorDeterministic(loc, atol=-1, validate_args=True)
       self.evaluate(dist.prob(loc))
 
   def testInvalidXRaises(self):
     loc = rng.rand(2, 3, 4).astype(np.float32)
-    with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
-                                 'rank at least 1'):
+    with self.assertRaisesRegex((ValueError, tf.errors.InvalidArgumentError),
+                                'rank at least 1'):
       dist = det.VectorDeterministic(loc, atol=1, validate_args=True)
       self.evaluate(dist.prob(0.))
 
@@ -438,14 +438,14 @@ class VectorDeterministicTest(test_util.TestCase):
     self.evaluate(dist.log_prob([1.]))
 
     self.evaluate(atol.assign(-1.))
-    with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
-                                 'Condition x >= 0'):
+    with self.assertRaisesRegex((ValueError, tf.errors.InvalidArgumentError),
+                                'Condition x >= 0'):
       self.evaluate(dist.log_prob([1.]))
 
     self.evaluate(atol.assign(0.1))
     self.evaluate(rtol.assign(-1.))
-    with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
-                                 'Condition x >= 0'):
+    with self.assertRaisesRegex((ValueError, tf.errors.InvalidArgumentError),
+                                'Condition x >= 0'):
       self.evaluate(dist.log_prob([1.]))
 
   @parameterized.named_parameters(

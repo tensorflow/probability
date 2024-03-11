@@ -604,7 +604,7 @@ class HalfStudentTTest(test_util.TestCase):
     df = tf.Variable(14, dtype=tf.int32)
     loc = tf.Variable(0, dtype=tf.int32)
     scale = tf.Variable(1, dtype=tf.int32)
-    with self.assertRaisesRegexp(ValueError, 'Expected floating point'):
+    with self.assertRaisesRegex(ValueError, 'Expected floating point'):
       half_student_t.HalfStudentT(
           df=df, loc=loc, scale=scale, validate_args=True)
 

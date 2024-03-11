@@ -260,7 +260,7 @@ class _BatchBroadcastTest(object):
       self.evaluate(tf.identity(obs))
 
   def test_bcast_to_errors(self):
-    with self.assertRaisesRegexp(ValueError, 'is incompatible with'):
+    with self.assertRaisesRegex(ValueError, 'is incompatible with'):
       batch_broadcast.BatchBroadcast(
           normal.Normal(tf.range(3.), 0.), to_shape=[2, 1])
 
@@ -273,7 +273,7 @@ class _BatchBroadcastTest(object):
               validate_args=True).log_prob(0.))
 
   def test_bcast_with_errors(self):
-    with self.assertRaisesRegexp(ValueError, 'Incompatible shapes'):
+    with self.assertRaisesRegex(ValueError, 'Incompatible shapes'):
       batch_broadcast.BatchBroadcast(
           normal.Normal(tf.range(3.), 0.), with_shape=[2, 4])
 
@@ -287,10 +287,10 @@ class _BatchBroadcastTest(object):
               validate_args=True).log_prob(0.))
 
   def test_bcast_both_error(self):
-    with self.assertRaisesRegexp(ValueError, 'Exactly one of'):
+    with self.assertRaisesRegex(ValueError, 'Exactly one of'):
       batch_broadcast.BatchBroadcast(normal.Normal(0., 1.), [3], to_shape=[3])
 
-    with self.assertRaisesRegexp(ValueError, 'Exactly one of'):
+    with self.assertRaisesRegex(ValueError, 'Exactly one of'):
       batch_broadcast.BatchBroadcast(normal.Normal(0., 1.))
 
 

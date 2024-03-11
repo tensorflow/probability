@@ -46,7 +46,7 @@ class IndependentDistributionTest(test_util.TestCase):
 
   def assertRaises(self, error_class, msg):
     if tf.executing_eagerly():
-      return self.assertRaisesRegexp(error_class, msg)
+      return self.assertRaisesRegex(error_class, msg)
     return self.assertRaisesOpError(msg)
 
   def testSampleAndLogProbUnivariate(self):
@@ -180,7 +180,7 @@ class IndependentDistributionTest(test_util.TestCase):
         reinterpreted_batch_ndims=0,
         validate_args=True)
 
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Event shapes do not match'):
       kullback_leibler.kl_divergence(ind1, ind2)
 
@@ -195,7 +195,7 @@ class IndependentDistributionTest(test_util.TestCase):
         reinterpreted_batch_ndims=0,
         validate_args=True)
 
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         NotImplementedError, 'different event shapes'):
       kullback_leibler.kl_divergence(ind1, ind2)
 
@@ -219,7 +219,7 @@ class IndependentDistributionTest(test_util.TestCase):
     self.assertAllEqual((4, 5), kl.shape)
 
     with tf.control_dependencies([loc2.assign(np.zeros((4, 5, 3, 2)))]):
-      with self.assertRaisesRegexp(Exception, 'Event shapes do not match'):
+      with self.assertRaisesRegex(Exception, 'Event shapes do not match'):
         self.evaluate(dist1.kl_divergence(dist2))
 
   def testKLScalarToMultivariate(self):
@@ -387,8 +387,8 @@ class IndependentDistributionTest(test_util.TestCase):
         self._parameters = {'logits': logits}
 
     d = IndepBern1d(tf.zeros([4, 5, 6]))
-    with self.assertRaisesRegexp(NotImplementedError,
-                                 'does not support batch slicing'):
+    with self.assertRaisesRegex(NotImplementedError,
+                                'does not support batch slicing'):
       d[:3]  # pylint: disable=pointless-statement
 
     class IndepBern1dSliceable(IndepBern1d):

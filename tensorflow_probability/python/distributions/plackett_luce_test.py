@@ -45,7 +45,7 @@ class PlackettLuceTest(test_util.TestCase):
 
   def assertRaises(self, error_class, msg):
     if tf.executing_eagerly():
-      return self.assertRaisesRegexp(error_class, msg)
+      return self.assertRaisesRegex(error_class, msg)
     return self.assertRaisesOpError(msg)
 
   def testScores(self):
@@ -166,7 +166,7 @@ class PlackettLuceFromVariableTest(test_util.TestCase):
 
   def testAssertionsScores(self):
     x = deferred_tensor.TransformedVariable(0., tfb.Identity(), shape=None)
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Argument `scores` must have rank at least 1.'):
       d = plackett_luce.PlackettLuce(scores=x, validate_args=True)
       self.evaluate([v.initializer for v in d.variables])

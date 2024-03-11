@@ -118,7 +118,7 @@ class MultiTaskGaussianProcessRegressionModelTest(
     kernel = exponentiated_quadratic.ExponentiatedQuadratic()
     multi_task_kernel = multitask_kernel.Independent(
         num_tasks=3, base_kernel=kernel)
-    with self.assertRaisesRegexp(ValueError, 'match the number of tasks'):
+    with self.assertRaisesRegex(ValueError, 'match the number of tasks'):
       observations = np.linspace(-1., 1., 24).astype(np.float32)
       mtgprm_lib.MultiTaskGaussianProcessRegressionModel(
           multi_task_kernel,
@@ -128,7 +128,7 @@ class MultiTaskGaussianProcessRegressionModelTest(
           observation_noise_variance=observation_noise_variance,
           validate_args=True)
 
-    with self.assertRaisesRegexp(ValueError, 'match the number of tasks'):
+    with self.assertRaisesRegex(ValueError, 'match the number of tasks'):
       observations = np.linspace(-1., 1., 32).reshape(8, 4).astype(np.float32)
       mtgprm_lib.MultiTaskGaussianProcessRegressionModel(
           multi_task_kernel,
@@ -138,7 +138,7 @@ class MultiTaskGaussianProcessRegressionModelTest(
           observation_noise_variance=observation_noise_variance,
           validate_args=True)
 
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'match the second to last dimension'):
       observations = np.linspace(-1., 1., 18).reshape(6, 3).astype(np.float32)
       mtgprm_lib.MultiTaskGaussianProcessRegressionModel(

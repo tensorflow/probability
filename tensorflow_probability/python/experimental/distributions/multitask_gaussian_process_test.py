@@ -402,15 +402,15 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
         observation_noise_variance=observation_noise_variance,
         validate_args=True)
 
-    with self.assertRaisesRegexp(ValueError, 'match the number of tasks'):
+    with self.assertRaisesRegex(ValueError, 'match the number of tasks'):
       observations = np.linspace(-1., 1., 15).astype(np.float32)
       multitask_gp.log_prob(observations)
 
-    with self.assertRaisesRegexp(ValueError, 'match the number of tasks'):
+    with self.assertRaisesRegex(ValueError, 'match the number of tasks'):
       observations = np.linspace(-1., 1., 20).reshape(5, 4).astype(np.float32)
       multitask_gp.log_prob(observations)
 
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'match the second to last dimension'):
       observations = np.linspace(-1., 1., 18).reshape(6, 3).astype(np.float32)
       multitask_gp.log_prob(observations)

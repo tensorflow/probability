@@ -315,7 +315,7 @@ class LKJTest(test_util.TestCase):
   def testDimensionGuard(self, dtype):
     testee_dist = lkj.LKJ(
         dimension=3, concentration=dtype([1., 4.]), validate_args=True)
-    with self.assertRaisesRegexp(ValueError, 'dimension mismatch'):
+    with self.assertRaisesRegex(ValueError, 'dimension mismatch'):
       testee_dist.log_prob(dtype(np.eye(4)))
 
   def testAssertValidCorrelationMatrix(self, dtype):

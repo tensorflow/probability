@@ -88,20 +88,20 @@ class BaseBijectorTest(test_util.TestCase):
       self.assertAllEqual(shape, inverse_event_shape_)
       self.assertAllEqual(shape, bij.inverse_event_shape(shape))
 
-    with self.assertRaisesRegexp(NotImplementedError,
-                                 'inverse not implemented'):
+    with self.assertRaisesRegex(NotImplementedError,
+                                'inverse not implemented'):
       bij.inverse(0)
 
-    with self.assertRaisesRegexp(NotImplementedError,
-                                 'forward not implemented'):
+    with self.assertRaisesRegex(NotImplementedError,
+                                'forward not implemented'):
       bij.forward(0)
 
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         NotImplementedError,
         'Cannot derive `inverse_log_det_jacobian`'):
       bij.inverse_log_det_jacobian(0, event_ndims=0)
 
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         NotImplementedError,
         'Cannot derive `forward_log_det_jacobian`'):
       bij.forward_log_det_jacobian(0, event_ndims=0)
@@ -140,14 +140,14 @@ class BaseBijectorTest(test_util.TestCase):
     b32 = _TypedIdentity(tf.float32)
     self.assertEqual(tf.float32, b32(0).dtype)
     self.assertEqual(tf.float32, b32(x32).dtype)
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         error_clazz, 'Tensor conversion requested dtype'):
       b32.forward(x64)
 
     b64 = _TypedIdentity(tf.float64)
     self.assertEqual(tf.float64, b64(0).dtype)
     self.assertEqual(tf.float64, b64(x64).dtype)
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         error_clazz, 'Tensor conversion requested dtype'):
       b64.forward(x32)
 
@@ -583,20 +583,20 @@ class UnspecifiedParameters(bijector_lib.Bijector):
 class BijectorTestEventNdims(test_util.TestCase):
 
   def assertRaisesError(self, msg):
-    return self.assertRaisesRegexp(Exception, msg)
+    return self.assertRaisesRegex(Exception, msg)
 
   def testBijectorNonIntegerEventNdims(self):
     bij = ExpOnlyJacobian()
-    with self.assertRaisesRegexp(ValueError, 'Expected integer'):
+    with self.assertRaisesRegex(ValueError, 'Expected integer'):
       bij.forward_log_det_jacobian(1., event_ndims=1.5)
-    with self.assertRaisesRegexp(ValueError, 'Expected integer'):
+    with self.assertRaisesRegex(ValueError, 'Expected integer'):
       bij.inverse_log_det_jacobian(1., event_ndims=1.5)
 
   def testBijectorArrayEventNdims(self):
     bij = ExpOnlyJacobian()
-    with self.assertRaisesRegexp(ValueError, 'Expected scalar'):
+    with self.assertRaisesRegex(ValueError, 'Expected scalar'):
       bij.forward_log_det_jacobian(1., event_ndims=(1, 2))
-    with self.assertRaisesRegexp(ValueError, 'Expected scalar'):
+    with self.assertRaisesRegex(ValueError, 'Expected scalar'):
       bij.inverse_log_det_jacobian(1., event_ndims=(1, 2))
 
   def testBijectorDynamicEventNdims(self):
@@ -1034,9 +1034,9 @@ class BijectorReduceEventDimsTest(test_util.TestCase):
   def testReduceEventNdimsForwardRaiseError(self):
     x = [[[1., 2.], [3., 4.]]]
     bij = ExpOnlyJacobian(forward_min_event_ndims=1)
-    with self.assertRaisesRegexp(ValueError, 'must be at least'):
+    with self.assertRaisesRegex(ValueError, 'must be at least'):
       bij.forward_log_det_jacobian(x, event_ndims=0)
-    with self.assertRaisesRegexp(ValueError, 'Input must have rank at least'):
+    with self.assertRaisesRegex(ValueError, 'Input must have rank at least'):
       bij.forward_log_det_jacobian(x, event_ndims=4)
 
   def testReduceEventNdimsInverse(self):
@@ -1055,9 +1055,9 @@ class BijectorReduceEventDimsTest(test_util.TestCase):
   def testReduceEventNdimsInverseRaiseError(self):
     x = [[[1., 2.], [3., 4.]]]
     bij = ExpOnlyJacobian(forward_min_event_ndims=1)
-    with self.assertRaisesRegexp(ValueError, 'must be at least'):
+    with self.assertRaisesRegex(ValueError, 'must be at least'):
       bij.inverse_log_det_jacobian(x, event_ndims=0)
-    with self.assertRaisesRegexp(ValueError, 'Input must have rank at least'):
+    with self.assertRaisesRegex(ValueError, 'Input must have rank at least'):
       bij.inverse_log_det_jacobian(x, event_ndims=4)
 
   def testReduceEventNdimsForwardConstJacobian(self):

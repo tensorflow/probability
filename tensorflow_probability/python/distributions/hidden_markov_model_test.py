@@ -1782,7 +1782,7 @@ class _HiddenMarkovModelAssertionTest(
 
     num_steps = 2
     message = 'is not over integers'
-    with self.assertRaisesRegexp(Exception, message):
+    with self.assertRaisesRegex(Exception, message):
       model = hidden_markov_model.HiddenMarkovModel(
           normal.Normal(loc=0.0, scale=1.0),
           categorical.Categorical(probs=transition_matrix),
@@ -1798,7 +1798,7 @@ class _HiddenMarkovModelAssertionTest(
 
     num_steps = 2
     message = 'is not over integers'
-    with self.assertRaisesRegexp(Exception, message):
+    with self.assertRaisesRegex(Exception, message):
       model = hidden_markov_model.HiddenMarkovModel(
           categorical.Categorical(probs=initial_prob),
           normal.Normal(loc=0.0, scale=1.0),
@@ -1816,7 +1816,7 @@ class _HiddenMarkovModelAssertionTest(
 
     num_steps = np.array([2, 3])
     message = '`num_steps` must be a scalar'
-    with self.assertRaisesRegexp(Exception, message):
+    with self.assertRaisesRegex(Exception, message):
       model = hidden_markov_model.HiddenMarkovModel(
           categorical.Categorical(probs=initial_prob),
           categorical.Categorical(probs=transition_matrix),
@@ -1834,7 +1834,7 @@ class _HiddenMarkovModelAssertionTest(
 
     num_steps = tf.Variable(np.array([2, 3]))
     message = '`num_steps` must be a scalar'
-    with self.assertRaisesRegexp(Exception, message):
+    with self.assertRaisesRegex(Exception, message):
       model = hidden_markov_model.HiddenMarkovModel(
           categorical.Categorical(probs=initial_prob),
           categorical.Categorical(probs=transition_matrix),
@@ -1852,7 +1852,7 @@ class _HiddenMarkovModelAssertionTest(
 
     num_steps = 0
     message = '`num_steps` must be at least 1'
-    with self.assertRaisesRegexp(Exception, message):
+    with self.assertRaisesRegex(Exception, message):
       model = hidden_markov_model.HiddenMarkovModel(
           categorical.Categorical(probs=initial_prob),
           categorical.Categorical(probs=transition_matrix),
@@ -1870,7 +1870,7 @@ class _HiddenMarkovModelAssertionTest(
 
     num_steps = 2
     message = 'must have scalar'
-    with self.assertRaisesRegexp(Exception, message):
+    with self.assertRaisesRegex(Exception, message):
       model = hidden_markov_model.HiddenMarkovModel(
           sample.Sample(
               categorical.Categorical(probs=initial_prob), sample_shape=2),
@@ -1889,7 +1889,7 @@ class _HiddenMarkovModelAssertionTest(
 
     num_steps = 1
     message = 'must agree on'
-    with self.assertRaisesRegexp(Exception, message):
+    with self.assertRaisesRegex(Exception, message):
       model = hidden_markov_model.HiddenMarkovModel(
           categorical.Categorical(probs=initial_prob),
           categorical.Categorical(probs=transition_matrix),
@@ -1911,7 +1911,7 @@ class _HiddenMarkovModelAssertionTest(
 
     num_steps = 1
     message = 'must agree on'
-    with self.assertRaisesRegexp(Exception, message):
+    with self.assertRaisesRegex(Exception, message):
       model = hidden_markov_model.HiddenMarkovModel(
           categorical.Categorical(probs=initial_prob),
           categorical.Categorical(probs=transition_matrix),
@@ -1943,7 +1943,7 @@ class _HiddenMarkovModelAssertionTest(
         categorical.Categorical(probs=observation_probs),
         num_steps=num_steps,
         validate_args=True)
-    with self.assertRaisesRegexp(Exception, message):
+    with self.assertRaisesRegex(Exception, message):
       with tf.control_dependencies([
           transition_matrix.assign(transition_matrix_data2)]):
         _ = self.evaluate(model.sample())
@@ -1959,7 +1959,7 @@ class _HiddenMarkovModelAssertionTest(
 
     num_steps = 4
 
-    with self.assertRaisesRegexp(Exception, 'can\'t have scalar batches'):
+    with self.assertRaisesRegex(Exception, 'can\'t have scalar batches'):
       model = hidden_markov_model.HiddenMarkovModel(
           categorical.Categorical(probs=initial_prob),
           categorical.Categorical(probs=transition_matrix),
@@ -1981,7 +1981,7 @@ class _HiddenMarkovModelAssertionTest(
 
     num_steps = 4
 
-    with self.assertRaisesRegexp(Exception, 'can\'t have scalar batches'):
+    with self.assertRaisesRegex(Exception, 'can\'t have scalar batches'):
       model = hidden_markov_model.HiddenMarkovModel(
           categorical.Categorical(probs=initial_prob),
           categorical.Categorical(probs=transition_matrix),
@@ -2010,7 +2010,7 @@ class _HiddenMarkovModelAssertionTest(
         num_steps=num_steps,
         validate_args=True)
 
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         Exception,
         'have scalar batches'):
       with tf.control_dependencies([
@@ -2052,7 +2052,7 @@ class _HiddenMarkovModelAssertionTest(
 
     num_steps = 5
 
-    with self.assertRaisesRegexp(Exception, 'matches num_steps - 1.'):
+    with self.assertRaisesRegex(Exception, 'matches num_steps - 1.'):
       model = hidden_markov_model.HiddenMarkovModel(
           categorical.Categorical(probs=initial_prob),
           categorical.Categorical(probs=transition_matrix),
@@ -2070,7 +2070,7 @@ class _HiddenMarkovModelAssertionTest(
 
     num_steps = 6
 
-    with self.assertRaisesRegexp(Exception, 'matches num_steps.'):
+    with self.assertRaisesRegex(Exception, 'matches num_steps.'):
       model = hidden_markov_model.HiddenMarkovModel(
           categorical.Categorical(probs=initial_prob),
           categorical.Categorical(probs=transition_matrix),

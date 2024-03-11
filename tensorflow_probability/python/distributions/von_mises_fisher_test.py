@@ -432,7 +432,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
       self.evaluate(vmf.prob([0.5, 0.5, 0.5]))
 
     msg = 'must have innermost dimension matching'
-    static_shape_assertion = self.assertRaisesRegexp(ValueError, msg)
+    static_shape_assertion = self.assertRaisesRegex(ValueError, msg)
     dynamic_shape_assertion = self.assertRaisesOpError(msg)
 
     x = [[1., 0., 0., 0.]]

@@ -151,7 +151,7 @@ class VectorizationTest(test_util.TestCase):
 
     vectorized_matvec = vectorization_util.make_rank_polymorphic(
         tf.linalg.matvec, core_ndims=(2, 1))
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Shape must be rank 2 but is rank 1'):
       vectorized_matvec(tf.zeros([5]), tf.zeros([2, 1, 5]))
 
@@ -176,7 +176,7 @@ class VectorizationTest(test_util.TestCase):
     # Define `fn` to expect a vector input.
     fn = lambda x: tf.einsum('n->', x)
     # Verify that it won't accept a batch dimension.
-    with self.assertRaisesRegexp(Exception, 'rank'):
+    with self.assertRaisesRegex(Exception, 'rank'):
       fn(tf.zeros([1, 5]))
 
     polymorphic_fn = vectorization_util.make_rank_polymorphic(fn,

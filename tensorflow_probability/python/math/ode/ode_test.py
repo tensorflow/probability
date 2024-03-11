@@ -664,7 +664,7 @@ class GeneralTest(test_util.TestCase):
     ode_fn = lambda time, state: -state
     initial_time = 0.
     initial_state = np.int32(1)
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         TypeError, ('`initial_state` must have a floating point or complex '
                     'floating point dtype')):
       solver(validate_args=True).solve(

@@ -272,7 +272,7 @@ class ChainBijectorTest(test_util.TestCase):
                               dependent_as_chain._parts_interact)
 
   def testInvalidChainNdimsRaisesError(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         "Differences between `event_ndims` and `min_event_ndims must be equal"):
       chain.Chain(

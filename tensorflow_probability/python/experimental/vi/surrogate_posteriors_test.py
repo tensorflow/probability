@@ -679,7 +679,7 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
         'b': logistic.Logistic(tf.zeros([], dtype=tf.float64), 1.)
     }
     operators = [tf.linalg.LinearOperatorDiag] * 2
-    with self.assertRaisesRegexp(NotImplementedError, 'mixed dtype'):
+    with self.assertRaisesRegex(NotImplementedError, 'mixed dtype'):
       init_fn, apply_fn = (
           surrogate_posteriors
           .build_affine_surrogate_posterior_from_base_distribution_stateless(

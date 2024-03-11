@@ -1808,7 +1808,7 @@ class NumpyTest(test_util.TestCase):
              np.arange(10).astype(np.int32).reshape(5, 2))
     init = np.zeros_like(elems[1][0])
     fn = lambda x, y_z: x + y_z[0] - y_z[1]
-    with self.assertRaisesRegexp(ValueError, r'.*size.*'):
+    with self.assertRaisesRegex(ValueError, r'.*size.*'):
       nptf.foldl(fn, elems, initializer=init)
 
   def test_foldl_struct_in_single_out(self):

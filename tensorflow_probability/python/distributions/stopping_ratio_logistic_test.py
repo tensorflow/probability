@@ -126,7 +126,7 @@ class StoppingRatioLogisticTest(test_util.TestCase):
     self.assertAllMeansClose(kl_samples, kl, axis=0, atol=2e-2)
 
   def testUnorderedCutpointsFails(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Argument `cutpoints` must be non-decreasing.'):
       dist = srp.StoppingRatioLogistic(
           cutpoints=[1., 0.9], loc=0.0, validate_args=True)

@@ -427,7 +427,7 @@ class _PowerSphericalTest(object):
       self.evaluate(pspherical.prob([0.5, 0.5, 0.5]))
 
     msg = 'must have innermost dimension matching'
-    static_shape_assertion = self.assertRaisesRegexp(ValueError, msg)
+    static_shape_assertion = self.assertRaisesRegex(ValueError, msg)
     dynamic_shape_assertion = self.assertRaisesOpError(msg)
 
     x = [[1., 0., 0., 0.]]
@@ -576,7 +576,7 @@ class _PowerSphericalTest(object):
         mean_direction=mean_direction1, concentration=concentration)
     vmf = von_mises_fisher.VonMisesFisher(
         mean_direction=mean_direction2, concentration=concentration)
-    with self.assertRaisesRegexp(ValueError, 'Can not compute the KL'):
+    with self.assertRaisesRegex(ValueError, 'Can not compute the KL'):
       kullback_leibler.kl_divergence(ps, vmf)
 
   def VerifyPowerSphericalVonMisesFisherKL(self, dim):

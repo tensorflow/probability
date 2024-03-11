@@ -308,9 +308,9 @@ class JointDistributionNamedTest(test_util.TestCase):
     lp_kwargs = self.evaluate(d.log_prob(a=a, e=e, x=x))
     self.assertAllClose(lp_value_positional, lp_kwargs)
 
-    with self.assertRaisesRegexp(ValueError,
-                                 'Joint distribution with unordered variables '
-                                 "can't take positional args"):
+    with self.assertRaisesRegex(ValueError,
+                                'Joint distribution with unordered variables '
+                                "can't take positional args"):
       lp_kwargs = d.log_prob(e, a, x)
 
   @parameterized.named_parameters(

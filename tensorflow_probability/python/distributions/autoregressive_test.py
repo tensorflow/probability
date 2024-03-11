@@ -211,8 +211,8 @@ class AutoregressiveTest(test_util.VectorDistributionTestHelpers,
       return normal.Normal(loc=tf.zeros_like(sample), scale=1.)
 
     num_steps = [4, 4, 4]
-    with self.assertRaisesRegexp(Exception,
-                                 'Argument `num_steps` must be a scalar'):
+    with self.assertRaisesRegex(Exception,
+                                'Argument `num_steps` must be a scalar'):
       ar = autoregressive.Autoregressive(
           fn, num_steps=num_steps, validate_args=True)
       self.evaluate(ar.sample(seed=test_util.test_seed()))
@@ -222,8 +222,8 @@ class AutoregressiveTest(test_util.VectorDistributionTestHelpers,
     ar = autoregressive.Autoregressive(
         fn, num_steps=num_steps, validate_args=True)
     self.evaluate(ar.sample(seed=test_util.test_seed()))
-    with self.assertRaisesRegexp(Exception,
-                                 'Argument `num_steps` must be a scalar'):
+    with self.assertRaisesRegex(Exception,
+                                'Argument `num_steps` must be a scalar'):
       with tf.control_dependencies([num_steps.assign([17, 3])]):
         self.evaluate(ar.sample(seed=test_util.test_seed()))
 
@@ -232,8 +232,8 @@ class AutoregressiveTest(test_util.VectorDistributionTestHelpers,
       return normal.Normal(loc=tf.zeros_like(sample), scale=1.)
 
     num_steps = 0
-    with self.assertRaisesRegexp(Exception,
-                                 'Argument `num_steps` must be positive'):
+    with self.assertRaisesRegex(Exception,
+                                'Argument `num_steps` must be positive'):
       ar = autoregressive.Autoregressive(
           fn, num_steps=num_steps, validate_args=True)
       self.evaluate(ar.sample(seed=test_util.test_seed()))
@@ -243,8 +243,8 @@ class AutoregressiveTest(test_util.VectorDistributionTestHelpers,
     ar = autoregressive.Autoregressive(
         fn, num_steps=num_steps, validate_args=True)
     self.evaluate(ar.sample(seed=test_util.test_seed()))
-    with self.assertRaisesRegexp(Exception,
-                                 'Argument `num_steps` must be positive'):
+    with self.assertRaisesRegex(Exception,
+                                'Argument `num_steps` must be positive'):
       with tf.control_dependencies([num_steps.assign(-9)]):
         self.evaluate(ar.sample(seed=test_util.test_seed()))
 

@@ -30,7 +30,7 @@ class PermuteBijectorTest(test_util.TestCase):
   """Tests correctness of the Permute bijector."""
 
   def assertRaisesError(self, msg):
-    return self.assertRaisesRegexp(Exception, msg)
+    return self.assertRaisesRegex(Exception, msg)
 
   def setUp(self):
     self._rng = np.random.RandomState(42)
@@ -101,7 +101,7 @@ class PermuteBijectorTest(test_util.TestCase):
 
   def testNonPermutationAssertion(self):
     message = 'must contain exactly one of each of'
-    with self.assertRaisesRegexp(Exception, message):
+    with self.assertRaisesRegex(Exception, message):
       permutation = np.int32([1, 0, 1])
       bijector = permute.Permute(permutation=permutation, validate_args=True)
       x = np.random.randn(4, 2, 3)
@@ -111,7 +111,7 @@ class PermuteBijectorTest(test_util.TestCase):
     message = 'must contain exactly one of each of'
     permutation = tf.Variable(np.int32([1, 0, 1]))
     self.evaluate(permutation.initializer)
-    with self.assertRaisesRegexp(Exception, message):
+    with self.assertRaisesRegex(Exception, message):
       bijector = permute.Permute(permutation=permutation, validate_args=True)
       x = np.random.randn(4, 2, 3)
       _ = self.evaluate(bijector.forward(x))
@@ -121,14 +121,14 @@ class PermuteBijectorTest(test_util.TestCase):
     permutation = tf.Variable(np.int32([1, 0, 2]))
     self.evaluate(permutation.initializer)
     bijector = permute.Permute(permutation=permutation, validate_args=True)
-    with self.assertRaisesRegexp(Exception, message):
+    with self.assertRaisesRegex(Exception, message):
       with tf.control_dependencies([permutation.assign([1, 0, 1])]):
         x = np.random.randn(4, 2, 3)
         _ = self.evaluate(bijector.forward(x))
 
   def testPermutationTypeAssertion(self):
     message = 'should be `int`-like'
-    with self.assertRaisesRegexp(Exception, message):
+    with self.assertRaisesRegex(Exception, message):
       permutation = np.float32([2, 0, 1])
       bijector = permute.Permute(permutation=permutation, validate_args=True)
       x = np.random.randn(4, 2, 3)

@@ -571,7 +571,7 @@ class JohnsonSUTest(test_util.TestCase):
 
   def testIncompatibleArgShapes(self):
     scale = tf1.placeholder_with_default(tf.ones([4, 1]), shape=None)
-    with self.assertRaisesRegexp(Exception, r'Incompatible shapes'):
+    with self.assertRaisesRegex(Exception, r'Incompatible shapes'):
       d = johnson_su.JohnsonSU(
           skewness=1.,
           tailweight=2.,

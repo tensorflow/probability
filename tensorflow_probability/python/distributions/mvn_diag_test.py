@@ -45,7 +45,7 @@ class MultivariateNormalDiagTest(test_util.TestCase):
   def testScalarParams(self):
     mu = -1.
     diag = -5.
-    with self.assertRaisesRegexp(ValueError, 'at least 1 dimension'):
+    with self.assertRaisesRegex(ValueError, 'at least 1 dimension'):
       mvn_diag.MultivariateNormalDiag(mu, diag)
 
   def testVectorParams(self):

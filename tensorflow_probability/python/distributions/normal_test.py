@@ -475,14 +475,14 @@ class NormalTest(test_util.TestCase):
   def testIncompatibleArgShapesGraph(self):
     if tf.executing_eagerly(): return
     scale = tf1.placeholder_with_default(tf.ones([4, 1]), shape=None)
-    with self.assertRaisesRegexp(tf.errors.OpError, r'Incompatible shapes'):
+    with self.assertRaisesRegex(tf.errors.OpError, r'Incompatible shapes'):
       d = normal.Normal(loc=tf.zeros([2, 3]), scale=scale, validate_args=True)
       self.evaluate(d.mean())
 
   def testIncompatibleArgShapesEager(self):
     if not tf.executing_eagerly(): return
     scale = tf1.placeholder_with_default(tf.ones([4, 1]), shape=None)
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         r'Arguments `loc` and `scale` must have compatible shapes.'):
       normal.Normal(loc=tf.zeros([2, 3]), scale=scale, validate_args=True)

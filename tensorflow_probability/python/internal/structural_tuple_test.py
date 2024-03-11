@@ -117,58 +117,58 @@ class StructTupleTest(test_util.TestCase):
 
   def testMakeTooManyValues(self):
     t = structural_tuple.structtuple(['a', 'b'])
-    with self.assertRaisesRegexp(TypeError,
-                                 'Expected 2 arguments or fewer, got 3'):
+    with self.assertRaisesRegex(TypeError,
+                                'Expected 2 arguments or fewer, got 3'):
       t._make([1, 2, 3])
 
   def testNonStrField(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         TypeError, 'Field names must be strings: 1 has type <class \'int\'>'):
       structural_tuple.structtuple([1])
 
   def testInvalidIdentifierField(self):
-    with self.assertRaisesRegexp(ValueError,
-                                 'Field names must be valid identifiers: 0'):
+    with self.assertRaisesRegex(ValueError,
+                                'Field names must be valid identifiers: 0'):
       structural_tuple.structtuple(['0'])
 
   def testKeywordField(self):
-    with self.assertRaisesRegexp(ValueError,
-                                 'Field names cannot be a keyword: def'):
+    with self.assertRaisesRegex(ValueError,
+                                'Field names cannot be a keyword: def'):
       structural_tuple.structtuple(['def'])
 
   def testUnderscoreField(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Field names cannot start with an underscore: _a'):
       structural_tuple.structtuple(['_a'])
 
   def testDuplicateField(self):
-    with self.assertRaisesRegexp(ValueError,
-                                 'Encountered duplicate field name: a'):
+    with self.assertRaisesRegex(ValueError,
+                                'Encountered duplicate field name: a'):
       structural_tuple.structtuple(['a', 'a'])
 
   def testDuplicateConstructorArg(self):
     t = structural_tuple.structtuple(['a'])
-    with self.assertRaisesRegexp(TypeError,
-                                 'Got multiple values for argument a'):
+    with self.assertRaisesRegex(TypeError,
+                                'Got multiple values for argument a'):
       t(1, a=2)
 
   def testUnexpectedConstructorArg(self):
     t = structural_tuple.structtuple(['a'])
-    with self.assertRaisesRegexp(TypeError,
-                                 'Got an unexpected keyword argument b'):
+    with self.assertRaisesRegex(TypeError,
+                                'Got an unexpected keyword argument b'):
       t(b=2)
 
   def testMissingAttribute(self):
     t = structural_tuple.structtuple(['a'])
     a = t()
-    with self.assertRaisesRegexp(AttributeError,
-                                 'StructTuple has no attribute b'):
+    with self.assertRaisesRegex(AttributeError,
+                                'StructTuple has no attribute b'):
       _ = a.b
 
   def testReplaceUnknownFields(self):
     t = structural_tuple.structtuple(['a'])
     a = t()
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, r'Got unexpected field names: \[\'b\', \'c\'\]'):
       a._replace(b=1, c=2)
 

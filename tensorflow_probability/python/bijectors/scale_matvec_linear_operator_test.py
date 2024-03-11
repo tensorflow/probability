@@ -167,12 +167,12 @@ class _ScaleMatvecLinearOperatorBlockTest(object):
 
     # Broadcasting of event shape components with batched LinearOperators
     # raises.
-    with self.assertRaisesRegexp(ValueError, 'bijector parameters changes'):
+    with self.assertRaisesRegex(ValueError, 'bijector parameters changes'):
       self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=[2, 2]))
 
     # Broadcasting of event shape components with batched LinearOperators
     # raises for `ldj_reduce_ndims > batch_ndims`.
-    with self.assertRaisesRegexp(ValueError, 'bijector parameters changes'):
+    with self.assertRaisesRegex(ValueError, 'bijector parameters changes'):
       self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=[3, 3]))
 
   def testEventShapeBroadcast(self):
@@ -192,7 +192,7 @@ class _ScaleMatvecLinearOperatorBlockTest(object):
         [y_.shape for y_ in bijector.inverse(x)])
 
     # Broadcasting of inputs within `ldj_reduce_shape` raises.
-    with self.assertRaisesRegexp(ValueError, 'left of `min_event_ndims`'):
+    with self.assertRaisesRegex(ValueError, 'left of `min_event_ndims`'):
       self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=[2, 2]))
 
   def testAlignedEventDims(self):
@@ -200,7 +200,7 @@ class _ScaleMatvecLinearOperatorBlockTest(object):
     op = self.build_operator()
     bijector = scale_matvec_linear_operator.ScaleMatvecLinearOperatorBlock(
         op, validate_args=True)
-    with self.assertRaisesRegexp(ValueError, 'equal for all elements'):
+    with self.assertRaisesRegex(ValueError, 'equal for all elements'):
       self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=[1, 2]))
 
 

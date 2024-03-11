@@ -45,7 +45,7 @@ class OneHotCategoricalTest(test_util.TestCase):
 
   def assertRaises(self, error_class, msg):
     if tf.executing_eagerly():
-      return self.assertRaisesRegexp(error_class, msg)
+      return self.assertRaisesRegex(error_class, msg)
     return self.assertRaisesOpError(msg)
 
   def testP(self):
@@ -342,7 +342,7 @@ class OneHotCategoricalFromVariableTest(test_util.TestCase):
 
   def testAssertionsLogits(self):
     x = deferred_tensor.TransformedVariable(0., tfb.Identity(), shape=None)
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Argument `logits` must have rank at least 1.'):
       d = oc.OneHotCategorical(logits=x, validate_args=True)
       self.evaluate([v.initializer for v in d.variables])

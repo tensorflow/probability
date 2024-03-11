@@ -36,7 +36,7 @@ class GetSamplesTest(test_util.TestCase):
     z = None
     n = None
     seed = test_util.test_seed()
-    with self.assertRaisesRegexp(ValueError, 'exactly one'):
+    with self.assertRaisesRegex(ValueError, 'exactly one'):
       _get_samples(dist, z, n, seed)
 
   def test_raises_if_both_z_and_n_are_not_none(self):
@@ -44,7 +44,7 @@ class GetSamplesTest(test_util.TestCase):
     z = dist.sample(seed=test_util.test_seed())
     n = 1
     seed = test_util.test_seed()
-    with self.assertRaisesRegexp(ValueError, 'exactly one'):
+    with self.assertRaisesRegex(ValueError, 'exactly one'):
       _get_samples(dist, z, n, seed)
 
   def test_returns_n_samples_if_n_provided(self):

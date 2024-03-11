@@ -52,7 +52,7 @@ class MarkovChainTest(test_util.TestCase):
             reinterpreted_batch_ndims=1),
         num_steps=5)
     x = self.evaluate(loses_batch_shape.sample([2], seed=test_util.test_seed()))
-    with self.assertRaisesRegexp(ValueError, 'batch shape is incorrect'):
+    with self.assertRaisesRegex(ValueError, 'batch shape is incorrect'):
       loses_batch_shape.log_prob(x)
 
     gains_batch_shape = markov_chain_lib.MarkovChain(
@@ -61,7 +61,7 @@ class MarkovChainTest(test_util.TestCase):
         transition_fn=lambda _, x: normal.Normal(loc=0., scale=tf.ones_like(x)),
         num_steps=5)
     x = self.evaluate(gains_batch_shape.sample([2], seed=test_util.test_seed()))
-    with self.assertRaisesRegexp(ValueError, 'batch shape is incorrect'):
+    with self.assertRaisesRegex(ValueError, 'batch shape is incorrect'):
       gains_batch_shape.log_prob(x)
 
   def test_log_prob_matches_linear_gaussian_ssm(self):

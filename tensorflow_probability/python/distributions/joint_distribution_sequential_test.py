@@ -430,11 +430,11 @@ class JointDistributionSequentialTest(test_util.TestCase):
         *value[:1], **dict(value_with_names[1:])))
     self.assertAllEqual(lp_value_positional, lp_args_then_kwargs)
 
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, r'Joint distribution expected values for [0-9] components'):
       d.log_prob(badvar=27.)
 
-    with self.assertRaisesRegexp(ValueError, 'unexpected keyword argument'):
+    with self.assertRaisesRegex(ValueError, 'unexpected keyword argument'):
       d.log_prob(*value, extra_arg=27.)
 
   def test_can_call_prob_with_args_and_kwargs(self):
@@ -925,7 +925,7 @@ class ResolveDistributionNamesTest(test_util.TestCase):
     self.assertAllEqual(dist_names, ['z', 'y'])
 
   def test_inconsistent_names_raise_error(self):
-    with self.assertRaisesRegexp(ValueError, 'Inconsistent names'):
+    with self.assertRaisesRegex(ValueError, 'Inconsistent names'):
       # Refers to first variable as both `z` and `x`.
       jds._resolve_distribution_names(
           dist_fn_args=[None, ['z'], ['x', 'w']],
@@ -933,7 +933,7 @@ class ResolveDistributionNamesTest(test_util.TestCase):
           leaf_name='y',
           instance_names=[None, None, None])
 
-    with self.assertRaisesRegexp(ValueError, 'Inconsistent names'):
+    with self.assertRaisesRegex(ValueError, 'Inconsistent names'):
       # Refers to first variable as `x`, but it was explicitly named `z`.
       jds._resolve_distribution_names(
           dist_fn_args=[None, ['x']],

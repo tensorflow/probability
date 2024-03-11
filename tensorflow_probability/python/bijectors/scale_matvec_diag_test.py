@@ -72,7 +72,7 @@ class ScaleMatvecDiagTest(test_util.TestCase, parameterized.TestCase):
         bijector.inverse_log_det_jacobian(x, event_ndims=1))
 
   def testRaisesWhenSingular(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         Exception,
         'Singular operator:  Diagonal contained zero values'):
       bijector = scale_matvec_diag.ScaleMatvecDiag(

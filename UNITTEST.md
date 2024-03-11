@@ -118,13 +118,13 @@ class _DistributionTest(tf.test.TestCase):
 class DistributionTest_StaticShape(_DistributionTest):
   ...
   def assertRaisesError(self, msg):
-    return self.assertRaisesRegexp(Exception, msg)
+    return self.assertRaisesRegex(Exception, msg)
 
 class DistributionTest_DynamicShape(_DistributionTest):
   ...
   def assertRaisesError(self, msg):
     if tf.executing_eagerly():
-      return self.assertRaisesRegexp(Exception, msg)
+      return self.assertRaisesRegex(Exception, msg)
     return self.assertRaisesOpError(msg)
 
 del _DistributionTest  # Don't run tests for the base class.

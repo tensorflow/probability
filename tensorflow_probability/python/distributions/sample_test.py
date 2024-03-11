@@ -309,8 +309,8 @@ class SampleDistributionTest(test_util.TestCase):
   def test_misshapen_event(self):
     d = sample.Sample(
         normal.Normal(0, 1, validate_args=True), 4, validate_args=True)
-    with self.assertRaisesRegexp(ValueError,
-                                 r'Incompatible shapes for broadcasting'):
+    with self.assertRaisesRegex(ValueError,
+                                r'Incompatible shapes for broadcasting'):
       self.evaluate(d.log_prob(tf.zeros([3])))
 
   def test_bijector_shapes(self):

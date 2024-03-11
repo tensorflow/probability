@@ -616,11 +616,11 @@ class ContinuousBernoulliSlicingTest(test_util.TestCase):
     )
     if tf.executing_eagerly():
       return
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         (ValueError, tf.errors.InvalidArgumentError),
         'Index out of range.*input has only 4 dims'):
       check(make_slicer[19, tf.newaxis, 2, ..., :, 0, 4])
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         (ValueError, tf.errors.InvalidArgumentError),
         'slice index.*out of bounds',
     ):

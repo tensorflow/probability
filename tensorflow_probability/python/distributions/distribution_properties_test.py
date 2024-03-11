@@ -677,7 +677,7 @@ class DistributionSlicingTest(test_util.TestCase):
     # Check that all distributions still register as non-iterable despite
     # defining __getitem__.  (Because __getitem__ magically makes an object
     # iterable for some reason.)
-    with self.assertRaisesRegexp(TypeError, 'not iterable'):
+    with self.assertRaisesRegex(TypeError, 'not iterable'):
       iter(dist)
 
     # Test slicing
