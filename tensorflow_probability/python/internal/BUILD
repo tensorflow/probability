@@ -251,6 +251,7 @@ multi_substrate_py_library(
 multi_substrate_py_test(
     name = "custom_gradient_test",
     srcs = ["custom_gradient_test.py"],
+    numpy_tags = ["notap"],
     deps = [
         ":custom_gradient",
         # tensorflow dep,
@@ -468,6 +469,7 @@ multi_substrate_py_test(
     name = "numerics_testing_test",
     size = "small",
     srcs = ["numerics_testing_test.py"],
+    numpy_tags = ["notap"],
     deps = [
         ":numerics_testing",
         # tensorflow dep,
