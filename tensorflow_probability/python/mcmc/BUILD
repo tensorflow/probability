@@ -630,6 +630,7 @@ py_test(
     name = "eight_schools_hmc_eager_test",
     size = "medium",  # Might run > 1 minute.
     srcs = ["eight_schools_hmc_eager_test.py"],
+    tags = ["no-oss-ci"],
     deps = [
         ":eight_schools_hmc",
         # tensorflow dep,
@@ -642,6 +643,7 @@ py_test(
     name = "eight_schools_hmc_graph_test",
     size = "medium",  # Might run > 1 minute.
     srcs = ["eight_schools_hmc_graph_test.py"],
+    tags = ["no-oss-ci"],
     deps = [
         ":eight_schools_hmc",
         # tensorflow dep,
