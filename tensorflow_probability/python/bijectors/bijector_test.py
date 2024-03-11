@@ -56,9 +56,9 @@ class BaseBijectorTest(test_util.TestCase):
   """Tests properties of the Bijector base-class."""
 
   def testIsAbstract(self):
-    with self.assertRaisesRegexp(TypeError,
-                                 ('Can\'t instantiate abstract class Bijector '
-                                  'with abstract methods? __init__')):
+    with self.assertRaisesRegex(TypeError,
+                                ('Can\'t instantiate abstract class Bijector '
+                                 'with.* abstract methods? \'?__init__')):
       bijector_lib.Bijector()  # pylint: disable=abstract-class-instantiated
 
   def testDefaults(self):

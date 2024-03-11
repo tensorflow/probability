@@ -1307,7 +1307,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     warnings.simplefilter('always')
     with warnings.catch_warnings(record=True) as w:
       d.sample(seed=test_util.test_seed())
-    self.assertRegexpMatches(
+    self.assertRegex(
         str(w[0].message),
         r'Falling back to stateful sampling for distribution #1.*'
         r'of type.*StatefulNormal.*component name "loc" and `dist.name` '
