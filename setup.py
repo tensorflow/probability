@@ -49,8 +49,8 @@ else:
   TFDS_PACKAGE = 'tfds-nightly'
 
 if release:
-  TF_PACKAGE = 'tensorflow >= 2.15'
-  KERAS_PACKAGE = 'tf-keras >= 2.15'
+  TF_PACKAGE = 'tensorflow >= 2.16'
+  KERAS_PACKAGE = 'tf-keras >= 2.16'
 else:
   TF_PACKAGE = 'tf-nightly'
   KERAS_PACKAGE = 'tf-keras-nightly'
