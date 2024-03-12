@@ -86,9 +86,10 @@ class Autoregressive(distribution.Distribution):
   def _normal_fn(event_size):
     n = event_size * (event_size + 1) // 2
     p = tf.Variable(tfd.Normal(loc=0., scale=1.).sample(n))
-    affine = tfb.FillScaleTriL(tfp.math.fill_triangular(0.25 * p))
+    ar_matrix = tf.linalg.set_diag(tfp.math.fill_triangular(0.25 * p),
+        tf.zeros(event_size))
     def _fn(samples):
-      scale = tf.exp(affine(samples))
+      scale = tf.exp(tf.linalg.matvec(ar_matrix, samples))
       return tfd.Independent(
           tfd.Normal(loc=0., scale=scale, validate_args=True),
           reinterpreted_batch_ndims=1)
@@ -291,6 +292,9 @@ class Autoregressive(distribution.Distribution):
 
     seed = stateful_seed if is_stateful_sampler else stateless_seed
 
+    # This runs for 1 more step than strictly necessary because there is no
+    # guarantee that the samples produced by the sample(n) above is the same as
+    # batched sample() below.
     if num_steps_static is not None:
       for _ in range(num_steps_static):
         # pylint: disable=not-callable

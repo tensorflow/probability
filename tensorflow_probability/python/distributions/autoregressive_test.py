@@ -21,7 +21,6 @@ import warnings
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import masked_autoregressive
-from tensorflow_probability.python.bijectors import scale_matvec_tril
 from tensorflow_probability.python.distributions import autoregressive
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
@@ -43,14 +42,17 @@ class AutoregressiveTest(test_util.VectorDistributionTestHelpers,
     super(AutoregressiveTest, self).setUp()
     self._rng = np.random.RandomState(42)
 
-  def _random_scale_tril(self, event_size):
+  def _random_ar_matrix(self, event_size):
     n = np.int32(event_size * (event_size + 1) // 2)
     p = 2. * self._rng.random_sample(n).astype(np.float32) - 1.
-    return linalg.fill_triangular(0.25 * p)
+    # Zero-out the diagonal to ensure auto-regressive property.
+    return tf.linalg.set_diag(
+        linalg.fill_triangular(0.25 * p), tf.zeros(event_size)
+    )
 
-  def _normal_fn(self, affine_bijector):
+  def _normal_fn(self, affine):
     def _fn(samples):
-      scale = tf.exp(affine_bijector.forward(samples))
+      scale = tf.exp(tf.linalg.matvec(affine, samples))
       return independent.Independent(
           normal.Normal(loc=0., scale=scale, validate_args=True),
           reinterpreted_batch_ndims=1,
@@ -63,10 +65,9 @@ class AutoregressiveTest(test_util.VectorDistributionTestHelpers,
     event_size = 2
     batch_event_shape = np.concatenate([batch_shape, [event_size]], axis=0)
     sample0 = tf.zeros(batch_event_shape)
-    affine = scale_matvec_tril.ScaleMatvecTriL(
-        scale_tril=self._random_scale_tril(event_size), validate_args=True)
+    ar_matrix = self._random_ar_matrix(event_size)
     ar = autoregressive.Autoregressive(
-        self._normal_fn(affine), sample0, validate_args=True)
+        self._normal_fn(ar_matrix), sample0, validate_args=True)
     self.run_test_sample_consistent_log_prob(
         self.evaluate,
         ar,
@@ -107,13 +108,12 @@ class AutoregressiveTest(test_util.VectorDistributionTestHelpers,
     event_size = np.int32(2)
     batch_event_shape = np.concatenate([batch_shape, [event_size]], axis=0)
     sample0 = tf.zeros(batch_event_shape)
-    affine = scale_matvec_tril.ScaleMatvecTriL(
-        scale_tril=self._random_scale_tril(event_size), validate_args=True)
+    ar_matrix = self._random_ar_matrix(event_size)
     ar = autoregressive.Autoregressive(
-        self._normal_fn(affine), sample0, validate_args=True)
+        self._normal_fn(ar_matrix), sample0, validate_args=True)
     ar_flow = masked_autoregressive.MaskedAutoregressiveFlow(
         is_constant_jacobian=True,
-        shift_and_log_scale_fn=lambda x: [None, affine.forward(x)],
+        shift_and_log_scale_fn=lambda x: [None, tf.linalg.matvec(ar_matrix, x)],
         validate_args=True)
     td = transformed_distribution.TransformedDistribution(
         # TODO(b/137665504): Use batch-adding meta-distribution to set the batch

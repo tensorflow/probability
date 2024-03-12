@@ -2568,7 +2568,6 @@ multi_substrate_py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:masked_autoregressive",
-        "//tensorflow_probability/python/bijectors:scale_matvec_tril",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math:linalg",
