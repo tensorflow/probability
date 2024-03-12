@@ -83,7 +83,9 @@ def _validate_tf_environment(package):
             'installed by default when you install TensorFlow Probability. '
             'This is so that JAX-only users do not have to install TensorFlow '
             'or TF-Keras. To use TensorFlow Probability with TensorFlow, '
-            'please install the tf-keras or tf-keras-nightly package.\n\n')
+            'please install the tf-keras or tf-keras-nightly package.\n'
+            'This can be be done through installing the '
+            'tensorflow-probability[tf] extra.\n\n')
       raise
 
 
