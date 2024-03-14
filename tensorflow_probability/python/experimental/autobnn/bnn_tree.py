@@ -27,16 +27,15 @@ from tensorflow_probability.python.experimental.autobnn import util
 Array = jnp.ndarray
 
 
-LEAVES = [
+NON_PERIODIC_KERNELS = [
     kernels.ExponentiatedQuadraticBNN,
-    kernels.MaternBNN,
-    kernels.ExponentialBNN,
     kernels.LinearBNN,
     kernels.QuadraticBNN,
-    kernels.PeriodicBNN,
-    kernels.OneLayerBNN,
+    # Don't use Matern, Exponential or OneLayer BNN's in the leaves because
+    # they all give very similar predictions to ExponentiatedQuadratic.
 ]
 
+LEAVES = NON_PERIODIC_KERNELS + [kernels.PeriodicBNN]
 
 OPERATORS = [
     operators.Multiply,
@@ -44,16 +43,6 @@ OPERATORS = [
     operators.WeightedSum,
     operators.ChangePoint,
     operators.LearnableChangePoint
-]
-
-
-NON_PERIODIC_KERNELS = [
-    kernels.ExponentiatedQuadraticBNN,
-    kernels.MaternBNN,
-    kernels.ExponentialBNN,
-    kernels.LinearBNN,
-    kernels.QuadraticBNN,
-    kernels.OneLayerBNN,
 ]
 
 
