@@ -52,6 +52,7 @@ from tensorflow_probability.python.distributions.gamma import Gamma
 from tensorflow_probability.python.distributions.gamma_gamma import GammaGamma
 from tensorflow_probability.python.distributions.gaussian_process import GaussianProcess
 from tensorflow_probability.python.distributions.gaussian_process_regression_model import GaussianProcessRegressionModel
+from tensorflow_probability.python.distributions.generalized_gamma import GeneralizedGamma
 from tensorflow_probability.python.distributions.generalized_normal import GeneralizedNormal
 from tensorflow_probability.python.distributions.generalized_pareto import GeneralizedPareto
 from tensorflow_probability.python.distributions.geometric import Geometric
@@ -205,6 +206,7 @@ __all__ = [
     'GaussianProcess',
     'GaussianProcessRegressionModel',
     'GeneralizedExtremeValue',
+    'GeneralizedGamma',
     'GeneralizedNormal',
     'GeneralizedPareto',
     'Geometric',
