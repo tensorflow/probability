@@ -211,7 +211,8 @@ def _plot_loss_fn(losses, ax=None, log_scale=True) -> plt.Figure:
 
 def make_predictions(params, net: bnn.BNN, x_test: jax.Array) -> jax.Array:
   """Use a (batch of) parameters to make a prediction on x_test data."""
-  return jax.vmap(lambda p: net.apply(p, x_test))(params)
+  f = jax.jit(lambda p: net.apply(p, x_test))
+  return jax.vmap(f)(params)
 
 
 def make_results_dataframe(
