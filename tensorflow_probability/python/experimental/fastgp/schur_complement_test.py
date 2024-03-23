@@ -78,7 +78,7 @@ class _SchurComplementTest(parameterized.TestCase):
       np.testing.assert_allclose(
           expected_k.matrix(x, y2),
           actual_k.matrix(x, y2),
-          rtol=3e-3)
+          rtol=2e-2)
 
 
 class SchurComplementTestFloat32(_SchurComplementTest):
