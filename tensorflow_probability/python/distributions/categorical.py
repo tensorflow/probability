@@ -30,6 +30,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math.generic import reduce_weighted_logsumexp
 
 
 def _broadcast_cat_event_and_params(event, params, base_dtype):
@@ -333,6 +334,14 @@ class Categorical(
         _mul_exp(log_probs, log_probs),
         axis=-1)
 
+  def _mean(self):
+    logits = self.logits_parameter()
+    return tf.math.exp(
+      reduce_weighted_logsumexp(
+        logits,
+        w=tf.range(self._num_categories(logits), dtype=logits.dtype),
+        axis=-1))
+  
   def _mode(self):
     x = self._probs if self._logits is None else self._logits
     mode = tf.cast(tf.argmax(x, axis=-1), self.dtype)
