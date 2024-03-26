@@ -54,7 +54,7 @@ landing_page:
       path: https://tensorflow.org/probability/oryx/notebooks/probabilistic_programming
     - heading: "Oryx on GitHub"
       image_path: /resources/images/github-card-16x9.png
-      path: https://github.com/tensorflow/probability/tree/main/spinoffs/oryx
+      path: https://github.com/jax-ml/oryx
       buttons:
       - label: View on GitHub
         path: https://github.com/tensorflow/probability
