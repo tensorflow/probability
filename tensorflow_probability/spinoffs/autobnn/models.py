@@ -22,11 +22,11 @@ linear components.
 import functools
 from typing import Sequence, Union
 import jax.numpy as jnp
-from tensorflow_probability.python.experimental.autobnn import bnn
-from tensorflow_probability.python.experimental.autobnn import bnn_tree
-from tensorflow_probability.python.experimental.autobnn import kernels
-from tensorflow_probability.python.experimental.autobnn import likelihoods
-from tensorflow_probability.python.experimental.autobnn import operators
+from tensorflow_probability.spinoffs.autobnn import bnn
+from tensorflow_probability.spinoffs.autobnn import bnn_tree
+from tensorflow_probability.spinoffs.autobnn import kernels
+from tensorflow_probability.spinoffs.autobnn import likelihoods
+from tensorflow_probability.spinoffs.autobnn import operators
 
 
 Array = jnp.ndarray

@@ -14,16 +14,16 @@
 # ============================================================================
 """Package for training GP-like Bayesian Neural Nets w/ composite structure."""
 
-from tensorflow_probability.python.experimental.autobnn import bnn
-from tensorflow_probability.python.experimental.autobnn import bnn_tree
-from tensorflow_probability.python.experimental.autobnn import estimators
-from tensorflow_probability.python.experimental.autobnn import kernels
-from tensorflow_probability.python.experimental.autobnn import likelihoods
-from tensorflow_probability.python.experimental.autobnn import models
-from tensorflow_probability.python.experimental.autobnn import operators
-from tensorflow_probability.python.experimental.autobnn import training_util
-from tensorflow_probability.python.experimental.autobnn import util
 from tensorflow_probability.python.internal import all_util
+from tensorflow_probability.spinoffs.autobnn import bnn
+from tensorflow_probability.spinoffs.autobnn import bnn_tree
+from tensorflow_probability.spinoffs.autobnn import estimators
+from tensorflow_probability.spinoffs.autobnn import kernels
+from tensorflow_probability.spinoffs.autobnn import likelihoods
+from tensorflow_probability.spinoffs.autobnn import models
+from tensorflow_probability.spinoffs.autobnn import operators
+from tensorflow_probability.spinoffs.autobnn import training_util
+from tensorflow_probability.spinoffs.autobnn import util
 
 _allowed_symbols = [
     'bnn',

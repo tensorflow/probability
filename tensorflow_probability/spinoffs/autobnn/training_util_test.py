@@ -18,11 +18,11 @@ import chex
 import jax
 import jax.numpy as jnp
 import numpy as np
-from tensorflow_probability.python.experimental.autobnn import kernels
-from tensorflow_probability.python.experimental.autobnn import operators
-from tensorflow_probability.python.experimental.autobnn import training_util
-from tensorflow_probability.python.experimental.autobnn import util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.spinoffs.autobnn import kernels
+from tensorflow_probability.spinoffs.autobnn import operators
+from tensorflow_probability.spinoffs.autobnn import training_util
+from tensorflow_probability.spinoffs.autobnn import util
 
 
 class TrainingUtilTest(test_util.TestCase):

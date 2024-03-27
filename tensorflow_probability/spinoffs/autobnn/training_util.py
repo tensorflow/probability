@@ -23,9 +23,9 @@ from jaxtyping import PyTree  # pylint: disable=g-importing-member
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from tensorflow_probability.python.experimental.autobnn import bnn
-from tensorflow_probability.python.experimental.autobnn import util
 from tensorflow_probability.python.experimental.timeseries import metrics
+from tensorflow_probability.spinoffs.autobnn import bnn
+from tensorflow_probability.spinoffs.autobnn import util
 
 
 def _make_bayeux_model(

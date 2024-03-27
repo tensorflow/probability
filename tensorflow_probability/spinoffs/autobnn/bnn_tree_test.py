@@ -18,8 +18,8 @@ from absl.testing import parameterized
 from flax import linen as nn
 import jax
 import jax.numpy as jnp
-from tensorflow_probability.python.experimental.autobnn import bnn_tree
-from tensorflow_probability.python.experimental.autobnn import kernels
+from tensorflow_probability.spinoffs.autobnn import bnn_tree
+from tensorflow_probability.spinoffs.autobnn import kernels
 from absl.testing import absltest
 
 

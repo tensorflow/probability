@@ -16,7 +16,7 @@
 
 from absl.testing import parameterized
 import jax.numpy as jnp
-from tensorflow_probability.python.experimental.autobnn import likelihoods
+from tensorflow_probability.spinoffs.autobnn import likelihoods
 from absl.testing import absltest
 
 

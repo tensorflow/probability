@@ -19,8 +19,8 @@ from typing import Optional
 from flax import linen as nn
 import jax
 import jax.numpy as jnp
-from tensorflow_probability.python.experimental.autobnn import bnn
-from tensorflow_probability.python.experimental.autobnn import likelihoods
+from tensorflow_probability.spinoffs.autobnn import bnn
+from tensorflow_probability.spinoffs.autobnn import likelihoods
 from tensorflow_probability.substrates.jax.bijectors import chain as chain_lib
 from tensorflow_probability.substrates.jax.bijectors import scale as scale_lib
 from tensorflow_probability.substrates.jax.bijectors import shift as shift_lib

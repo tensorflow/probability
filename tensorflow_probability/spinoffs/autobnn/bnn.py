@@ -21,7 +21,7 @@ from flax import linen as nn
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, PyTree  # pylint: disable=g-importing-member,g-multiple-import
-from tensorflow_probability.python.experimental.autobnn import likelihoods
+from tensorflow_probability.spinoffs.autobnn import likelihoods
 from tensorflow_probability.substrates.jax.distributions import distribution as distribution_lib
 
 

@@ -19,7 +19,7 @@ from typing import Any, Callable, List, Tuple
 import jax
 import jax.numpy as jnp
 import scipy
-from tensorflow_probability.python.experimental.autobnn import bnn
+from tensorflow_probability.spinoffs.autobnn import bnn
 from tensorflow_probability.substrates.jax.distributions import distribution as distribution_lib
 
 

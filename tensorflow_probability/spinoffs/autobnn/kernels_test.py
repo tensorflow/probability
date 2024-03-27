@@ -18,8 +18,8 @@ from absl.testing import parameterized
 import jax
 import jax.numpy as jnp
 import numpy as np
-from tensorflow_probability.python.experimental.autobnn import kernels
-from tensorflow_probability.python.experimental.autobnn import util
+from tensorflow_probability.spinoffs.autobnn import kernels
+from tensorflow_probability.spinoffs.autobnn import util
 from tensorflow_probability.substrates.jax.distributions import lognormal as lognormal_lib
 
 from absl.testing import absltest

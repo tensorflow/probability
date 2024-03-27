@@ -250,14 +250,14 @@ py_library(
     name = "training_util",
     srcs = ["training_util.py"],
     deps = [
+        ":bnn",
+        ":util",
         # bayeux dep,
         # jax dep,
         # jaxtyping dep,
         # matplotlib dep,
         # numpy dep,
         # pandas dep,
-        "//tensorflow_probability/python/experimental/autobnn:bnn",
-        "//tensorflow_probability/python/experimental/autobnn:util",
         "//tensorflow_probability/python/experimental/timeseries:metrics",
     ],
 )
@@ -268,14 +268,14 @@ py_test(
     # TODO(b/322864412): enable this test in OSS.
     tags = ["no-oss-ci"],
     deps = [
+        ":kernels",
+        ":operators",
         ":training_util",
+        ":util",
         # chex dep,
         # google/protobuf:use_fast_cpp_protos dep,
         # jax dep,
         # numpy dep,
-        "//tensorflow_probability/python/experimental/autobnn:kernels",
-        "//tensorflow_probability/python/experimental/autobnn:operators",
-        "//tensorflow_probability/python/experimental/autobnn:util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
