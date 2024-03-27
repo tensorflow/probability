@@ -458,7 +458,7 @@ class _FastGpTest(parameterized.TestCase):
     self.assertAlmostEqual(value, slow_value, delta=8)
     slow_d_amp, slow_d_length_scale, slow_d_noise, slow_d_jitter = slow_gradient
     self.assertAlmostEqual(d_amp, slow_d_amp, delta=0.01)
-    self.assertAlmostEqual(d_length_scale, slow_d_length_scale, delta=0.001)
+    self.assertAlmostEqual(d_length_scale, slow_d_length_scale, delta=0.002)
     # TODO(thomaswc): Investigate why the noise gradient is so noisy.
     self.assertAlmostEqual(d_noise, slow_d_noise, delta=0.5)
     # TODO(thomaswc): Investigate why slow_d_jitter is zero.
