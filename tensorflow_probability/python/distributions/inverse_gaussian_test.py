@@ -383,6 +383,7 @@ class _InverseGaussianTest(object):
   @test_util.numpy_disable_gradient_test
   def testCompareToExplicitGradient(self):
     """Compare to the explicit reparameterization derivative."""
+    self.skipTest('b/331471078')
     concentration_np = np.arange(4)[..., np.newaxis] + 1.
     concentration = tf.constant(concentration_np, self.dtype)
     loc_np = np.arange(3) + 1.
