@@ -15,10 +15,10 @@
 # Description:
 #   A package for target densities.
 
-# Placeholder: py_library
-# Placeholder: py_test
 # [internal] load pytype.bzl (pytype_strict_library)
 # [internal] load strict.bzl
+# Placeholder: py_library
+# Placeholder: py_test
 
 package(
     # default_applicable_licenses
