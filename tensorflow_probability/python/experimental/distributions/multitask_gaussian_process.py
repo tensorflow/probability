@@ -101,7 +101,9 @@ def _compute_flattened_scale(
   observation_noise_variance = tf.convert_to_tensor(observation_noise_variance)
 
   # We can add the observation noise to each block.
-  if isinstance(kernel, multitask_kernel.Independent):
+  # Check if the kernel is tfpke.Independent-like.
+  if (isinstance(kernel_matrix, tf.linalg.LinearOperatorKronecker) and
+      isinstance(kernel_matrix.operators[1], tf.linalg.LinearOperatorIdentity)):
     # The Independent kernel matrix is realized as a kronecker product of the
     # kernel over inputs, and an identity matrix per task (representing
     # independent tasks). Update the diagonal of the first matrix and take the
@@ -123,7 +125,8 @@ def _compute_flattened_scale(
         operators=[base_kernel_matrix] + kernel_matrix.operators[1:])
     return cholesky_util.cholesky_from_fn(kernel_matrix, cholesky_fn)
 
-  if isinstance(kernel, multitask_kernel.Separable):
+  # Check if the kernel is tfpke.Separable-like.
+  if isinstance(kernel_matrix, tf.linalg.LinearOperatorKronecker):
     # When `kernel_matrix` is a kronecker product, we can compute
     # an eigenvalue decomposition to get a matrix square-root, which will
     # be faster than densifying the kronecker product.

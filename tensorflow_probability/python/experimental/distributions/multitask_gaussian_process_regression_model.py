@@ -174,14 +174,18 @@ def _scale_from_precomputed(precomputed_cholesky, kernel):
       f'Unexpected value for `precompute_cholesky`: {precomputed_cholesky}.')
 
 
-def _precomputed_from_scale(observation_scale, kernel):
+def _precomputed_from_scale(observation_scale):
   """Extracts expensive precomputed values."""
+  # TODO(b/331842377): Remove these checks and just store `observation_scale`
+  # when TFP objects are fully-functional JAX pytrees.
   if isinstance(observation_scale, tf.linalg.LinearOperatorLowerTriangular):
     return {'tril': {'chol_tril': observation_scale.tril}}
-  if isinstance(kernel, multitask_kernel.Independent):
+  # Check tfpke.Independent-like.
+  if (isinstance(observation_scale, tf.linalg.LinearOperatorKronecker)):
     base_kernel_chol_op = observation_scale.operators[0]
     return {'independent': {'chol_tril': base_kernel_chol_op.tril}}
-  if isinstance(kernel, multitask_kernel.Separable):
+  # Check tfpke.Separable-like.
+  if isinstance(observation_scale, tf.linalg.LinearOperatorComposition):
     kronecker_op, diag_op = observation_scale.operators
     kronecker_orths = [
         {'identity': k.domain_dimension_tensor()}
@@ -190,7 +194,7 @@ def _precomputed_from_scale(observation_scale, kernel):
     return {'separable': {'kronecker_orths': kronecker_orths,
                           'diag': diag_op.diag}}
   # This should not happen.
-  raise ValueError('Unexpected values for kernel and observation_scale.')
+  raise ValueError('Unexpected value for observation_scale.')
 
 
 class MultiTaskGaussianProcessRegressionModel(
@@ -685,7 +689,7 @@ class MultiTaskGaussianProcessRegressionModel(
 
       # pylint: disable=protected-access
       mtgprm._precomputed_divisor_matrix_cholesky = (
-          _precomputed_from_scale(observation_scale, kernel))
+          _precomputed_from_scale(observation_scale))
       mtgprm._precomputed_solve_on_observation = solve_on_observations
       # pylint: enable=protected-access
 
