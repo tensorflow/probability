@@ -46,10 +46,13 @@ setup(
         'bayeux-ml',
         'chex',
         'flax',
+        'jax',
         'jaxtyping',
         'matplotlib',
+        'numpy',
         'pandas',
         'scipy',
+        'tensorflow-probability'
         ],
     # Add in any packaged data.
     exclude_package_data={'': ['BUILD']},
