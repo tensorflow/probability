@@ -118,7 +118,7 @@ py_test(
         ":estimators",
         ":kernels",
         ":operators",
-        # tensorflow_probability/python/internal:test_util dep,
+        # absl/testing:absltest dep,
     ],
 )
 
@@ -271,11 +271,11 @@ py_test(
         ":operators",
         ":training_util",
         ":util",
+        # absl/testing:absltest dep,
         # chex dep,
         # google/protobuf:use_fast_cpp_protos dep,
         # jax dep,
         # numpy dep,
-        # tensorflow_probability/python/internal:test_util dep,
     ],
 )
 
@@ -300,6 +300,6 @@ py_test(
         # google/protobuf:use_fast_cpp_protos dep,
         # jax dep,
         # numpy dep,
-        # tensorflow_probability/python/internal:test_util dep,
+        # tensorflow_probability/python/internal:test_util.jax dep,
     ],
 )

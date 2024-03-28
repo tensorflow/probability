@@ -18,14 +18,15 @@ import chex
 import jax
 import jax.numpy as jnp
 import numpy as np
-from tensorflow_probability.python.internal import test_util
 from autobnn import kernels
 from autobnn import operators
 from autobnn import training_util
 from autobnn import util
 
+from absl.testing import absltest
 
-class TrainingUtilTest(test_util.TestCase):
+
+class TrainingUtilTest(absltest.TestCase):
 
   def test__filter_stuck_chains_doesnt_overfilter(self):
     noise_scale = 0.001 * np.random.randn(64, 100, 1)
@@ -210,4 +211,4 @@ class TrainingUtilTest(test_util.TestCase):
 
 
 if __name__ == '__main__':
-  test_util.main()
+  absltest.main()

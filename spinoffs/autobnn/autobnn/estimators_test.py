@@ -16,14 +16,15 @@
 
 import jax
 import numpy as np
-from tensorflow_probability.python.internal import test_util
 from autobnn import estimators
 from autobnn import kernels
 from autobnn import operators
 from autobnn import util
 
+from absl.testing import absltest
 
-class AutoBNNTest(test_util.TestCase):
+
+class AutoBNNTest(absltest.TestCase):
 
   def test_train_map(self):
     seed = jax.random.PRNGKey(20231018)
@@ -114,7 +115,7 @@ class AutoBNNTest(test_util.TestCase):
     autobnn.fit(x_train, y_train)
     summary_lines = autobnn.summary().split('\n')
 
-    self.assertEqual(len(summary_lines), 8, f'Unexpected {len(summary_lines)=}')
+    self.assertLen(summary_lines, 8, f'Unexpected {len(summary_lines)=}')
 
     for line in summary_lines:
       self.assertRegex(
@@ -126,4 +127,4 @@ class AutoBNNTest(test_util.TestCase):
 
 
 if __name__ == '__main__':
-  test_util.main()
+  absltest.main()

@@ -17,9 +17,9 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
-from tensorflow_probability.python.internal import test_util
 from autobnn import kernels
 from autobnn import util
+from tensorflow_probability.substrates.jax.internal import test_util
 
 
 class UtilTest(test_util.TestCase):
@@ -58,14 +58,19 @@ class UtilTest(test_util.TestCase):
     p = bnn.init(seed, jnp.ones((1, 10), dtype=jnp.float32))
 
     # Softplus(low=0.2) bijector
-    self.assertEqual(0.2 + jax.nn.softplus(p['params']['noise_scale']),
-                     transform(p)['params']['noise_scale'])
-    self.assertEqual(jnp.exp(p['params']['amplitude']),
-                     transform(p)['params']['amplitude'])
+    self.assertEqual(
+        0.2 + jax.nn.softplus(p['params']['noise_scale']),
+        transform(p)['params']['noise_scale'],
+    )
+    self.assertEqual(
+        jnp.exp(p['params']['amplitude']), transform(p)['params']['amplitude']
+    )
 
     # Identity bijector
-    self.assertAllEqual(p['params']['dense2']['kernel'],
-                        transform(p)['params']['dense2']['kernel'])
+    self.assertAllEqual(
+        p['params']['dense2']['kernel'],
+        transform(p)['params']['dense2']['kernel'],
+    )
 
 
 if __name__ == '__main__':
