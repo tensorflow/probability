@@ -19,10 +19,10 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.spinoffs.autobnn import kernels
-from tensorflow_probability.spinoffs.autobnn import operators
-from tensorflow_probability.spinoffs.autobnn import training_util
-from tensorflow_probability.spinoffs.autobnn import util
+from autobnn import kernels
+from autobnn import operators
+from autobnn import training_util
+from autobnn import util
 
 
 class TrainingUtilTest(test_util.TestCase):

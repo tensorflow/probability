@@ -14,18 +14,17 @@
 # ============================================================================
 """Package for training GP-like Bayesian Neural Nets w/ composite structure."""
 
-from tensorflow_probability.python.internal import all_util
-from tensorflow_probability.spinoffs.autobnn import bnn
-from tensorflow_probability.spinoffs.autobnn import bnn_tree
-from tensorflow_probability.spinoffs.autobnn import estimators
-from tensorflow_probability.spinoffs.autobnn import kernels
-from tensorflow_probability.spinoffs.autobnn import likelihoods
-from tensorflow_probability.spinoffs.autobnn import models
-from tensorflow_probability.spinoffs.autobnn import operators
-from tensorflow_probability.spinoffs.autobnn import training_util
-from tensorflow_probability.spinoffs.autobnn import util
+from autobnn import bnn
+from autobnn import bnn_tree
+from autobnn import estimators
+from autobnn import kernels
+from autobnn import likelihoods
+from autobnn import models
+from autobnn import operators
+from autobnn import training_util
+from autobnn import util
 
-_allowed_symbols = [
+__all__ = [
     'bnn',
     'bnn_tree',
     'estimators',
@@ -36,5 +35,3 @@ _allowed_symbols = [
     'training_util',
     'util',
 ]
-
-all_util.remove_undocumented(__name__, _allowed_symbols)

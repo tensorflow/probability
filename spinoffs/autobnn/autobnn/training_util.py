@@ -23,9 +23,75 @@ from jaxtyping import PyTree  # pylint: disable=g-importing-member
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from tensorflow_probability.python.experimental.timeseries import metrics
-from tensorflow_probability.spinoffs.autobnn import bnn
-from tensorflow_probability.spinoffs.autobnn import util
+from autobnn import bnn
+from autobnn import util
+
+
+def smape(y, yhat):
+  """Return the symmetric mean absolute percentage error.
+
+  Args:
+    y: An array containing the true values.
+    yhat: An array containing the predicted values.
+
+  Returns:
+    The scalar SMAPE.
+  """
+  # https://en.wikipedia.org/wiki/Symmetric_mean_absolute_percentage_error
+  assert len(yhat) == len(y)
+  h = len(y)
+  errors = np.abs(y - yhat) / (np.abs(y) + np.abs(yhat)) * 100
+  return 2/h * np.sum(errors)
+
+
+def mase(y, yhat, y_obs, m):
+  """Return the mean absolute scaled error.
+
+  Args:
+      y: An array containing the true values.
+      yhat: An array containing the predicted values.
+      y_obs: An array containing the training values.
+      m: The season length.
+
+  Returns:
+    The scalar MASE.
+  """
+  # https://en.wikipedia.org/wiki/Mean_absolute_scaled_error
+  assert len(yhat) == len(y)
+  n = len(y_obs)
+  h = len(y)
+  assert 0 < m < len(y_obs)
+  numer = np.sum(np.abs(y - yhat))
+  denom = np.sum(np.abs(y_obs[m:] - y_obs[:-m])) / (n - m)
+  return (1 / h) * (numer / denom)
+
+
+def msis(y, yhat_lower, yhat_upper, y_obs, m, a=0.05):
+  """Return the mean scaled interval score.
+
+  Args:
+    y: An array containing the true values.
+    yhat_lower: An array containing the a% quantile of the predicted
+      distribution.
+    yhat_upper: An array containing the (1-a)% quantile of the
+      predicted distribution.
+    y_obs: An array containing the training values.
+    m: The season length.
+    a: A scalar in [0, 1] specifying the quantile window to evaluate.
+
+  Returns:
+    The scalar MSIS.
+  """
+  # https://www.uber.com/blog/m4-forecasting-competition/
+  assert len(y) == len(yhat_lower) == len(yhat_upper)
+  n = len(y_obs)
+  h = len(y)
+  numer = np.sum(
+      (yhat_upper - yhat_lower)
+      + (2 / a) * (yhat_lower - y) * (y < yhat_lower)
+      + (2 / a) * (y - yhat_upper) * (yhat_upper < y))
+  denom = np.sum(np.abs(y_obs[m:] - y_obs[:-m])) / (n - m)
+  return (1 / h) * (numer / denom)
 
 
 def _make_bayeux_model(
@@ -247,12 +313,12 @@ def make_results_dataframe(
   # 'm3': [smape, mase, msis],
   # 'traffic': [wmppl, wmape],
   # 'm5': [wrmsse, wspl]
-  smapes = np.array([metrics.smape(y_test[:i], predictions[:i])
+  smapes = np.array([smape(y_test[:i], predictions[:i])
                      for i in range(1, n_test+1)])
-  mases = np.array([metrics.mase(y_test[:i], predictions[:i], y_train, 12)
+  mases = np.array([mase(y_test[:i], predictions[:i], y_train, 12)
                     for i in range(1, n_test+1)])
   msises = np.array(
-      [metrics.msis(y_test[:i], p2_5[:i], p97_5[:i], y_train, 12)
+      [msis(y_test[:i], p2_5[:i], p97_5[:i], y_train, 12)
        for i in range(1, n_test + 1)])
   return pd.DataFrame(
       data=np.array([predictions, p2_5, p90, p97_5,

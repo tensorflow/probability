@@ -19,9 +19,9 @@ import bayeux as bx
 import jax
 import jax.numpy as jnp
 import numpy as np
-from tensorflow_probability.spinoffs.autobnn import kernels
-from tensorflow_probability.spinoffs.autobnn import operators
-from tensorflow_probability.spinoffs.autobnn import util
+from autobnn import kernels
+from autobnn import operators
+from autobnn import util
 from tensorflow_probability.substrates.jax.distributions import distribution as distribution_lib
 from absl.testing import absltest
 

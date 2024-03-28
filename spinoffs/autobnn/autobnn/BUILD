@@ -37,7 +37,7 @@ py_library(
         ":operators",
         ":training_util",
         ":util",
-        "//tensorflow_probability/python/internal:all_util",
+        # tensorflow_probability/python/internal:all_util dep,
     ],
 )
 
@@ -49,7 +49,7 @@ py_library(
         # flax:core dep,
         # jax dep,
         # jaxtyping dep,
-        "//tensorflow_probability/python/distributions:distribution.jax",
+        # tensorflow_probability/python/distributions:distribution.jax dep,
     ],
 )
 
@@ -62,8 +62,8 @@ py_test(
         # google/protobuf:use_fast_cpp_protos dep,
         # jax dep,
         "//tensorflow_probability:jax",
-        "//tensorflow_probability/python/distributions:lognormal.jax",
-        "//tensorflow_probability/python/distributions:normal.jax",
+        # tensorflow_probability/python/distributions:lognormal.jax dep,
+        # tensorflow_probability/python/distributions:normal.jax dep,
     ],
 )
 
@@ -118,7 +118,7 @@ py_test(
         ":estimators",
         ":kernels",
         ":operators",
-        "//tensorflow_probability/python/internal:test_util",
+        # tensorflow_probability/python/internal:test_util dep,
     ],
 )
 
@@ -130,10 +130,10 @@ py_library(
         # flax dep,
         # flax:core dep,
         # jax dep,
-        "//tensorflow_probability/python/distributions:lognormal.jax",
-        "//tensorflow_probability/python/distributions:normal.jax",
-        "//tensorflow_probability/python/distributions:student_t.jax",
-        "//tensorflow_probability/python/distributions:uniform.jax",
+        # tensorflow_probability/python/distributions:lognormal.jax dep,
+        # tensorflow_probability/python/distributions:normal.jax dep,
+        # tensorflow_probability/python/distributions:student_t.jax dep,
+        # tensorflow_probability/python/distributions:uniform.jax dep,
     ],
 )
 
@@ -147,7 +147,7 @@ py_test(
         # absl/testing:parameterized dep,
         # google/protobuf:use_fast_cpp_protos dep,
         # jax dep,
-        "//tensorflow_probability/python/distributions:lognormal.jax",
+        # tensorflow_probability/python/distributions:lognormal.jax dep,
     ],
 )
 
@@ -158,14 +158,14 @@ py_library(
         # flax:core dep,
         # jax dep,
         # jaxtyping dep,
-        "//tensorflow_probability/python/bijectors:softplus.jax",
-        "//tensorflow_probability/python/distributions:distribution.jax",
-        "//tensorflow_probability/python/distributions:inflated.jax",
-        "//tensorflow_probability/python/distributions:logistic.jax",
-        "//tensorflow_probability/python/distributions:lognormal.jax",
-        "//tensorflow_probability/python/distributions:negative_binomial.jax",
-        "//tensorflow_probability/python/distributions:normal.jax",
-        "//tensorflow_probability/python/distributions:transformed_distribution.jax",
+        # tensorflow_probability/python/bijectors:softplus.jax dep,
+        # tensorflow_probability/python/distributions:distribution.jax dep,
+        # tensorflow_probability/python/distributions:inflated.jax dep,
+        # tensorflow_probability/python/distributions:logistic.jax dep,
+        # tensorflow_probability/python/distributions:lognormal.jax dep,
+        # tensorflow_probability/python/distributions:negative_binomial.jax dep,
+        # tensorflow_probability/python/distributions:normal.jax dep,
+        # tensorflow_probability/python/distributions:transformed_distribution.jax dep,
     ],
 )
 
@@ -216,14 +216,14 @@ py_library(
         ":likelihoods",
         # flax:core dep,
         # jax dep,
-        "//tensorflow_probability/python/bijectors:chain.jax",
-        "//tensorflow_probability/python/bijectors:scale.jax",
-        "//tensorflow_probability/python/bijectors:shift.jax",
-        "//tensorflow_probability/python/distributions:beta.jax",
-        "//tensorflow_probability/python/distributions:dirichlet.jax",
-        "//tensorflow_probability/python/distributions:half_normal.jax",
-        "//tensorflow_probability/python/distributions:normal.jax",
-        "//tensorflow_probability/python/distributions:transformed_distribution.jax",
+        # tensorflow_probability/python/bijectors:chain.jax dep,
+        # tensorflow_probability/python/bijectors:scale.jax dep,
+        # tensorflow_probability/python/bijectors:shift.jax dep,
+        # tensorflow_probability/python/distributions:beta.jax dep,
+        # tensorflow_probability/python/distributions:dirichlet.jax dep,
+        # tensorflow_probability/python/distributions:half_normal.jax dep,
+        # tensorflow_probability/python/distributions:normal.jax dep,
+        # tensorflow_probability/python/distributions:transformed_distribution.jax dep,
     ],
 )
 
@@ -242,7 +242,7 @@ py_test(
         # google/protobuf:use_fast_cpp_protos dep,
         # jax dep,
         # numpy dep,
-        "//tensorflow_probability/python/distributions:distribution.jax",
+        # tensorflow_probability/python/distributions:distribution.jax dep,
     ],
 )
 
@@ -258,7 +258,6 @@ py_library(
         # matplotlib dep,
         # numpy dep,
         # pandas dep,
-        "//tensorflow_probability/python/experimental/timeseries:metrics",
     ],
 )
 
@@ -276,7 +275,7 @@ py_test(
         # google/protobuf:use_fast_cpp_protos dep,
         # jax dep,
         # numpy dep,
-        "//tensorflow_probability/python/internal:test_util",
+        # tensorflow_probability/python/internal:test_util dep,
     ],
 )
 
@@ -288,7 +287,7 @@ py_library(
         # jax dep,
         # numpy dep,
         # scipy dep,
-        "//tensorflow_probability/python/distributions:distribution.jax",
+        # tensorflow_probability/python/distributions:distribution.jax dep,
     ],
 )
 
@@ -301,6 +300,6 @@ py_test(
         # google/protobuf:use_fast_cpp_protos dep,
         # jax dep,
         # numpy dep,
-        "//tensorflow_probability/python/internal:test_util",
+        # tensorflow_probability/python/internal:test_util dep,
     ],
 )

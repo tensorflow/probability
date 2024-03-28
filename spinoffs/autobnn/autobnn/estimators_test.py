@@ -17,10 +17,10 @@
 import jax
 import numpy as np
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.spinoffs.autobnn import estimators
-from tensorflow_probability.spinoffs.autobnn import kernels
-from tensorflow_probability.spinoffs.autobnn import operators
-from tensorflow_probability.spinoffs.autobnn import util
+from autobnn import estimators
+from autobnn import kernels
+from autobnn import operators
+from autobnn import util
 
 
 class AutoBNNTest(test_util.TestCase):

@@ -17,7 +17,7 @@
 from flax import linen as nn
 import jax
 import jax.numpy as jnp
-from tensorflow_probability.spinoffs.autobnn import bnn
+from autobnn import bnn
 from tensorflow_probability.substrates.jax.distributions import lognormal as lognormal_lib
 from tensorflow_probability.substrates.jax.distributions import normal as normal_lib
 from absl.testing import absltest

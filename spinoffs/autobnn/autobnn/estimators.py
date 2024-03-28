@@ -19,10 +19,10 @@ from typing import Any, Mapping, Optional, Sequence, Union
 import jax
 import jax.numpy as jnp
 from jaxtyping import ArrayLike, PyTree  # pylint: disable=g-importing-member,g-multiple-import
-from tensorflow_probability.spinoffs.autobnn import bnn
-from tensorflow_probability.spinoffs.autobnn import likelihoods
-from tensorflow_probability.spinoffs.autobnn import models
-from tensorflow_probability.spinoffs.autobnn import training_util
+from autobnn import bnn
+from autobnn import likelihoods
+from autobnn import models
+from autobnn import training_util
 
 
 class _AutoBnnEstimator:
