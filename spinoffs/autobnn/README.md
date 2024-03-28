@@ -18,8 +18,13 @@ Vikash K. Mansinghka.  _Sequential Monte Carlo Learning for Time Series
 Structure Discovery_. ICML 2023.
 
 
-## Setup
+## Installation
 
-AutoBNN has three additional dependencies beyond those used by the core
-Tensorflow Probability package:  flax, scipy and jaxtyping.  These
-can be installed by running `setup_autobnn.sh`.
+AutoBNN can be installed with pip
+
+```
+pip install autobnn
+```
+
+or it can be installed by source by following [these instructions]
+(https://github.com/tensorflow/probability?tab=readme-ov-file#installing-from-source).
