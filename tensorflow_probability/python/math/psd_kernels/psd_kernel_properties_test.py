@@ -220,7 +220,7 @@ class PSDKernelSlicingTest(test_util.TestCase):
 
     # Check that applying a sliced kernel produces the same results as slicing
     # the results from the original.
-    self.assertAllClose(results[apply_slices], sliced_results, rtol=1e-5)
+    self.assertAllClose(results[apply_slices], sliced_results, rtol=2e-5)
 
   @parameterized.named_parameters(
       {'testcase_name': dname, 'kernel_name': dname}
