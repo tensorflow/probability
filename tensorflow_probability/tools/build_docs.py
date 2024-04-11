@@ -46,7 +46,12 @@ flags.DEFINE_string("site_path", "probability/api_docs/python",
 
 FLAGS = flags.FLAGS
 
-DO_NOT_GENERATE_DOCS_FOR = []
+DO_NOT_GENERATE_DOCS_FOR = [
+    tfp.experimental.substrates.jax.tf2jax,
+    tfp.experimental.substrates.jax.experimental,
+    tfp.experimental.substrates.numpy.tf2numpy,
+    tfp.experimental.substrates.numpy.experimental,
+]
 
 
 def internal_filter(path, parent, children):

@@ -19,9 +19,6 @@ import importlib
 import types
 
 
-__all__ = ['LazyLoader']
-
-
 class LazyLoader(types.ModuleType):
   """Lazily import a module to avoid pulling in large deps, defer checks."""
 

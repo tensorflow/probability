@@ -41,7 +41,6 @@ py_library(
         "//tensorflow_probability/python/glm",
         "//tensorflow_probability/python/internal",
         "//tensorflow_probability/python/internal:all_util",
-        "//tensorflow_probability/python/internal:lazy_loader",
         "//tensorflow_probability/python/layers",
         "//tensorflow_probability/python/math",
         "//tensorflow_probability/python/mcmc",

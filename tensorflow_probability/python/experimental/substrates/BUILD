@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2019 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,13 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-sh_binary(
-    name = "pip_pkg",
-    srcs = ["pip_pkg.sh"],
-    data = [
-        "README.md",
-        "required_packages.py",
-        "setup.py",
-        "//tensorflow_probability",
+# Description:
+#   API-unstable code that is part of the TFP package.
+
+# Placeholder: py_library
+
+package(
+    # default_applicable_licenses
+    default_visibility = [
+        "//tensorflow_probability:__subpackages__",
+    ],
+)
+
+licenses(["notice"])
+
+py_library(
+    name = "substrates",
+    srcs = ["__init__.py"],
+    deps = [
+        "//tensorflow_probability/python/internal:all_util",
+        "//tensorflow_probability/python/internal:lazy_loader",
+        "//tensorflow_probability/substrates",
     ],
 )

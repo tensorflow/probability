@@ -32,8 +32,6 @@ py_library(
     srcs = [
         "__init__.py",
     ],
-    # :substrates needs to be visible to the external :pip_pkg target.
-    visibility = ["//visibility:public"],  # EnableOnExport
     deps = [
         ":jax",
         ":numpy",

@@ -258,9 +258,6 @@ def main(argv):
   if FLAGS.numpy_to_jax:
     contents = contents.replace('tfp.substrates.numpy', 'tfp.substrates.jax')
     contents = contents.replace('substrates.numpy', 'substrates.jax')
-    contents = contents.replace(
-        'tensorflow_probability.substrates import numpy',
-        'tensorflow_probability.substrates import jax')
     contents = contents.replace('backend.numpy', 'backend.jax')
     contents = contents.replace('backend import numpy as tf',
                                 'backend import jax as tf')

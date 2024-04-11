@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2019 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,13 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-sh_binary(
-    name = "pip_pkg",
-    srcs = ["pip_pkg.sh"],
-    data = [
-        "README.md",
-        "required_packages.py",
-        "setup.py",
-        "//tensorflow_probability",
-    ],
-)
+"""TensorFlow Probability alternative substrates."""
+
+from tensorflow_probability.python.internal import all_util
+from tensorflow_probability.python.internal import lazy_loader
+
+jax = lazy_loader.LazyLoader(
+    'jax', globals(),
+    'tensorflow_probability.substrates.jax')
+numpy = lazy_loader.LazyLoader(
+    'numpy', globals(),
+    'tensorflow_probability.substrates.numpy')
+
+
+_allowed_symbols = [
+    'jax',
+    'numpy',
+]
+
+all_util.remove_undocumented(__name__, _allowed_symbols)

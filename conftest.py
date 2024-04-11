@@ -20,6 +20,7 @@ from absl import app
 collect_ignore = [
     "discussion/",
     "setup.py",
+    "tensorflow_probability/python/experimental/substrates/"
 ]
 
 
