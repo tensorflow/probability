@@ -48,6 +48,7 @@ py_library(
     srcs = ["jax/__init__.py"],
     tags = ["alt_dep=//tensorflow_probability:jax"],
     deps = [
+        # jax dep,
 #         "//tensorflow_probability/google:google.jax",  # DisableOnExport
 #         "//tensorflow_probability/google/autosts:autosts.jax",  # DisableOnExport
 #         "//tensorflow_probability/google/staging:staging.jax",  # DisableOnExport
