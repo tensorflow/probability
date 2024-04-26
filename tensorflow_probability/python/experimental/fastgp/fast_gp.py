@@ -72,7 +72,7 @@ class GaussianProcessConfig:
   probe_vector_type: str = 'rademacher'
   # The number of probe vectors to use when estimating the log det.
   num_probe_vectors: int = 35
-  # One of 'slq' (for stochastic Lancos quadrature) or
+  # One of 'slq' (for stochastic Lanczos quadrature) or
   # 'r1', 'r2', 'r3', 'r4', 'r5', or 'r6' for the rational function
   # approximation of the given order.
   log_det_algorithm: str = 'r3'

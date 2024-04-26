@@ -52,6 +52,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/experimental/bijectors",
         "//tensorflow_probability/python/experimental/distribute",
         "//tensorflow_probability/python/experimental/distributions",
+        "//tensorflow_probability/python/experimental/fastgp",
         "//tensorflow_probability/python/experimental/joint_distribution_layers",
         "//tensorflow_probability/python/experimental/linalg",
         "//tensorflow_probability/python/experimental/marginalize",
@@ -70,5 +71,6 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/experimental/vi",
         "//tensorflow_probability/python/internal:all_util",
         "//tensorflow_probability/python/internal:auto_composite_tensor",
+        "//tensorflow_probability/python/internal:lazy_loader",
     ],
 )

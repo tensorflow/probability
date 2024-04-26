@@ -18,7 +18,6 @@ import functools
 import jax
 import jax.experimental.sparse
 import jax.numpy as jnp
-from jaxtyping import Float
 import numpy as np
 from tensorflow_probability.python.experimental.fastgp import partial_lanczos
 from tensorflow_probability.python.internal.backend import jax as tf2jax
@@ -36,7 +35,7 @@ def _matvec(M, x) -> jax.Array:
 
 def largest_eigenvector(
     M: tf2jax.linalg.LinearOperator, key: jax.Array, num_iters: int = 10
-) -> tuple[Float, Array]:
+):
   """Returns the largest (eigenvalue, eigenvector) of M."""
   n = M.shape[-1]
   v = jax.random.uniform(key, shape=(n,), dtype=M.dtype)
@@ -55,7 +54,7 @@ def make_randomized_truncated_svd(
     rank: int = 20,
     oversampling: int = 10,
     num_iters: int = 4,
-) -> tuple[Float, Array]:
+):
   """Returns approximate SVD for symmetric `M`."""
   # This is based on:
   # N. Halko, P.G. Martinsson, J. A. Tropp

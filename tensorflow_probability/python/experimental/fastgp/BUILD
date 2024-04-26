@@ -62,7 +62,6 @@ py_library(
     name = "mbcg",
     srcs = ["mbcg.py"],
     deps = [
-        # jax dep,
     ],
 )
 
@@ -84,7 +83,6 @@ py_library(
         ":fast_log_det",
         ":mbcg",
         ":preconditioners",
-        # jax dep,
         "//tensorflow_probability/python/bijectors:softplus.jax",
         "//tensorflow_probability/python/distributions:distribution.jax",
         "//tensorflow_probability/python/distributions:gaussian_process_regression_model.jax",
@@ -121,7 +119,6 @@ py_library(
         ":linear_operator_sum",
         ":mbcg",
         ":preconditioners",
-        # jax dep,
         "//tensorflow_probability/python/distributions:distribution.jax",
         "//tensorflow_probability/python/distributions/internal:stochastic_process_util.jax",
         "//tensorflow_probability/python/experimental/psd_kernels:multitask_kernel.jax",
@@ -153,7 +150,6 @@ py_library(
         ":fast_gp",
         ":preconditioners",
         ":schur_complement",
-        # jax dep,
         "//tensorflow_probability/python/bijectors:softplus.jax",
         "//tensorflow_probability/python/distributions/internal:stochastic_process_util.jax",
         "//tensorflow_probability/python/internal:dtype_util.jax",
@@ -180,9 +176,7 @@ py_library(
     srcs = ["linalg.py"],
     deps = [
         ":partial_lanczos",
-        # jax dep,
         # jax:experimental_sparse dep,
-        # jaxtyping dep,
         "//tensorflow_probability/python/internal/backend/jax",
     ],
 )
@@ -205,7 +199,6 @@ py_library(
     srcs = ["partial_lanczos.py"],
     deps = [
         ":mbcg",
-        # jax dep,
         # scipy dep,
         "//tensorflow_probability/python/internal/backend/jax",
     ],
@@ -231,8 +224,6 @@ py_library(
         ":mbcg",
         ":partial_lanczos",
         ":preconditioners",
-        # jax dep,
-        # jaxtyping dep,
         # numpy dep,
         # scipy dep,
     ],
@@ -266,9 +257,6 @@ py_library(
     deps = [
         ":linalg",
         ":linear_operator_sum",
-        # jax dep,
-        # jax:experimental_sparse dep,
-        # jaxtyping dep,
         "//tensorflow_probability/python/internal/backend/jax",
         "//tensorflow_probability/python/math:linalg.jax",
     ],
@@ -292,7 +280,6 @@ py_library(
     srcs = ["schur_complement.py"],
     deps = [
         ":preconditioners",
-        # jax dep,
         "//tensorflow_probability/python/bijectors:softplus.jax",
         "//tensorflow_probability/python/internal:distribution_util.jax",
         "//tensorflow_probability/python/internal:dtype_util.jax",

@@ -50,8 +50,14 @@ from tensorflow_probability.python.experimental import vi
 from tensorflow_probability.python.experimental.util.composite_tensor import as_composite
 from tensorflow_probability.python.experimental.util.composite_tensor import register_composite
 from tensorflow_probability.python.internal import all_util
+from tensorflow_probability.python.internal import lazy_loader
 from tensorflow_probability.python.internal.auto_composite_tensor import auto_composite_tensor
 from tensorflow_probability.python.internal.auto_composite_tensor import AutoCompositeTensor
+
+# TODO(thomaswc): Figure out why fastgp needs to be lazy_loaded.
+globals()['fastgp'] = lazy_loader.LazyLoader(
+    'fastgp', globals(), 'tensorflow_probability.python.experimental.fastgp'
+)
 
 
 _allowed_symbols = [
@@ -63,6 +69,7 @@ _allowed_symbols = [
     'bijectors',
     'distribute',
     'distributions',
+    'fastgp',
     'joint_distribution_layers',
     'linalg',
     'marginalize',

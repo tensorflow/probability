@@ -22,7 +22,6 @@ import functools
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import Float
 import numpy as np
 from tensorflow_probability.python.experimental.fastgp import mbcg
 from tensorflow_probability.python.experimental.fastgp import partial_lanczos
@@ -159,7 +158,7 @@ def _log_det_rational_approx_with_hutchinson(
     probe_vectors: Array,
     key: jax.Array,
     num_iters: int,
-) -> Float:
+):
   """Approximate log det using a rational function.
 
   We calculate log det M as the trace of log M, and we approximate the
@@ -295,7 +294,7 @@ def _r1(
     probe_vectors: Array,
     key: jax.Array,
     num_iters: int,
-) -> Float:
+):
   """Approximate log det using a 1st order rational function."""
   return _log_det_rational_approx_with_hutchinson(
       jnp.asarray(R1_SHIFTS, dtype=probe_vectors.dtype),
@@ -315,7 +314,7 @@ def _r2(
     probe_vectors: Array,
     key: jax.Array,
     num_iters: int,
-) -> Float:
+):
   """Approximate log det using a 2nd order rational function."""
   return _log_det_rational_approx_with_hutchinson(
       jnp.asarray(R2_SHIFTS, dtype=probe_vectors.dtype),
@@ -335,7 +334,7 @@ def _r3(
     probe_vectors: Array,
     key: jax.Array,
     num_iters: int,
-) -> Float:
+):
   """Approximate log det using a 4th order rational function."""
   return _log_det_rational_approx_with_hutchinson(
       jnp.asarray(R3_SHIFTS, dtype=probe_vectors.dtype),
@@ -355,7 +354,7 @@ def _r4(
     probe_vectors: Array,
     key: jax.Array,
     num_iters: int,
-) -> Float:
+):
   """Approximate log det using a 4th order rational function."""
   return _log_det_rational_approx_with_hutchinson(
       jnp.asarray(R4_SHIFTS, dtype=probe_vectors.dtype),
@@ -375,7 +374,7 @@ def _r5(
     probe_vectors: Array,
     key: jax.Array,
     num_iters: int,
-) -> Float:
+):
   """Approximate log det using a 4th order rational function."""
   return _log_det_rational_approx_with_hutchinson(
       jnp.asarray(R5_SHIFTS, dtype=probe_vectors.dtype),
@@ -395,7 +394,7 @@ def _r6(
     probe_vectors: Array,
     key: jax.Array,
     num_iters: int,
-) -> Float:
+):
   """Approximate log det using a 4th order rational function."""
   return _log_det_rational_approx_with_hutchinson(
       jnp.asarray(R6_SHIFTS, dtype=probe_vectors.dtype),
@@ -453,7 +452,7 @@ def r1(
     probe_vector_type: ProbeVectorType = ProbeVectorType.RADEMACHER,
     num_iters: int = 20,
     **unused_kwargs,
-) -> Float:
+):
   """Approximate log det using a 2nd order rational function."""
   n = M.shape[-1]
   key1, key2 = jax.random.split(key)
@@ -473,7 +472,7 @@ def r2(
     probe_vector_type: ProbeVectorType = ProbeVectorType.RADEMACHER,
     num_iters: int = 20,
     **unused_kwargs,
-) -> Float:
+):
   """Approximate log det using a 2nd order rational function."""
   n = M.shape[-1]
   key1, key2 = jax.random.split(key)
@@ -493,7 +492,7 @@ def r3(
     probe_vector_type: ProbeVectorType = ProbeVectorType.RADEMACHER,
     num_iters: int = 20,
     **unused_kwargs,
-) -> Float:
+):
   """Approximate log det using a 3rd order rational function."""
   n = M.shape[-1]
   key1, key2 = jax.random.split(key)
@@ -513,7 +512,7 @@ def r4(
     probe_vector_type: ProbeVectorType = ProbeVectorType.RADEMACHER,
     num_iters: int = 20,
     **unused_kwargs,
-) -> Float:
+):
   """Approximate log det using a 4th order rational function."""
   n = M.shape[-1]
   key1, key2 = jax.random.split(key)
@@ -533,7 +532,7 @@ def r5(
     probe_vector_type: ProbeVectorType = ProbeVectorType.RADEMACHER,
     num_iters: int = 20,
     **unused_kwargs,
-) -> Float:
+):
   """Approximate log det using a 5th order rational function."""
   n = M.shape[-1]
   key1, key2 = jax.random.split(key)
@@ -553,7 +552,7 @@ def r6(
     probe_vector_type: ProbeVectorType = ProbeVectorType.RADEMACHER,
     num_iters: int = 20,
     **unused_kwargs,
-) -> Float:
+):
   """Approximate log det using a 6th order rational function."""
   n = M.shape[-1]
   key1, key2 = jax.random.split(key)
@@ -597,7 +596,7 @@ def _stochastic_lanczos_quadrature_log_det(
     unused_key,
     probe_vectors_are_rademacher: bool,
     num_iters: int,
-) -> Float:
+):
   """Fast log det using the alg. from https://arxiv.org/pdf/1809.11165.pdf ."""
   n = M.shape[-1]
 
@@ -639,7 +638,7 @@ def stochastic_lanczos_quadrature_log_det(
     probe_vector_type: ProbeVectorType = ProbeVectorType.RADEMACHER,
     num_iters: int = 25,
     **unused_kwargs,
-) -> Float:
+):
   """Fast log det using the alg. from https://arxiv.org/pdf/1809.11165.pdf ."""
   n = M.shape[-1]
   num_iters = min(n, num_iters)
@@ -703,7 +702,7 @@ def log_det_taylor_series_with_hutchinson(
     num_probe_vectors: int,
     key: jax.Array,
     num_taylor_series_iterations: int = 10,
-) -> Float:
+):
   """Return an approximation of log det M."""
   # TODO(thomaswc): Consider having this support a batch of LinearOperators.
   n = M.shape[0]

@@ -38,9 +38,7 @@ nothing is known about the kernel structure.
 """
 
 import jax
-import jax.experimental.sparse
 import jax.numpy as jnp
-from jaxtyping import Float
 from tensorflow_probability.python.experimental.fastgp import linalg
 from tensorflow_probability.python.experimental.fastgp import linear_operator_sum
 from tensorflow_probability.python.internal.backend import jax as tf2jax
@@ -82,7 +80,7 @@ class Preconditioner:
     """The log absolute value of the determinant of the preconditioner."""
     return self.full_preconditioner().log_abs_determinant()
 
-  def trace_of_inverse_product(self, A: jax.Array) -> Float:
+  def trace_of_inverse_product(self, A: jax.Array):
     """Returns tr( P^(-1) A ) for a n x n, non-batched A."""
     result = self.full_preconditioner().solve(A)
     if isinstance(result, tf2jax.linalg.LinearOperator):
@@ -105,10 +103,10 @@ class IdentityPreconditioner(Preconditioner):
   def preconditioned_operator(self) -> tf2jax.linalg.LinearOperator:
     return promote_to_operator(self.M)
 
-  def log_det(self) -> Float:
+  def log_det(self):
     return 0.0
 
-  def trace_of_inverse_product(self, A: jax.Array) -> Float:
+  def trace_of_inverse_product(self, A: jax.Array):
     return jnp.trace(A)
 
   def tree_flatten(self):
@@ -137,10 +135,10 @@ class DiagonalPreconditioner(Preconditioner):
         [promote_to_operator(self.M), self.full_preconditioner().inverse()]
     )
 
-  def log_det(self) -> Float:
+  def log_det(self):
     return jnp.sum(jnp.log(self.d))
 
-  def trace_of_inverse_product(self, A: jax.Array) -> Float:
+  def trace_of_inverse_product(self, A: jax.Array):
     return jnp.sum(jnp.diag(A) / self.d)
 
   def tree_flatten(self):
@@ -481,11 +479,11 @@ class SplitPreconditioner(Preconditioner):
         is_positive_definite=True,
     )
 
-  def log_det(self) -> Float:
+  def log_det(self):
     """Returns log det(R^T R) = 2 log det R."""
     return 2 * self.right_half().log_abs_determinant()
 
-  def trace_of_inverse_product(self, A: jax.Array) -> Float:
+  def trace_of_inverse_product(self, A: jax.Array):
     """Returns tr( (R^T R)^(-1) A ) for a n x n, non-batched A."""
     raise NotImplementedError(
         'Base classes must override trace_of_inverse_product.')
@@ -510,10 +508,10 @@ class DiagonalSplitPreconditioner(SplitPreconditioner):
         self.d, is_non_singular=True, is_positive_definite=True
     )
 
-  def log_det(self) -> Float:
+  def log_det(self):
     return jnp.sum(jnp.log(self.d))
 
-  def trace_of_inverse_product(self, A: jax.Array) -> Float:
+  def trace_of_inverse_product(self, A: jax.Array):
     return jnp.sum(jnp.diag(A) / self.d)
 
   def tree_flatten(self):
@@ -582,7 +580,7 @@ class LowRankSplitPreconditioner(SplitPreconditioner):
   def right_half(self) -> tf2jax.linalg.LinearOperator:
     return self.P
 
-  def trace_of_inverse_product(self, A: jax.Array) -> Float:
+  def trace_of_inverse_product(self, A: jax.Array):
     # We want the trace of (P^T P)^(-1) A
     # = P^(-1) P^(-t) A
     # = [[ B^(-1), - B^(-1) C D^(-1)], [0, D^(-1)]]
