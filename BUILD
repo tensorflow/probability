@@ -20,5 +20,6 @@ sh_binary(
         "required_packages.py",
         "setup.py",
         "//tensorflow_probability",
+        "//tensorflow_probability/substrates",
     ],
 )
