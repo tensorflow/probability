@@ -305,9 +305,13 @@ class MemoryLeakTest(test_util.TestCase):
     # These weakrefs could potentially come from tf.function.variables.
     dist = layer(x)
     gc.collect()
+    gc.collect()
+    gc.collect()
     before_objs = len(gc.get_objects())
     for _ in range(int(1e2)):
       dist = layer(x)
+    gc.collect()
+    gc.collect()
     gc.collect()
     after_objs = len(gc.get_objects())
     del dist
