@@ -15,9 +15,9 @@
 # Description:
 #   Internal helper libraries for distributions.
 
+# Placeholder: py_binary
 # Placeholder: py_library
 # Placeholder: py_test
-# Placeholder: py_binary
 load(
     "//tensorflow_probability/python:build_defs.bzl",
     "multi_substrate_py_library",
