@@ -15,9 +15,9 @@
 # Description:
 #   TensorFlow Probability examples.
 
+# Placeholder: py_binary
 # Placeholder: py_library
 # Placeholder: py_test
-# Placeholder: py_binary
 
 package(
     # default_applicable_licenses
