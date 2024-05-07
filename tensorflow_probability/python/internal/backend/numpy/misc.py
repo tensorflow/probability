@@ -60,8 +60,12 @@ def _argsort(values, axis=-1, direction='ASCENDING', stable=False, name=None):  
     values = np.negative(values)
   else:
     raise ValueError('Unrecognized direction: {}.'.format(direction))
-  return np.argsort(
-      values, axis, kind='stable' if stable else 'quicksort').astype(np.int32)
+  try:
+    # stable keyword introduced in NumPy 2.0.
+    return np.argsort(values, axis, stable=stable).astype(np.int32)
+  except TypeError:
+    return np.argsort(
+        values, axis, kind='stable' if stable else 'quicksort').astype(np.int32)
 
 
 def _histogram_fixed_width(values, value_range, nbins=100, dtype=np.int32,
@@ -103,7 +107,11 @@ def _sort(values, axis=-1, direction='ASCENDING', name=None):  # pylint: disable
     values = np.negative(values)
   else:
     raise ValueError('Unrecognized direction: {}.'.format(direction))
-  result = np.sort(values, axis, kind='stable')
+  try:
+    # NumPy 2.0
+    result = np.sort(values, axis, stable=True)
+  except TypeError:
+    result = np.sort(values, axis, kind='stable')
   if direction == 'DESCENDING':
     return np.negative(result)
   return result
