@@ -117,7 +117,7 @@ def _make_bayeux_model(
   initial_state = jax.vmap(_init)(jax.random.split(seed, num_particles))
   # It is okay to reuse the initial_state[0] as the test point, as Bayeux
   # only uses it to figure out the treedef.
-  test_point = jax.tree_map(lambda t: t[0], initial_state)
+  test_point = jax.tree.map(lambda t: t[0], initial_state)
 
   if for_vi:
 
@@ -127,7 +127,7 @@ def _make_bayeux_model(
       # of size [1] to the start, so we undo all of that.
       del seed
       return net.log_prob(
-          {'params': jax.tree_map(lambda x: x[0, ...], params)},
+          {'params': jax.tree.map(lambda x: x[0, ...], params)},
           data=x_train,
           observations=y_train)
 
@@ -189,9 +189,9 @@ def _filter_stuck_chains(params):
   halfway_to_zero = -0.5 * stds_mu / stds_scale
   unstuck = jnp.where(z_scores > halfway_to_zero)[0]
   if unstuck.shape[0] > 2:
-    return jax.tree_map(lambda x: x[unstuck], params)
+    return jax.tree.map(lambda x: x[unstuck], params)
   best_two = jnp.argsort(stds)[-2:]
-  return jax.tree_map(lambda x: x[best_two], params)
+  return jax.tree.map(lambda x: x[best_two], params)
 
 
 @jax.named_call
@@ -214,7 +214,7 @@ def fit_bnn_vi(
       seed=vi_seed, **vi_kwargs)
   params = surrogate_dist.sample(seed=draw_seed, sample_shape=num_draws)
 
-  params = jax.tree_map(lambda x: x.reshape((-1,) + x.shape[2:]), params)
+  params = jax.tree.map(lambda x: x.reshape((-1,) + x.shape[2:]), params)
   return params, {'loss': loss}
 
 
@@ -241,7 +241,7 @@ def fit_bnn_mcmc(
   # is the easiest way to determine where "stuck chains" occur, and it is
   # nice to return parameters with a single batch dimension.
   params = _filter_stuck_chains(params)
-  params = jax.tree_map(lambda x: x.reshape((-1,) + x.shape[2:]), params)
+  params = jax.tree.map(lambda x: x.reshape((-1,) + x.shape[2:]), params)
   return params, {'noise_scale': params['params'].get('noise_scale', None)}
 
 
@@ -430,6 +430,6 @@ def debatchify_params(params: PyTree) -> List[Dict[str, Any]]:
   """Nested dict of rank n tensors -> a list of nested dicts of rank n-1's."""
   n = get_params_batch_length(params)
   def get_item(i):
-    return jax.tree_map(lambda x: x[i, ...], params)
+    return jax.tree.map(lambda x: x[i, ...], params)
 
   return [get_item(i) for i in range(n)]

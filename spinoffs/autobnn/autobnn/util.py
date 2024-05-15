@@ -27,24 +27,24 @@ def make_transforms(
     net: bnn.BNN,
 ) -> Tuple[Callable[..., Any], Callable[..., Any], Callable[..., Any]]:
   """Returns unconstraining bijectors for all variables in the BNN."""
-  jb = jax.tree_map(
+  jb = jax.tree.map(
       lambda x: x.experimental_default_event_space_bijector(),
       net.get_all_distributions(),
       is_leaf=lambda x: isinstance(x, distribution_lib.Distribution),
   )
 
   def transform(params):
-    return {'params': jax.tree_map(lambda p, b: b(p), params['params'], jb)}
+    return {'params': jax.tree.map(lambda p, b: b(p), params['params'], jb)}
 
   def inverse_transform(params):
     return {
-        'params': jax.tree_map(lambda p, b: b.inverse(p), params['params'], jb)
+        'params': jax.tree.map(lambda p, b: b.inverse(p), params['params'], jb)
     }
 
   def inverse_log_det_jacobian(params):
     return jax.tree_util.tree_reduce(
         lambda a, b: a + b,
-        jax.tree_map(
+        jax.tree.map(
             lambda p, b: jnp.sum(b.inverse_log_det_jacobian(p)),
             params['params'],
             jb,

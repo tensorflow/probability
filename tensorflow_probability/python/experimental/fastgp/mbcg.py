@@ -155,7 +155,7 @@ def modified_batched_conjugate_gradients(
     new_off_diags = off_diags.at[:, j - 1].set(off_diag_update)
 
     # Only update if we are not within tolerance.
-    (preconditioned_errors, search_directions, alpha) = (jax.tree_map(
+    (preconditioned_errors, search_directions, alpha) = (jax.tree.map(
         lambda o, n: jnp.where(converged, o, n),
         (old_preconditioned_errors, old_search_directions, old_alpha),
         (preconditioned_errors, search_directions, safe_alpha)))

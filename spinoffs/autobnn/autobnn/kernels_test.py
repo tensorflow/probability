@@ -45,7 +45,7 @@ class ReproduceExperimentTest(absltest.TestCase):
     linear_bnn = kernels.OneLayerBNN(width=50)
     seed = jax.random.PRNGKey(0)
     init_params = linear_bnn.init(seed, x_train)
-    constant_params = jax.tree_map(
+    constant_params = jax.tree.map(
         lambda x: jnp.full(x.shape, 0.1), init_params)
     constant_params['params']['noise_scale'] = jnp.array([0.005 ** 0.5])
     return linear_bnn, constant_params, x_train, y_train

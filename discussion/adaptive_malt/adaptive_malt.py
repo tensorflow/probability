@@ -1085,7 +1085,7 @@ def meads_step(meads_state: MeadsState,
   def refold(x, perm):
     return x.reshape((num_chains,) + x.shape[2:])[perm].reshape(x.shape)
 
-  phmc_state = jax.tree_map(functools.partial(refold, perm=perm), phmc_state)
+  phmc_state = jax.tree.map(functools.partial(refold, perm=perm), phmc_state)
 
   if vector_step_size is None:
     vector_step_size = phmc_state.state.std(1, keepdims=True)
@@ -1135,7 +1135,7 @@ def meads_step(meads_state: MeadsState,
         ], 0), fold_to_skip, 0)
 
   active_fold_state, phmc_extra = fun_mc.prefab.persistent_hamiltonian_monte_carlo_step(
-      jax.tree_map(select_folds, phmc_state),
+      jax.tree.map(select_folds, phmc_state),
       target_log_prob_fn=target_log_prob_fn,
       step_size=select_folds(scalar_step_size[:, jnp.newaxis, jnp.newaxis] *
                              rolled_vector_step_size),
@@ -1143,10 +1143,10 @@ def meads_step(meads_state: MeadsState,
       noise_fraction=select_folds(noise_fraction)[:, jnp.newaxis, jnp.newaxis],
       mh_drift=select_folds(mh_drift)[:, jnp.newaxis],
       seed=phmc_seed)
-  phmc_state = jax.tree_map(rejoin_folds, active_fold_state, phmc_state)
+  phmc_state = jax.tree.map(rejoin_folds, active_fold_state, phmc_state)
 
   # Revert the ordering of the walkers.
-  phmc_state = jax.tree_map(functools.partial(refold, perm=unperm), phmc_state)
+  phmc_state = jax.tree.map(functools.partial(refold, perm=unperm), phmc_state)
 
   meads_state = MeadsState(
       phmc_state=phmc_state,
@@ -1838,7 +1838,7 @@ def run_grid_element(mean_trajectory_length: jnp.ndarray,
   for i in range(num_replicas):
     with utils.delete_device_buffers():
       res.append(
-          jax.tree_map(
+          jax.tree.map(
               np.array,
               _run_grid_element_impl(
                   seed=jax.random.fold_in(seed, i),
@@ -1853,7 +1853,7 @@ def run_grid_element(mean_trajectory_length: jnp.ndarray,
                   jitter_style=jitter_style,
                   target_accept_prob=target_accept_prob,
               )))
-  res = jax.tree_map(lambda *x: np.stack(x, 0), *res)
+  res = jax.tree.map(lambda *x: np.stack(x, 0), *res)
   res['mean_trajectory_length'] = mean_trajectory_length
   res['damping'] = damping
 
@@ -1988,7 +1988,7 @@ def run_trial(
   for i in range(num_replicas):
     with utils.delete_device_buffers():
       res.append(
-          jax.tree_map(
+          jax.tree.map(
               np.array,
               _run_trial_impl(
                   seed=jax.random.fold_in(seed, i),
@@ -2006,5 +2006,5 @@ def run_trial(
                   trajectory_length_adaptation_rate_decay=trajectory_length_adaptation_rate_decay,
                   save_warmup=save_warmup,
               )))
-  res = jax.tree_map(lambda *x: np.stack(x, 0), *res)
+  res = jax.tree.map(lambda *x: np.stack(x, 0), *res)
   return res
