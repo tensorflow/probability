@@ -182,7 +182,7 @@ def trace(state, fn, num_steps, unroll, max_steps, parallel_iterations=10):
   num_outputs = num_steps if max_steps is None else max_steps
 
   if tf.config.experimental_functions_run_eagerly() or tf.executing_eagerly():
-    state, first_untraced, first_traced = fn(state)
+    state, first_untraced, first_traced, stop = fn(state)
     arrays = tf.nest.map_structure(
         lambda v: tf.TensorArray(  # pylint: disable=g-long-lambda
             v.dtype,
@@ -195,7 +195,7 @@ def trace(state, fn, num_steps, unroll, max_steps, parallel_iterations=10):
     # the `TensorArray`s etc., we can get it by pre-compiling the wrapper
     # function.
     input_spec = tf.nest.map_structure(tf.TensorSpec.from_tensor, state)
-    fn, (_, untraced_spec, traced_spec) = _eval_shape(fn, input_spec)
+    fn, (_, untraced_spec, traced_spec, stop_spec) = _eval_shape(fn, input_spec)
 
     arrays = tf.nest.map_structure(
         lambda spec: tf.TensorArray(  # pylint: disable=g-long-lambda
@@ -206,18 +206,23 @@ def trace(state, fn, num_steps, unroll, max_steps, parallel_iterations=10):
     first_untraced = tf.nest.map_structure(
         lambda spec: tf.zeros(spec.shape, spec.dtype), untraced_spec)
     start_idx = 0
+    if isinstance(stop_spec, tuple):
+      stop = ()
+    else:
+      stop = False
 
-  def body(i, state, _, arrays):
-    state, untraced, traced = fn(state)
+  def body(i, stop, state, untraced, arrays):
+    del stop, untraced
+    state, untraced, traced, stop = fn(state)
     arrays = tf.nest.map_structure(lambda a, e: a.write(i, e), arrays, traced)
-    return i + 1, state, untraced, arrays
+    return i + 1, stop, state, untraced, arrays
 
-  def cond(i, *_):
-    return i < num_steps
+  def cond(i, stop, *_):
+    return (i < num_steps) & (isinstance(stop, tuple) or ~stop)
 
   static_num_steps = tf.get_static_value(num_steps)
   static_num_outputs = tf.get_static_value(num_outputs)
-  loop_vars = (start_idx, state, first_untraced, arrays)
+  loop_vars = (start_idx, stop, state, first_untraced, arrays)
 
   if unroll:
     if static_num_steps is None:
@@ -233,8 +238,10 @@ def trace(state, fn, num_steps, unroll, max_steps, parallel_iterations=10):
     # TODO(siege): Investigate if using lists instead of TensorArray's is faster
     # (like is done in the JAX backend).
     for _ in range(start_idx, static_num_iters):
+      if loop_vars[1]:
+        break
       loop_vars = body(*loop_vars)
-    _, state, untraced, arrays = loop_vars
+    _, _, state, untraced, arrays = loop_vars
   else:
     if static_num_steps is None:
       if max_steps is None:
@@ -246,7 +253,7 @@ def trace(state, fn, num_steps, unroll, max_steps, parallel_iterations=10):
         maximum_iterations = static_num_steps - start_idx
       else:
         maximum_iterations = min(static_num_steps, max_steps) - start_idx
-    _, state, untraced, arrays = tf.while_loop(
+    _, _, state, untraced, arrays = tf.while_loop(
         cond=cond,
         body=body,
         loop_vars=loop_vars,

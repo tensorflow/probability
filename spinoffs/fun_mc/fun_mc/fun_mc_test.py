@@ -247,6 +247,42 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
       ('Unrolled', True),
       ('NotUnrolled', False),
   )
+  def testTraceStopFnSingle(self, unroll):
+    x, (traced, untraced) = fun_mc.trace(
+        0,
+        lambda x: (x + 1, (10 * x, 100 * x)),
+        5,
+        unroll=unroll,
+        trace_mask=(True, False),
+        stop_fn=lambda x, _: x == 1,
+    )
+    self.assertAllEqual(1, x)
+    self.assertAllEqual(0, traced[0])
+    self.assertEqual(5, traced.shape[0])
+    self.assertAllEqual(0, untraced)
+
+  @parameterized.named_parameters(
+      ('Unrolled', True),
+      ('NotUnrolled', False),
+  )
+  def testTraceStopFnMulti(self, unroll):
+    x, (traced, untraced) = fun_mc.trace(
+        0,
+        lambda x: (x + 1, (10 * x, 100 * x)),
+        5,
+        unroll=unroll,
+        trace_mask=(True, False),
+        stop_fn=lambda x, _: x == 3,
+    )
+    self.assertAllEqual(3, x)
+    self.assertAllEqual(20, traced[2])
+    self.assertEqual(5, traced.shape[0])
+    self.assertAllEqual(200, untraced)
+
+  @parameterized.named_parameters(
+      ('Unrolled', True),
+      ('NotUnrolled', False),
+  )
   def testTraceMask(self, unroll):
     def fun(x):
       return x + 1, (2 * x, 3 * x)

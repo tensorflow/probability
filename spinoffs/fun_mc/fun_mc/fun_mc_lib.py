@@ -221,6 +221,7 @@ def trace(
     trace_mask: bool | BooleanNest = True,
     unroll: bool = False,
     max_steps: int | None = None,
+    stop_fn: Callable[[State, ArrayNest], BooleanArray] | None = None,
     parallel_iterations: int = 10,
 ) -> tuple[State, ArrayNest]:
   """`TransitionOperator` that runs `fn` repeatedly and traces its outputs.
@@ -245,8 +246,11 @@ def trace(
       performance at the cost of increasing the XLA optimization time. Only
       works if `num_steps` is statically known.
     max_steps: If `num_steps` is not statically known and you still want to
-      trace values, you can use `max_steps` to allocate output trace to be of
-      this length. Only elements up to `num_steps` will be valid, however.
+      values, you can use `max_steps` to allocate output trace to be of this
+      length. Only elements up to `num_steps` will be valid, however.
+    stop_fn: Optional callable that takes in the outputs of `fn` and returns a
+      boolean. If `True`, then the iteration is stopped. Only the elements
+      stored into traces before `stop_fn` returned `True` are valid.
     parallel_iterations: Number of iterations of the while loop to run in
       parallel (TensorFlow-only).
 
@@ -286,11 +290,17 @@ def trace(
     state, extra = util.map_tree(
         util.convert_to_tensor, call_transition_operator(fn, state)
     )
+    if stop_fn is None:
+      # For TF compatibility, we can't use None. () is conveniently "falsy",
+      # which we rely on in the backend implementations.
+      stop = ()
+    else:
+      stop = stop_fn(state, extra)
     trace_element = util.map_tree(
         util.convert_to_tensor, trace_fn(state, extra)
     )
     untraced, traced = _split_trace(trace_element, trace_mask)
-    return state, untraced, traced
+    return state, untraced, traced, stop
 
   state = util.map_tree(util.convert_to_tensor, state)
 

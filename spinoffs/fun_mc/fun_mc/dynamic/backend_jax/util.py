@@ -169,8 +169,12 @@ def random_categorical(logits, num_samples, seed):
 def trace(state, fn, num_steps, unroll, max_steps, **_):
   """Implementation of `trace` operator, without the calling convention."""
   # We need the shapes and dtypes of the outputs of `fn`.
-  _, untraced_spec, traced_spec = jax.eval_shape(
+  _, untraced_spec, traced_spec, stop_spec = jax.eval_shape(
       fn, map_tree(lambda s: jax.ShapeDtypeStruct(s.shape, s.dtype), state))
+  if isinstance(stop_spec, tuple):
+    stop = ()
+  else:
+    stop = False
   untraced_init, traced_init = map_tree(
       lambda spec: jnp.zeros(spec.shape, spec.dtype),
       (untraced_spec, traced_spec),
@@ -194,7 +198,7 @@ def trace(state, fn, num_steps, unroll, max_steps, **_):
             'Cannot unroll when `num_steps` is not statically known and '
             '`max_steps` is not specified.'
         )
-  if max_steps is not None:
+  if max_steps is not None or not isinstance(stop_spec, tuple):
     use_scan = False
 
   if unroll:
@@ -203,8 +207,8 @@ def trace(state, fn, num_steps, unroll, max_steps, **_):
     traced_lists = map_tree(lambda _: [], traced_spec)
     untraced = untraced_init
     for step in range(num_outputs):
-      if step < num_steps:
-        state, untraced, traced_element = fn(state)
+      if step < num_steps and not stop:
+        state, untraced, traced_element, stop = fn(state)
       else:
         traced_element = traced_init
       map_tree_up_to(traced_spec, lambda l, e: l.append(e), traced_lists,
@@ -217,7 +221,7 @@ def trace(state, fn, num_steps, unroll, max_steps, **_):
 
     def wrapper(state_untraced, _):
       state, _ = state_untraced
-      state, untraced, traced = fn(state)
+      state, untraced, traced, _ = fn(state)
       return (state, untraced), traced
 
     (state, untraced), traced = lax.scan(
@@ -234,19 +238,31 @@ def trace(state, fn, num_steps, unroll, max_steps, **_):
 
     trace_arrays = map_tree(
         lambda spec: jnp.zeros((num_outputs,) + spec.shape, spec.dtype),
-        traced_spec)
+        traced_spec,
+    )
+    loop_vars = (
+        jnp.zeros_like(num_steps),
+        stop,
+        state,
+        untraced_init,
+        trace_arrays,
+    )
 
-    def wrapper(i, state_untraced_traced):
-      state, _, trace_arrays = state_untraced_traced
-      state, untraced, traced = fn(state)
+    def cond(loop_vars):
+      i, stop, *_ = loop_vars
+      return (i < num_steps) & (isinstance(stop, tuple) or ~stop)
+
+    def body(loop_vars):
+      i, _, state, _, trace_arrays = loop_vars
+      state, untraced, traced, stop = fn(state)
       trace_arrays = map_tree(lambda a, e: a.at[i].set(e), trace_arrays, traced)
-      return (state, untraced, trace_arrays)
 
-    state, untraced, traced = lax.fori_loop(
-        jnp.asarray(0, num_steps.dtype),
-        num_steps,
-        wrapper,
-        (state, untraced_init, trace_arrays),
+      return i + 1, stop, state, untraced, trace_arrays
+
+    _, _, state, untraced, traced = lax.while_loop(
+        cond,
+        body,
+        loop_vars,
     )
   return state, untraced, traced
 
