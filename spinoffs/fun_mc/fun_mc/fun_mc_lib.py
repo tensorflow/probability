@@ -220,6 +220,7 @@ def trace(
     trace_fn: Callable[[State, ArrayNest], ArrayNest] = _trace_extra,
     trace_mask: bool | BooleanNest = True,
     unroll: bool = False,
+    max_steps: int | None = None,
     parallel_iterations: int = 10,
 ) -> tuple[State, ArrayNest]:
   """`TransitionOperator` that runs `fn` repeatedly and traces its outputs.
@@ -243,8 +244,11 @@ def trace(
     unroll: Whether to unroll the loop. This can occasionally lead to improved
       performance at the cost of increasing the XLA optimization time. Only
       works if `num_steps` is statically known.
+    max_steps: If `num_steps` is not statically known and you still want to
+      trace values, you can use `max_steps` to allocate output trace to be of
+      this length. Only elements up to `num_steps` will be valid, however.
     parallel_iterations: Number of iterations of the while loop to run in
-      parallel.
+      parallel (TensorFlow-only).
 
   Returns:
     state: The final state returned by `fn`.
@@ -295,6 +299,7 @@ def trace(
       fn=wrapper,
       num_steps=num_steps,
       unroll=unroll,
+      max_steps=max_steps,
       parallel_iterations=parallel_iterations,
   )
 

@@ -166,33 +166,47 @@ def random_categorical(logits, num_samples, seed):
   return jax.vmap(_searchsorted)(flat_cum_sum, flat_eta).reshape(eta.shape).T
 
 
-def trace(state, fn, num_steps, unroll, **_):
+def trace(state, fn, num_steps, unroll, max_steps, **_):
   """Implementation of `trace` operator, without the calling convention."""
   # We need the shapes and dtypes of the outputs of `fn`.
   _, untraced_spec, traced_spec = jax.eval_shape(
       fn, map_tree(lambda s: jax.ShapeDtypeStruct(s.shape, s.dtype), state))
-  untraced_init = map_tree(lambda spec: jnp.zeros(spec.shape, spec.dtype),
-                           untraced_spec)
+  untraced_init, traced_init = map_tree(
+      lambda spec: jnp.zeros(spec.shape, spec.dtype),
+      (untraced_spec, traced_spec),
+  )
 
   try:
     num_steps = int(num_steps)
     use_scan = True
   except TypeError:
     use_scan = False
-    if flatten_tree(traced_spec):
-      raise ValueError(
-          'Cannot trace values when `num_steps` is not statically known. Pass '
-          'False to `trace_mask` or return an empty structure (e.g. `()`) as '
-          'the extra output.')
-    if unroll:
-      raise ValueError(
-          'Cannot unroll when `num_steps` is not statically known.')
+    if max_steps is None:
+      if flatten_tree(traced_spec):
+        raise ValueError(  # pylint: disable=raise-missing-from
+            'Cannot trace values when `num_steps` is not statically known and '
+            '`max_steps` is not specified. Pass `False` to `trace_mask` or '
+            'return an empty structure (e.g. `()`) as '
+            'the extra output.'
+        )
+      if unroll:
+        raise ValueError(  # pylint: disable=raise-missing-from
+            'Cannot unroll when `num_steps` is not statically known and '
+            '`max_steps` is not specified.'
+        )
+  if max_steps is not None:
+    use_scan = False
 
   if unroll:
+    num_outputs = num_steps if max_steps is None else max_steps
+
     traced_lists = map_tree(lambda _: [], traced_spec)
     untraced = untraced_init
-    for _ in range(num_steps):
-      state, untraced, traced_element = fn(state)
+    for step in range(num_outputs):
+      if step < num_steps:
+        state, untraced, traced_element = fn(state)
+      else:
+        traced_element = traced_init
       map_tree_up_to(traced_spec, lambda l, e: l.append(e), traced_lists,
                      traced_element)
     # Using asarray instead of stack to handle empty arrays correctly.
@@ -213,8 +227,13 @@ def trace(state, fn, num_steps, unroll, **_):
         length=num_steps,
     )
   else:
+    num_outputs = num_steps if max_steps is None else max_steps
+    num_steps = (
+        num_steps if max_steps is None else jnp.minimum(num_steps, max_steps)
+    )
+
     trace_arrays = map_tree(
-        lambda spec: jnp.zeros((num_steps,) + spec.shape, spec.dtype),
+        lambda spec: jnp.zeros((num_outputs,) + spec.shape, spec.dtype),
         traced_spec)
 
     def wrapper(i, state_untraced_traced):

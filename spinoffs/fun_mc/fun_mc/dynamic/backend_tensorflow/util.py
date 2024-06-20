@@ -177,14 +177,16 @@ def _eval_shape(fn, input_spec):
   return compiled_fn, output_spec
 
 
-def trace(state, fn, num_steps, unroll, parallel_iterations=10):
+def trace(state, fn, num_steps, unroll, max_steps, parallel_iterations=10):
   """TF implementation of `trace` operator, without the calling convention."""
+  num_outputs = num_steps if max_steps is None else max_steps
+
   if tf.config.experimental_functions_run_eagerly() or tf.executing_eagerly():
     state, first_untraced, first_traced = fn(state)
     arrays = tf.nest.map_structure(
         lambda v: tf.TensorArray(  # pylint: disable=g-long-lambda
             v.dtype,
-            size=num_steps,
+            size=num_outputs,
             element_shape=v.shape).write(0, v),
         first_traced)
     start_idx = 1
@@ -198,7 +200,7 @@ def trace(state, fn, num_steps, unroll, parallel_iterations=10):
     arrays = tf.nest.map_structure(
         lambda spec: tf.TensorArray(  # pylint: disable=g-long-lambda
             spec.dtype,
-            size=num_steps,
+            size=num_outputs,
             element_shape=spec.shape),
         traced_spec)
     first_untraced = tf.nest.map_structure(
@@ -214,22 +216,36 @@ def trace(state, fn, num_steps, unroll, parallel_iterations=10):
     return i < num_steps
 
   static_num_steps = tf.get_static_value(num_steps)
+  static_num_outputs = tf.get_static_value(num_outputs)
   loop_vars = (start_idx, state, first_untraced, arrays)
 
   if unroll:
     if static_num_steps is None:
       raise ValueError(
-          'Cannot unroll when `num_steps` is not statically known.')
+          'Cannot unroll when `num_steps` is not statically known or '
+          '`max_steps` is None.'
+      )
+    static_num_iters = (
+        static_num_steps
+        if max_steps is None
+        else min(static_num_steps, max_steps)
+    )
     # TODO(siege): Investigate if using lists instead of TensorArray's is faster
     # (like is done in the JAX backend).
-    for _ in range(start_idx, static_num_steps):
+    for _ in range(start_idx, static_num_iters):
       loop_vars = body(*loop_vars)
     _, state, untraced, arrays = loop_vars
   else:
     if static_num_steps is None:
-      maximum_iterations = None
+      if max_steps is None:
+        maximum_iterations = None
+      else:
+        maximum_iterations = max_steps - start_idx
     else:
-      maximum_iterations = static_num_steps - start_idx
+      if max_steps is None:
+        maximum_iterations = static_num_steps - start_idx
+      else:
+        maximum_iterations = min(static_num_steps, max_steps) - start_idx
     _, state, untraced, arrays = tf.while_loop(
         cond=cond,
         body=body,
@@ -241,7 +257,7 @@ def trace(state, fn, num_steps, unroll, parallel_iterations=10):
   traced = tf.nest.map_structure(lambda a: a.stack(), arrays)
 
   def _merge_static_length(x):
-    x.set_shape(tf.TensorShape(static_num_steps).concatenate(x.shape[1:]))
+    x.set_shape(tf.TensorShape(static_num_outputs).concatenate(x.shape[1:]))
     return x
 
   traced = tf.nest.map_structure(_merge_static_length, traced)

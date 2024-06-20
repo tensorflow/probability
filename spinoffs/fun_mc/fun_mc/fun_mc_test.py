@@ -211,10 +211,37 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
 
     @jax.jit
     def trace_n(num_steps):
-      return fun_mc.trace(0, lambda x: (x + 1, ()), num_steps)[0]
+      return fun_mc.trace(
+          0,
+          lambda x: (x + 1, (10 * x, 100 * x)),
+          num_steps,
+          max_steps=6,
+          trace_mask=(True, False),
+      )
 
-    x = trace_n(5)
+    x, (traced, untraced) = trace_n(5)
     self.assertAllEqual(5, x)
+    self.assertAllEqual(40, traced[4])
+    self.assertEqual(6, traced.shape[0])
+    self.assertAllEqual(400, untraced)
+
+  @parameterized.named_parameters(
+      ('Unrolled', True),
+      ('NotUnrolled', False),
+  )
+  def testTraceMaxSteps(self, unroll):
+    x, (traced, untraced) = fun_mc.trace(
+        0,
+        lambda x: (x + 1, (10 * x, 100 * x)),
+        5,
+        max_steps=6,
+        unroll=unroll,
+        trace_mask=(True, False),
+    )
+    self.assertAllEqual(5, x)
+    self.assertAllEqual(40, traced[4])
+    self.assertEqual(6, traced.shape[0])
+    self.assertAllEqual(400, untraced)
 
   @parameterized.named_parameters(
       ('Unrolled', True),
