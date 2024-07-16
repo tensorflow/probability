@@ -29,6 +29,7 @@ FLAGS = flags.FLAGS
 TF_REPLACEMENTS = {
     'import tensorflow ':
         'from tensorflow_probability.python.internal.backend import numpy ',
+    'import tensorflow.experimental.numpy as tnp': 'import numpy as tnp',
     'import tensorflow.compat.v1':
         'from tensorflow_probability.python.internal.backend.numpy.compat '
         'import v1',
