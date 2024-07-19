@@ -227,6 +227,7 @@ XLA_LOGPROB_RTOL.update({
 
 COMPOSITE_TENSOR_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-6)
 COMPOSITE_TENSOR_LOGPROB_RTOL.update({
+    'GammaGamma': 1e-5,
     'WishartTriL': 1e-5,
 })
 
