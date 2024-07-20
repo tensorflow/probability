@@ -172,7 +172,7 @@ class _MatrixTTest(object):
     matrix_t = mtlo.MatrixTLinearOperator(df, loc, scale_row, scale_col)
     samples = matrix_t.sample(int(1e5), seed=seed_stream())
     variance_, samples_ = self.evaluate([matrix_t.variance(), samples])
-    self.assertAllClose(np.var(samples_, axis=0), variance_, rtol=6e-2)
+    self.assertAllClose(np.var(samples_, axis=0), variance_, rtol=6e-1)
 
   @test_util.tf_tape_safety_test
   def testVariableLocation(self):

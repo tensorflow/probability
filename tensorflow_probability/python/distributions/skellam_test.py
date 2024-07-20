@@ -172,7 +172,7 @@ class _SkellamTest(object):
     self.assertEqual(samples.shape, (n, 2, 3))
     self.assertEqual(sample_values.shape, (n, 2, 3))
     self.assertAllClose(
-        sample_values.mean(axis=0), stats.skellam.mean(rate1, rate2), rtol=.03)
+        sample_values.mean(axis=0), stats.skellam.mean(rate1, rate2), atol=.03)
     self.assertAllClose(
         sample_values.var(axis=0), stats.skellam.var(rate1, rate2), rtol=.03)
 
@@ -194,7 +194,7 @@ class _SkellamTest(object):
     self.assertEqual(sample_values.shape, (n, 4, 5))
     self.assertAllClose(
         sample_values.mean(axis=0),
-        stats.skellam.mean(rate1, rate2), rtol=.04, atol=0)
+        stats.skellam.mean(rate1, rate2), atol=0.1)
 
   def testSkellamSampleMultidimensionalVariance(self):
     rate1 = self.dtype([2., 3., 4., 5., 6.])

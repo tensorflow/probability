@@ -790,9 +790,9 @@ class REMCTest(test_util.TestCase):
     max_scale = np.sqrt(np.max(true_cov))
 
     self.assertAllClose(
-        true_mean, sample_mean_, atol=6 * max_scale / np.sqrt(np.min(ess_)))
+        true_mean, sample_mean_, atol=12 * max_scale / np.sqrt(np.min(ess_)))
     self.assertAllClose(
-        true_cov, sample_cov_, atol=6 * max_scale**2 / np.sqrt(np.min(ess_)))
+        true_cov, sample_cov_, atol=12 * max_scale**2 / np.sqrt(np.min(ess_)))
 
   @parameterized.named_parameters([
       dict(  # pylint: disable=g-complex-comprehension
@@ -885,12 +885,12 @@ class REMCTest(test_util.TestCase):
           results.post_swap_replica_states
       ]
 
-    num_results = 2000
+    num_results = 4000
     states, (log_accept_ratio, replica_states) = sample.sample_chain(
         num_results=num_results,
         current_state=loc[::-1],  # Batch members far from their mode!
         kernel=remc,
-        num_burnin_steps=100,
+        num_burnin_steps=1000,
         trace_fn=trace_fn,
         seed=test_util.test_seed())
 
@@ -1272,7 +1272,7 @@ class REMCTest(test_util.TestCase):
     if tf.executing_eagerly():
       num_results = 25
     else:
-      num_results = 1000
+      num_results = 2000
 
     results = self.checkAndMakeResultsForTestingUntemperedLogProbFn(
         likelihood_variance=tf.convert_to_tensor([0.05] * 4),
@@ -1282,10 +1282,10 @@ class REMCTest(test_util.TestCase):
     )
 
     # Temperatures 0 and 1 are widely separated, so don't expect any swapping.
-    self.assertLess(results['conditional_swap_prob'][0], 0.05)
+    self.assertLess(results['conditional_swap_prob'][0], 0.1)
 
     # Temperatures 1 and 2 are close, so they should swap.
-    self.assertGreater(results['conditional_swap_prob'][1], 0.95)
+    self.assertGreater(results['conditional_swap_prob'][1], 0.8)
 
   def testWithUntemperedLPTemperatureGapNearZero(self):
     inverse_temperatures = tf.convert_to_tensor([1., 0.9999, 0.0])

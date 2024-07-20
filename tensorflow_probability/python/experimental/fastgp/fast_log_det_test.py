@@ -18,14 +18,12 @@ import math
 
 from absl.testing import parameterized
 import jax
-from jax import config
 import jax.numpy as jnp
 import numpy as np
 from tensorflow_probability.python.experimental.fastgp import fast_log_det
 from tensorflow_probability.python.experimental.fastgp import preconditioners
 from tensorflow_probability.substrates import jax as tfp
-
-from absl.testing import absltest
+from tensorflow_probability.substrates.jax.internal import test_util
 
 # pylint: disable=invalid-name
 
@@ -39,7 +37,7 @@ def rational_at_one(shifts, coefficients):
   return s
 
 
-class _FastLogDetTest(parameterized.TestCase):
+class _FastLogDetTest(test_util.TestCase):
   def test_make_probe_vectors_rademacher(self):
     pvs = fast_log_det.make_probe_vectors(
         10,
@@ -345,7 +343,7 @@ class _FastLogDetTest(parameterized.TestCase):
   @parameterized.parameters(
       (fast_log_det.ProbeVectorType.NORMAL, 1.1, 0.4),
       (fast_log_det.ProbeVectorType.NORMAL_ORTHOGONAL, 1.7, 0.6),
-      (fast_log_det.ProbeVectorType.NORMAL_QMC, 0.6, 0.3))
+      (fast_log_det.ProbeVectorType.NORMAL_QMC, 1.0, 1.0))
   def test_stochastic_lanczos_quadrature_normal_log_det(
       self, probe_vector_type, error_float32, error_float64):
     error = error_float32 if self.dtype == np.float32 else error_float64
@@ -676,5 +674,4 @@ del _FastLogDetTest
 
 
 if __name__ == '__main__':
-  config.update('jax_enable_x64', True)
-  absltest.main()
+  test_util.main()

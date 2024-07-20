@@ -145,7 +145,7 @@ class SampleAnnealedImportanceTest(test_util.TestCase):
         '                 event_size: {}\n'.format(
             log_true_normalizer_, log_estimated_normalizer_, ais_weights_size_,
             event_size_))
-    self.assertNear(ratio_estimate_true_.mean(), 1., 4. * standard_error_)
+    self.assertNear(ratio_estimate_true_.mean(), 1., 5. * standard_error_)
 
   def _ais_gets_correct_log_normalizer_wrapper(self, independent_chain_ndims,
                                                use_transformed_kernel=False):

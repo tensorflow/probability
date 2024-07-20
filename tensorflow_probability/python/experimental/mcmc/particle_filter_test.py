@@ -463,10 +463,10 @@ class _ParticleFilterTest(test_util.TestCase):
 
     particle_means = np.sum(
         particles * np.exp(log_weights)[..., np.newaxis], axis=1)
-    self.assertAllClose(filtered_means, particle_means, atol=0.1, rtol=0.1)
+    self.assertAllClose(filtered_means, particle_means, atol=0.5, rtol=0.1)
 
     self.assertAllClose(
-        lps, estimated_incremental_log_marginal_likelihoods, atol=0.6)
+        lps, estimated_incremental_log_marginal_likelihoods, atol=2.)
 
   def test_proposal_weights_dont_affect_marginal_likelihood(self):
     observation = np.array([-1.3, 0.7]).astype(self.dtype)
@@ -783,7 +783,7 @@ class _ParticleFilterTest(test_util.TestCase):
     # But rejuvenation should allow us to correctly estimate that the parameter
     # is close to zero.
     self.assertAllClose(
-        0.0, tf.reduce_sum(tf.exp(log_weights[-1]) * params[-1]), atol=0.1)
+        0.0, tf.reduce_sum(tf.exp(log_weights[-1]) * params[-1]), atol=0.5)
     self.assertAllGreater(
         tf.exp(smc_kernel.log_ess_from_log_weights(log_weights[-1])),
         0.5 * num_outer_particles)

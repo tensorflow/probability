@@ -140,7 +140,9 @@ def sanitize_seed(seed, salt=None, name=None):
     # discipline of splitting.
 
     if salt is not None:
-      salt = int(hashlib.sha512(str(salt).encode('utf-8')).hexdigest(), 16)
+      salt = int(hashlib.sha512(str(salt).encode('utf-8')).hexdigest(), 16) % (
+          2**31 - 1
+      )
       seed = fold_in(seed, salt)
 
     if JAX_MODE:

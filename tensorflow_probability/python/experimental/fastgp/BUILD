@@ -240,6 +240,7 @@ py_test(
         # absl/testing:parameterized dep,
         # jax dep,
         # numpy dep,
+        "//tensorflow_probability/python/internal:test_util.jax",
         "//tensorflow_probability/substrates:jax",
     ],
 )

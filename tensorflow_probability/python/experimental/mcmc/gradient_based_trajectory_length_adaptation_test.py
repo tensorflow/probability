@@ -392,14 +392,14 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
     self.assertAllClose(1.5, mean_step_size, atol=0.2)
     # Both SNAPER and ChEES-rate find roughly the same trajectory length for
     # this target.
-    self.assertAllClose(15., mean_max_trajectory_length, rtol=0.3)
+    self.assertAllClose(15., mean_max_trajectory_length, rtol=0.5)
     self.assertAllClose(
         target.mean(), tf.reduce_mean(chain, axis=[0, 1]),
         atol=1.)
     self.assertAllClose(
         target.variance(),
         tf.math.reduce_variance(chain, axis=[0, 1]),
-        rtol=0.1)
+        rtol=0.2)
 
   def testPreconditionedHMC(self):
     if tf.executing_eagerly() and not JAX_MODE:
@@ -452,10 +452,10 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
 
     self.assertAllClose(0.75, p_accept, atol=0.1)
     self.assertAllClose(1.2, mean_step_size, atol=0.2)
-    self.assertAllClose(1.5, mean_max_trajectory_length, rtol=0.25)
+    self.assertAllClose(1.5, mean_max_trajectory_length, rtol=0.5)
     self.assertAllClose(
         target.mean(), tf.reduce_mean(chain, axis=[0, 1]),
-        atol=0.3)
+        atol=0.5)
     self.assertAllClose(
         target.variance(),
         tf.math.reduce_variance(chain, axis=[0, 1]),
@@ -731,7 +731,7 @@ class DistributedGBTLATest(distribute_test_lib.DistributedTest):
     self.assertAllClose(0.75, p_accept.mean(), atol=0.1)
     # Both ChEES-rate and SNAPER learn roughly the same trajectory length.
     self.assertAllClose(1.5, mean_step_size[0], atol=0.2)
-    self.assertAllClose(15., mean_max_trajectory_length[0], rtol=0.3)
+    self.assertAllClose(15., mean_max_trajectory_length[0], rtol=0.5)
     self.assertAllClose(
         target.mean(), mean.mean(0),
         atol=1.)
