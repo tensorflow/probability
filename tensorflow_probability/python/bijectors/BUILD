@@ -1854,6 +1854,7 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "real_nvp_test",
     size = "small",
+    timeout = "moderate",
     srcs = ["real_nvp_test.py"],
     deps = [
         ":inline",
