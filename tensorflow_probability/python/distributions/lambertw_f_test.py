@@ -205,7 +205,7 @@ class LambertWNormalTest(test_util.TestCase):
     model.compile(optimizer=optimizer, loss=negloglik)
 
     model.fit(x, y, epochs=1, verbose=True, batch_size=32, validation_split=0.2)
-    self.assertGreater(model.history.history["val_loss"][0], -np.Inf)
+    self.assertGreater(model.history.history["val_loss"][0], -np.inf)
 
 
 if __name__ == "__main__":

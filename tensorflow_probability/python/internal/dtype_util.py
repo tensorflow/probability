@@ -231,6 +231,15 @@ def common_dtype(args, dtype_hint=None):
       lambda dt, h: base_dtype(h if dt is None else dt), dtype, dtype_hint)
 
 
+def _issctype(x):
+  if not isinstance(x, (type, np.dtype)):
+    return False
+  try:
+    return np.dtype(x) != np.object_
+  except:  # pylint: disable=bare-except
+    return False
+
+
 def convert_to_dtype(tensor_or_dtype, dtype=None, dtype_hint=None):
   """Get a dtype from a list/tensor/dtype using convert_to_tensor semantics."""
   if tensor_or_dtype is None:
@@ -244,7 +253,7 @@ def convert_to_dtype(tensor_or_dtype, dtype=None, dtype_hint=None):
   # Numpy dtypes defer to dtype/dtype_hint
   elif isinstance(tensor_or_dtype, np.ndarray):
     dt = base_dtype(dtype or dtype_hint or tensor_or_dtype.dtype)
-  elif np.issctype(tensor_or_dtype):
+  elif _issctype(tensor_or_dtype):
     dt = base_dtype(dtype or dtype_hint or tensor_or_dtype)
   else:
     # If this is a Python object, call `convert_to_tensor` and grab the dtype.

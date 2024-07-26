@@ -89,8 +89,12 @@ def assert_scalar_congruency(bijector,
   ten_x_pts = np.linspace(lower_x, upper_x, num=10).astype(np.float32)
   if bijector.dtype is not None:
     ten_x_pts = ten_x_pts.astype(dtype_util.as_numpy_dtype(bijector.dtype))
-    lower_x = np.cast[dtype_util.as_numpy_dtype(bijector.dtype)](lower_x)
-    upper_x = np.cast[dtype_util.as_numpy_dtype(bijector.dtype)](upper_x)
+    lower_x = np.asarray(
+        lower_x, dtype=dtype_util.as_numpy_dtype(bijector.dtype)
+    )
+    upper_x = np.asarray(
+        upper_x, dtype=dtype_util.as_numpy_dtype(bijector.dtype)
+    )
   forward_on_10_pts = bijector.forward(ten_x_pts)
 
   # Set the lower/upper limits in the range of the bijector.

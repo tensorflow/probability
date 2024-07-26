@@ -179,7 +179,9 @@ class DtypeUtilTest(test_util.TestCase):
       disable_numpy=True,
       reason='`convert_to_tensor` respects array dtypes in numpy backend.')
   def testConvertToDtype(self, tensor_or_dtype, dtype, dtype_hint):
-    if np.issctype(tensor_or_dtype):
+    if isinstance(tensor_or_dtype, np.generic) or hasattr(
+        tensor_or_dtype, 'dtype'
+    ):
       example_tensor = np.zeros([], tensor_or_dtype)
     elif isinstance(tensor_or_dtype, tf.DType):
       example_tensor = tf.zeros([], tensor_or_dtype)
@@ -203,7 +205,7 @@ class DtypeUtilTest(test_util.TestCase):
       disable_jax=True,
       reason='`convert_to_tensor` only raises in TF mode.')
   def testConvertToDTypeRaises(self, tensor_or_dtype, dtype, dtype_hint):
-    if np.issctype(tensor_or_dtype):
+    if isinstance(tensor_or_dtype, np.generic):
       example_tensor = np.zeros([], tensor_or_dtype)
     elif isinstance(tensor_or_dtype, tf.DType):
       example_tensor = tf.zeros([], tensor_or_dtype)
