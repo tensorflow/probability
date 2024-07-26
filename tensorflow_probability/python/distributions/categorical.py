@@ -333,6 +333,32 @@ class Categorical(
         _mul_exp(log_probs, log_probs),
         axis=-1)
 
+  def _mean(self):
+    if self._logits is None:
+      # If we only have probs, there's not much we can do to ensure numerical
+      # precision.
+      log_probs = tf.math.log(self._probs)
+    else:
+      log_probs = tf.math.log_softmax(self._logits)
+    labels = tf.range(self._num_categories(log_probs), dtype=log_probs.dtype)
+    mean = tf.reduce_sum(_mul_exp(labels, log_probs), axis=-1)
+    tensorshape_util.set_shape(mean, log_probs.shape[:-1])
+    return mean
+
+  def _variance(self):
+    if self._logits is None:
+      # If we only have probs, there's not much we can do to ensure numerical
+      # precision.
+      log_probs = tf.math.log(self._probs)
+    else:
+      log_probs = tf.math.log_softmax(self._logits)
+    labels = tf.range(self._num_categories(log_probs), dtype=log_probs.dtype)
+    mean = tf.reduce_sum(_mul_exp(labels, log_probs), axis=-1, keepdims=True)
+    var = tf.reduce_sum(
+        _mul_exp(tf.math.squared_difference(labels, mean), log_probs), axis=-1)
+    tensorshape_util.set_shape(var, log_probs.shape[:-1])
+    return var
+
   def _mode(self):
     x = self._probs if self._logits is None else self._logits
     mode = tf.cast(tf.argmax(x, axis=-1), self.dtype)

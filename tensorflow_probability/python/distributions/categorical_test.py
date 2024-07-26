@@ -500,6 +500,25 @@ class CategoricalTest(test_util.TestCase):
     self.assertEqual(3, tensorshape_util.rank(log_prob.shape))
     self.assertAllEqual([2, 2, 2], log_prob.shape)
 
+  def testMean(self):
+    histograms = np.array([[[0.2, 0.8], [0.6, 0.4]]])
+    dist = categorical.Categorical(
+        tf.math.log(histograms) - 50., validate_args=True)
+    self.assertAllClose([[0.8, 0.4]], self.evaluate(dist.mean()))
+
+  def testMeanHuge(self):
+    num_logits = 10_000_000
+    dist = categorical.Categorical(
+        tf.zeros(num_logits), validate_args=True)
+    self.assertAllClose(num_logits / 2, self.evaluate(dist.mean()))
+
+  def testVariance(self):
+    histograms = np.array([[[0.2, 0.8], [0.6, 0.4]]])
+    dist = categorical.Categorical(
+        tf.math.log(histograms) - 50., validate_args=True)
+    self.assertAllClose(
+        [[0.2 * 0.8, 0.6 * 0.4]], self.evaluate(dist.variance()))
+
   def testMode(self):
     histograms = np.array([[[0.2, 0.8], [0.6, 0.4]]])
     dist = categorical.Categorical(
