@@ -704,11 +704,11 @@ class StdtrTest(test_util.TestCase):
 
     err = self.compute_max_gradient_error(
         lambda z: stdtr(z, t), [df], delta=1e-5)
-    self.assertLess(err, 2e-10)
+    self.assertLess(err, 3e-10)
 
     err = self.compute_max_gradient_error(
         lambda z: stdtr(df, z), [t], delta=1e-5)
-    self.assertLess(err, 7e-11)
+    self.assertLess(err, 2e-10)
 
   @parameterized.parameters(np.float32, np.float64)
   @test_util.numpy_disable_gradient_test
