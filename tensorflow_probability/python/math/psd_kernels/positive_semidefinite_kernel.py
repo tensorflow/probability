@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import slicing
@@ -133,6 +134,11 @@ class PositiveSemidefiniteKernel(tf.Module, metaclass=abc.ABCMeta):
     although the typical usage of `apply` (eg, building a matrix diagonal) will
     also have `example_ndims` 1.
 
+  Inputs may also be nested structures, in which case the batch and example
+  dimensions of all elements must broadcast. The number of feature dimensions of
+  each element must be equal to the corresponding element of the `feature_ndims`
+  structure.
+
   ##### Examples
 
     ```python
@@ -189,9 +195,11 @@ class PositiveSemidefiniteKernel(tf.Module, metaclass=abc.ABCMeta):
     """Construct a PositiveSemidefiniteKernel (subclass) instance.
 
     Args:
-      feature_ndims: Python `integer` indicating the number of dims (the rank)
-        of the feature space this kernel acts on.
-      dtype: `DType` on which this kernel operates.
+      feature_ndims: Python `integer`, or nested structure of integers,
+        indicating the number of dims (the rank) of the feature space this
+        kernel acts on.
+      dtype: `DType` on which this kernel operates. Must have the same nested
+        structure as `feature_ndims`.
       name: Python `str` name prefixed to Ops created by this class. Default:
         subclass name.
       validate_args: Python `bool`, default `False`. When `True` kernel
@@ -201,8 +209,11 @@ class PositiveSemidefiniteKernel(tf.Module, metaclass=abc.ABCMeta):
       parameters: Python `dict` of constructor arguments.
 
     Raises:
-      ValueError: if `feature_ndims` is not an integer greater than 0
-    Inputs to PositiveSemidefiniteKernel methods partition into 3 pieces:
+      ValueError: if `feature_ndims` (or any element, if nested) is not an
+        integer greater than or equal to 0.
+
+    Inputs to PositiveSemidefiniteKernel methods (or each element, if nested)
+    partition into 3 pieces:
 
     ```none
     [b1, ..., bB, e1, ..., eE, f1, ..., fF]
@@ -216,11 +227,17 @@ class PositiveSemidefiniteKernel(tf.Module, metaclass=abc.ABCMeta):
     dimensions belong to the feature dimensions. This enables us to predict
     which shape dimensions will be 'reduced' away during kernel computation.
     """
-    if not (isinstance(feature_ndims, int) and feature_ndims > 0):
+    if not all(isinstance(ndim, int) and ndim >= 0
+               for ndim in tf.nest.flatten(feature_ndims)):
       raise ValueError(
-          '`feature_ndims` must be a Python `integer` greater than zero. ' +
-          f'Got: {feature_ndims}')
+          '`feature_ndims` must contain only Python `integer`s greater than '
+          f'or equal to zero. Got: {feature_ndims}')
     self._feature_ndims = feature_ndims
+
+    # If dtype is not provided, ensure that it has the same nested structure as
+    # the kernel's inputs.
+    if dtype is None:
+      dtype = nest_util.broadcast_structure(feature_ndims, None)
     self._dtype = dtype
     if not name or name[-1] != '/':  # `name` is not a name scope
       name = tf.name_scope(name or type(self).__name__).name
@@ -340,16 +357,19 @@ class PositiveSemidefiniteKernel(tf.Module, metaclass=abc.ABCMeta):
     or, in words: rank-`D` real-valued tensors of shape `[d1, ..., dD]`. Inputs
     can be vectors in some `R^N`, but are not restricted to be. Indeed, one
     might consider kernels over matrices, tensors, or even more general spaces,
-    like strings or graphs.
+    like strings or graphs. Inputs may also be nested structures, in which case
+    `feature_ndims` is a parallel nested structure containing the feature rank
+    of each component.
 
     Returns:
-      The number of feature dimensions (feature rank) of this kernel.
+      The (possibly nested) number of feature dimensions (feature rank) of this
+      kernel.
     """
     return self._feature_ndims
 
   @property
   def dtype(self):
-    """DType over which the kernel operates."""
+    """(Nested) dype over which the kernel operates."""
     return self._dtype
 
   @property
@@ -518,19 +538,24 @@ class PositiveSemidefiniteKernel(tf.Module, metaclass=abc.ABCMeta):
     """Apply the kernel function pairs of inputs.
 
     Args:
-      x1: `Tensor` input to the kernel, of shape `B1 + E1 + F`, where `B1` and
-        `E1` may be empty (ie, no batch/example dims, resp.) and `F` (the
-        feature shape) must have rank equal to the kernel's `feature_ndims`
-        property. Batch shape must broadcast with the batch shape of `x2` and
-        with the kernel's batch shape. Example shape must broadcast with example
-        shape of `x2`. `x1` and `x2` must have the same *number* of example dims
-        (ie, same rank).
-      x2: `Tensor` input to the kernel, of shape `B2 + E2 + F`, where `B2` and
-        `E2` may be empty (ie, no batch/example dims, resp.) and `F` (the
-        feature shape) must have rank equal to the kernel's `feature_ndims`
-        property. Batch shape must broadcast with the batch shape of `x2` and
-        with the kernel's batch shape. Example shape must broadcast with example
-        shape of `x2`. `x1` and `x2` must have the same *number* of example
+      x1: (Nested) `Tensor` input to the kernel, of shape `B1 + E1 + F`, where
+        `B1` and `E1` may be empty (ie, no batch/example dims, resp.). If
+        nested, `B1` and `E1` must broadcast across elements of the
+        structure. `F` (the feature shape) must have rank equal to the
+        kernel's `feature_ndims` property, or to the corresponding element of
+        the `feature_ndims` nested structure. Batch shape must broadcast with
+        the batch shape of `x2` and with the kernel's batch shape. Example
+        shape must broadcast with example shape of `x2`. `x1` and `x2` must
+        have the same *number* of example dims (ie, same rank).
+      x2: (Nested) `Tensor` input to the kernel, of shape `B2 + E2 + F`, where
+        `B2` and `E2` may be empty (ie, no batch/example dims, resp.). If
+        nested, `B1` and `E1` must broadcast across elements of the
+        structure. `F` (the feature shape) must have rank equal to the
+        kernel's `feature_ndims` property, or to the corresponding element of
+        the `feature_ndims` nested structure. Batch shape must broadcast with
+        the batch shape of `x2` and with the kernel's batch shape. Example
+        shape must broadcast with example shape of `x2`. `x1` and `x2` must
+        have the same *number* of example dims (ie, same rank).
       example_ndims: A python integer, the number of example dims in the inputs.
         In essence, this parameter controls how broadcasting of the kernel's
         batch shape with input batch shapes works. The kernel batch shape will
@@ -625,8 +650,10 @@ class PositiveSemidefiniteKernel(tf.Module, metaclass=abc.ABCMeta):
 
     """
     with self._name_and_control_scope(name):
-      x1 = tf.convert_to_tensor(x1, name='x1', dtype_hint=self.dtype)
-      x2 = tf.convert_to_tensor(x2, name='x2', dtype_hint=self.dtype)
+      x1 = nest_util.convert_to_nested_tensor(
+          x1, name='x1', dtype_hint=self.dtype, allow_packing=True)
+      x2 = nest_util.convert_to_nested_tensor(
+          x2, name='x2', dtype_hint=self.dtype, allow_packing=True)
       return self._call_apply(x1, x2, example_ndims=example_ndims)
 
   def _call_apply(self, x1, x2, example_ndims):
@@ -634,8 +661,9 @@ class PositiveSemidefiniteKernel(tf.Module, metaclass=abc.ABCMeta):
 
     if should_expand_dims:
       example_ndims += 1
-      x1 = tf.expand_dims(x1, -(self.feature_ndims + 1))
-      x2 = tf.expand_dims(x2, -(self.feature_ndims + 1))
+      expand_x_dims = lambda x, n: tf.expand_dims(x, -(n + 1))
+      x1 = tf.nest.map_structure(expand_x_dims, x1, self.feature_ndims)
+      x2 = tf.nest.map_structure(expand_x_dims, x2, self.feature_ndims)
 
     result = self._apply(x1, x2, example_ndims=example_ndims)
 
@@ -653,26 +681,28 @@ class PositiveSemidefiniteKernel(tf.Module, metaclass=abc.ABCMeta):
     times. See tests and existing subclasses for examples.
 
     Args:
-      x1: `Tensor` input to the first positional parameter of the kernel, of
-        shape `B1 + E1 + F`, where `B1` may be empty (ie, no batch dims, resp.),
-        `E1` is a shape of rank at least 1, and `F` (the feature shape) must
-        have rank equal to the kernel's `feature_ndims` property. Batch shape
-        must broadcast with the batch shape of `x2` and with the kernel's batch
-        shape. Example shape must broadcast with example shape of `x2` (They
-        don't strictly need to be equal, e.g., when `apply` is called from
-        `matrix`, `x1` and `x2` each have 1's in opposing positions in their
-        example shapes). `x1` and `x2` must have the same *number* of example
-        dims (ie, same rank).
-      x2: `Tensor` input to the second positional parameter of the kernel,
-        shape `B2 + E2 + F`, where `B2` may be empty (ie, no batch dims, resp.),
-        `E2` is a shape of rank at least 1, and `F` (the feature shape) must
-        have rank equal to the kernel's `feature_ndims` property. Batch shape
-        must broadcast with the batch shape of `x1` and with the kernel's batch
-        shape. Example shape must broadcast with example shape of `x1` (They
-        don't strictly need to be equal, e.g., when `apply` is called from
-        `matrix`, `x1` and `x2` each have 1's in opposing positions in their
-        example shapes). `x1` and `x2` must have the same *number* of example
-        dims (ie, same rank).
+      x1: (Nested) `Tensor` input to the first positional parameter of the
+        kernel, of shape `B1 + E1 + F`, where `B1` may be empty (ie, no batch
+        dims, resp.), `E1` is a shape of rank at least 1, and `F` (the
+        feature shape) must have rank equal to the kernel's `feature_ndims`
+        property (or to the corresponding element of `feature_ndims`, if
+        nested). Batch shape must broadcast with the batch shape of `x2` and
+        with the kernel's batch shape. Example shape must broadcast with
+        example shape of `x2` (They don't strictly need to be equal, e.g.,
+        when `apply` is called from `matrix`, `x1` and `x2` each have 1's in
+        opposing positions in their example shapes). `x1` and `x2` must have
+        the same *number* of example dims (ie, same rank).
+      x2: (Nested) `Tensor` input to the second positional parameter of the
+        kernel, shape `B2 + E2 + F`, where `B2` may be empty (ie, no batch
+        dims, resp.), `E2` is a shape of rank at least 1, and `F` (the
+        feature shape) must have rank equal to the kernel's `feature_ndims`
+        property (or to the corresponding element of `feature_ndims`, if
+        nested). Batch shape must broadcast with the batch shape of `x1` and
+        with the kernel's batch shape. Example shape must broadcast with
+        example shape of `x1` (They don't strictly need to be equal, e.g.,
+        when `apply` is called from `matrix`, `x1` and `x2` each have 1's in
+        opposing positions in their example shapes). `x1` and `x2` must have
+        the same *number* of example dims (ie, same rank).
       example_ndims: A python integer greater than or equal to 1, the number of
         example dims in the inputs. In essence, this parameter controls how
         broadcasting of the kernel's batch shape with input batch shapes works.
@@ -692,18 +722,20 @@ class PositiveSemidefiniteKernel(tf.Module, metaclass=abc.ABCMeta):
     """Construct (batched) matrices from (batches of) collections of inputs.
 
     Args:
-      x1: `Tensor` input to the first positional parameter of the kernel, of
-        shape `B1 + [e1] + F`, where `B1` may be empty (ie, no batch dims,
-        resp.), `e1` is a single integer (ie, `x1` has example ndims exactly 1),
-        and `F` (the feature shape) must have rank equal to the kernel's
-        `feature_ndims` property. Batch shape must broadcast with the batch
-        shape of `x2` and with the kernel's batch shape.
-      x2: `Tensor` input to the second positional parameter of the kernel,
-        shape `B2 + [e2] + F`, where `B2` may be empty (ie, no batch dims,
-        resp.), `e2` is a single integer (ie, `x2` has example ndims exactly 1),
-        and `F` (the feature shape) must have rank equal to the kernel's
-        `feature_ndims` property. Batch shape must broadcast with the batch
-        shape of `x1` and with the kernel's batch shape.
+      x1: (Nested) `Tensor` input to the first positional parameter of the
+        kernel, of shape `B1 + [e1] + F`, where `B1` may be empty (ie, no
+        batch dims, resp.), `e1` is a single integer (ie, `x1` has example
+        ndims exactly 1), and `F` (the feature shape) must have rank equal to
+        the kernel's `feature_ndims` property (or to the corresponding
+        element of `feature_ndims`, if nested). Batch shape must broadcast
+        with the batch shape of `x2` and with the kernel's batch shape.
+      x2: (Nested) `Tensor` input to the second positional parameter of the
+        kernel, shape `B2 + [e2] + F`, where `B2` may be empty (ie, no batch
+        dims, resp.), `e2` is a single integer (ie, `x2` has example ndims
+        exactly 1), and `F` (the feature shape) must have rank equal to the
+        kernel's `feature_ndims` property (or to the corresponding element of
+        `feature_ndims`, if nested). Batch shape must broadcast with the
+        batch shape of `x1` and with the kernel's batch shape.
       name: name to give to the op
 
     Returns:
@@ -851,33 +883,40 @@ class PositiveSemidefiniteKernel(tf.Module, metaclass=abc.ABCMeta):
 
     """
     with self._name_and_control_scope(name):
-      x1 = tf.convert_to_tensor(x1, name='x1', dtype_hint=self.dtype)
-      x2 = tf.convert_to_tensor(x2, name='x2', dtype_hint=self.dtype)
+      x1 = nest_util.convert_to_nested_tensor(
+          x1, name='x1', dtype_hint=self.dtype, allow_packing=True)
+      x2 = nest_util.convert_to_nested_tensor(
+          x2, name='x2', dtype_hint=self.dtype, allow_packing=True)
       return self._matrix(x1, x2)
 
   def _matrix(self, x1, x2):
-    x1 = util.pad_shape_with_ones(
-        x1, ndims=1, start=-(self.feature_ndims + 1))
-    x2 = util.pad_shape_with_ones(
-        x2, ndims=1, start=-(self.feature_ndims + 2))
+    x1 = tf.nest.map_structure(
+        lambda x, n: util.pad_shape_with_ones(x, ndims=1, start=-(n + 1)),
+        x1, self.feature_ndims)
+    x2 = tf.nest.map_structure(
+        lambda x, n: util.pad_shape_with_ones(x, ndims=1, start=-(n + 2)),
+        x2, self.feature_ndims)
+
     return self._call_apply(x1, x2, example_ndims=2)
 
   def tensor(self, x1, x2, x1_example_ndims, x2_example_ndims, name='tensor'):
     """Construct (batched) tensors from (batches of) collections of inputs.
 
     Args:
-      x1: `Tensor` input to the first positional parameter of the kernel, of
-        shape `B1 + E1 + F`, where `B1` and `E1` arbitrary shapes which may be
-        empty (ie, no batch/example dims, resp.), and `F` (the feature shape)
-        must have rank equal to the kernel's `feature_ndims` property. Batch
-        shape must broadcast with the batch shape of `x2` and with the kernel's
-        batch shape.
-      x2: `Tensor` input to the second positional parameter of the kernel,
-        shape `B2 + E2 + F`, where `B2` and `E2` arbitrary shapes which may be
-        empty (ie, no batch/example dims, resp.), and `F` (the feature shape)
-        must have rank equal to the kernel's `feature_ndims` property. Batch
-        shape must broadcast with the batch shape of `x1` and with the kernel's
-        batch shape.
+      x1: (Nested) `Tensor` input to the first positional parameter of the
+        kernel, of shape `B1 + E1 + F`, where `B1` and `E1` arbitrary shapes
+        which may be empty (ie, no batch/example dims, resp.), and `F` (the
+        feature shape) must have rank equal to the kernel's `feature_ndims`
+        property (or to the corresponding element of `feature_ndims`, if
+        nested). Batch shape must broadcast with the batch shape of `x2` and
+        with the kernel's batch shape.
+      x2: (Nested) `Tensor` input to the second positional parameter of the
+        kernel, shape `B2 + E2 + F`, where `B2` and `E2` arbitrary shapes
+        which may be empty (ie, no batch/example dims, resp.), and `F` (the
+        feature shape) must have rank equal to the kernel's `feature_ndims`
+        property (or to the corresponding element of `feature_ndims`, if
+        nested). Batch shape must broadcast with the batch shape of `x1` and
+        with the kernel's batch shape.
       x1_example_ndims: A python integer greater than or equal to 0, the number
         of example dims in the first input. This affects both the alignment of
         batch shapes and the shape of the final output of the function.
@@ -1016,23 +1055,25 @@ class PositiveSemidefiniteKernel(tf.Module, metaclass=abc.ABCMeta):
 
     """
     with self._name_and_control_scope(name):
-      x1 = tf.convert_to_tensor(x1, name='x1', dtype_hint=self.dtype)
-      x2 = tf.convert_to_tensor(x2, name='x2', dtype_hint=self.dtype)
+      x1 = nest_util.convert_to_nested_tensor(
+          x1, name='x1', dtype_hint=self.dtype, allow_packing=True)
+      x2 = nest_util.convert_to_nested_tensor(
+          x2, name='x2', dtype_hint=self.dtype, allow_packing=True)
       # Specialize to the matrix computation.
       if x1_example_ndims == 1 and x2_example_ndims == 1:
         return self._matrix(x1, x2)
       return self._tensor(x1, x2, x1_example_ndims, x2_example_ndims)
 
   def _tensor(self, x1, x2, x1_example_ndims, x2_example_ndims):
-    x1 = util.pad_shape_with_ones(
-        x1,
-        ndims=x2_example_ndims,
-        start=-(self.feature_ndims + 1))
+    x1 = tf.nest.map_structure(
+        lambda x, n: util.pad_shape_with_ones(  # pylint: disable=g-long-lambda
+            x, ndims=x2_example_ndims, start=-(n + 1)),
+        x1, self.feature_ndims)
 
-    x2 = util.pad_shape_with_ones(
-        x2,
-        ndims=x1_example_ndims,
-        start=-(self.feature_ndims + 1 + x2_example_ndims))
+    x2 = tf.nest.map_structure(
+        lambda x, n: util.pad_shape_with_ones(  # pylint: disable=g-long-lambda
+            x, ndims=x1_example_ndims, start=-(n + 1 + x2_example_ndims)),
+        x2, self.feature_ndims)
 
     return self._call_apply(
         x1, x2, example_ndims=(x1_example_ndims + x2_example_ndims))
@@ -1076,7 +1117,7 @@ class PositiveSemidefiniteKernel(tf.Module, metaclass=abc.ABCMeta):
                     else ''),
                 feature_ndims=self.feature_ndims,
                 dtype=None if self.dtype is None
-                else dtype_util.name(self.dtype)))
+                else tf.nest.map_structure(dtype_util.name, self.dtype)))
 
   def __repr__(self):
     return ('<tfp.math.psd_kernels.{type_name} '
@@ -1089,7 +1130,7 @@ class PositiveSemidefiniteKernel(tf.Module, metaclass=abc.ABCMeta):
                 batch_shape=self.batch_shape,
                 feature_ndims=self.feature_ndims,
                 dtype=None if self.dtype is None
-                else dtype_util.name(self.dtype)))
+                else tf.nest.map_structure(dtype_util.name, self.dtype)))
 
   def _parameter_control_dependencies(self, is_init):
     """Returns a list of ops to be executed in members with graph deps.
@@ -1265,10 +1306,12 @@ class _NonCompositeTensorSumKernel(PositiveSemidefiniteKernel):
     parameters = dict(locals())
     if not kernels:
       raise ValueError("Can't create _SumKernel over empty list.")
-    if len(set([k.feature_ndims for k in kernels])) > 1:
-      raise ValueError(
-          "Can't sum kernels with different feature_ndims. Got:\n%s" %
-          str([k.feature_ndims for k in kernels]))
+    ndims = kernels[0].feature_ndims
+    for k in kernels[1:]:
+      if k.feature_ndims != ndims:
+        raise ValueError(
+            "Can't sum kernels with different feature_ndims. Got:\n%s" %
+            str([k.feature_ndims for k in kernels]))
     self._kernels = _flatten_summand_list(kernels)
     if name is None:
       name = 'SumKernel'
@@ -1294,15 +1337,15 @@ class _NonCompositeTensorSumKernel(PositiveSemidefiniteKernel):
     return self._kernels
 
   def _apply(self, x1, x2, example_ndims=0):
-    return sum([k.apply(x1, x2, example_ndims) for k in self.kernels])
+    return sum(k.apply(x1, x2, example_ndims) for k in self.kernels)
 
   def _matrix(self, x1, x2):
-    return sum([k.matrix(x1, x2) for k in self.kernels])
+    return sum(k.matrix(x1, x2) for k in self.kernels)
 
   def _tensor(self, x1, x2, x1_example_ndims, x2_example_ndims):
-    return sum([
+    return sum(
         k.tensor(
-            x1, x2, x1_example_ndims, x2_example_ndims) for k in self.kernels])
+            x1, x2, x1_example_ndims, x2_example_ndims) for k in self.kernels)
 
   def _batch_shape(self):
     return functools.reduce(tf.broadcast_static_shape,
@@ -1366,10 +1409,12 @@ class _NonCompositeTensorProductKernel(PositiveSemidefiniteKernel):
     parameters = dict(locals())
     if not kernels:
       raise ValueError("Can't create _ProductKernel over empty list.")
-    if len(set([k.feature_ndims for k in kernels])) > 1:
-      raise ValueError(
-          "Can't multiply kernels with different feature_ndims. Got:\n%s" %
-          str([k.feature_ndims for k in kernels]))
+    ndims = kernels[0].feature_ndims
+    for k in kernels[1:]:
+      if k.feature_ndims != ndims:
+        raise ValueError(
+            "Can't multiply kernels with different feature_ndims. Got:\n%s" %
+            str([k.feature_ndims for k in kernels]))
     self._kernels = _flatten_multiplicand_list(kernels)
     if name is None:
       name = 'ProductKernel'

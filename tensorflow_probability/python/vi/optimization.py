@@ -22,7 +22,6 @@ from tensorflow_probability.python.math.minimize import minimize
 from tensorflow_probability.python.math.minimize import minimize_stateless
 from tensorflow_probability.python.vi import csiszar_divergence
 
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 _trace_loss = lambda traceable_quantities: traceable_quantities.loss
 
@@ -391,24 +390,12 @@ def fit_surrogate_posterior_stateless(
       name=name)
 
 
-@deprecation.deprecated_args(
-    '2022-03-01',
-    'Custom loss functions are no longer supported in '
-    '`fit_surrogate_posterior`. Instead, use the `discrepancy_fn` argument to '
-    'specify a custom divergence, or pass a custom loss directly to '
-    '`tfp.math.minimize` as '
-    '`loss_fn=functools.partial(variational_loss_fn, '
-    'target_log_prob_fn=target_log_prob_fn, '
-    'surrogate_posterior=surrogate_posterior, '
-    'sample_size=sample_size)`.',
-    'variational_loss_fn')
 def fit_surrogate_posterior(target_log_prob_fn,
                             surrogate_posterior,
                             optimizer,
                             num_steps,
                             convergence_criterion=None,
                             trace_fn=_trace_loss,
-                            variational_loss_fn=None,
                             discrepancy_fn=csiszar_divergence.kl_reverse,
                             sample_size=1,
                             importance_sample_size=1,
@@ -455,8 +442,8 @@ def fit_surrogate_posterior(target_log_prob_fn,
       transformations of unconstrained variables, so that the transformations
       execute at runtime instead of at distribution creation.
     optimizer: Optimizer instance to use. This may be a TF1-style
-      `tf.train.Optimizer`, TF2-style `tf.optimizers.Optimizer`, or any Python
-      object that implements `optimizer.apply_gradients(grads_and_vars)`.
+      `tf.train.Optimizer`, TF2-style `tf_keras.optimizers.Optimizer`, or any
+      Python object that implements `optimizer.apply_gradients(grads_and_vars)`.
     num_steps: Python `int` number of steps to run the optimizer.
     convergence_criterion: Optional instance of
       `tfp.optimizer.convergence_criteria.ConvergenceCriterion`
@@ -476,21 +463,9 @@ def fit_surrogate_posterior(target_log_prob_fn,
       as well as any other quantities captured in the closure of `trace_fn`,
       for example, statistics of a variational distribution.
       Default value: `lambda traceable_quantities: traceable_quantities.loss`.
-    variational_loss_fn: Optional Python `callable` with signature
-      `loss = variational_loss_fn(target_log_prob_fn, surrogate_posterior,
-       sample_size, seed)` defining a variational loss function. The default is
-       a Monte Carlo approximation to the standard evidence lower bound (ELBO),
-       equivalent to minimizing the 'reverse' `KL[q||p]` divergence between the
-       surrogate `q` and true posterior `p`. [1]
-       Default value: `None` (equivalent to `functools.partial(
-         tfp.vi.monte_carlo_variational_loss,
-         discrepancy_fn=tfp.vi.kl_reverse,
-         importance_sample_size=importance_sample_size,
-         use_reparameterization=True)`.
     discrepancy_fn: Python `callable` representing a Csiszar `f` function in
       in log-space. See the docs for `tfp.vi.monte_carlo_variational_loss` for
-      examples. This argument is ignored if a `variational_loss_fn` is
-      explicitly specified.
+      examples.
       Default value: `tfp.vi.kl_reverse`.
     sample_size: Python `int` number of Monte Carlo samples to use
       in estimating the variational divergence. Larger values may stabilize
@@ -501,8 +476,6 @@ def fit_surrogate_posterior(target_log_prob_fn,
       `surrogate_posterior` is optimized to function as an importance-sampling
       proposal distribution. In this case, posterior expectations should be
       approximated by importance sampling, as demonstrated in the example below.
-      This argument is ignored if a `variational_loss_fn` is explicitly
-      specified.
       Default value: `1`.
     trainable_variables: Optional list of `tf.Variable` instances to optimize
       with respect to. If `None`, defaults to the set of all variables accessed
@@ -549,7 +522,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
   losses = tfp.vi.fit_surrogate_posterior(
       conditioned_log_prob,
       surrogate_posterior=q_z,
-      optimizer=tf.optimizers.Adam(learning_rate=0.1),
+      optimizer=tf_keras.optimizers.Adam(learning_rate=0.1),
       num_steps=100)
   print(q_z.mean(), q_z.stddev())  # => approximately [2.5, 1/sqrt(2)]
   ```
@@ -562,7 +535,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
     losses = tfp.vi.fit_surrogate_posterior(
         conditioned_log_prob,
         surrogate_posterior=q_z,
-        optimizer=tf.optimizers.Adam(learning_rate=0.1),
+        optimizer=tf_keras.optimizers.Adam(learning_rate=0.1),
         num_steps=100,
         discrepancy_fn=tfp.vi.kl_forward)
   ```
@@ -616,7 +589,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
         conditioned_log_prob,
         surrogate_posterior=q_z,
         importance_sample_size=10,
-        optimizer=tf.optimizers.Adam(learning_rate=0.1),
+        optimizer=tf_keras.optimizers.Adam(learning_rate=0.1),
         num_steps=200)
 
   # Estimate posterior statistics with importance sampling.
@@ -707,7 +680,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
   losses, log_amplitude_path, sample_path = tfp.vi.fit_surrogate_posterior(
     target_log_prob_fn=lambda *args: model.log_prob(args),
     surrogate_posterior=q,
-    optimizer=tf.optimizers.Adam(learning_rate=0.1),
+    optimizer=tf_keras.optimizers.Adam(learning_rate=0.1),
     sample_size=1,
     num_steps=500,
     trace_fn=lambda loss, grads, vars: (loss, kernel_log_amplitude,
@@ -730,17 +703,16 @@ def fit_surrogate_posterior(target_log_prob_fn,
 
   """
 
-  if variational_loss_fn is None:
-    variational_loss_fn = functools.partial(
-        csiszar_divergence.monte_carlo_variational_loss,
-        discrepancy_fn=discrepancy_fn,
-        importance_sample_size=importance_sample_size,
-        # Silent fallback to score-function gradients leads to
-        # difficult-to-debug failures, so force reparameterization gradients by
-        # default.
-        gradient_estimator=(
-            csiszar_divergence.GradientEstimators.REPARAMETERIZATION),
-        )
+  variational_loss_fn = functools.partial(
+      csiszar_divergence.monte_carlo_variational_loss,
+      discrepancy_fn=discrepancy_fn,
+      importance_sample_size=importance_sample_size,
+      # Silent fallback to score-function gradients leads to
+      # difficult-to-debug failures, so force reparameterization gradients by
+      # default.
+      gradient_estimator=(
+          csiszar_divergence.GradientEstimators.REPARAMETERIZATION),
+      )
 
   def complete_variational_loss_fn(seed=None):
     return variational_loss_fn(

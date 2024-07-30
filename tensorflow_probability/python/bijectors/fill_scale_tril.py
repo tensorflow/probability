@@ -20,6 +20,7 @@ from tensorflow_probability.python.bijectors import fill_triangular
 from tensorflow_probability.python.bijectors import shift
 from tensorflow_probability.python.bijectors import softplus
 from tensorflow_probability.python.bijectors import transform_diagonal
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
 
@@ -27,6 +28,8 @@ from tensorflow_probability.python.internal import tensor_util
 __all__ = [
     'FillScaleTriL',
 ]
+
+JAX_MODE = False
 
 
 class FillScaleTriL(chain.Chain):
@@ -103,15 +106,18 @@ class FillScaleTriL(chain.Chain):
 
     Raises:
       TypeError, if `diag_bijector` is not an instance of
-        `tf.__internal__.CompositeTensor`.
+        `tf.__internal__.CompositeTensor` (or a pytree in JAX mode).
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       if diag_bijector is None:
         diag_bijector = softplus.Softplus(validate_args=validate_args)
-      if not isinstance(diag_bijector, tf.__internal__.CompositeTensor):
-        raise TypeError('`diag_bijector` must be an instance of '
-                        '`tf.__internal__.CompositeTensor`.')
+      if not auto_composite_tensor.is_composite_tensor(diag_bijector):
+        if JAX_MODE:
+          raise TypeError('`diag_bijector` must be a pytree.')
+        else:
+          raise TypeError('`diag_bijector` must be an instance of '
+                          '`tf.__internal__.CompositeTensor`.')
 
       if diag_shift is not None:
         dtype = dtype_util.common_dtype([diag_bijector, diag_shift], tf.float32)

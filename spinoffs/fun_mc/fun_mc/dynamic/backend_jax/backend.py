@@ -14,18 +14,19 @@
 # ============================================================================
 """JAX backend."""
 
-from fun_mc.dynamic.backend_jax import tf_on_jax
+import jax
+import jax.numpy as jnp
+
 from fun_mc.dynamic.backend_jax import util
 from tensorflow_probability.substrates import jax as tfp
 from tensorflow_probability.substrates.jax.internal import distribute_lib
 from tensorflow_probability.substrates.jax.internal import prefer_static
 
-tf = tf_on_jax.tf
-
 __all__ = [
     'distribute_lib',
     'prefer_static',
-    'tf',
+    'jax',
+    'jnp',
     'tfp',
     'util',
 ]

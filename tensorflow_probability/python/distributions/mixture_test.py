@@ -720,17 +720,16 @@ class MixtureTest(test_util.TestCase):
     ]
 
     for x_tensor in xs_to_check:
-      with self.cached_session() as sess:
-        x_cdf_tf_result, x_log_cdf_tf_result = sess.run(
-            [mixture_tf.cdf(x_tensor), mixture_tf.log_cdf(x_tensor)])
+      x_cdf_tf_result, x_log_cdf_tf_result = self.evaluate(
+          [mixture_tf.cdf(x_tensor), mixture_tf.log_cdf(x_tensor)])
 
-        # Compute the cdf with scipy.
-        scipy_component_cdfs = [stats.norm.cdf(x=x_tensor, loc=mu, scale=sigma)
-                                for (mu, sigma) in zip(means, sigmas)]
-        scipy_cdf_result = np.dot(mixture_weights,
-                                  np.array(scipy_component_cdfs))
-        self.assertAllClose(x_cdf_tf_result, scipy_cdf_result)
-        self.assertAllClose(np.exp(x_log_cdf_tf_result), scipy_cdf_result)
+      # Compute the cdf with scipy.
+      scipy_component_cdfs = [stats.norm.cdf(x=x_tensor, loc=mu, scale=sigma)
+                              for (mu, sigma) in zip(means, sigmas)]
+      scipy_cdf_result = np.dot(mixture_weights,
+                                np.array(scipy_component_cdfs))
+      self.assertAllClose(x_cdf_tf_result, scipy_cdf_result)
+      self.assertAllClose(np.exp(x_log_cdf_tf_result), scipy_cdf_result)
 
   def testCdfBatchUnivariate(self):
     """Tests against scipy for a (batch of) mixture(s) of seven gaussians."""
@@ -764,21 +763,20 @@ class MixtureTest(test_util.TestCase):
     ]
 
     for x_tensor in xs_to_check:
-      with self.cached_session() as sess:
-        x_cdf_tf_result, x_log_cdf_tf_result = sess.run(
-            [mixture_tf.cdf(x_tensor), mixture_tf.log_cdf(x_tensor)])
+      x_cdf_tf_result, x_log_cdf_tf_result = self.evaluate(
+          [mixture_tf.cdf(x_tensor), mixture_tf.log_cdf(x_tensor)])
 
-        # Compute the cdf with scipy.
-        scipy_component_cdfs = [stats.norm.cdf(x=x_tensor, loc=mu, scale=sigma)
-                                for (mu, sigma) in zip(means, sigmas)]
-        weights_and_cdfs = zip(np.transpose(mixture_weights, axes=[1, 0]),
-                               scipy_component_cdfs)
-        final_cdf_probs_per_component = [
-            np.multiply(c_p_value, d_cdf_value)
-            for (c_p_value, d_cdf_value) in weights_and_cdfs]
-        scipy_cdf_result = np.sum(final_cdf_probs_per_component, axis=0)
-        self.assertAllClose(x_cdf_tf_result, scipy_cdf_result)
-        self.assertAllClose(np.exp(x_log_cdf_tf_result), scipy_cdf_result)
+      # Compute the cdf with scipy.
+      scipy_component_cdfs = [stats.norm.cdf(x=x_tensor, loc=mu, scale=sigma)
+                              for (mu, sigma) in zip(means, sigmas)]
+      weights_and_cdfs = zip(np.transpose(mixture_weights, axes=[1, 0]),
+                             scipy_component_cdfs)
+      final_cdf_probs_per_component = [
+          np.multiply(c_p_value, d_cdf_value)
+          for (c_p_value, d_cdf_value) in weights_and_cdfs]
+      scipy_cdf_result = np.sum(final_cdf_probs_per_component, axis=0)
+      self.assertAllClose(x_cdf_tf_result, scipy_cdf_result)
+      self.assertAllClose(np.exp(x_log_cdf_tf_result), scipy_cdf_result)
 
   def testSampleBimixGamma(self):
     """Tests a bug in the underlying tfd.Gamma op.
@@ -802,14 +800,15 @@ class MixtureTest(test_util.TestCase):
                                 shape=tf.TensorShape(None))
     loc = tf.Variable(np.zeros((3, 5, 4)), dtype=tf.float32,
                       shape=tf.TensorShape(None))
-    scale = tf.Variable(1., dtype=tf.float32, shape=tf.TensorShape(None))
+    scale_diag = tf.Variable(
+        np.ones((3, 5, 4)), dtype=tf.float32, shape=tf.TensorShape(None))
 
     dist = mixture.Mixture(
         categorical.Categorical(logits=logits),
         components=[
             dirichlet.Dirichlet(concentration),
             mvn_diag.MultivariateNormalDiag(
-                loc=loc, scale_identity_multiplier=scale)
+                loc=loc, scale_diag=scale_diag)
         ],
         validate_args=True)
 

@@ -449,13 +449,14 @@ class TransformedTransitionKernelTest(test_util.TestCase):
                      outer_pkr_two.inner_results.inner_results.accepted_results)
 
     seed = test_util.test_seed(sampler_type='stateless')
+    dup_seed = lambda: test_util.clone_seed(seed)
     outer_results_one, outer_results_two = self.evaluate([
-        outer_kernel.one_step(2., outer_pkr_one, seed=seed),
-        outer_kernel.one_step(9., outer_pkr_two, seed=seed)
+        outer_kernel.one_step(2., outer_pkr_one, seed=dup_seed()),
+        outer_kernel.one_step(9., outer_pkr_two, seed=dup_seed())
     ])
     chain_results_one, chain_results_two = self.evaluate([
-        chain_kernel.one_step(2., chain_pkr_one, seed=seed),
-        chain_kernel.one_step(9., chain_pkr_two, seed=seed)
+        chain_kernel.one_step(2., chain_pkr_one, seed=dup_seed()),
+        chain_kernel.one_step(9., chain_pkr_two, seed=dup_seed())
     ])
     self.assertNear(chain_results_one[0],
                     outer_results_one[0],

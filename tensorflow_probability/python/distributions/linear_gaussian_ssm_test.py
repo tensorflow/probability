@@ -943,8 +943,8 @@ class _MissingObservationsTests(test_util.TestCase):
 
     big_mask = np.random.randn(*np.concatenate(
         [[1, 2, 3], sample_shape, [num_timesteps]], axis=0)) > 0
-    with self.assertRaisesRegexp(ValueError,
-                                 'mask cannot have higher rank than x'):
+    with self.assertRaisesRegex(ValueError,
+                                'mask cannot have higher rank than x'):
       (log_likelihoods, filtered_means, filtered_covs, _, _, _,
        _) = model.forward_filter(
            x=observed_time_series, mask=big_mask)
@@ -971,11 +971,12 @@ class _MissingObservationsTests(test_util.TestCase):
         model_with_mask.posterior_marginals(observed_time_series),
         model.posterior_marginals(observed_time_series, mask=observation_mask))
     seed = test_util.test_seed(sampler_type='stateless')
+    seed2 = test_util.clone_seed(seed)
     self.assertAllEqual(
         model_with_mask.posterior_sample(
             observed_time_series, seed=seed),
         model.posterior_sample(
-            observed_time_series, mask=observation_mask, seed=seed))
+            observed_time_series, mask=observation_mask, seed=seed2))
 
 
 class MissingObservationsTestsSequential(_MissingObservationsTests):
@@ -1627,7 +1628,7 @@ class _AugmentSampleShapeTest(object):
 class AugmentSampleShapeTestStatic(test_util.TestCase, _AugmentSampleShapeTest):
 
   def assertRaisesError(self, msg):
-    return self.assertRaisesRegexp(Exception, msg)
+    return self.assertRaisesRegex(Exception, msg)
 
   def build_inputs(self, full_batch_shape, partial_batch_shape):
 
@@ -1647,7 +1648,7 @@ class AugmentSampleShapeTestDynamic(test_util.TestCase,
 
   def assertRaisesError(self, msg):
     if tf.executing_eagerly():
-      return self.assertRaisesRegexp(Exception, msg)
+      return self.assertRaisesRegex(Exception, msg)
     else:
       return self.assertRaisesOpError(msg)
 

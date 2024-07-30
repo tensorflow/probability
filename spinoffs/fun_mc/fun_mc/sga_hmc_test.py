@@ -20,17 +20,16 @@ import os
 # Dependency imports
 
 from absl.testing import parameterized
-import jax
-from jax.config import config as jax_config
+from jax import config as jax_config
 import tensorflow.compat.v2 as real_tf
-
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from fun_mc import backend
 from fun_mc import fun_mc_lib as fun_mc
 from fun_mc import sga_hmc
 from fun_mc import test_util
 
-tf = backend.tf
+jax = backend.jax
+jnp = backend.jnp
 tfp = backend.tfp
 util = backend.util
 tfd = tfp.distributions
@@ -39,13 +38,16 @@ Root = tfd.JointDistributionCoroutine.Root
 
 
 real_tf.enable_v2_behavior()
+real_tf.experimental.numpy.experimental_enable_numpy_behavior()
 jax_config.update('jax_enable_x64', True)
 
 BACKEND = None  # Rewritten by backends/rewrite.py.
 
 if BACKEND == 'backend_jax':
-  os.environ['XLA_FLAGS'] = (f'{os.environ.get("XLA_FLAGS", "")} '
-                             '--xla_force_host_platform_device_count=4')
+  os.environ['XLA_FLAGS'] = (
+      f'{os.environ.get("XLA_FLAGS", "")} '
+      '--xla_force_host_platform_device_count=4'
+  )
 
 
 def _test_seed():
@@ -53,37 +55,43 @@ def _test_seed():
 
 
 class SGAHMCTest(tfp_test_util.TestCase):
+  _is_on_jax = BACKEND == 'backend_jax'
 
   def _make_seed(self, seed):
-    return util.make_tensor_seed([seed, 0])
+    if self._is_on_jax:
+      return jax.random.PRNGKey(seed)
+    else:
+      return util.make_tensor_seed([seed, 0])
 
   @property
   def _dtype(self):
     raise NotImplementedError()
 
   def _constant(self, value):
-    return tf.constant(value, self._dtype)
+    return jnp.array(value, self._dtype)
 
   def testHMCWithStateGrads(self):
-    trajectory_length = 1.
+    trajectory_length = 1.0
     epsilon = 1e-3
 
     seed = self._make_seed(_test_seed())
 
     def hmc_step(trajectory_length, axis_name=()):
-
       @tfp.experimental.distribute.JointDistributionCoroutine
       def model():
-        z = yield Root(tfd.Normal(0., 1))
+        z = yield Root(tfd.Normal(0.0, 1))
         yield tfp.experimental.distribute.Sharded(
-            tfd.Sample(tfd.Normal(z, 1.), 8), axis_name)
+            tfd.Sample(tfd.Normal(z, 1.0), 8), axis_name
+        )
 
       @tfp.experimental.distribute.JointDistributionCoroutine
       def momentum_dist():
-        yield Root(tfd.Normal(0., 2))
+        yield Root(tfd.Normal(0.0, 2))
         yield Root(
             tfp.experimental.distribute.Sharded(
-                tfd.Sample(tfd.Normal(0., 3.), 8), axis_name))
+                tfd.Sample(tfd.Normal(0.0, 3.0), 8), axis_name
+            )
+        )
 
       def target_log_prob_fn(x):
         return model.log_prob(x), ()
@@ -101,31 +109,41 @@ class SGAHMCTest(tfp_test_util.TestCase):
               hmc_state,
               trajectory_length=trajectory_length,
               scalar_step_size=epsilon,
-              step_size_scale=util.map_tree(lambda x: 1. + tf.abs(x), state),
+              step_size_scale=util.map_tree(lambda x: 1.0 + jnp.abs(x), state),
               target_log_prob_fn=target_log_prob_fn,
               seed=seed,
               kinetic_energy_fn=kinetic_energy_fn,
               momentum_sample_fn=momentum_sample_fn,
-              named_axis=model.experimental_shard_axis_names))
+              named_axis=model.experimental_shard_axis_names,
+          )
+      )
 
       def sum_state(x, axis_name):
-        res = tf.reduce_sum(x**2)
+        res = jnp.sum(x**2)
         if axis_name:
           res = backend.distribute_lib.psum(res, axis_name)
         return res
 
-      sum_sq = util.map_tree_up_to(hmc_extra.proposed_state, sum_state,
-                                   hmc_extra.proposed_state,
-                                   model.experimental_shard_axis_names)
+      sum_sq = util.map_tree_up_to(
+          hmc_extra.proposed_state,
+          sum_state,
+          hmc_extra.proposed_state,
+          model.experimental_shard_axis_names,
+      )
       sum_sq = sum(util.flatten_tree(sum_sq))
       return sum_sq, ()
 
     def finite_diff_grad(f, epsilon, x):
-      return (fun_mc.call_potential_fn(f, util.map_tree(
-          lambda x: x + epsilon, x))[0] - fun_mc.call_potential_fn(
-              f, util.map_tree(lambda x: x - epsilon, x))[0]) / (2 * epsilon)
+      return (
+          fun_mc.call_potential_fn(f, util.map_tree(lambda x: x + epsilon, x))[
+              0
+          ]
+          - fun_mc.call_potential_fn(
+              f, util.map_tree(lambda x: x - epsilon, x)
+          )[0]
+      ) / (2 * epsilon)
 
-    f = tf.function(hmc_step)
+    f = jax.jit(hmc_step)
     auto_diff = util.value_and_grad(f, trajectory_length)[2]
     finite_diff = finite_diff_grad(f, epsilon, trajectory_length)
 
@@ -135,13 +153,16 @@ class SGAHMCTest(tfp_test_util.TestCase):
 
       @functools.partial(jax.pmap, axis_name='i')
       def run(_):
-        f = tf.function(lambda trajectory_length: hmc_step(  # pylint: disable=g-long-lambda
-            trajectory_length, axis_name='i'))
+        f = jax.jit(
+            lambda trajectory_length: hmc_step(  # pylint: disable=g-long-lambda
+                trajectory_length, axis_name='i'
+            )
+        )
         auto_diff = util.value_and_grad(f, trajectory_length)[2]
         finite_diff = finite_diff_grad(f, epsilon, trajectory_length)
         return auto_diff, finite_diff
 
-      auto_diff, finite_diff = run(tf.ones(4))
+      auto_diff, finite_diff = run(jnp.ones(4))
       self.assertAllClose(auto_diff, finite_diff, rtol=0.01)
 
   @parameterized.named_parameters(
@@ -175,25 +196,34 @@ class SGAHMCTest(tfp_test_util.TestCase):
     seed = self._make_seed(_test_seed())
     seeds = util.split_seed(seed, 4)
     previous_state = {
-        'global':
-            self._constant(util.random_normal([2, 3], self._dtype, seeds[0])),
-        'local':
-            self._constant(
-                util.random_normal([2, 2, 3], self._dtype, seeds[1]))
+        'global': self._constant(
+            util.random_normal([2, 3], self._dtype, seeds[0])
+        ),
+        'local': self._constant(
+            util.random_normal([2, 2, 3], self._dtype, seeds[1])
+        ),
     }
     named_axis = util.map_tree(lambda _: [], previous_state)
     chain_named_axis = []
     trajectory_length = self._constant(0.5)
     accept_prob = self._constant([0.1, 0.5])
     state_mean = {
-        'global':
-            self._constant(util.random_normal([3], self._dtype, seeds[2])),
-        'local':
-            self._constant(util.random_normal([2, 3], self._dtype, seeds[3]))
+        'global': self._constant(
+            util.random_normal([3], self._dtype, seeds[2])
+        ),
+        'local': self._constant(
+            util.random_normal([2, 3], self._dtype, seeds[3])
+        ),
     }
 
-    def eval_criterion(trajectory_length, previous_state, accept_prob,
-                       chain_named_axis, state_mean, named_axis):
+    def eval_criterion(
+        trajectory_length,
+        previous_state,
+        accept_prob,
+        chain_named_axis,
+        state_mean,
+        named_axis,
+    ):
       extra_kwargs = {}
       if with_trajectory:
         extra_kwargs.update(trajectory_length=trajectory_length)
@@ -203,13 +233,15 @@ class SGAHMCTest(tfp_test_util.TestCase):
       def proposed_state_part(previous_state, named_axis):
         if BACKEND == 'backend_jax':
           part_trajectory_length = distribute_lib.pbroadcast(
-              trajectory_length, [chain_named_axis, named_axis])
+              trajectory_length, [chain_named_axis, named_axis]
+          )
         else:
           part_trajectory_length = trajectory_length
         return (part_trajectory_length + 1) * previous_state
 
-      proposed_state = util.map_tree_up_to(previous_state, proposed_state_part,
-                                           previous_state, named_axis)
+      proposed_state = util.map_tree_up_to(
+          previous_state, proposed_state_part, previous_state, named_axis
+      )
 
       return criterion_fn(
           previous_state=previous_state,
@@ -217,7 +249,8 @@ class SGAHMCTest(tfp_test_util.TestCase):
           accept_prob=accept_prob,
           named_axis=named_axis,
           chain_named_axis=chain_named_axis,
-          **extra_kwargs)
+          **extra_kwargs,
+      )
 
     value, _, grad = fun_mc.call_potential_fn_with_grads(
         functools.partial(
@@ -226,14 +259,16 @@ class SGAHMCTest(tfp_test_util.TestCase):
             chain_named_axis=chain_named_axis,
             accept_prob=accept_prob,
             state_mean=state_mean,
-            named_axis=named_axis), trajectory_length)
+            named_axis=named_axis,
+        ),
+        trajectory_length,
+    )
 
     self.assertEqual(self._dtype, value.dtype)
     self.assertEqual(self._dtype, grad.dtype)
-    self.assertAllGreater(tf.abs(grad), 0.)
+    self.assertAllGreater(jnp.abs(grad), 0.0)
 
     if BACKEND == 'backend_jax':
-
       named_axis = {
           'global': [],
           'local': 'local',
@@ -246,9 +281,9 @@ class SGAHMCTest(tfp_test_util.TestCase):
 
       @functools.partial(jax.pmap, axis_name='chain')
       def run_chain(previous_state, accept_prob):
-
         @functools.partial(
-            jax.pmap, axis_name='local', in_axes=(in_axes, in_axes))
+            jax.pmap, axis_name='local', in_axes=(in_axes, in_axes)
+        )
         def run_state(previous_state, state_mean):
           value, _, grad = fun_mc.call_potential_fn_with_grads(
               functools.partial(
@@ -257,7 +292,10 @@ class SGAHMCTest(tfp_test_util.TestCase):
                   chain_named_axis=chain_named_axis,
                   accept_prob=accept_prob,
                   state_mean=state_mean,
-                  named_axis=named_axis), trajectory_length)
+                  named_axis=named_axis,
+              ),
+              trajectory_length,
+          )
           return value, grad
 
         return run_state(previous_state, state_mean)
@@ -267,43 +305,59 @@ class SGAHMCTest(tfp_test_util.TestCase):
       self.assertAllClose(grad, sharded_grad[0, 0])
 
   def testSGAHMC(self):
-
     @tfd.JointDistributionCoroutine
     def model():
-      x = yield Root(tfd.Normal(self._constant(0.), 1.))
-      yield tfd.Sample(tfd.Normal(x, 1.), 2)
+      x = yield Root(tfd.Normal(self._constant(0.0), 1.0))
+      yield tfd.Sample(tfd.Normal(x, 1.0), 2)
 
     def target_log_prob_fn(x):
       return model.log_prob(x), ()
 
-    @tf.function
+    @jax.jit
     def kernel(sga_hmc_state, step, seed):
       adapt = step < num_adapt_steps
       seed, hmc_seed = util.split_seed(seed, 2)
 
-      sga_hmc_state, sga_hmc_extra = sga_hmc.stochastic_gradient_ascent_hmc_step(
-          sga_hmc_state,
-          scalar_step_size=0.1,
-          target_log_prob_fn=target_log_prob_fn,
-          criterion_fn=sga_hmc.chees_criterion,
-          adapt=adapt,
-          seed=hmc_seed,
+      sga_hmc_state, sga_hmc_extra = (
+          sga_hmc.stochastic_gradient_ascent_hmc_step(
+              sga_hmc_state,
+              scalar_step_size=self._constant(0.1),
+              step_size_scale=self._constant(1.0),
+              target_log_prob_fn=target_log_prob_fn,
+              criterion_fn=sga_hmc.chees_criterion,
+              adapt=adapt,
+              seed=hmc_seed,
+          )
       )
 
-      return (sga_hmc_state, step + 1, seed
-             ), sga_hmc_extra.trajectory_length_params.mean_trajectory_length()
+      return (
+          sga_hmc_state,
+          step + 1,
+          seed,
+      ), sga_hmc_extra.trajectory_length_params.mean_trajectory_length()
 
     init_trajectory_length = self._constant(0.1)
     num_adapt_steps = 10
     _, trajectory_length = fun_mc.trace(
-        (sga_hmc.stochastic_gradient_ascent_hmc_init(
-            util.map_tree_up_to(
-                model.dtype, lambda dtype, shape: tf.zeros(  # pylint: disable=g-long-lambda
-                    (16,) + tuple(shape), dtype), model.dtype,
-                model.event_shape),
-            target_log_prob_fn,
-            init_trajectory_length=init_trajectory_length), 0,
-         self._make_seed(_test_seed())), kernel, num_adapt_steps + 2)
+        (
+            sga_hmc.stochastic_gradient_ascent_hmc_init(
+                util.map_tree_up_to(
+                    model.dtype,
+                    lambda dtype, shape: jnp.zeros(  # pylint: disable=g-long-lambda
+                        (16,) + tuple(shape), dtype
+                    ),
+                    model.dtype,
+                    model.event_shape,
+                ),
+                target_log_prob_fn,
+                init_trajectory_length=init_trajectory_length,
+            ),
+            0,
+            self._make_seed(_test_seed()),
+        ),
+        kernel,
+        num_adapt_steps + 2,
+    )
 
     # We expect it to increase as part of adaptation.
     self.assertAllGreater(trajectory_length[-1], init_trajectory_length)
@@ -316,7 +370,7 @@ class SGAHMCTest32(SGAHMCTest):
 
   @property
   def _dtype(self):
-    return tf.float32
+    return jnp.float32
 
 
 @test_util.multi_backend_test(globals(), 'sga_hmc_test')
@@ -324,7 +378,7 @@ class SGAHMCTest64(SGAHMCTest):
 
   @property
   def _dtype(self):
-    return tf.float64
+    return jnp.float64
 
 
 del SGAHMCTest

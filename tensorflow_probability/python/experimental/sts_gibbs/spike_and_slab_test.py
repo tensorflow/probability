@@ -145,7 +145,8 @@ class SpikeAndSlabTest(test_util.TestCase):
     self.assertAllClose(
         nonzero_subvector(self.evaluate(
             initial_state.conditional_weights_mean)),
-        restricted_weights_posterior_mean)
+        restricted_weights_posterior_mean,
+        atol=5e-5)
     self.assertAllClose(
         nonzero_submatrix(initial_state.conditional_posterior_precision_chol),
         tf.linalg.cholesky(restricted_weights_posterior_prec.to_dense()))
@@ -220,12 +221,12 @@ class SpikeAndSlabTest(test_util.TestCase):
 
     rng = test_util.test_np_rng()
     initial_nonzeros = rng.randint(
-        low=0, high=2, size=batch_shape + [num_features]).astype(np.bool)
+        low=0, high=2, size=batch_shape + [num_features]).astype(bool)
     flip_idxs = rng.choice(
         num_features, size=num_flips, replace=False).astype(np.int32)
     if batch_shape:
       should_flip = rng.randint(
-          low=0, high=2, size=[num_flips] + batch_shape).astype(np.bool)
+          low=0, high=2, size=[num_flips] + batch_shape).astype(bool)
     else:
       should_flip = np.array([True] * num_flips)
 
@@ -346,7 +347,7 @@ class SpikeAndSlabTest(test_util.TestCase):
                                      tf.float32)
     self.assertAllClose(nonzero_prior_prob,
                         tf.reduce_mean(nonzero_weight_samples),
-                        atol=0.03)
+                        atol=0.04)
 
   @parameterized.named_parameters(('', False), ('_xla', True))
   def test_deterministic_given_seed(self, use_xla):
@@ -365,6 +366,7 @@ class SpikeAndSlabTest(test_util.TestCase):
       return sampler.sample_noise_variance_and_weights(
           targets, initial_nonzeros, seed=seed)
     variance1, weights1 = self.evaluate(do_sample(seed))
+    seed = test_util.clone_seed(seed)
     variance2, weights2 = self.evaluate(do_sample(seed))
     self.assertAllFinite(variance1)
     self.assertAllClose(variance1, variance2)

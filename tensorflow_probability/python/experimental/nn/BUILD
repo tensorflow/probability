@@ -15,9 +15,13 @@
 # Description:
 #   tf.Module tools for building neural architectures.
 
+# Placeholder: py_library
+# Placeholder: py_test
+
 licenses(["notice"])
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -51,6 +55,7 @@ py_library(
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/experimental/nn/util:kernel_bias",
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 
@@ -69,6 +74,7 @@ py_test(
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/util:deferred_tensor",
     ],
 )
@@ -84,6 +90,7 @@ py_library(
         "//tensorflow_probability/python/experimental/nn/util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 
@@ -100,6 +107,7 @@ py_test(
         "//tensorflow_probability/python/distributions:independent",
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/util:deferred_tensor",
     ],
 )
@@ -133,6 +141,7 @@ py_test(
         "//tensorflow_probability/python/distributions:independent",
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/util:deferred_tensor",
     ],
 )
@@ -147,6 +156,7 @@ py_library(
         "//tensorflow_probability/python/distributions:distribution",
         "//tensorflow_probability/python/experimental/nn/util:utils",
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/util:deferred_tensor",
     ],
 )
@@ -163,6 +173,7 @@ py_test(
         "//tensorflow_probability/python/distributions:independent",
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 

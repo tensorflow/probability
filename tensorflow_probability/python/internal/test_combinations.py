@@ -297,15 +297,10 @@ def _augment_with_special_arguments(test_method, test_combinations):
           original_kwargs.copy()):
         context_managers.append(manager)
 
-    if hasattr(contextlib, 'nested'):  # Python 2
-      # TODO(isaprykin): Switch to ExitStack when contextlib2 is available.
-      with contextlib.nested(*context_managers):
-        execute_test_method()
-    else:  # Python 3
-      with contextlib.ExitStack() as context_stack:
-        for manager in context_managers:
-          context_stack.enter_context(manager)
-        execute_test_method()
+    with contextlib.ExitStack() as context_stack:
+      for manager in context_managers:
+        context_stack.enter_context(manager)
+      execute_test_method()
 
   return decorated
 

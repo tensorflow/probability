@@ -20,6 +20,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
@@ -385,7 +386,7 @@ class BatchBroadcast(
       else:
         distribution = kwargs.get('distribution')
 
-      if not isinstance(distribution, tf.__internal__.CompositeTensor):
+      if not auto_composite_tensor.is_composite_tensor(distribution):
         return _BatchBroadcast(*args, **kwargs)
     return super(BatchBroadcast, cls).__new__(cls)
 
@@ -473,7 +474,7 @@ class _BroadcastingBijector(_NonCompositeTensorBroadcastingBijector,
       else:
         bijector = kwargs.get('bijector')
 
-      if not (isinstance(bcast_dist, tf.__internal__.CompositeTensor)
-              and isinstance(bijector, tf.__internal__.CompositeTensor)):
+      if not (auto_composite_tensor.is_composite_tensor(bcast_dist)
+              and auto_composite_tensor.is_composite_tensor(bijector)):
         return _NonCompositeTensorBroadcastingBijector(*args, **kwargs)
     return super(_BroadcastingBijector, cls).__new__(cls)

@@ -183,7 +183,7 @@ class SlicingTest(test_util.TestCase):
     self.assertAllEqual(expected, self.evaluate(sliced).shape)
 
   def test_single_param_multi_ellipsis(self):
-    with self.assertRaisesRegexp(ValueError, 'Found multiple `...`'):
+    with self.assertRaisesRegex(ValueError, 'Found multiple `...`'):
       slicing._slice_single_param(
           tf.zeros([7, 6, 5, 4, 3]),
           param_event_ndims=2,

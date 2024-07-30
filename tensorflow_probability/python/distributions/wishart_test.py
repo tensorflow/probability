@@ -365,7 +365,7 @@ class WishartTest(test_util.TestCase):
       error_type = ValueError
 
     # Check expensive, deferred assertions.
-    with self.assertRaisesRegexp(error_type, 'cannot be less than'):
+    with self.assertRaisesRegex(error_type, 'cannot be less than'):
       chol_w = wishart.WishartTriL(
           df=df_deferred, scale_tril=chol_scale_deferred, validate_args=True)
       self.evaluate(chol_w.log_prob(np.asarray(x, dtype=np.float32)))
@@ -399,10 +399,10 @@ class WishartTest(test_util.TestCase):
     # Still has these assertions because they're resolveable at graph
     # construction:
     # df < rank
-    with self.assertRaisesRegexp(ValueError, 'cannot be less than'):
+    with self.assertRaisesRegex(ValueError, 'cannot be less than'):
       wishart.WishartTriL(df=2, scale_tril=chol_scale, validate_args=False)
     # non-float dtype
-    with self.assertRaisesRegexp(TypeError, '.'):
+    with self.assertRaisesRegex(TypeError, '.'):
       wishart.WishartTriL(
           df=4,
           scale_tril=np.asarray(chol_scale, dtype=np.int32),

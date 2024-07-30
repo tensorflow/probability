@@ -15,7 +15,12 @@
 # Description:
 #   TensorFlow Probability examples.
 
+# Placeholder: py_binary
+# Placeholder: py_library
+# Placeholder: py_test
+
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -47,6 +52,7 @@ py_library(
 py_test(
     name = "bayesian_neural_network_test",
     size = "medium",
+    timeout = "long",
     srcs = ["bayesian_neural_network.py"],
     args = [
         "--fake_data",
@@ -54,6 +60,7 @@ py_test(
         "--num_monte_carlo=4",
     ],
     main = "bayesian_neural_network.py",
+    tags = ["not_run:arm"],
     deps = [
         ":bayesian_neural_network_lib",
     ],
@@ -78,6 +85,7 @@ py_library(
         # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 

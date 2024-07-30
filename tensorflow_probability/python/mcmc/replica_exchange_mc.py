@@ -390,7 +390,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       mixture_distribution=tfd.Categorical(probs=[0.5, 0.5]),
       components_distribution=tfd.MultivariateNormalDiag(
           loc=[[-1., -1], [1., 1.]],
-          scale_identity_multiplier=[0.1, 0.1]))
+          scale_diag=0.1*tf.ones([2, 2])))
 
   inverse_temperatures = 0.2**tf.range(4, dtype=dtype)
 

@@ -21,6 +21,7 @@ load(
 )
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -40,15 +41,18 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/experimental/auto_batching",
         "//tensorflow_probability/python/experimental/marginalize",
         "//tensorflow_probability/python/experimental/nn",
-        "//tensorflow_probability/python/experimental/substrates",
+        "//tensorflow_probability/python/experimental/timeseries",
         "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/experimental/util:composite_tensor",
     ],
     deps = [
+#         "//tensorflow_probability/google/tfp_google",  # DisableOnExport
         "//tensorflow_probability/python/experimental/auto_batching",
+        "//tensorflow_probability/python/experimental/bayesopt",
         "//tensorflow_probability/python/experimental/bijectors",
         "//tensorflow_probability/python/experimental/distribute",
         "//tensorflow_probability/python/experimental/distributions",
+        "//tensorflow_probability/python/experimental/fastgp",
         "//tensorflow_probability/python/experimental/joint_distribution_layers",
         "//tensorflow_probability/python/experimental/linalg",
         "//tensorflow_probability/python/experimental/marginalize",
@@ -60,12 +64,13 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/experimental/sequential",
         "//tensorflow_probability/python/experimental/stats",
         "//tensorflow_probability/python/experimental/sts_gibbs",
-        "//tensorflow_probability/python/experimental/substrates",
         "//tensorflow_probability/python/experimental/tangent_spaces",
+        "//tensorflow_probability/python/experimental/timeseries",
         "//tensorflow_probability/python/experimental/util",
         "//tensorflow_probability/python/experimental/util:composite_tensor",
         "//tensorflow_probability/python/experimental/vi",
         "//tensorflow_probability/python/internal:all_util",
         "//tensorflow_probability/python/internal:auto_composite_tensor",
+        "//tensorflow_probability/python/internal:lazy_loader",
     ],
 )

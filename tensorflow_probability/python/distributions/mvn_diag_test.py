@@ -45,7 +45,7 @@ class MultivariateNormalDiagTest(test_util.TestCase):
   def testScalarParams(self):
     mu = -1.
     diag = -5.
-    with self.assertRaisesRegexp(ValueError, 'at least 1 dimension'):
+    with self.assertRaisesRegex(ValueError, 'at least 1 dimension'):
       mvn_diag.MultivariateNormalDiag(mu, diag)
 
   def testVectorParams(self):
@@ -138,17 +138,6 @@ class MultivariateNormalDiagTest(test_util.TestCase):
 
     mvn = mvn_diag.MultivariateNormalDiag(
         loc=tf.zeros([3], dtype=tf.float32),
-        scale_identity_multiplier=[3., 2.],
-        validate_args=True)
-    self.assertAllEqual([2], mvn.batch_shape)
-    self.assertAllEqual([3], mvn.event_shape)
-    self.assertAllClose(
-        np.array([[[3., 0, 0], [0, 3, 0], [0, 0, 3]], [[2, 0, 0], [0, 2, 0],
-                                                       [0, 0, 2]]])**2.,
-        self.evaluate(mvn.covariance()))
-
-    mvn = mvn_diag.MultivariateNormalDiag(
-        loc=tf.zeros([3], dtype=tf.float32),
         scale_diag=[[3., 2, 1], [4, 5, 6]],
         validate_args=True)
     self.assertAllEqual([2], mvn.batch_shape)
@@ -170,24 +159,10 @@ class MultivariateNormalDiagTest(test_util.TestCase):
 
     mvn = mvn_diag.MultivariateNormalDiag(
         loc=self.maybe_static(tf.zeros([100, 3], dtype=tf.float32), is_static),
-        scale_identity_multiplier=self.maybe_static(3., is_static),
-        validate_args=True)
-    self.assertAllClose(
-        np.array(9. * np.ones([100, 3])), self.evaluate(mvn.variance()))
-
-    mvn = mvn_diag.MultivariateNormalDiag(
-        loc=self.maybe_static(tf.zeros([100, 3], dtype=tf.float32), is_static),
         scale_diag=self.maybe_static([3., 3., 3.], is_static),
         validate_args=True)
     self.assertAllClose(
         np.array(9. * np.ones([100, 3])), self.evaluate(mvn.variance()))
-
-    mvn = mvn_diag.MultivariateNormalDiag(
-        loc=tf.zeros([3], dtype=tf.float32),
-        scale_identity_multiplier=[3., 2.],
-        validate_args=True)
-    self.assertAllClose(
-        np.array([[3., 3, 3], [2, 2, 2]])**2., self.evaluate(mvn.variance()))
 
     mvn = mvn_diag.MultivariateNormalDiag(
         loc=tf.zeros([3], dtype=tf.float32),
@@ -208,24 +183,10 @@ class MultivariateNormalDiagTest(test_util.TestCase):
 
     mvn = mvn_diag.MultivariateNormalDiag(
         loc=self.maybe_static(tf.zeros([100, 3], dtype=tf.float32), is_static),
-        scale_identity_multiplier=self.maybe_static(3., is_static),
-        validate_args=True)
-    self.assertAllClose(
-        np.array(3. * np.ones([100, 3])), self.evaluate(mvn.stddev()))
-
-    mvn = mvn_diag.MultivariateNormalDiag(
-        loc=self.maybe_static(tf.zeros([100, 3], dtype=tf.float32), is_static),
         scale_diag=self.maybe_static([3., 3., 3.], is_static),
         validate_args=True)
     self.assertAllClose(
         np.array(3. * np.ones([100, 3])), self.evaluate(mvn.stddev()))
-
-    mvn = mvn_diag.MultivariateNormalDiag(
-        loc=tf.zeros([3], dtype=tf.float32),
-        scale_identity_multiplier=[3., 2.],
-        validate_args=True)
-    self.assertAllClose(
-        np.array([[3., 3, 3], [2, 2, 2]]), self.evaluate(mvn.stddev()))
 
     mvn = mvn_diag.MultivariateNormalDiag(
         loc=tf.zeros([3], dtype=tf.float32),
@@ -341,19 +302,6 @@ class MultivariateNormalDiagTest(test_util.TestCase):
       lp = d.log_prob([0., 0.])
     self.assertIsNotNone(tape.gradient(lp, scale_diag))
 
-  @test_util.tf_tape_safety_test
-  def testVariableScaleIdentityMultiplier(self):
-    loc = tf.constant([1., 1.])
-    scale_identity_multiplier = tf.Variable(3.14)
-    d = mvn_diag.MultivariateNormalDiag(
-        loc,
-        scale_identity_multiplier=scale_identity_multiplier,
-        validate_args=True)
-    self.evaluate(scale_identity_multiplier.initializer)
-    with tf.GradientTape() as tape:
-      lp = d.log_prob([0., 0.])
-    self.assertIsNotNone(tape.gradient(lp, scale_identity_multiplier))
-
   @test_util.numpy_disable_variable_test
   @test_util.jax_disable_variable_test
   def testVariableScaleDiagAssertions(self):
@@ -368,24 +316,6 @@ class MultivariateNormalDiagTest(test_util.TestCase):
     self.evaluate(scale_diag.initializer)
     with self.assertRaises(Exception):
       with tf.control_dependencies([scale_diag.assign([1., 0.])]):
-        self.evaluate(d.sample(seed=test_util.test_seed()))
-
-  @test_util.numpy_disable_variable_test
-  @test_util.jax_disable_variable_test
-  def testVariableScaleIdentityMultiplierAssertions(self):
-    # We test that changing the scale to be non-invertible raises an exception
-    # when validate_args is True. This is really just testing the underlying
-    # LinearOperator instance, but we include it to demonstrate that it works as
-    # expected.
-    loc = tf.constant([1., 1.])
-    scale_identity_multiplier = tf.Variable(np.ones(2, dtype=np.float32))
-    d = mvn_diag.MultivariateNormalDiag(
-        loc,
-        scale_identity_multiplier=scale_identity_multiplier,
-        validate_args=True)
-    self.evaluate(scale_identity_multiplier.initializer)
-    with self.assertRaises(Exception):
-      with tf.control_dependencies([scale_identity_multiplier.assign(0.)]):
         self.evaluate(d.sample(seed=test_util.test_seed()))
 
   @parameterized.named_parameters(dict(testcase_name=''),

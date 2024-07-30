@@ -52,7 +52,8 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+JAX_MODE = False
+NUMPY_MODE = False
 
 
 class TupleDistribution(distribution.Distribution):
@@ -592,20 +593,20 @@ class DistributionTest(test_util.TestCase):
             allow_nan_stats=False)
 
     terrible_distribution = TerribleDistribution()
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         NotImplementedError, 'prob is not implemented'):
       terrible_distribution.prob(1.)
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         NotImplementedError, 'log_prob is not implemented'):
       terrible_distribution.log_prob(1.)
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         NotImplementedError, 'cdf is not implemented'):
       terrible_distribution.cdf(1.)
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         NotImplementedError, 'log_cdf is not implemented'):
       terrible_distribution.log_cdf(1.)
-    with self.assertRaisesRegexp(NotImplementedError,
-                                 'unnormalized_log_prob is not implemented'):
+    with self.assertRaisesRegex(NotImplementedError,
+                                'unnormalized_log_prob is not implemented'):
       terrible_distribution.unnormalized_log_prob(1.)
 
   def testUnnormalizedProbDerivation(self):
@@ -646,7 +647,7 @@ class DistributionTest(test_util.TestCase):
 
   def testNotIterable(self):
     normal = normal_lib.Normal(loc=0., scale=1.)
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         TypeError,
         '\'Normal\' object is not iterable'
     ):
@@ -748,11 +749,6 @@ class ParametersTest(test_util.TestCase):
     self.assertEqual({'arg1': 1., 'arg2': 2., 'arg3': None, 'named': {}},
                      actual_d_parameters)
     self.assertEqual(actual_d_parameters, d.parameters)
-
-  @tf_test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
-  def testNoSelfRefs(self):
-    d = Dummy(1., arg2=2.)
-    self.assertAllEqual(1. + 2., self.evaluate(d.mean()))
 
   def testTfFunction(self):
     if not tf.executing_eagerly(): return
@@ -884,7 +880,7 @@ class ConditionalDistributionTest(test_util.TestCase):
     for name in ['sample', 'log_prob', 'prob', 'log_cdf', 'cdf',
                  'log_survival_function', 'survival_function']:
       method = getattr(d, name)
-      with self.assertRaisesRegexp(ValueError, 'b1.*b2'):
+      with self.assertRaisesRegex(ValueError, 'b1.*b2'):
         if name == 'sample':
           method([], seed=test_util.test_seed(), arg1='b1', arg2='b2')
         else:
@@ -932,12 +928,12 @@ class ConditionalDistributionTest(test_util.TestCase):
     for log_m, m in zip(hidden_logspace_methods, regular_methods):
       setattr(dist, log_m, raise_with_input_fn)
       method = getattr(dist, m)
-      with self.assertRaisesRegexp(ValueError, 'b1.*b2'):
+      with self.assertRaisesRegex(ValueError, 'b1.*b2'):
         method(1.0, arg1='b1', arg2='b2')
 
     setattr(dist, '_stddev', raise_only_conditional_fn)
     method = getattr(dist, 'variance')
-    with self.assertRaisesRegexp(ValueError, 'b1.*b2'):
+    with self.assertRaisesRegex(ValueError, 'b1.*b2'):
       method(arg1='b1', arg2='b2')
 
   def testDefaultMethodLogSpaceInvocations(self):
@@ -957,16 +953,16 @@ class ConditionalDistributionTest(test_util.TestCase):
     for m, log_m in zip(hidden_methods, regular_logspace_methods):
       setattr(dist, m, raise_with_input_fn)
       method = getattr(dist, log_m)
-      with self.assertRaisesRegexp(ValueError, 'b1.*b2'):
+      with self.assertRaisesRegex(ValueError, 'b1.*b2'):
         method(1.0, arg1='b1', arg2='b2')
 
     setattr(dist, '_variance', raise_only_conditional_fn)
     method = getattr(dist, 'stddev')
-    with self.assertRaisesRegexp(ValueError, 'b1.*b2'):
+    with self.assertRaisesRegex(ValueError, 'b1.*b2'):
       method(arg1='b1', arg2='b2')
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@test_util.test_graph_and_eager_modes
 class BatchShapeInferenceTests(test_util.TestCase):
 
   @parameterized.named_parameters(

@@ -15,16 +15,20 @@
 # Description:
 #   Internal utilities for TensorFlow probability.
 
+# [internal] load pytype.bzl (pytype_strict_test)
+# [internal] load strict.bzl
+# Placeholder: py_library
+# Placeholder: py_test
 load(
     "//tensorflow_probability/python:build_defs.bzl",
     "multi_substrate_py_library",
     "multi_substrate_py_test",
 )
-# [internal] load pytype.bzl (pytype_strict_test)
 
 licenses(["notice"])
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
 #         "//tensorflow_probability/google:friends",  # DisableOnExport
@@ -62,11 +66,12 @@ py_test(
         ":auto_composite_tensor",
         ":tensor_util",
         ":test_util",
-        # absl/flags dep,
         # absl/testing:absltest dep,
+        # absl/flags dep,
         # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:bijector",
+        "//tensorflow_probability/python/bijectors:bijector_test_util",
         "//tensorflow_probability/python/bijectors:reshape",
         "//tensorflow_probability/python/bijectors:scale",
         "//tensorflow_probability/python/bijectors:shift",
@@ -101,6 +106,7 @@ multi_substrate_py_test(
     srcs = ["batch_shape_lib_test.py"],
     deps = [
         ":test_util",
+        # mock dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:exp",
@@ -132,6 +138,7 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["distribute_lib_test.py"],
     disabled_substrates = ["numpy"],
+    shard_count = 3,
     deps = [
         ":distribute_lib",
         ":distribute_test_lib",
@@ -160,10 +167,11 @@ multi_substrate_py_library(
     srcs = ["batched_rejection_sampler.py"],
     deps = [
         ":broadcast_util",
+        ":prefer_static",
         ":samplers",
+        ":tensorshape_util",
         # numpy dep,  # For np.nan
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
@@ -243,6 +251,7 @@ multi_substrate_py_library(
 multi_substrate_py_test(
     name = "custom_gradient_test",
     srcs = ["custom_gradient_test.py"],
+    numpy_tags = ["notap"],
     deps = [
         ":custom_gradient",
         # tensorflow dep,
@@ -385,6 +394,7 @@ multi_substrate_py_test(
         ":auto_composite_tensor",
         ":loop_util",
         ":prefer_static",
+        ":samplers",
         ":tensorshape_util",
         ":test_util",
         # tensorflow dep,
@@ -420,6 +430,7 @@ multi_substrate_py_library(
     srcs = ["nest_util.py"],
     deps = [
         ":prefer_static",
+        ":tensor_util",
         # numpy dep,
         # tensorflow dep,
     ],
@@ -458,6 +469,7 @@ multi_substrate_py_test(
     name = "numerics_testing_test",
     size = "small",
     srcs = ["numerics_testing_test.py"],
+    numpy_tags = ["notap"],
     deps = [
         ":numerics_testing",
         # tensorflow dep,
@@ -488,6 +500,21 @@ multi_substrate_py_test(
     name = "prefer_static_test",
     size = "small",
     srcs = ["prefer_static_test.py"],
+    deps = [
+        ":prefer_static",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+# py_strict
+py_test(
+    name = "prefer_static_shape64_test",
+    size = "small",
+    srcs = ["prefer_static_shape64_test.py"],
+    env = {"TF_FLAG_TF_SHAPE_DEFAULT_INT64": "true"},
     deps = [
         ":prefer_static",
         # absl/testing:parameterized dep,
@@ -628,6 +655,7 @@ multi_substrate_py_test(
     srcs = ["trainable_state_util_test.py"],
     jax_size = "medium",
     numpy_tags = ["notap"],
+    tf_tags = ["no-oss-ci"],  # TODO(b/308579205)
     deps = [
         # optax dep,
         # tensorflow dep,
@@ -641,6 +669,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/experimental/util",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/internal:trainable_state_util",
         "//tensorflow_probability/python/math:gradient",
         "//tensorflow_probability/python/math:minimize",
@@ -749,12 +778,14 @@ multi_substrate_py_library(
         ":dtype_util",
         ":samplers",
         ":test_combinations",
+        # absl/testing:absltest dep,
         # absl/flags dep,
         # hypothesis dep,
         # numpy dep,
         # six dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:bijector",
+        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:empirical_statistical_testing",
         "//tensorflow_probability/python/util:deferred_tensor",
         "//tensorflow_probability/python/util:seed_stream",
@@ -892,5 +923,13 @@ exports_files(
     visibility = [
         "//tensorflow_probability:__subpackages__",
 #         "//tensorflow_probability/google:friends",  # DisableOnExport
+    ],
+)
+
+py_library(
+    name = "tf_keras",
+    srcs = ["tf_keras.py"],
+    deps = [
+        # tensorflow dep,
     ],
 )

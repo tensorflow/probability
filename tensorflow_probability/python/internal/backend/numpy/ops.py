@@ -56,6 +56,7 @@ __all__ = [
     'stop_gradient',
     'GradientTape',
     'Module',
+    'SparseTensor',
     'Tensor',
     'Variable',
     # 'gradients',
@@ -141,7 +142,9 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint
   """Emulates tf.convert_to_tensor."""
   dtype = utils.numpy_dtype(dtype)
   dtype_hint = utils.numpy_dtype(dtype_hint)
-  if is_tensor(value) and not isinstance(value, Variable):
+  if isinstance(value, Variable):
+    value = value.__wrapped__
+  if is_tensor(value):
     # In NumPy mode, we are lenient on the dtype compatibility check because
     # some codepaths rely on flexible conversion from int/float64 to 32.
     if dtype is not None and value.dtype != dtype:
@@ -215,10 +218,14 @@ def _default_convert_to_tensor(value, dtype=None):
   """Default tensor conversion function for array, bool, int, float, and complex."""
   if JAX_MODE:
     # TODO(b/223267515): We shouldn't need to specialize here.
-    if 'PRNGKeyArray' in str(type(value)):
+    if hasattr(value, 'dtype') and jax.dtypes.issubdtype(
+        value.dtype, jax.dtypes.prng_key
+    ):
       return value
     if isinstance(value, (list, tuple)) and value:
-      if 'PRNGKeyArray' in str(type(value[0])):
+      if hasattr(value[0], 'dtype') and jax.dtypes.issubdtype(
+          value[0].dtype, jax.dtypes.prng_key
+      ):
         return np.stack(value, axis=0)
 
   inferred_dtype = _infer_dtype(value, np.float32)
@@ -365,6 +372,15 @@ class GradientTape(object):
                      parallel_iterations=None, experimental_use_pfor=True):  # pylint: disable=unused-argument
     raise NotImplementedError
 
+
+class SparseTensor(object):
+  """tf.SparseTensor stub."""
+
+  def __init__(self, *args, **kwargs):
+    raise NotImplementedError(
+        'SparseTensor not currently supported in JAX and NumPy backends.')
+
+
 bitcast = utils.copy_docstring(
     'tf.bitcast',
     lambda input, type, name=None: convert_to_tensor(  # pylint: disable=g-long-lambda
@@ -378,7 +394,8 @@ broadcast_static_shape = utils.copy_docstring(
 
 broadcast_to = utils.copy_docstring(
     'tf.broadcast_to',
-    lambda input, shape, name=None: np.broadcast_to(input, shape))
+    lambda input, shape, name=None: np.broadcast_to(
+        _convert_to_tensor(input), shape))
 
 
 def _cast(x, dtype):
@@ -619,12 +636,17 @@ class NumpyVariable(getattr(wrapt, 'ObjectProxy', object)):
       v = v.astype(utils.numpy_dtype(dtype))
     super(NumpyVariable, self).__init__(v)
     self._self_name = name
+    self._self_trainable = trainable
     self.initializer = None
   # pylint: enable=unused-argument
 
   @property
   def name(self):
     return self._self_name if self._self_name is not None else str(id(self))
+
+  @property
+  def trainable(self):
+    return self._self_trainable
 
   def __array__(self, dtype=None):
     if dtype is not None:
@@ -658,10 +680,6 @@ if JAX_MODE:
       jax.core.pytype_aval_mappings[onp.ndarray])
 
 
-def _convert_variable_to_tensor(value, dtype=None):
-  return convert_to_tensor(value.__wrapped__, dtype=dtype)
-register_tensor_conversion_function(NumpyVariable, _convert_variable_to_tensor)
-
 Variable = NumpyVariable
 
 
@@ -670,8 +688,7 @@ class _TensorMeta(type(np.ndarray)):
   @classmethod
   def __instancecheck__(cls, instance):
     if JAX_MODE:
-      return isinstance(instance, (jax.xla.DeviceArray,
-                                   jax.core.Tracer))
+      return isinstance(instance, jax.Array)
     return isinstance(instance, np.ndarray)
 
 
@@ -724,6 +741,10 @@ class Module(object):
 
   def _no_dependency(self, x):
     return x
+
+  @property
+  def name(self):
+    return self._name
 
   @property
   def trainable_variables(self):

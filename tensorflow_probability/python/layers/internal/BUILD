@@ -15,9 +15,13 @@
 # Description:
 #   Internal helper libraries for layers.
 
+# Placeholder: py_library
+# Placeholder: py_test
+
 licenses(["notice"])
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -54,8 +58,13 @@ py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:categorical",
+        "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/distributions:uniform",
+        "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/layers:distribution_layer",
     ],
 )
 

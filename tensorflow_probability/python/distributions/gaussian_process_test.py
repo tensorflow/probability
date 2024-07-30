@@ -13,6 +13,7 @@
 # limitations under the License.
 # ============================================================================
 # Dependency imports
+from absl.testing import parameterized
 import numpy as np
 
 import tensorflow.compat.v1 as tf1
@@ -21,15 +22,15 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import gaussian_process
 from tensorflow_probability.python.distributions import gaussian_process_regression_model as gprm
 from tensorflow_probability.python.distributions import mvn_diag
-from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import gradient
 from tensorflow_probability.python.math import psd_kernels
+from tensorflow_probability.python.math.psd_kernels.internal import test_util as psd_kernel_test_util
 
 
-class _GaussianProcessTest(object):
+class _GaussianProcessTest(test_util.TestCase):
 
   def testShapes(self):
     # 5x5 grid of index points in R^2 and flatten to 25x2
@@ -182,7 +183,7 @@ class _GaussianProcessTest(object):
     amp = np.float64(.5)
     len_scale = np.float64(.2)
     kernel = psd_kernels.ExponentiatedQuadratic(amp, len_scale)
-    mean_fn = lambda x: x[:, 0]**2
+    mean_fn = lambda x: x[..., 0]**2
     jitter = np.float64(1e-4)
     observation_noise_variance = np.float64(3e-3)
 
@@ -193,11 +194,19 @@ class _GaussianProcessTest(object):
         jitter=jitter,
         validate_args=True)
 
-    index_points = np.random.uniform(-1., 1., [10, 1])
+    index_points = np.random.uniform(-1., 1., [5, 10, 1])
+
+    # Check that the internal batch_shape and event_shape methods work.
+    self.assertAllEqual([5], gp._batch_shape(index_points=index_points))  # pylint: disable=protected-access
+    self.assertAllEqual([10], gp._event_shape(index_points=index_points))  # pylint: disable=protected-access
 
     expected_mean = mean_fn(index_points)
     self.assertAllClose(expected_mean,
                         self.evaluate(gp.mean(index_points=index_points)))
+
+    # Check that late-binding samples work.
+    self.evaluate(gp.sample(
+        seed=test_util.test_seed(), index_points=index_points))
 
     def _kernel_fn(x, y):
       return amp ** 2 * np.exp(-.5 * (np.squeeze((x - y)**2)) / (len_scale**2))
@@ -209,30 +218,22 @@ class _GaussianProcessTest(object):
 
     self.assertAllClose(expected_covariance,
                         self.evaluate(gp.covariance(index_points=index_points)))
-    self.assertAllClose(np.diag(expected_covariance),
+    self.assertAllClose(np.diagonal(expected_covariance, axis1=-2, axis2=-1),
                         self.evaluate(gp.variance(index_points=index_points)))
-    self.assertAllClose(np.sqrt(np.diag(expected_covariance)),
-                        self.evaluate(gp.stddev(index_points=index_points)))
+    self.assertAllClose(
+        np.sqrt(np.diagonal(expected_covariance, axis1=-2, axis2=-1)),
+        self.evaluate(gp.stddev(index_points=index_points)))
 
     # Calling mean with no index_points should raise an Error
     with self.assertRaises(ValueError):
       gp.mean()
 
+    # Calling sample with no index_points should raise an Error
+    with self.assertRaises(ValueError):
+      gp.sample(seed=test_util.test_seed())
+
     self.assertIn("event_shape=?", repr(gp))
     self.assertIn("event_shape=[10]", repr(gp.copy(index_points=index_points)))
-
-  def testMarginalHasCorrectTypes(self):
-    gp = gaussian_process.GaussianProcess(
-        kernel=psd_kernels.ExponentiatedQuadratic(), validate_args=True)
-
-    self.assertIsInstance(
-        gp.get_marginal_distribution(
-            index_points=np.ones([1, 1], dtype=np.float32)), normal.Normal)
-
-    self.assertIsInstance(
-        gp.get_marginal_distribution(
-            index_points=np.ones([10, 1], dtype=np.float32)),
-        mvn_linear_operator.MultivariateNormalLinearOperator)
 
   def testOneOfCholeskyAndMarginalFn(self):
     with self.assertRaises(ValueError):
@@ -398,29 +399,27 @@ class _GaussianProcessTest(object):
     x = gp.sample(3, seed=test_util.test_seed())
     lp = gp.log_prob(x)
 
-    self.assertAllClose(lp, gp.log_prob(x, is_missing=[False, False]))
+    self.assertAllClose(lp, gp.log_prob(x, is_missing=[[False], [False]]))
     self.assertAllClose(tf.convert_to_tensor([np.zeros((3, 2)), lp]),
-                        gp.log_prob(x, is_missing=[[[True]], [[False]]]))
+                        gp.log_prob(x, is_missing=[[[[True]]], [[[False]]]]))
     self.assertAllClose(
         tf.convert_to_tensor([[lp[0, 0], 0.0], [0.0, 0.0], [0., lp[2, 1]]]),
-        gp.log_prob(x, is_missing=[[False, True], [True, True], [True, False]]))
-
-  def testAlwaysYieldMultivariateNormal(self):
-    gp = gaussian_process.GaussianProcess(
-        kernel=psd_kernels.ExponentiatedQuadratic(),
-        index_points=tf.ones([5, 1, 2]),
-        always_yield_multivariate_normal=False,
+        gp.log_prob(
+            x,
+            is_missing=[[[False], [True]], [[True], [True]], [[True], [False]]])
     )
-    self.assertAllEqual([5], self.evaluate(gp.batch_shape_tensor()))
-    self.assertAllEqual([], self.evaluate(gp.event_shape_tensor()))
 
+  def testSingleIndexPoint(self):
     gp = gaussian_process.GaussianProcess(
         kernel=psd_kernels.ExponentiatedQuadratic(),
         index_points=tf.ones([5, 1, 2]),
-        always_yield_multivariate_normal=True,
     )
     self.assertAllEqual([5], self.evaluate(gp.batch_shape_tensor()))
     self.assertAllEqual([1], self.evaluate(gp.event_shape_tensor()))
+    gp_pp = gp.posterior_predictive(tf.ones([5, 1]),
+                                    predictive_index_points=tf.ones([5, 1, 2]))
+    self.assertAllEqual([5], self.evaluate(gp_pp.batch_shape_tensor()))
+    self.assertAllEqual([1], self.evaluate(gp_pp.event_shape_tensor()))
 
   @test_util.disable_test_for_backend(
       disable_numpy=True,
@@ -446,9 +445,92 @@ class _GaussianProcessTest(object):
     self.assertAllClose(actual, call_log_prob(gp))
     self.assertAllClose(actual, call_log_prob(unflat))
 
+  @parameterized.parameters(
+      {"foo_feature_shape": [5], "bar_feature_shape": [3]},
+      {"foo_feature_shape": [3, 2], "bar_feature_shape": [5]},
+      {"foo_feature_shape": [3, 2], "bar_feature_shape": [4, 3]},
+  )
+  def testStructuredIndexPoints(self, foo_feature_shape, bar_feature_shape):
+    base_kernel = psd_kernels.ExponentiatedQuadratic()
+    structured_kernel = psd_kernel_test_util.MultipartTestKernel(
+        base_kernel,
+        feature_ndims={"foo": len(foo_feature_shape),
+                       "bar": len(bar_feature_shape)})
+
+    foo_num_features = np.prod(foo_feature_shape)
+    bar_num_features = np.prod(bar_feature_shape)
+    batch_and_example_shape = [3, 2, 10]
+    index_points = np.random.uniform(
+        -1, 1, batch_and_example_shape + [foo_num_features + bar_num_features]
+        ).astype(np.float32)
+    split_index_points = tf.split(
+        index_points, [foo_num_features, bar_num_features], axis=-1)
+    structured_index_points = {
+        "foo": tf.reshape(split_index_points[0],
+                          batch_and_example_shape + foo_feature_shape),
+        "bar": tf.reshape(split_index_points[1],
+                          batch_and_example_shape + bar_feature_shape)}
+    base_gp = gaussian_process.GaussianProcess(
+        base_kernel, index_points=index_points)
+    structured_gp = gaussian_process.GaussianProcess(
+        structured_kernel, index_points=structured_index_points)
+
+    self.assertAllEqual(base_gp.event_shape, structured_gp.event_shape)
+    self.assertAllEqual(base_gp.event_shape_tensor(),
+                        structured_gp.event_shape_tensor())
+    self.assertAllEqual(base_gp.batch_shape, structured_gp.batch_shape)
+    self.assertAllEqual(base_gp.batch_shape_tensor(),
+                        structured_gp.batch_shape_tensor())
+
+    s = structured_gp.sample(3, seed=test_util.test_seed())
+    self.assertAllClose(base_gp.log_prob(s), structured_gp.log_prob(s))
+    self.assertAllClose(base_gp.mean(), structured_gp.mean())
+    self.assertAllClose(base_gp.variance(), structured_gp.variance())
+
+    # Check that batch shapes and number of index points broadcast across
+    # different parts of index_points.
+    bcast_structured_index_points = {
+        "foo": np.random.uniform(
+            -1, 1, [2, 1] + foo_feature_shape).astype(np.float32),
+        "bar": np.random.uniform(
+            -1, 1, [3, 1, 10] + bar_feature_shape).astype(np.float32),
+    }
+    bcast_structured_gp = gaussian_process.GaussianProcess(
+        structured_kernel, index_points=bcast_structured_index_points)
+    self.assertAllEqual(base_gp.event_shape, bcast_structured_gp.event_shape)
+    self.assertAllEqual(base_gp.event_shape_tensor(),
+                        bcast_structured_gp.event_shape_tensor())
+    self.assertAllEqual(base_gp.batch_shape, bcast_structured_gp.batch_shape)
+    self.assertAllEqual(base_gp.batch_shape_tensor(),
+                        bcast_structured_gp.batch_shape_tensor())
+
+    index_points_bad_num_examples = {
+        "foo": np.random.uniform(
+            -1, 1, [5] + foo_feature_shape).astype(np.float32),
+        "bar": np.random.uniform(
+            -1, 1, [2] + bar_feature_shape).astype(np.float32),
+    }
+
+    # Non-broadcasting numbers of index points should raise.
+    structured_gp_bad_num_examples = gaussian_process.GaussianProcess(
+        structured_kernel, index_points=index_points_bad_num_examples)
+    with self.assertRaisesRegex(ValueError, "the same or broadcastable"):
+      _ = structured_gp_bad_num_examples.event_shape
+
+    # Iterable index points should be interpreted as single Tensors if the
+    # kernel is not structured.
+    index_points_list = tf.unstack(index_points)
+    gp_with_list = gaussian_process.GaussianProcess(
+        base_kernel, index_points=index_points_list)
+    self.assertAllEqual(base_gp.event_shape_tensor(),
+                        gp_with_list.event_shape_tensor())
+    self.assertAllEqual(base_gp.batch_shape_tensor(),
+                        gp_with_list.batch_shape_tensor())
+    self.assertAllClose(base_gp.log_prob(s), gp_with_list.log_prob(s))
+
 
 @test_util.test_all_tf_execution_regimes
-class GaussianProcessStaticTest(_GaussianProcessTest, test_util.TestCase):
+class GaussianProcessStaticTest(_GaussianProcessTest):
   is_static = True
 
   @test_util.numpy_disable_gradient_test
@@ -476,10 +558,40 @@ class GaussianProcessStaticTest(_GaussianProcessTest, test_util.TestCase):
                         tf.function(_grad, jit_compile=True)(lscales),
                         atol=0.01)
 
+  @test_util.numpy_disable_gradient_test
+  def test_gradient_non_nan(self):
+    x_obs = normal.Normal(0., 1.).sample((10, 2, 6), seed=test_util.test_seed())
+    y_obs = tf.reduce_sum(x_obs, axis=(-1, -2))
+    x_obs = tf.concat(
+        [x_obs, np.full([3, 2, 6], np.nan, dtype=np.float32)], axis=0)
+    y_obs = tf.concat([y_obs, np.full([3], np.nan, dtype=np.float32)], axis=0)
+    is_missing = np.array([False] * 10 + [True] * 3)
+
+    def loss(length_scales):
+      kernel = psd_kernels.MaternFiveHalves(
+          amplitude=tf.math.sqrt(1e-2), feature_ndims=2)
+      kernel = psd_kernels.FeatureScaled(
+          kernel, scale_diag=tf.math.sqrt(length_scales))
+      return gaussian_process.GaussianProcess(
+          kernel,
+          index_points=x_obs,
+          observation_noise_variance=1.,
+      ).log_prob(y_obs, is_missing=is_missing)
+
+    lscales = tf.convert_to_tensor([[11.67385626, 0.21246016, 0.0215677,
+                                     0.08823962, 0.22416186, 0.06885594]] * 2)
+
+    def _grad(lscales):
+      return gradient.value_and_gradient(loss, lscales)[1]
+    self.assertAllNotNan(_grad(lscales))
+
 
 @test_util.test_all_tf_execution_regimes
-class GaussianProcessDynamicTest(_GaussianProcessTest, test_util.TestCase):
+class GaussianProcessDynamicTest(_GaussianProcessTest):
   is_static = False
+
+
+del _GaussianProcessTest
 
 
 if __name__ == "__main__":

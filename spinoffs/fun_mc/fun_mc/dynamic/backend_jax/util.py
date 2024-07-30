@@ -20,12 +20,13 @@ import jax
 from jax import lax
 from jax import random
 from jax import tree_util
-from jax.example_libraries import stax
 import jax.numpy as jnp
 
 __all__ = [
     'assert_same_shallow_tree',
     'block_until_ready',
+    'convert_to_tensor',
+    'diff',
     'flatten_tree',
     'get_shallow_tree',
     'inverse_fn',
@@ -34,14 +35,18 @@ __all__ = [
     'map_tree_up_to',
     'move_axis',
     'named_call',
+    'new_dynamic_array',
     'random_categorical',
     'random_integer',
     'random_normal',
     'random_uniform',
+    'repeat',
     'split_seed',
+    'stack_dynamic_array',
     'trace',
     'value_and_grad',
     'value_and_ldj',
+    'write_to_dynamic_array',
 ]
 
 
@@ -63,10 +68,12 @@ def unflatten_tree(tree, xs):
 def map_tree_up_to(shallow, fn, tree, *rest):
   """`map_tree` with recursion depth defined by depth of `shallow`."""
 
-  def wrapper(_, *rest):
-    return fn(*rest)
+  def wrapper(x, *rest):
+    return None if x is None else fn(*rest)
 
-  return tree_util.tree_map(wrapper, shallow, tree, *rest)
+  return tree_util.tree_map(
+      wrapper, shallow, tree, *rest, is_leaf=lambda x: x is None
+  )
 
 
 def get_shallow_tree(is_leaf, tree):
@@ -92,6 +99,10 @@ def make_tensor_seed(seed):
   """Converts a seed to a `Tensor` seed."""
   if seed is None:
     raise ValueError('seed must not be None when using JAX')
+  if hasattr(seed, 'dtype') and jax.dtypes.issubdtype(
+      seed.dtype, jax.dtypes.prng_key
+  ):
+    return seed
   return jnp.asarray(seed, jnp.uint32)
 
 
@@ -143,7 +154,7 @@ def _searchsorted(a, v):
 
 def random_categorical(logits, num_samples, seed):
   """Returns a sample from a categorical distribution. `logits` must be 2D."""
-  probs = stax.softmax(logits)
+  probs = jax.nn.softmax(logits)
   cum_sum = jnp.cumsum(probs, axis=-1)
 
   eta = random.uniform(
@@ -155,33 +166,51 @@ def random_categorical(logits, num_samples, seed):
   return jax.vmap(_searchsorted)(flat_cum_sum, flat_eta).reshape(eta.shape).T
 
 
-def trace(state, fn, num_steps, unroll, **_):
+def trace(state, fn, num_steps, unroll, max_steps, **_):
   """Implementation of `trace` operator, without the calling convention."""
   # We need the shapes and dtypes of the outputs of `fn`.
-  _, untraced_spec, traced_spec = jax.eval_shape(
+  _, untraced_spec, traced_spec, stop_spec = jax.eval_shape(
       fn, map_tree(lambda s: jax.ShapeDtypeStruct(s.shape, s.dtype), state))
-  untraced_init = map_tree(lambda spec: jnp.zeros(spec.shape, spec.dtype),
-                           untraced_spec)
+  if isinstance(stop_spec, tuple):
+    stop = ()
+  else:
+    stop = False
+  untraced_init, traced_init = map_tree(
+      lambda spec: jnp.zeros(spec.shape, spec.dtype),
+      (untraced_spec, traced_spec),
+  )
 
   try:
     num_steps = int(num_steps)
     use_scan = True
   except TypeError:
     use_scan = False
-    if flatten_tree(traced_spec):
-      raise ValueError(
-          'Cannot trace values when `num_steps` is not statically known. Pass '
-          'False to `trace_mask` or return an empty structure (e.g. `()`) as '
-          'the extra output.')
-    if unroll:
-      raise ValueError(
-          'Cannot unroll when `num_steps` is not statically known.')
+    if max_steps is None:
+      if flatten_tree(traced_spec):
+        raise ValueError(  # pylint: disable=raise-missing-from
+            'Cannot trace values when `num_steps` is not statically known and '
+            '`max_steps` is not specified. Pass `False` to `trace_mask` or '
+            'return an empty structure (e.g. `()`) as '
+            'the extra output.'
+        )
+      if unroll:
+        raise ValueError(  # pylint: disable=raise-missing-from
+            'Cannot unroll when `num_steps` is not statically known and '
+            '`max_steps` is not specified.'
+        )
+  if max_steps is not None or not isinstance(stop_spec, tuple):
+    use_scan = False
 
   if unroll:
+    num_outputs = num_steps if max_steps is None else max_steps
+
     traced_lists = map_tree(lambda _: [], traced_spec)
     untraced = untraced_init
-    for _ in range(num_steps):
-      state, untraced, traced_element = fn(state)
+    for step in range(num_outputs):
+      if step < num_steps and not stop:
+        state, untraced, traced_element, stop = fn(state)
+      else:
+        traced_element = traced_init
       map_tree_up_to(traced_spec, lambda l, e: l.append(e), traced_lists,
                      traced_element)
     # Using asarray instead of stack to handle empty arrays correctly.
@@ -192,7 +221,7 @@ def trace(state, fn, num_steps, unroll, **_):
 
     def wrapper(state_untraced, _):
       state, _ = state_untraced
-      state, untraced, traced = fn(state)
+      state, untraced, traced, _ = fn(state)
       return (state, untraced), traced
 
     (state, untraced), traced = lax.scan(
@@ -202,20 +231,38 @@ def trace(state, fn, num_steps, unroll, **_):
         length=num_steps,
     )
   else:
-    trace_arrays = map_tree(
-        lambda spec: jnp.zeros((num_steps,) + spec.shape, spec.dtype),
-        traced_spec)
+    num_outputs = num_steps if max_steps is None else max_steps
+    num_steps = (
+        num_steps if max_steps is None else jnp.minimum(num_steps, max_steps)
+    )
 
-    def wrapper(i, state_untraced_traced):
-      state, _, trace_arrays = state_untraced_traced
-      state, untraced, traced = fn(state)
+    trace_arrays = map_tree(
+        lambda spec: jnp.zeros((num_outputs,) + spec.shape, spec.dtype),
+        traced_spec,
+    )
+    loop_vars = (
+        jnp.zeros_like(num_steps),
+        stop,
+        state,
+        untraced_init,
+        trace_arrays,
+    )
+
+    def cond(loop_vars):
+      i, stop, *_ = loop_vars
+      return (i < num_steps) & (isinstance(stop, tuple) or ~stop)
+
+    def body(loop_vars):
+      i, _, state, _, trace_arrays = loop_vars
+      state, untraced, traced, stop = fn(state)
       trace_arrays = map_tree(lambda a, e: a.at[i].set(e), trace_arrays, traced)
-      return (state, untraced, trace_arrays)
-    state, untraced, traced = lax.fori_loop(
-        jnp.asarray(0, num_steps.dtype),
-        num_steps,
-        wrapper,
-        (state, untraced_init, trace_arrays),
+
+      return i + 1, stop, state, untraced, trace_arrays
+
+    _, _, state, untraced, traced = lax.while_loop(
+        cond,
+        body,
+        loop_vars,
     )
   return state, untraced, traced
 
@@ -250,7 +297,6 @@ def value_and_ldj(fn, args):
   assert y_extra == 3
   assert y_ldj == jnp.log(2)
   ```
-
   """
   value, (extra, ldj) = fn(args)
   return value, (extra, ldj), ldj
@@ -307,11 +353,13 @@ def block_until_ready(tensors):
   Returns:
     tensors: Tensors that are are guaranteed to be ready to materialize.
   """
+
   def _block_until_ready(tensor):
     if hasattr(tensor, 'block_until_ready'):
       return tensor.block_until_ready()
     else:
       return tensor
+
   return map_tree(_block_until_ready, tensors)
 
 
@@ -326,3 +374,40 @@ def named_call(f=None, name=None):
     return functools.partial(named_call, name=name)
 
   return jax.named_call(f, name=name)
+
+
+def diff(x, prepend=None):
+  """Like jnp.diff."""
+  return jnp.diff(x, prepend=prepend)
+
+
+def repeat(x, repeats, total_repeat_length=None):
+  """Like jnp.repeat."""
+  return jnp.repeat(x, repeats, total_repeat_length=total_repeat_length)
+
+
+def new_dynamic_array(shape, dtype, size):
+  """Creates a new dynamic array."""
+  return jnp.zeros((size,) + tuple(shape), dtype)
+
+
+def write_to_dynamic_array(array, index, element):
+  """Writes to the dynamic array."""
+  return array.at[index].set(element)
+
+
+def stack_dynamic_array(array):
+  """Stacks the dynamic array."""
+  return jnp.asarray(array)
+
+
+def eval_shape(fn, *args):
+  """Evaluates the shape/dtypes of fn statically."""
+  return jax.eval_shape(fn, *args)
+
+
+def convert_to_tensor(x):
+  """A looser convert_to_tensor."""
+  if x is None:
+    return x
+  return jnp.asarray(x)

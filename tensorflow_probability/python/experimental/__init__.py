@@ -28,6 +28,7 @@ You are welcome to try any of this out (and tell us how well it works for you!).
 """
 
 from tensorflow_probability.python.experimental import auto_batching
+from tensorflow_probability.python.experimental import bayesopt
 from tensorflow_probability.python.experimental import bijectors
 from tensorflow_probability.python.experimental import distribute
 from tensorflow_probability.python.experimental import distributions
@@ -41,15 +42,22 @@ from tensorflow_probability.python.experimental import parallel_filter
 from tensorflow_probability.python.experimental import psd_kernels
 from tensorflow_probability.python.experimental import sequential
 from tensorflow_probability.python.experimental import stats
-from tensorflow_probability.python.experimental import substrates
+from tensorflow_probability.python.experimental import sts_gibbs
 from tensorflow_probability.python.experimental import tangent_spaces
+from tensorflow_probability.python.experimental import timeseries
 from tensorflow_probability.python.experimental import util
 from tensorflow_probability.python.experimental import vi
 from tensorflow_probability.python.experimental.util.composite_tensor import as_composite
 from tensorflow_probability.python.experimental.util.composite_tensor import register_composite
 from tensorflow_probability.python.internal import all_util
+from tensorflow_probability.python.internal import lazy_loader
 from tensorflow_probability.python.internal.auto_composite_tensor import auto_composite_tensor
 from tensorflow_probability.python.internal.auto_composite_tensor import AutoCompositeTensor
+
+# TODO(thomaswc): Figure out why fastgp needs to be lazy_loaded.
+globals()['fastgp'] = lazy_loader.LazyLoader(
+    'fastgp', globals(), 'tensorflow_probability.python.experimental.fastgp'
+)
 
 
 _allowed_symbols = [
@@ -57,9 +65,11 @@ _allowed_symbols = [
     'as_composite',
     'auto_composite_tensor',
     'AutoCompositeTensor',
+    'bayesopt',
     'bijectors',
     'distribute',
     'distributions',
+    'fastgp',
     'joint_distribution_layers',
     'linalg',
     'marginalize',
@@ -70,12 +80,17 @@ _allowed_symbols = [
     'psd_kernels',
     'register_composite',
     'sequential',
+    'sts_gibbs',
     'stats',
-    'substrates',
     'tangent_spaces',
+    'timeseries',
     'unnest',
     'util',
     'vi',
 ]
 
 all_util.remove_undocumented(__name__, _allowed_symbols)
+
+# from tensorflow_probability.google import tfp_google  # DisableOnExport  # pylint:disable=line-too-long,g-bad-import-order,g-import-not-at-top
+# tfp_google.bind(globals())  # DisableOnExport
+# del tfp_google  # DisableOnExport

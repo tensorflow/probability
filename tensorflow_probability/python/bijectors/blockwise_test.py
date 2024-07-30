@@ -240,11 +240,11 @@ class BlockwiseBijectorTest(test_util.TestCase):
     self.assertStartsWith(bijector.name, 'blockwise_of_exp')
 
   def testRaisesEmptyBijectors(self):
-    with self.assertRaisesRegexp(ValueError, '`bijectors` must not be empty'):
+    with self.assertRaisesRegex(ValueError, '`bijectors` must not be empty'):
       blockwise.Blockwise(bijectors=[])
 
   def testRaisesBadBlocks(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         r'`block_sizes` must be `None`, or a vector of the same length as '
         r'`bijectors`. Got a `Tensor` with shape \(2L?,\) and `bijectors` of '
@@ -327,7 +327,7 @@ class BlockwiseBijectorTest(test_util.TestCase):
 
   def testNonCompositeTensor(self):
     e = exp.Exp()
-    s = test_util.NonCompositeTensorScale(scale=tf.constant(3.))
+    s = bijector_test_util.NonCompositeTensorScale(scale=tf.constant(3.))
     bijector = blockwise.Blockwise(bijectors=[e, s])
     self.assertNotIsInstance(bijector, tf.__internal__.CompositeTensor)
     self.assertAllClose(

@@ -28,6 +28,9 @@ from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import gradient
 
 JAX_MODE = False
+NUMPY_MODE = False
+TF_MODE = not (JAX_MODE or NUMPY_MODE)
+
 
 if JAX_MODE:
   from jax import random  # pylint: disable=g-import-not-at-top
@@ -50,12 +53,16 @@ class CollectiveTest(test_lib.DistributedTest):
   @parameterized.named_parameters(
       ('sum', tf.reduce_sum, distribute_lib.reduce_sum),
       ('mean', tf.reduce_mean, distribute_lib.reduce_mean),
-      ('max', tf.reduce_max, _allow_all_gather(distribute_lib.reduce_max)),
-      ('min', tf.reduce_min, _allow_all_gather(distribute_lib.reduce_min)),
+      ('max', tf.reduce_max, _allow_all_gather(distribute_lib.reduce_max),
+       True),
+      ('min', tf.reduce_min, _allow_all_gather(distribute_lib.reduce_min),
+       True),
       ('logsumexp', tf.reduce_logsumexp,
-       _allow_all_gather(distribute_lib.reduce_logsumexp)))
+       _allow_all_gather(distribute_lib.reduce_logsumexp), True))
   def test_distributed_reduce_works_as_normal_with_int_axes(
-      self, reduce_op, distributed_op):
+      self, reduce_op, distributed_op, skip_on_eager=False):
+    if skip_on_eager and (tf.executing_eagerly() and TF_MODE):
+      self.skipTest('Not supported in Eager.')
     x = tf.reshape(
         tf.range(test_lib.NUM_DEVICES * 6.) / 5., [test_lib.NUM_DEVICES, 3, 2])
 
@@ -68,18 +75,21 @@ class CollectiveTest(test_lib.DistributedTest):
       self.assertAllEqual(reduce_out, dist_out)
 
   @parameterized.named_parameters(*(
-      (f'{name} {ax}', (op, d_op), ax)  # pylint: disable=g-complex-comprehension
-      for (name, op, d_op), ax in itertools.product((
-          ('sum', tf.reduce_sum, distribute_lib.reduce_sum),
-          ('mean', tf.reduce_mean, distribute_lib.reduce_mean),
-          ('max', tf.reduce_max, _allow_all_gather(distribute_lib.reduce_max)),
-          ('min', tf.reduce_min, _allow_all_gather(distribute_lib.reduce_min)),
+      (f'{name} {ax}', *args, ax)  # pylint: disable=g-complex-comprehension
+      for (name, *args), ax in itertools.product((
+          ('sum', tf.reduce_sum, distribute_lib.reduce_sum, False),
+          ('mean', tf.reduce_mean, distribute_lib.reduce_mean, False),
+          ('max', tf.reduce_max, _allow_all_gather(distribute_lib.reduce_max),
+           True),
+          ('min', tf.reduce_min, _allow_all_gather(distribute_lib.reduce_min),
+           True),
           ('logsumexp', tf.reduce_logsumexp,
-           _allow_all_gather(distribute_lib.reduce_logsumexp))), (
+           _allow_all_gather(distribute_lib.reduce_logsumexp), True)), (
                None, 0, 1, 2, [0, 1], [1, 2], [0, 2], [0, 1, 2]))))
   def test_reduce_with_collectives_matches_reduce_without_collectives(
-      self, ops, axes):
-    reduce_op, distributed_op = ops
+      self, reduce_op, distributed_op, skip_on_eager, axes):
+    if skip_on_eager and (tf.executing_eagerly() and TF_MODE):
+      self.skipTest('Not supported in Eager.')
     x = tf.reshape(
         tf.range(test_lib.NUM_DEVICES * 6.) / 5., [test_lib.NUM_DEVICES, 3, 2])
 
@@ -112,14 +122,17 @@ class CollectiveTest(test_lib.DistributedTest):
       ('sum', tf.reduce_sum, distribute_lib.reduce_sum, True),
       ('mean', tf.reduce_mean, distribute_lib.reduce_mean, True),
       ('max', tf.reduce_max, _allow_all_gather(
-          distribute_lib.reduce_max), False),
+          distribute_lib.reduce_max), False, True),
       ('min', tf.reduce_min, _allow_all_gather(distribute_lib.reduce_min),
-       False), ('logsumexp', tf.reduce_logsumexp,
-                _allow_all_gather(distribute_lib.reduce_logsumexp), True))
+       False, True),
+      ('logsumexp', tf.reduce_logsumexp,
+       _allow_all_gather(distribute_lib.reduce_logsumexp), True, True))
   def test_reduce_with_collective_grads_matches_without_collectives(
-      self, reduce_op, distributed_op, is_supported):
+      self, reduce_op, distributed_op, is_supported, skip_on_eager=False):
     if not is_supported:
       self.skipTest('Gradient of operation not supported.')
+    if skip_on_eager and (tf.executing_eagerly() and TF_MODE):
+      self.skipTest('Not supported in Eager.')
     x = tf.reshape(
         tf.range(test_lib.NUM_DEVICES * 6.) / 5., [test_lib.NUM_DEVICES, 3, 2])
 
@@ -279,7 +292,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
     def add_one(x):
       return x + 1.
 
-    values = self.strategy.experimental_distribute_values_from_function(
+    values = self.strategy().experimental_distribute_values_from_function(
         value_fn)
     out_values = self.evaluate(
         self.per_replica_to_tensor(self.strategy_run(add_one, (values,))))
@@ -300,7 +313,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
 
     sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
         log_prob_parts, [None, True])
-    self.assertAllEqualNested(
+    self.assertAllCloseNested(
         self.evaluate(sharded_log_prob_parts([tf.constant(0.), data])),
         self.evaluate([
             normal.Normal(0., 1.).log_prob(0.),
@@ -323,7 +336,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
 
     sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
         log_prob_parts, [True, True])
-    self.assertAllEqualNested(
+    self.assertAllCloseNested(
         self.evaluate(sharded_log_prob_parts([tf.ones(4), data])),
         self.evaluate([
             tf.reduce_sum(normal.Normal(0., 1.).log_prob(tf.ones(4))),
@@ -352,7 +365,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
     out_parts = self.per_replica_to_tensor(
         self.strategy_run(run, (x, sharded_data), in_axes=(None, 0)))
 
-    self.assertAllEqualNested(
+    self.assertAllCloseNested(
         self.evaluate(out_parts),
         self.evaluate([
             tf.ones(4) * normal.Normal(0., 1.).log_prob(0.),
@@ -382,7 +395,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
     out_parts = self.per_replica_to_tensor(
         self.strategy_run(run, (sharded_x, sharded_data)))
 
-    self.assertAllEqualNested(
+    self.assertAllCloseNested(
         self.evaluate(out_parts),
         self.evaluate([
             tf.ones(4) * tf.reduce_sum(normal.Normal(0., 1.).log_prob(x)),
@@ -415,7 +428,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
         self.strategy_run(
             run, (w, sharded_x, sharded_data), in_axes=(None, 0, 0)))
 
-    self.assertAllEqualNested(
+    self.assertAllCloseNested(
         self.evaluate(out_parts),
         self.evaluate([
             tf.ones(4) * normal.Normal(0., 1.).log_prob(w),
@@ -454,7 +467,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
 
     true_grad = self.evaluate(gradient.value_and_gradient(true_log_prob, x)[1])
 
-    self.assertAllEqualNested(self.evaluate(out_grads), tf.ones(4) * true_grad)
+    self.assertAllCloseNested(self.evaluate(out_grads), tf.ones(4) * true_grad)
 
   def test_correct_gradient_for_local_variable(self):
 
@@ -489,7 +502,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
 
     true_grad = self.evaluate(gradient.value_and_gradient(true_log_prob, x)[1])
 
-    self.assertAllEqualNested(self.evaluate(out_grads), true_grad)
+    self.assertAllCloseNested(self.evaluate(out_grads), true_grad)
 
   def test_correct_gradient_for_global_and_local_variable(self):
 
@@ -530,7 +543,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
     true_grad = gradient.value_and_gradient(true_log_prob, [w, x])[1]
     true_grad[0] = tf.ones(4) * true_grad[0]
 
-    self.assertAllEqualNested(
+    self.assertAllCloseNested(
         self.evaluate(out_grads), self.evaluate(true_grad))
 
   def test_correct_gradient_for_global_and_local_variable_batched(self):
@@ -580,7 +593,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
     true_grad = gradient.value_and_gradient(true_log_prob, [w, x])[1]
     true_grad[0] = tf.ones([batch_size, 4, 1]) * true_grad[0][:, tf.newaxis]
 
-    self.assertAllEqualNested(
+    self.assertAllCloseNested(
         self.evaluate(out_grads), self.evaluate(true_grad))
 
   def test_correct_gradient_for_global_and_local_variable_dict(self):
@@ -626,7 +639,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
     true_grad = gradient.value_and_gradient(true_log_prob, [w, x])[1]
     true_grad[0] = tf.ones(4) * true_grad[0]
 
-    self.assertAllEqualNested(
+    self.assertAllCloseNested(
         self.evaluate(out_grads), self.evaluate(true_grad))
 
   def test_correct_gradient_for_local_integer_variable(self):
@@ -661,8 +674,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
               tf.reduce_sum(bernoulli.Bernoulli(logits=x).log_prob(data)))
 
     true_grad = self.evaluate(gradient.value_and_gradient(true_log_prob, x)[1])
-
-    self.assertAllEqualNested(self.evaluate(out_grads), true_grad)
+    self.assertAllCloseNested(self.evaluate(out_grads), true_grad)
 
   def test_correct_gradient_dtype_for_disconnected_variables(self):
 
@@ -737,10 +749,10 @@ class LogProbPartsTest(test_lib.DistributedTest):
     true_values, true_grads = self.evaluate(
         gradient.value_and_gradient(true_log_prob, (x, data1, data2)))
 
-    self.assertAllEqualNested(out_values, tf.ones([2, 2]) * true_values)
-    self.assertAllEqualNested(out_grads[0], tf.ones([2, 2]) * true_grads[0])
-    self.assertAllEqualNested(out_grads[1], tf.ones([2, 2]) * true_grads[1])
-    self.assertAllEqualNested(out_grads[2], tf.ones([2, 2]) * true_grads[2])
+    self.assertAllCloseNested(out_values, tf.ones([2, 2]) * true_values)
+    self.assertAllCloseNested(out_grads[0], tf.ones([2, 2]) * true_grads[0])
+    self.assertAllCloseNested(out_grads[1], tf.ones([2, 2]) * true_grads[1])
+    self.assertAllCloseNested(out_grads[2], tf.ones([2, 2]) * true_grads[2])
 
   def test_nested_shard_axes(self):
     if not JAX_MODE:
@@ -782,9 +794,9 @@ class LogProbPartsTest(test_lib.DistributedTest):
     true_values, true_grads = self.evaluate(
         gradient.value_and_gradient(true_log_prob, (x, data)))
 
-    self.assertAllEqualNested(out_values, tf.ones([2, 2]) * true_values)
-    self.assertAllEqualNested(out_grads[0], tf.ones([2, 2]) * true_grads[0])
-    self.assertAllEqualNested(out_grads[1], tf.ones([2, 2]) * true_grads[1])
+    self.assertAllCloseNested(out_values, tf.ones([2, 2]) * true_values)
+    self.assertAllCloseNested(out_grads[0], tf.ones([2, 2]) * true_grads[0])
+    self.assertAllCloseNested(out_grads[1], tf.ones([2, 2]) * true_grads[1])
 
   def test_gradient_is_correctly_reduced_with_multiple_axes(self):
     if not JAX_MODE:
@@ -837,11 +849,11 @@ class LogProbPartsTest(test_lib.DistributedTest):
 
     self.assertAllClose(
         out_values, tf.ones([2, 2]) * true_values, rtol=1e-6, atol=1e-6)
-    self.assertAllEqualNested(out_grads[0],
+    self.assertAllCloseNested(out_grads[0],
                               tf.ones([2, 2]) * true_grads[0][:, None])
-    self.assertAllEqualNested(out_grads[1],
+    self.assertAllCloseNested(out_grads[1],
                               tf.ones([2, 2]) * true_grads[1][None])
-    self.assertAllEqualNested(out_grads[2], tf.ones([2, 2]) * true_grads[2])
+    self.assertAllCloseNested(out_grads[2], tf.ones([2, 2]) * true_grads[2])
 
 
 if __name__ == '__main__':

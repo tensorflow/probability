@@ -31,7 +31,9 @@ from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math import generic
 
 
-class StoppingRatioLogistic(distribution.AutoCompositeTensorDistribution):
+class StoppingRatioLogistic(
+    distribution.DiscreteDistributionMixin,
+    distribution.AutoCompositeTensorDistribution):
   """Stopping ratio logistic distribution.
 
   The StoppingRatioLogistic distribution is parameterized by a location and a
@@ -244,11 +246,12 @@ class StoppingRatioLogistic(distribution.AutoCompositeTensorDistribution):
     return tf.math.exp(self.categorical_log_probs())
 
   def _num_categories(self):
-    return ps.shape(self.cutpoints, out_type=self.dtype)[-1] + 1
+    return ps.shape(self.cutpoints)[-1] + 1
 
   def _sample_n(self, n, seed=None):
     return categorical.Categorical(
-        logits=self.categorical_log_probs()).sample(n, seed=seed)
+        logits=self.categorical_log_probs(),
+        dtype=self.dtype).sample(n, seed=seed)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -266,7 +269,7 @@ class StoppingRatioLogistic(distribution.AutoCompositeTensorDistribution):
 
   def _mode(self):
     log_probs = self.categorical_log_probs()
-    mode = tf.argmax(log_probs, axis=-1, output_type=self.dtype)
+    mode = tf.cast(tf.argmax(log_probs, axis=-1), self.dtype)
     tensorshape_util.set_shape(mode, log_probs.shape[:-1])
     return mode
 

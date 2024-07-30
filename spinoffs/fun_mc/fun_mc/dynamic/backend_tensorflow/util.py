@@ -26,6 +26,8 @@ tnp = tf.experimental.numpy
 __all__ = [
     'assert_same_shallow_tree',
     'block_until_ready',
+    'convert_to_tensor',
+    'diff',
     'flatten_tree',
     'get_shallow_tree',
     'inverse_fn',
@@ -34,13 +36,17 @@ __all__ = [
     'map_tree_up_to',
     'move_axis',
     'named_call',
+    'new_dynamic_array',
     'random_categorical',
     'random_integer',
     'random_normal',
     'random_uniform',
+    'repeat',
     'split_seed',
+    'stack_dynamic_array',
     'trace',
     'value_and_ldj',
+    'write_to_dynamic_array',
 ]
 
 
@@ -171,13 +177,17 @@ def _eval_shape(fn, input_spec):
   return compiled_fn, output_spec
 
 
-def trace(state, fn, num_steps, unroll, parallel_iterations=10):
+def trace(state, fn, num_steps, unroll, max_steps, parallel_iterations=10):
   """TF implementation of `trace` operator, without the calling convention."""
+  num_outputs = num_steps if max_steps is None else max_steps
+
   if tf.config.experimental_functions_run_eagerly() or tf.executing_eagerly():
-    state, first_untraced, first_traced = fn(state)
+    state, first_untraced, first_traced, stop = fn(state)
     arrays = tf.nest.map_structure(
         lambda v: tf.TensorArray(  # pylint: disable=g-long-lambda
-            v.dtype, size=num_steps, element_shape=v.shape).write(0, v),
+            v.dtype,
+            size=num_outputs,
+            element_shape=v.shape).write(0, v),
         first_traced)
     start_idx = 1
   else:
@@ -185,41 +195,65 @@ def trace(state, fn, num_steps, unroll, parallel_iterations=10):
     # the `TensorArray`s etc., we can get it by pre-compiling the wrapper
     # function.
     input_spec = tf.nest.map_structure(tf.TensorSpec.from_tensor, state)
-    fn, (_, untraced_spec, traced_spec) = _eval_shape(fn, input_spec)
+    fn, (_, untraced_spec, traced_spec, stop_spec) = _eval_shape(fn, input_spec)
 
     arrays = tf.nest.map_structure(
         lambda spec: tf.TensorArray(  # pylint: disable=g-long-lambda
-            spec.dtype, size=num_steps, element_shape=spec.shape), traced_spec)
+            spec.dtype,
+            size=num_outputs,
+            element_shape=spec.shape),
+        traced_spec)
     first_untraced = tf.nest.map_structure(
         lambda spec: tf.zeros(spec.shape, spec.dtype), untraced_spec)
     start_idx = 0
+    if isinstance(stop_spec, tuple):
+      stop = ()
+    else:
+      stop = False
 
-  def body(i, state, _, arrays):
-    state, untraced, traced = fn(state)
+  def body(i, stop, state, untraced, arrays):
+    del stop, untraced
+    state, untraced, traced, stop = fn(state)
     arrays = tf.nest.map_structure(lambda a, e: a.write(i, e), arrays, traced)
-    return i + 1, state, untraced, arrays
+    return i + 1, stop, state, untraced, arrays
 
-  def cond(i, *_):
-    return i < num_steps
+  def cond(i, stop, *_):
+    return (i < num_steps) & (isinstance(stop, tuple) or ~stop)
 
   static_num_steps = tf.get_static_value(num_steps)
-  loop_vars = (start_idx, state, first_untraced, arrays)
+  static_num_outputs = tf.get_static_value(num_outputs)
+  loop_vars = (start_idx, stop, state, first_untraced, arrays)
 
   if unroll:
     if static_num_steps is None:
       raise ValueError(
-          'Cannot unroll when `num_steps` is not statically known.')
+          'Cannot unroll when `num_steps` is not statically known or '
+          '`max_steps` is None.'
+      )
+    static_num_iters = (
+        static_num_steps
+        if max_steps is None
+        else min(static_num_steps, max_steps)
+    )
     # TODO(siege): Investigate if using lists instead of TensorArray's is faster
     # (like is done in the JAX backend).
-    for _ in range(start_idx, static_num_steps):
+    for _ in range(start_idx, static_num_iters):
+      if loop_vars[1]:
+        break
       loop_vars = body(*loop_vars)
-    _, state, untraced, arrays = loop_vars
+    _, _, state, untraced, arrays = loop_vars
   else:
     if static_num_steps is None:
-      maximum_iterations = None
+      if max_steps is None:
+        maximum_iterations = None
+      else:
+        maximum_iterations = max_steps - start_idx
     else:
-      maximum_iterations = static_num_steps - start_idx
-    _, state, untraced, arrays = tf.while_loop(
+      if max_steps is None:
+        maximum_iterations = static_num_steps - start_idx
+      else:
+        maximum_iterations = min(static_num_steps, max_steps) - start_idx
+    _, _, state, untraced, arrays = tf.while_loop(
         cond=cond,
         body=body,
         loop_vars=loop_vars,
@@ -230,7 +264,7 @@ def trace(state, fn, num_steps, unroll, parallel_iterations=10):
   traced = tf.nest.map_structure(lambda a: a.stack(), arrays)
 
   def _merge_static_length(x):
-    x.set_shape(tf.TensorShape(static_num_steps).concatenate(x.shape[1:]))
+    x.set_shape(tf.TensorShape(static_num_outputs).concatenate(x.shape[1:]))
     return x
 
   traced = tf.nest.map_structure(_merge_static_length, traced)
@@ -266,7 +300,6 @@ def value_and_ldj(fn, args):
   assert y_extra == 3
   assert y_ldj == np.log(2)
   ```
-
   """
   value, (extra, ldj) = fn(args)
   return value, (extra, ldj), ldj
@@ -348,3 +381,50 @@ def named_call(f=None, name=None):
       return f(*args, **kwargs)
 
   return wrapped
+
+
+def diff(x, prepend=None):
+  """Like jnp.diff."""
+  if prepend is not None:
+    x = tf.concat([tf.convert_to_tensor(prepend, dtype=x.dtype)[tf.newaxis], x],
+                  0)
+  return x[1:] - x[:-1]
+
+
+def repeat(x, repeats, total_repeat_length=None):
+  """Like jnp.repeat."""
+  res = tf.repeat(x, repeats)
+  if total_repeat_length is not None:
+    res.set_shape([total_repeat_length] + [None] * (len(res.shape) - 1))
+  return res
+
+
+def new_dynamic_array(shape, dtype, size):
+  """Creates a new dynamic array."""
+  return tf.TensorArray(dtype, size=size, element_shape=shape)
+
+
+def write_to_dynamic_array(array, index, element):
+  """Writes to the dynamic array."""
+  return array.write(index, element)
+
+
+def stack_dynamic_array(array):
+  """Stacks the dynamic array."""
+  return array.stack()
+
+
+def eval_shape(fn, *args):
+  """Evaluates the shape/dtypes of fn statically."""
+  args = tf.nest.map_structure(tf.TensorSpec.from_tensor, args)
+  _, shape = _eval_shape(lambda args: fn(*args), args)
+  return shape
+
+
+def convert_to_tensor(x):
+  """A looser convert_to_tensor."""
+  if x is None:
+    return x
+  if isinstance(x, tf.TensorArray):
+    return x
+  return tf.convert_to_tensor(x)

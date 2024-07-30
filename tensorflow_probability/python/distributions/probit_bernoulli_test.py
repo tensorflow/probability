@@ -259,7 +259,7 @@ class ProbitBernoulliTest(test_util.TestCase):
       seed = test_util.test_seed() if seed is None else seed
       if tf.executing_eagerly():
         tf.random.set_seed(seed)
-      return seed
+      return test_util.clone_seed(seed)
     seed = _seed()
     self.assertAllEqual(
         self.evaluate(dist.sample(n, seed)),

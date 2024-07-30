@@ -168,7 +168,7 @@ class IteratedFilterTest(test_util.TestCase):
     self.assertAllClose(parameter_estimates['recovery_rate'], 0.1, atol=0.05)
 
   def test_raises_error_on_inconsistent_prior_shapes(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'The specified prior does not generate consistent shapes'):
       iterated_filter_lib.IteratedFilter(
           parameter_prior=normal.Normal(0., 1.),

@@ -20,12 +20,15 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.bijectors import reshape as reshape_bijector
 from tensorflow_probability.python.distributions import uniform as uniform_distribution
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow_probability.python.math.gradient import batch_jacobian
+
+JAX_MODE = False
 
 
 def assert_finite(array):
@@ -86,8 +89,12 @@ def assert_scalar_congruency(bijector,
   ten_x_pts = np.linspace(lower_x, upper_x, num=10).astype(np.float32)
   if bijector.dtype is not None:
     ten_x_pts = ten_x_pts.astype(dtype_util.as_numpy_dtype(bijector.dtype))
-    lower_x = np.cast[dtype_util.as_numpy_dtype(bijector.dtype)](lower_x)
-    upper_x = np.cast[dtype_util.as_numpy_dtype(bijector.dtype)](upper_x)
+    lower_x = np.asarray(
+        lower_x, dtype=dtype_util.as_numpy_dtype(bijector.dtype)
+    )
+    upper_x = np.asarray(
+        upper_x, dtype=dtype_util.as_numpy_dtype(bijector.dtype)
+    )
   forward_on_10_pts = bijector.forward(ten_x_pts)
 
   # Set the lower/upper limits in the range of the bijector.
@@ -324,3 +331,71 @@ def get_fldj_theoretical(bijector,
       f(x_unconstrained), event_ndims=inverse_event_ndims)
   return (log_det_jacobian + tf.cast(input_correction, log_det_jacobian.dtype) -
           tf.cast(output_correction, log_det_jacobian.dtype))
+
+
+# TODO(b/182603117): Add other bijector methods for use in future tests.
+class NonCompositeTensorScale(bijector_lib.Bijector):
+  """`Scale` bijector that is not a `CompositeTensor`."""
+
+  def __init__(self, scale):
+    parameters = dict(locals())
+    self.scale = scale
+    super(NonCompositeTensorScale, self).__init__(
+        validate_args=True,
+        forward_min_event_ndims=0.,
+        parameters=parameters,
+        name='non_composite_scale')
+
+  def _forward(self, x):
+    return x * self.scale
+
+  def _inverse(self, y):
+    return y / self.scale
+
+
+class NonCompositeTensorExp(bijector_lib.Bijector):
+  """`Exp` bijector that is not a `CompositeTensor`."""
+
+  def __init__(self):
+    parameters = dict(locals())
+    super(NonCompositeTensorExp, self).__init__(
+        validate_args=True,
+        forward_min_event_ndims=0.,
+        parameters=parameters,
+        name='non_composite_exp')
+
+  def _forward(self, x):
+    return tf.math.exp(x)
+
+  def _inverse(self, y):
+    return tf.math.log(y)
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
+
+class PytreeShift(bijector_lib.Bijector):
+  """Mimics a user-defined bijector that is registered as a Pytree."""
+
+  def __init__(self, shift):
+    parameters = dict(locals())
+    self.shift = shift
+    super(PytreeShift, self).__init__(
+        validate_args=True,
+        forward_min_event_ndims=0,
+        parameters=parameters,
+        name='pytree_shift')
+
+  def _forward(self, x):
+    return x + self.shift
+
+  def _inverse(self, y):
+    return y - self.shift
+
+if JAX_MODE:
+  from jax import tree_util  # pylint: disable=g-import-not-at-top, g-bad-import-order
+  tree_util.register_pytree_node(
+      PytreeShift,
+      flatten_func=lambda v: (v.shift, None),
+      unflatten_func=lambda _, c: PytreeShift(c))

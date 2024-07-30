@@ -202,7 +202,7 @@ class OrderedLogisticTest(test_util.TestCase):
     self.assertAllClose(ordered_cdf, latent_cdf)
 
   def testUnorderedCutpointsFails(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Argument `cutpoints` must be non-decreasing.'):
       dist = ol.OrderedLogistic(
           cutpoints=[1., 0.9], loc=0.0, validate_args=True)

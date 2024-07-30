@@ -30,6 +30,7 @@ from tensorflow_probability.python.distributions import sample
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import tf_keras
 
 
 @test_util.test_all_tf_execution_regimes
@@ -226,7 +227,7 @@ def _make_gated_bijector_fn():
     else:
       reshape_output = lambda x: x
 
-    out = tf1.layers.dense(inputs=x, units=2 * output_units)
+    out = tf_keras.tf1_layers.dense(inputs=x, units=2 * output_units)
     shift, logit_gate = tf.split(out, 2, axis=-1)
     shift = reshape_output(shift)
     logit_gate = reshape_output(logit_gate)
@@ -250,7 +251,7 @@ class GatedTest(RealNVPTestBase):
 class RealNVPTestCommon(test_util.TestCase):
 
   def testMatrixBijectorRaises(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'Bijectors with `forward_min_event_ndims` > 1 are not supported'):
 
@@ -262,7 +263,7 @@ class RealNVPTestCommon(test_util.TestCase):
       rnvp.forward([1., 2.])
 
   def testRankChangingBijectorRaises(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Bijectors which alter `event_ndims` are not supported.'):
 
       def bijector_fn(*args, **kwargs):
@@ -274,13 +275,13 @@ class RealNVPTestCommon(test_util.TestCase):
       rnvp.forward([1., 2.])
 
   def testNonIntegerNumMaskedRaises(self):
-    with self.assertRaisesRegexp(TypeError, '`num_masked` must be an integer'):
+    with self.assertRaisesRegex(TypeError, '`num_masked` must be an integer'):
       real_nvp.RealNVP(
           num_masked=0.5, shift_and_log_scale_fn=lambda x, _: (x, x))
 
   def testNonFloatFractionMaskedRaises(self):
-    with self.assertRaisesRegexp(TypeError,
-                                 '`fraction_masked` must be a float'):
+    with self.assertRaisesRegex(TypeError,
+                                '`fraction_masked` must be a float'):
       real_nvp.RealNVP(
           fraction_masked=1, shift_and_log_scale_fn=lambda x, _: (x, x))
 
@@ -291,7 +292,7 @@ class RealNVPTestCommon(test_util.TestCase):
       ('UpperBoundary', 1.),
   )
   def testBadFractionRaises(self, fraction_masked):
-    with self.assertRaisesRegexp(ValueError, '`fraction_masked` must be in'):
+    with self.assertRaisesRegex(ValueError, '`fraction_masked` must be in'):
       real_nvp.RealNVP(
           fraction_masked=fraction_masked,
           shift_and_log_scale_fn=lambda x, _: (x, x))
@@ -303,7 +304,7 @@ class RealNVPTestCommon(test_util.TestCase):
       ('UpperBoundary', 1),
   )
   def testBadNumMaskRaises(self, num_masked):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'Number of masked units {} must be smaller than the event size 1'
         .format(num_masked)):

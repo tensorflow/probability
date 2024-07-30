@@ -291,6 +291,7 @@ class KumaraswamyTest(test_util.TestCase):
         validate_args=True)
     samples1 = self.evaluate(dist1.sample(n_val, seed=seed))
 
+    seed = test_util.clone_seed(seed)
     tf.random.set_seed(seed)
     dist2 = kumaraswamy.Kumaraswamy(
         concentration1=a_val,

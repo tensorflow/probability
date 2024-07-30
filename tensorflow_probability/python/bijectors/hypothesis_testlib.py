@@ -191,6 +191,10 @@ def trivially_instantiable_bijectors():
       result[bijector_name] = bijector_class
 
   result['Invert'] = tfb.Invert
+  # Add these bijectors since they subclass Invert but actually have no
+  # parameters.
+  result['Log'] = tfb.Log
+  result['Log1p'] = tfb.Log1p
 
   for bijector_name in sorted(result):
     logging.warning('Trivially supported bijectors: tfb.%s', bijector_name)
@@ -380,6 +384,9 @@ def bijector_supports():
       'Transpose':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_UNCONSTRAINED),
+      'UnitVector':
+          BijectorSupport(Support.VECTOR_UNCONSTRAINED,
+                          Support.VECTOR_WITH_L2_NORM_1_SIZE_GT1),
       'WeibullCDF':
           BijectorSupport(Support.SCALAR_NON_NEGATIVE, Support.SCALAR_IN_0_1),
   }
@@ -558,7 +565,9 @@ def generalized_pareto_constraint(loc, scale, conc):
   def constrain(x):
     conc_ = tf.convert_to_tensor(conc)
     loc_ = tf.convert_to_tensor(loc)
-    return tf.where(conc_ >= 0.,
+    # When conc is very small but negative, the maximum of the support is
+    # infinite, so we treat it as if it were non-negative.
+    return tf.where((conc_ >= 0.) | ~tf.math.is_finite(scale / conc_),
                     tf.math.softplus(x) + loc_,
                     loc_ - tf.math.sigmoid(x) * scale / conc_)
   return constrain

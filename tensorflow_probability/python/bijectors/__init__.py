@@ -94,6 +94,7 @@ from tensorflow_probability.python.bijectors.square import Square
 from tensorflow_probability.python.bijectors.tanh import Tanh
 from tensorflow_probability.python.bijectors.transform_diagonal import TransformDiagonal
 from tensorflow_probability.python.bijectors.transpose import Transpose
+from tensorflow_probability.python.bijectors.unit_vector import UnitVector
 from tensorflow_probability.python.bijectors.weibull_cdf import WeibullCDF
 
 # pylint: enable=unused-import,line-too-long,g-importing-member
@@ -173,6 +174,7 @@ __all__ = [
     "Tanh",
     "TransformDiagonal",
     "Transpose",
+    "UnitVector",
     "WeibullCDF",
     "masked_autoregressive_default_template",
     "masked_dense",

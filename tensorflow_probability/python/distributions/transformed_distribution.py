@@ -388,7 +388,7 @@ class _TransformedDistribution(distribution_lib.Distribution):
     return tf.reduce_logsumexp(tf.stack(lp_on_fibers), axis=0)
 
   def _prob(self, y, **kwargs):
-    if not hasattr(self.distribution, '_prob'):
+    if not hasattr(self.distribution, '_prob') or self.bijector._is_injective:  # pylint: disable=protected-access
       return tf.exp(self._log_prob(y, **kwargs))
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
 
@@ -400,9 +400,6 @@ class _TransformedDistribution(distribution_lib.Distribution):
         )
     ildj = self.bijector.inverse_log_det_jacobian(
         y, event_ndims=event_ndims, **bijector_kwargs)
-    if self.bijector._is_injective:  # pylint: disable=protected-access
-      base_prob = self.distribution.prob(x, **distribution_kwargs)
-      return base_prob * tf.exp(tf.cast(ildj, base_prob.dtype))
 
     # Compute prob on each element of the inverse image.
     prob_on_fibers = []
@@ -493,7 +490,7 @@ class _TransformedDistribution(distribution_lib.Distribution):
     y = self.bijector.forward(x, **bijector_kwargs)
 
     sample_shape = tf.convert_to_tensor([], dtype=tf.int32, name='sample_shape')
-    y = self._set_sample_static_shape(y, sample_shape)
+    y = self._set_sample_static_shape(y, sample_shape, **kwargs)
     return y
 
   def _stddev(self, **kwargs):
@@ -684,8 +681,8 @@ class TransformedDistribution(
       else:
         bijector = kwargs.get('bijector')
 
-      if not (isinstance(distribution, tf.__internal__.CompositeTensor)
-              and isinstance(bijector, tf.__internal__.CompositeTensor)):
+      if not (auto_composite_tensor.is_composite_tensor(distribution)
+              and auto_composite_tensor.is_composite_tensor(bijector)):
         return _TransformedDistribution(*args, **kwargs)
     return super(TransformedDistribution, cls).__new__(cls)
 

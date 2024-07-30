@@ -15,9 +15,12 @@
 # Description:
 #   Various backend alternatives to TF.
 
+# Placeholder: py_library
+
 licenses(["notice"])
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],

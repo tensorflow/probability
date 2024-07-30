@@ -37,7 +37,7 @@ class LossNotDecreasingTests(test_util.TestCase):
                               expected_num_steps,
                               pass_inputs_as_tensors):
 
-    with self.assertRaisesRegexp(ValueError, 'Must specify at least one of'):
+    with self.assertRaisesRegex(ValueError, 'Must specify at least one of'):
       loss_not_decreasing.LossNotDecreasing()
 
     window_size = 2

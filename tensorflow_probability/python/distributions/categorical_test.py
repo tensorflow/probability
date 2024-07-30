@@ -500,6 +500,25 @@ class CategoricalTest(test_util.TestCase):
     self.assertEqual(3, tensorshape_util.rank(log_prob.shape))
     self.assertAllEqual([2, 2, 2], log_prob.shape)
 
+  def testMean(self):
+    histograms = np.array([[[0.2, 0.8], [0.6, 0.4]]])
+    dist = categorical.Categorical(
+        tf.math.log(histograms) - 50., validate_args=True)
+    self.assertAllClose([[0.8, 0.4]], self.evaluate(dist.mean()))
+
+  def testMeanHuge(self):
+    num_logits = 10_000_000
+    dist = categorical.Categorical(
+        tf.zeros(num_logits), validate_args=True)
+    self.assertAllClose(num_logits / 2, self.evaluate(dist.mean()))
+
+  def testVariance(self):
+    histograms = np.array([[[0.2, 0.8], [0.6, 0.4]]])
+    dist = categorical.Categorical(
+        tf.math.log(histograms) - 50., validate_args=True)
+    self.assertAllClose(
+        [[0.2 * 0.8, 0.6 * 0.4]], self.evaluate(dist.variance()))
+
   def testMode(self):
     histograms = np.array([[[0.2, 0.8], [0.6, 0.4]]])
     dist = categorical.Categorical(
@@ -601,6 +620,28 @@ class CategoricalTest(test_util.TestCase):
 
 
 @test_util.test_all_tf_execution_regimes
+class ForceProbsToZeroOutsideSupportTest(test_util.TestCase):
+
+  def testPMFFloats(self):
+    logits = np.log(np.array([0.2, 0.8]))
+    dist = categorical.Categorical(logits=logits,
+                                   force_probs_to_zero_outside_support=True)
+    inputs = [0., 0.5, 1., 1.5]
+    # Should be 0 for non-integers.
+    expected_outputs = np.array([0.2, 0., 0.8, 0.])
+    self.assertAllClose(self.evaluate(dist.prob(inputs)), expected_outputs)
+
+  def testPMFOutOfBounds(self):
+    logits = np.log(np.array([0.2, 0.8]))
+    dist = categorical.Categorical(logits=logits,
+                                   force_probs_to_zero_outside_support=True)
+    inputs = [-2, -1, 0, 1, 2, 3]
+    # Should be 0 for out of bound inputs.
+    expected_outputs = np.array([0., 0., 0.2, 0.8, 0., 0.])
+    self.assertAllClose(self.evaluate(dist.prob(inputs)), expected_outputs)
+
+
+@test_util.test_all_tf_execution_regimes
 class CategoricalFromVariableTest(test_util.TestCase):
 
   @test_util.tf_tape_safety_test
@@ -632,7 +673,7 @@ class CategoricalFromVariableTest(test_util.TestCase):
 
   def testAssertionsLogits(self):
     x = deferred_tensor.TransformedVariable(0., identity.Identity(), shape=None)
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Argument `logits` must have rank at least 1.'):
       d = categorical.Categorical(logits=x, validate_args=True)
       self.evaluate([v.initializer for v in d.variables])

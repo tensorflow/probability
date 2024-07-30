@@ -477,7 +477,7 @@ class MultinomialFromVariableTest(test_util.TestCase):
 
   def testAssertionsLogits(self):
     x = deferred_tensor.TransformedVariable(0., tfb.Identity(), shape=None)
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Argument `logits` must have rank at least 1.'):
       d = multinomial.Multinomial(total_count=2., logits=x, validate_args=True)
       self.evaluate([v.initializer for v in d.variables])

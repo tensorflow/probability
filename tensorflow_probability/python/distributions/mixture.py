@@ -22,9 +22,10 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import parameter_properties
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
@@ -275,7 +276,7 @@ class _Mixture(distribution.Distribution):
         tf.reshape(stacked_devs, [-1, len(self.components)]))
 
     # I.e. re-shape to list(batch_shape) + list(event_shape).
-    return tf.reshape(batched_dev, tf.shape(broadcasted_cat_probs)[:-1])
+    return tf.reshape(batched_dev, ps.shape(broadcasted_cat_probs)[:-1])
 
   def _log_prob(self, x):
     x = tf.convert_to_tensor(x, name='x')
@@ -414,11 +415,11 @@ class _Mixture(distribution.Distribution):
     # checked.  In `__init__`, we could record whether or not all batch ranks/
     # shapes are known statically, in order to skip the checks here.
     cat_batch_shape = self._cat.batch_shape_tensor()
-    cat_batch_rank = prefer_static.rank_from_shape(
+    cat_batch_rank = ps.rank_from_shape(
         cat_batch_shape, self._cat.batch_shape)
     batch_shapes = [d.batch_shape_tensor() for d in self.components]
-    batch_ranks = [prefer_static.rank_from_shape(batch_shapes[i],
-                                                 self.components[i].batch_shape)
+    batch_ranks = [ps.rank_from_shape(batch_shapes[i],
+                                      self.components[i].batch_shape)
                    for i in range(len(self.components))]
     check_message = 'components[{}] batch shape must match cat batch shape'
     for i in range(len(self._components)):
@@ -450,8 +451,8 @@ class Mixture(_Mixture, distribution.AutoCompositeTensorDistribution):
         components = kwargs.get('components')
 
       _validate_cat_and_components(cat, components)
-      if not (isinstance(cat, tf.__internal__.CompositeTensor)
-              and all(isinstance(d, tf.__internal__.CompositeTensor)
+      if not (auto_composite_tensor.is_composite_tensor(cat)
+              and all(auto_composite_tensor.is_composite_tensor(d)
                       for d in components)):
         return _Mixture(*args, **kwargs)
     return super(Mixture, cls).__new__(cls)

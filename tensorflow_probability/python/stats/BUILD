@@ -22,6 +22,7 @@ load(
 )
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -90,6 +91,7 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["moving_stats_test.py"],
     jax_tags = ["notap"],
+    shard_count = 3,
     deps = [
         ":moving_stats",
         # numpy dep,
@@ -115,6 +117,7 @@ multi_substrate_py_test(
     srcs = ["ranking_test.py"],
     jax_tags = ["notap"],
     numpy_tags = ["notap"],
+    shard_count = 2,
     deps = [
         ":quantiles",
         ":ranking",

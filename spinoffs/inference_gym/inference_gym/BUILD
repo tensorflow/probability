@@ -17,9 +17,10 @@
 #   against the same.
 
 # [internal] load pytype.bzl (pytype_strict_library)
-# [internal] load dummy dependency
+# Placeholder: py_library
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
         "//inference_gym:__subpackages__",
@@ -96,5 +97,3 @@ py_library(
     name = "backend_tensorflow",
     srcs = ["dynamic/backend_tensorflow/__init__.py"],
 )
-
-# third_party_dependency(package = "py/inference_gym")  # DisableOnExport

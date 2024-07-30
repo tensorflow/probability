@@ -17,7 +17,6 @@
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
-
 from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
@@ -29,12 +28,14 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
     'Dirichlet',
+    'FlatDirichlet',
 ]
 
 
@@ -315,6 +316,10 @@ class Dirichlet(distribution.AutoCompositeTensorDistribution):
     return softmax_centered_bijector.SoftmaxCentered(
         validate_args=self.validate_args)
 
+  def _experimental_tangent_space(self, x):
+    from tensorflow_probability.python.experimental.tangent_spaces import simplex  # pylint:disable=g-import-not-at-top
+    return simplex.ProbabilitySimplexSpace()
+
   def _sample_control_dependencies(self, x):
     """Checks the validity of a sample."""
     assertions = []
@@ -446,3 +451,122 @@ def _kl_dirichlet_dirichlet(d1, d2, name=None):
     return (
         tf.reduce_sum(concentration_diff * digamma_diff, axis=-1) -
         tf.math.lbeta(concentration1) + tf.math.lbeta(concentration2))
+
+
+class FlatDirichlet(Dirichlet):
+  """Special case of Dirichlet for concentration = 1.
+
+  This case is both frequent and admits a more efficient sampling algorithm.
+  """
+
+  def __init__(
+      self,
+      concentration_shape,
+      dtype=tf.float32,
+      validate_args=False,
+      allow_nan_stats=True,
+      force_probs_to_zero_outside_support=False,
+      name='FlatDirichlet',
+  ):
+    """Initialize a batch of FlatDirichlet distributions.
+
+    Args:
+      concentration_shape: Integer `Tensor` shape of the concentration
+        parameter.
+      dtype: The dtype of the distribution.
+      validate_args: Python `bool`, default `False`. When `True` distribution
+        parameters are checked for validity despite possibly degrading runtime
+        performance. When `False` invalid inputs may silently render incorrect
+        outputs.
+      allow_nan_stats: Python `bool`, default `True`. When `True`, statistics
+        (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+        result is undefined. When `False`, an exception is raised if one or more
+        of the statistic's batch members are undefined.
+      force_probs_to_zero_outside_support: If `True`, force `prob(x) == 0` and
+        `log_prob(x) == -inf` for values of x outside the distribution support.
+      name: Python `str` name prefixed to Ops created by this class.
+    """
+    parameters = dict(locals())
+    self._concentration_shape = tensor_util.convert_nonref_to_tensor(
+        concentration_shape,
+        dtype=tf.int32,
+        name='concentration_shape',
+        as_shape_tensor=True,
+    )
+    self._concentration_shape_static = tensorshape_util.constant_value_as_shape(
+        self._concentration_shape
+    )
+    concentration = tf.ones(concentration_shape, dtype=dtype)
+    super(FlatDirichlet, self).__init__(
+        concentration=concentration,
+        validate_args=validate_args,
+        allow_nan_stats=allow_nan_stats,
+        force_probs_to_zero_outside_support=force_probs_to_zero_outside_support,
+        name=name,
+    )
+    self._parameters = parameters
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        concentration_shape=parameter_properties.ShapeParameterProperties()
+    )
+
+  @property
+  def concentration_shape(self):
+    return self._concentration_shape
+
+  def _batch_shape_tensor(self):
+    return tf.constant(self._concentration_shape[:-1], dtype=tf.int32)
+
+  def _batch_shape(self):
+    return tf.TensorShape(self._concentration_shape_static[:-1])
+
+  def _event_shape_tensor(self):
+    return tf.constant(self._concentration_shape[-1], dtype=tf.int32)
+
+  def _event_shape(self):
+    return tf.TensorShape([self._concentration_shape_static[-1]])
+
+  def _log_prob(self, x):
+    # The pdf of a flat dirichlet is just Gamma(n).
+    n = tf.cast(self._concentration_shape[-1], dtype=tf.float32)
+    lp = tf.math.lgamma(n)
+    if self._force_probs_to_zero_outside_support:
+      eps = np.finfo(dtype_util.as_numpy_dtype(x.dtype)).eps
+      in_support = (
+          tf.reduce_all(x >= 0, axis=-1) &
+          # Reusing the logic of tf.debugging.assert_near, 10 * np.finfo.eps
+          (tf.math.abs(tf.reduce_sum(x, axis=-1) - 1.) < 10 * eps))
+      return tf.where(in_support, lp, -float('inf'))
+    return lp
+
+  def _sample_n(self, n, seed=None):
+    # https://en.wikipedia.org/wiki/Dirichlet_distribution#When_each_alpha_is_1
+    tshape = self._concentration_shape
+    # rand_shape = [n] + tshape[:-1] + [tshape[-1] - 1]
+    rand_shape = ps.tensor_scatter_nd_sub(
+        ps.concat([[n], tshape], 0), indices=[-1], updates=[1]
+    )
+    rand_values = samplers.uniform(
+        rand_shape,
+        minval=dtype_util.as_numpy_dtype(self.dtype)(0.0),
+        maxval=dtype_util.as_numpy_dtype(self.dtype)(1.0),
+        dtype=self.dtype,
+        seed=seed,
+    )
+    # sentinel_shape = [n] + tshape[:-1] + [1]
+    sentinel_shape = ps.tensor_scatter_nd_update(
+        ps.concat([[n], tshape], 0), indices=[-1], updates=[1]
+    )
+    padded_values = tf.concat(
+        [
+            tf.zeros(sentinel_shape, dtype=self.dtype),
+            rand_values,
+            tf.ones(sentinel_shape, dtype=self.dtype),
+        ],
+        axis=-1,
+    )
+    sorted_values = tf.sort(padded_values, axis=-1)
+    value_diffs = sorted_values[..., 1:] - sorted_values[..., :-1]
+    return value_diffs

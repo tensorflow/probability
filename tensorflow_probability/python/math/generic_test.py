@@ -37,6 +37,8 @@ from tensorflow_probability.python.math.gradient import batch_jacobian
 
 
 JAX_MODE = False
+NUMPY_MODE = False
+TF_MODE = not (JAX_MODE or NUMPY_MODE)
 
 
 def _allow_all_gather(fn):
@@ -258,7 +260,6 @@ class SoftplusInverseTest(test_util.TestCase):
     self.assertAllEqual(np.ones_like(tf_softplus_inverse).astype(np.bool_),
                         np.isfinite(tf_softplus_inverse))
 
-  @test_util.numpy_disable_gradient_test  # TODO(sharadmv): fix Numpy test
   def testNumbers(self):
     for t in [np.float32, np.float64]:
       lower = {np.float32: -50, np.float64: -50}.get(t, -100)
@@ -715,6 +716,8 @@ class CollectiveTest(distribute_test_lib.DistributedTest):
       ), (None, 0, 1, 2, [0, 1], [1, 2], [0, 2], [0, 1, 2]))))
   def test_reduce_with_collectives_matches_reduce_without_collectives(
       self, reduce_op, axes):
+    if (tf.executing_eagerly() and TF_MODE):
+      self.skipTest('Not supported in Eager.')
 
     if axes is None:
       pos_axes = list(range(2))

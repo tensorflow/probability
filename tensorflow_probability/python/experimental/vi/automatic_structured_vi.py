@@ -40,6 +40,7 @@ from tensorflow_probability.python.distributions import truncated_normal
 from tensorflow_probability.python.distributions import uniform
 
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import trainable_state_util
@@ -347,6 +348,30 @@ def _asvi_convex_update_for_base_distribution(dist,
         ps.shape(prior_value)[
             ps.rank(prior_value) - param_properties.event_ndims:]
     ], axis=0)
+    # We need to pick a dtype that is compatible with the other parameters that
+    # this parameter interacts with. We don't have direct access to this, so we
+    # do some heuristics here.
+    converted_prior_value = getattr(dist, param, None)
+    if converted_prior_value is None:
+      converted_prior_value = getattr(dist, '_' + param, None)
+
+    if converted_prior_value is not None:
+      # This is the safest option, if we can grab its converted value, then that
+      # value is guaranteed to be good. Small chance that the implementor added
+      # a property/attribute with the same name, but unrelated semantics...
+      param_dtype = converted_prior_value.dtype
+    elif bijector.dtype is not None:
+      # For many bijectors, parameter_properties is implemented to specify a
+      # good dtype value.
+      param_dtype = bijector.dtype
+    elif dtype_util.is_floating(dist.dtype):
+      # If the distribution returns floats, all floats are probably of the same
+      # type. This doesn't work for discrete distributions.
+      param_dtype = dist.dtype
+    else:
+      # The greedy local conversion is unlikely to work, but we've run out of
+      # places to look.
+      param_dtype = tf.convert_to_tensor(prior_value).dtype
 
     # Initialize the mean-field parameter as a (constrained) standard
     # normal sample.
@@ -358,6 +383,7 @@ def _asvi_convex_update_for_base_distribution(dist,
             bijector.forward(
                 samplers.normal(
                     shape=bijector.inverse_event_shape(param_shape),
+                    dtype=bijector.inverse_dtype(param_dtype),
                     seed=seed))),
         name='mean_field_parameter_{}_{}'.format(_get_name(dist), param),
         constraining_bijector=bijector)
@@ -368,7 +394,7 @@ def _asvi_convex_update_for_base_distribution(dist,
           init_fn=lambda: tf.fill(  # pylint: disable=g-long-lambda
               dims=param_shape,
               value=tf.cast(initial_prior_weight,
-                            tf.convert_to_tensor(prior_value).dtype)),
+                            param_dtype)),
           name='prior_weight_{}_{}'.format(_get_name(dist), param),
           constraining_bijector=sigmoid.Sigmoid())
       temp_params_dict[param] = prior_weight * prior_value + (
@@ -471,7 +497,7 @@ def _build_asvi_surrogate_posterior(prior,
     target_log_prob_fn,
     surrogate_posterior=surrogate_posterior,
     num_steps=100,
-    optimizer=tf.optimizers.Adam(0.1),
+    optimizer=tf_keras.optimizers.Adam(0.1),
     sample_size=10)
 
   # After optimization, samples from the surrogate will approximate
@@ -483,7 +509,7 @@ def _build_asvi_surrogate_posterior(prior,
 
   #### References
 
-  [1]: Luca Ambrogioni, Kate Line, Emily Fertig, Sharad Vikram, Max Hinne,
+  [1]: Luca Ambrogioni, Kate Lin, Emily Fertig, Sharad Vikram, Max Hinne,
         Dave Moore, Marcel van Gerven. Automatic structured variational
         inference. _arXiv preprint arXiv:2002.00643_, 2020
         https://arxiv.org/abs/2002.00643

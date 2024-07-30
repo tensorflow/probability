@@ -21,6 +21,7 @@ load(
 )
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -33,6 +34,8 @@ multi_substrate_py_library(
     srcs = ["__init__.py"],
     deps = [
         ":additive_kernel",
+        ":feature_scaled_with_categorical",
+        ":feature_scaled_with_embedded_categorical",
         ":multitask_kernel",
     ],
 )
@@ -68,12 +71,46 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_library(
+    name = "feature_scaled_with_categorical",
+    srcs = ["feature_scaled_with_categorical.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:joint_map",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:nest_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math/psd_kernels:positive_semidefinite_kernel",
+        "//tensorflow_probability/python/math/psd_kernels/internal:util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "feature_scaled_with_categorical_test",
+    size = "medium",
+    srcs = ["feature_scaled_with_categorical_test.py"],
+    deps = [
+        ":feature_scaled_with_categorical",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math/psd_kernels:exponentiated_quadratic",
+        "//tensorflow_probability/python/math/psd_kernels:feature_scaled",
+        "//tensorflow_probability/python/math/psd_kernels:matern",
+    ],
+)
+
+multi_substrate_py_library(
     name = "multitask_kernel",
     srcs = ["multitask_kernel.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:nest_util",
         "//tensorflow_probability/python/math/psd_kernels:positive_semidefinite_kernel",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
     ],
@@ -90,5 +127,39 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math/psd_kernels:exponentiated_quadratic",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "feature_scaled_with_embedded_categorical",
+    srcs = ["feature_scaled_with_embedded_categorical.py"],
+    deps = [
+        ":feature_scaled_with_categorical",
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math/psd_kernels:positive_semidefinite_kernel",
+        "//tensorflow_probability/python/math/psd_kernels/internal:util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "feature_scaled_with_embedded_categorical_test",
+    size = "medium",
+    srcs = ["feature_scaled_with_embedded_categorical_test.py"],
+    deps = [
+        ":feature_scaled_with_categorical",
+        ":feature_scaled_with_embedded_categorical",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math/psd_kernels:exponentiated_quadratic",
+        "//tensorflow_probability/python/math/psd_kernels:feature_scaled",
+        "//tensorflow_probability/python/math/psd_kernels:matern",
     ],
 )

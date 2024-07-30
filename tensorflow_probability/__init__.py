@@ -17,9 +17,10 @@
 # Contributors to the `python/` dir should not alter this file; instead update
 # `python/__init__.py` as necessary.
 
-from tensorflow_probability import substrates
 # from tensorflow_probability.google import staging  # DisableOnExport
 # from tensorflow_probability.google import tfp_google  # DisableOnExport
 from tensorflow_probability.python import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.version import __version__
 
+# tfp_google.bind(globals())  # DisableOnExport
+# del tfp_google  # DisableOnExport

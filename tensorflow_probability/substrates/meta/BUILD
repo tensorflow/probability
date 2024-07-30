@@ -14,9 +14,13 @@
 # ============================================================================
 # Tests for the backend integration.
 
+# Placeholder: py_binary
+# Placeholder: py_test
+
 licenses(["notice"])
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],

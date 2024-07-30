@@ -46,6 +46,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
 
+from tensorflow_probability.python.internal import tf_keras
 
 JAX_MODE = False
 
@@ -55,9 +56,9 @@ class BaseBijectorTest(test_util.TestCase):
   """Tests properties of the Bijector base-class."""
 
   def testIsAbstract(self):
-    with self.assertRaisesRegexp(TypeError,
-                                 ('Can\'t instantiate abstract class Bijector '
-                                  'with abstract methods? __init__')):
+    with self.assertRaisesRegex(TypeError,
+                                ('Can\'t instantiate abstract class Bijector '
+                                 'with.* abstract methods? \'?__init__')):
       bijector_lib.Bijector()  # pylint: disable=abstract-class-instantiated
 
   def testDefaults(self):
@@ -87,20 +88,20 @@ class BaseBijectorTest(test_util.TestCase):
       self.assertAllEqual(shape, inverse_event_shape_)
       self.assertAllEqual(shape, bij.inverse_event_shape(shape))
 
-    with self.assertRaisesRegexp(NotImplementedError,
-                                 'inverse not implemented'):
+    with self.assertRaisesRegex(NotImplementedError,
+                                'inverse not implemented'):
       bij.inverse(0)
 
-    with self.assertRaisesRegexp(NotImplementedError,
-                                 'forward not implemented'):
+    with self.assertRaisesRegex(NotImplementedError,
+                                'forward not implemented'):
       bij.forward(0)
 
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         NotImplementedError,
         'Cannot derive `inverse_log_det_jacobian`'):
       bij.inverse_log_det_jacobian(0, event_ndims=0)
 
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         NotImplementedError,
         'Cannot derive `forward_log_det_jacobian`'):
       bij.forward_log_det_jacobian(0, event_ndims=0)
@@ -139,14 +140,14 @@ class BaseBijectorTest(test_util.TestCase):
     b32 = _TypedIdentity(tf.float32)
     self.assertEqual(tf.float32, b32(0).dtype)
     self.assertEqual(tf.float32, b32(x32).dtype)
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         error_clazz, 'Tensor conversion requested dtype'):
       b32.forward(x64)
 
     b64 = _TypedIdentity(tf.float64)
     self.assertEqual(tf.float64, b64(0).dtype)
     self.assertEqual(tf.float64, b64(x64).dtype)
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         error_clazz, 'Tensor conversion requested dtype'):
       b64.forward(x32)
 
@@ -582,20 +583,20 @@ class UnspecifiedParameters(bijector_lib.Bijector):
 class BijectorTestEventNdims(test_util.TestCase):
 
   def assertRaisesError(self, msg):
-    return self.assertRaisesRegexp(Exception, msg)
+    return self.assertRaisesRegex(Exception, msg)
 
   def testBijectorNonIntegerEventNdims(self):
     bij = ExpOnlyJacobian()
-    with self.assertRaisesRegexp(ValueError, 'Expected integer'):
+    with self.assertRaisesRegex(ValueError, 'Expected integer'):
       bij.forward_log_det_jacobian(1., event_ndims=1.5)
-    with self.assertRaisesRegexp(ValueError, 'Expected integer'):
+    with self.assertRaisesRegex(ValueError, 'Expected integer'):
       bij.inverse_log_det_jacobian(1., event_ndims=1.5)
 
   def testBijectorArrayEventNdims(self):
     bij = ExpOnlyJacobian()
-    with self.assertRaisesRegexp(ValueError, 'Expected scalar'):
+    with self.assertRaisesRegex(ValueError, 'Expected scalar'):
       bij.forward_log_det_jacobian(1., event_ndims=(1, 2))
-    with self.assertRaisesRegexp(ValueError, 'Expected scalar'):
+    with self.assertRaisesRegex(ValueError, 'Expected scalar'):
       bij.inverse_log_det_jacobian(1., event_ndims=(1, 2))
 
   def testBijectorDynamicEventNdims(self):
@@ -791,7 +792,11 @@ class BijectorBatchShapesTest(test_util.TestCase):
 
     def _maybe_broadcast_param_batch_shape(p, s):
       if isinstance(p, invert.Invert) and not p.bijector._params_event_ndims():
-        return s  # Can't broadcast a bijector that doesn't itself have params.
+        # Split has a shape parameter that has no batch shape.
+        if isinstance(p.bijector, split.Split):
+          return s
+        if not p.bijector._params_event_ndims():
+          return s  # Can't broadcast a bijector that doesn't have params.
       return ps.broadcast_shape(s, new_batch_shape)
     expected_broadcast_param_batch_shapes = tf.nest.map_structure(
         _maybe_broadcast_param_batch_shape,
@@ -974,7 +979,7 @@ class BijectorCachingTest(test_util.TestCase):
     bijector = InverseOnlyBijector(scale=2.)
     y = tf.constant(10.)
     if keras:
-      y = tf.keras.layers.Input(shape=(), dtype=tf.float32, tensor=y)
+      y = tf_keras.layers.Input(shape=(), dtype=tf.float32, tensor=y)
     x = bijector.inverse(y)
     # Forward computation should work here because it should look up
     # `y` in the cache and call `inverse_log_det_jacobian`.
@@ -1029,9 +1034,9 @@ class BijectorReduceEventDimsTest(test_util.TestCase):
   def testReduceEventNdimsForwardRaiseError(self):
     x = [[[1., 2.], [3., 4.]]]
     bij = ExpOnlyJacobian(forward_min_event_ndims=1)
-    with self.assertRaisesRegexp(ValueError, 'must be at least'):
+    with self.assertRaisesRegex(ValueError, 'must be at least'):
       bij.forward_log_det_jacobian(x, event_ndims=0)
-    with self.assertRaisesRegexp(ValueError, 'Input must have rank at least'):
+    with self.assertRaisesRegex(ValueError, 'Input must have rank at least'):
       bij.forward_log_det_jacobian(x, event_ndims=4)
 
   def testReduceEventNdimsInverse(self):
@@ -1050,9 +1055,9 @@ class BijectorReduceEventDimsTest(test_util.TestCase):
   def testReduceEventNdimsInverseRaiseError(self):
     x = [[[1., 2.], [3., 4.]]]
     bij = ExpOnlyJacobian(forward_min_event_ndims=1)
-    with self.assertRaisesRegexp(ValueError, 'must be at least'):
+    with self.assertRaisesRegex(ValueError, 'must be at least'):
       bij.inverse_log_det_jacobian(x, event_ndims=0)
-    with self.assertRaisesRegexp(ValueError, 'Input must have rank at least'):
+    with self.assertRaisesRegex(ValueError, 'Input must have rank at least'):
       bij.inverse_log_det_jacobian(x, event_ndims=4)
 
   def testReduceEventNdimsForwardConstJacobian(self):
@@ -1093,7 +1098,8 @@ class BijectorLDJCachingTest(test_util.TestCase):
     # Exercise the scenario outlined in
     # https://github.com/tensorflow/probability/issues/253 (originally reported
     # internally as b/119756336).
-    x1 = tf1.placeholder(tf.float32, shape=[None, 2], name='x1')
+    x1_value = np.random.uniform(size=[10, 2])
+    x1 = tf1.placeholder_with_default(x1_value, shape=[None, 2], name='x1')
     x2 = tf1.placeholder(tf.float32, shape=[None, 2], name='x2')
 
     bij = ConstantJacobian()
@@ -1101,9 +1107,7 @@ class BijectorLDJCachingTest(test_util.TestCase):
     bij.forward_log_det_jacobian(x2, event_ndims=1)
     a = bij.forward_log_det_jacobian(x1, event_ndims=1, name='a_fldj')
 
-    x1_value = np.random.uniform(size=[10, 2])
-    with self.test_session() as sess:
-      sess.run(a, feed_dict={x1: x1_value})
+    self.evaluate(a)
 
 
 @test_util.test_all_tf_execution_regimes

@@ -597,8 +597,8 @@ class JointDistributionSequentialAutoBatched(
 
       # Return a `_JointDistributionSequentialAutoBatched` instance if `model`
       # contains distributions that are not CompositeTensors.
-      if not all(isinstance(d, tf.__internal__.CompositeTensor) or callable(d)
-                 for d in model):
+      if not all(auto_composite_tensor.is_composite_tensor(d)
+                 or callable(d) for d in model):
         return _JointDistributionSequentialAutoBatched(*args, **kwargs)
     return super(JointDistributionSequentialAutoBatched, cls).__new__(cls)
 
@@ -634,8 +634,8 @@ class JointDistributionNamedAutoBatched(
 
       # Return a `_JointDistributionNamedAutoBatched` instance if `model`
       # contains distributions that are not CompositeTensors.
-      if not all(isinstance(d, tf.__internal__.CompositeTensor) or callable(d)
-                 for d in tf.nest.flatten(model)):
+      if not all(auto_composite_tensor.is_composite_tensor(d)
+                 or callable(d) for d in tf.nest.flatten(model)):
         return _JointDistributionNamedAutoBatched(*args, **kwargs)
     return super(JointDistributionNamedAutoBatched, cls).__new__(cls)
 

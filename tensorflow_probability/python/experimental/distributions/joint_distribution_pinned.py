@@ -246,7 +246,7 @@ class JointDistributionPinned(object):
       pulled_back_shape)
   vars = tf.nest.map_structure(tf.Variable, uniform_init)
 
-  opt = tf.optimizers.Adam(.01)
+  opt = tf_keras.optimizers.Adam(.01)
 
   @tf.function(autograph=False)
   def one_step():
@@ -343,6 +343,7 @@ class JointDistributionPinned(object):
     self._use_vectorized_map = getattr(distribution,
                                        'use_vectorized_map',
                                        False)
+    self.allow_nan_stats = False
 
   @property
   def distribution(self):
@@ -431,6 +432,11 @@ class JointDistributionPinned(object):
         self._prune(self.distribution.dtype, retain='unpinned'))
 
   @property
+  def reparameterization_type(self):
+    return self._prune(self.distribution.reparameterization_type,
+                       retain='unpinned')
+
+  @property
   def event_shape(self):
     """Statically resolvable event shapes of unpinned parts."""
     return self._prune(self.distribution.event_shape, retain='unpinned')
@@ -495,6 +501,31 @@ class JointDistributionPinned(object):
     pins = dict(self.pins, **_to_pins(self, *args, **kwargs))
     return JointDistributionPinned(self.distribution, **pins)
 
+  def unpin(self, *pinned_part_names):
+    """Unpins selected parts, returning a new instance.
+
+    Args:
+      *pinned_part_names: One or more `str` names of parts to unpin.
+
+    Returns:
+      jd: A joint distribution with the specified pins dropped. If all pins are
+        dropped, the underlying joint distribution is returned.
+    """
+    if not pinned_part_names:
+      return self
+    unrecognized_part_names = [
+        p for p in pinned_part_names if p not in self.pins]
+    if unrecognized_part_names:
+      raise ValueError(
+          f'Unrecognized part names: {unrecognized_part_names}. '
+          f'Current pinned part names are {sorted(self.pins)}.')
+    pins = dict(self.pins)
+    for part in pinned_part_names:
+      pins.pop(part)
+    if not pins:
+      return self.distribution
+    return JointDistributionPinned(self.distribution, **pins)
+
   def _flat_resolve_names(self):
     return [n for n in self.distribution._flat_resolve_names()
             if n not in self.pins]
@@ -525,6 +556,12 @@ class JointDistributionPinned(object):
     return self._prune(
         self.distribution.sample(sample_shape, seed=seed, **self.pins),
         retain='unpinned')
+
+  def experimental_sample_and_log_prob(
+      self, sample_shape=(), seed=None, name='sample_and_log_prob', **kwargs):
+    del name
+    x = self.sample_unpinned(sample_shape=sample_shape, seed=seed, **kwargs)
+    return x, self.log_prob(x, **kwargs)
 
   def sample_and_log_weight(self, sample_shape=(), seed=None):
     """Draws unnormalized samples and their log-weights with ancestral sampling.
@@ -700,7 +737,7 @@ def _to_pins(dist, *args, **kwargs):
     dist: JointDistribution*-like object with _flat_resolve_names(), dtype, and
       _model_flatten(x).
     *args: Either a sequence of pins that aligns with `_model_flatten` and
-      `_flat_resolve_names`, or a single item sequence where `pins[0]`
+      `_flat_resolve_names`, or a single item sequence where `args[0]`
       structure is compatible with `dist.dtype`.
     **kwargs: Named pins with keys corresponding to part names resolved by
       `_flat_resolve_names()`.
@@ -708,15 +745,17 @@ def _to_pins(dist, *args, **kwargs):
   Returns:
     pins: Python dict mapping resolved names to pinned values.
   """
+  dtypes = dist._model_flatten(dist.dtype)
+  if not dtypes:
+    return {}
   forbid_sequences = (
       isinstance(dist.dtype, dict) and
       not isinstance(dist.dtype, collections.OrderedDict))
   if bool(args) == bool(kwargs):
     raise ValueError('Exactly one of *args or **kwargs should be set.')
-  dtypes = dist._model_flatten(dist.dtype)
   struct0 = dtypes[0]
   if len(args) == 1:
-    # We can interpret a single-element *pins as either a value (matching the
+    # We can interpret a single-element *args as either a value (matching the
     # structure of dist.dtype [perhaps partially]), or a first-item pin.
     try:
       tf.nest.assert_same_structure(args[0], struct0)

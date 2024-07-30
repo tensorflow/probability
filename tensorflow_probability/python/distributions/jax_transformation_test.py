@@ -28,7 +28,10 @@ import jax.numpy as np
 
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal.backend import jax as tf
+from tensorflow_probability.substrates.jax.bijectors import bijector_test_util
 from tensorflow_probability.substrates.jax.distributions import hypothesis_testlib as dhps
+from tensorflow_probability.substrates.jax.distributions import normal
+from tensorflow_probability.substrates.jax.distributions import transformed_distribution
 from tensorflow_probability.substrates.jax.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.substrates.jax.internal import test_util
 
@@ -157,6 +160,7 @@ class JitTest(test_util.TestCase):
     seed = test_util.test_seed()
     result = jax.jit(_sample)(seed)
     if not FLAGS.execute_only:
+      seed = test_util.clone_seed(seed)
       self.assertAllClose(_sample(seed), result, rtol=1e-6,
                           atol=1e-6)
 
@@ -429,6 +433,30 @@ class PytreeTest(test_util.TestCase):
         validate_args=False,
         eligibility_filter=lambda dname: dname not in PYTREE_BLOCKLIST))
     dist_and_sample(dist)
+
+  def test_user_defined_pytree(self):
+    k = np.asarray([3])
+    pytree_shift = bijector_test_util.PytreeShift(k)
+    td = transformed_distribution.TransformedDistribution(
+        normal.Normal(0., 1), bijector=pytree_shift)
+    leaves, treedef = jax.tree_util.tree_flatten(td)
+    node_data = treedef.node_data()
+
+    # `td` and `td.bijector` are both Pytrees, but only `td` was registered as a
+    # Pytree via AutoCompositeTensor.
+    self.assertFalse(jax.tree_util.treedef_is_leaf(treedef))
+    self.assertFalse(
+        jax.tree_util.treedef_is_leaf(jax.tree_util.tree_structure(td.bijector))
+    )
+    self.assertIsInstance(td, tf.__internal__.CompositeTensor)
+    self.assertNotIsInstance(td.bijector, tf.__internal__.CompositeTensor)
+
+    # `"bijector"` is in the tuple of arg names for the Pytree children and not
+    # the auxiliary data.
+    self.assertIn('bijector', node_data[1][0])
+    # The shift parameter (and both Normal parameters) are leaves.
+    self.assertLen(leaves, 3)
+
 
 if __name__ == '__main__':
   os.environ['XLA_FLAGS'] = '--xla_force_host_platform_device_count=8'

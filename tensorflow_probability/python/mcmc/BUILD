@@ -15,6 +15,8 @@
 # Description:
 #   MCMC methods, diagnostics, and related utilities.
 
+# Placeholder: py_library
+# Placeholder: py_test
 load(
     "//tensorflow_probability/python:build_defs.bzl",
     "multi_substrate_py_library",
@@ -22,6 +24,7 @@ load(
 )
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -138,6 +141,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:distribute_lib",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/mcmc/internal:leapfrog_integrator",
         "//tensorflow_probability/python/mcmc/internal:util",
         "//tensorflow_probability/python/util:seed_stream",
@@ -172,6 +176,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/math:generic",
         "//tensorflow_probability/python/util:deferred_tensor",
     ],
@@ -284,6 +289,7 @@ multi_substrate_py_test(
     timeout = "long",
     srcs = ["langevin_test.py"],
     disabled_substrates = ["numpy"],
+    shard_count = 3,
     deps = [
         ":langevin",
         ":sample",
@@ -349,6 +355,7 @@ multi_substrate_py_test(
     name = "random_walk_metropolis_test",
     size = "medium",
     srcs = ["random_walk_metropolis_test.py"],
+    shard_count = 2,
     deps = [
         ":random_walk_metropolis",
         ":sample",
@@ -425,6 +432,7 @@ multi_substrate_py_test(
     size = "medium",
     timeout = "long",
     srcs = ["sample_test.py"],
+    shard_count = 3,
     deps = [
         ":hmc",
         ":kernel",
@@ -473,6 +481,7 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["sample_annealed_importance_test.py"],
     numpy_tags = ["notap"],
+    shard_count = 3,
     deps = [
         ":hmc",
         ":sample_annealed_importance",
@@ -487,7 +496,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_library(
     name = "sample_halton_sequence",
-    srcs = ["sample_halton_sequence.py"],
+    srcs = ["sample_halton_sequence_lib.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -621,6 +630,7 @@ py_test(
     name = "eight_schools_hmc_eager_test",
     size = "medium",  # Might run > 1 minute.
     srcs = ["eight_schools_hmc_eager_test.py"],
+    tags = ["no-oss-ci"],
     deps = [
         ":eight_schools_hmc",
         # tensorflow dep,
@@ -633,6 +643,7 @@ py_test(
     name = "eight_schools_hmc_graph_test",
     size = "medium",  # Might run > 1 minute.
     srcs = ["eight_schools_hmc_graph_test.py"],
+    tags = ["no-oss-ci"],
     deps = [
         ":eight_schools_hmc",
         # tensorflow dep,

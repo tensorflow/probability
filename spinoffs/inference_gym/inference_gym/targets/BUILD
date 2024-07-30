@@ -17,8 +17,11 @@
 
 # [internal] load pytype.bzl (pytype_strict_library)
 # [internal] load strict.bzl
+# Placeholder: py_library
+# Placeholder: py_test
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
         "//inference_gym:__subpackages__",

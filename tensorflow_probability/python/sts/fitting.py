@@ -132,7 +132,7 @@ def build_factored_surrogate_posterior(
     loss_curve = tfp.vi.fit_surrogate_posterior(
       target_log_prob_fn=model.joint_distribution(observed_time_series).log_prob,
       surrogate_posterior=surrogate_posterior,
-      optimizer=tf.optimizers.Adam(learning_rate=0.1),
+      optimizer=tf_keras.optimizers.Adam(learning_rate=0.1),
       num_steps=200)
     posterior_samples = surrogate_posterior.sample(50)
 
@@ -152,7 +152,7 @@ def build_factored_surrogate_posterior(
         surrogate_posterior,
         sample_size=10)
 
-    optimizer = tf.optimizers.Adam(learning_rate=0.1)
+    optimizer = tf_keras.optimizers.Adam(learning_rate=0.1)
     for step in range(200):
       with tf.GradientTape() as tape:
         loss = loss_fn()
@@ -231,18 +231,20 @@ def build_factored_surrogate_posterior_stateless(
   ```python
     # This example only works in the JAX backend because it uses
     # `optax` for stateless optimizers.
-    seed = tfp.random.sanitize_seed([0, 0], salt='fit_stateless')
+    seed = tfp.random.sanitize_seed(jax.random.PRNGKey(0), salt='fit_stateless')
     init_seed, fit_seed, sample_seed = tfp.random.split_seed(seed, n=3)
     init_fn, build_surrogate_fn = (
         tfp.sts.build_factored_surrogate_posterior_stateless(model=model))
     initial_parameters = init_fn(init_seed)
     jd = model.joint_distribution(observed_time_series)
-    loss_curve = tfp.vi.fit_surrogate_posterior_stateless(
+    final_parameters, loss_curve = tfp.vi.fit_surrogate_posterior_stateless(
       target_log_prob_fn=jd.log_prob,
       initial_parameters=initial_parameters,
       build_surrogate_posterior_fn=build_surrogate_fn,
       optimizer=optax.adam(1e-4),
-      num_steps=200)
+      num_steps=200,
+      seed=fit_seed)
+    surrogate_posterior = build_surrogate_fn(final_parameters)
     posterior_samples = surrogate_posterior.sample(50, seed=sample_seed)
   ```
   """

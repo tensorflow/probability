@@ -29,7 +29,9 @@ class _NoOpCache(dict):
     return {}
 
 
-class Identity(bijector.AutoCompositeTensorBijector):
+class Identity(
+    bijector.CoordinatewiseBijectorMixin,
+    bijector.AutoCompositeTensorBijector):
   """Compute Y = g(X) = X.
 
     Example Use:

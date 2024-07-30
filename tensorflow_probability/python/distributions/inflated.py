@@ -48,7 +48,8 @@ class _Inflated(mixture.Mixture):
   supports all of the methods of that class.
 
   ### Examples:
-   ```python
+
+  ```python
   zinb = Inflated(
            tfd.NegativeBinomial(5.0, probs=0.1), inflated_loc_prob=0.2)
   sample = zinb.sample(seed=jax.random.PRNGKey(0))
@@ -241,7 +242,7 @@ class Inflated(_Inflated, distribution_lib.AutoCompositeTensorDistribution):
       else:
         distribution = kwargs.get('distribution')
 
-      if not isinstance(distribution, tf.__internal__.CompositeTensor):
+      if not auto_composite_tensor.is_composite_tensor(distribution):
         return _Inflated(*args, **kwargs)
     return super(Inflated, cls).__new__(cls)
 

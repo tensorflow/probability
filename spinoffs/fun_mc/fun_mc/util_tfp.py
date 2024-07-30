@@ -15,21 +15,21 @@
 """FunMC utilities implemented via TensorFlow Probability."""
 
 import functools
-
-from typing import Any, Optional, Tuple  # pylint: disable=unused-import
+from typing import Any, Optional
 from fun_mc import backend
 from fun_mc import fun_mc_lib
 
-tf = backend.tf
+jnp = backend.jnp
 tfp = backend.tfp
 tfb = tfp.bijectors
 util = backend.util
 
 
 def bijector_to_transform_fn(
-    bijector: 'fun_mc_lib.BijectorNest',
-    state_structure: 'Any',
-    batch_ndims: 'fun_mc_lib.IntTensor' = 0) -> 'fun_mc_lib.TransitionOperator':
+    bijector: fun_mc_lib.BijectorNest,
+    state_structure: Any,
+    batch_ndims: int = 0,
+) -> fun_mc_lib.TransitionOperator:
   """Creates a TransitionOperator that transforms the state using a bijector.
 
   The returned operator has the following signature:
@@ -60,34 +60,46 @@ def bijector_to_transform_fn(
     transform_fn: The created transformation.
   """
   bijector_structure = util.get_shallow_tree(
-      lambda b: isinstance(b, tfb.Bijector), bijector)
+      lambda b: isinstance(b, tfb.Bijector), bijector
+  )
 
   def transform_fn(bijector, state_structure, *args, **kwargs):
     """Transport map implemented via the bijector."""
     state = fun_mc_lib.recover_state_from_args(args, kwargs, state_structure)
 
-    value = util.map_tree_up_to(bijector_structure, lambda b, x: b(x), bijector,
-                                state)
+    value = util.map_tree_up_to(
+        bijector_structure, lambda b, x: b(x), bijector, state
+    )
     ldj_parts = util.map_tree_up_to(
         bijector_structure,
         lambda b, x: b.forward_log_det_jacobian(  # pylint: disable=g-long-lambda
             x,
-            event_ndims=util.map_tree(lambda x: tf.rank(x) - batch_ndims, x)),
+            event_ndims=util.map_tree(lambda x: len(x.shape) - batch_ndims, x),
+        ),
         bijector,
-        state)
+        state,
+    )
     ldj = sum(util.flatten_tree(ldj_parts))
 
     return value, ((), ldj)
 
-  inverse_bijector = util.map_tree_up_to(bijector_structure,
-                                         tfp.bijectors.Invert, bijector)
+  inverse_bijector = util.map_tree_up_to(
+      bijector_structure, tfp.bijectors.Invert, bijector
+  )
 
-  forward_transform_fn = functools.partial(transform_fn, bijector,
-                                           state_structure)
+  forward_transform_fn = functools.partial(
+      transform_fn, bijector, state_structure
+  )
   inverse_transform_fn = functools.partial(
-      transform_fn, inverse_bijector,
-      util.map_tree_up_to(bijector_structure, lambda b, s: b.forward_dtype(s),
-                          bijector, state_structure))
+      transform_fn,
+      inverse_bijector,
+      util.map_tree_up_to(
+          bijector_structure,
+          lambda b, s: b.forward_dtype(s),
+          bijector,
+          state_structure,
+      ),
+  )
 
   forward_transform_fn.inverse = inverse_transform_fn
   inverse_transform_fn.inverse = forward_transform_fn
@@ -96,8 +108,10 @@ def bijector_to_transform_fn(
 
 
 def transition_kernel_wrapper(
-    current_state: 'fun_mc_lib.FloatNest', kernel_results: 'Optional[Any]',
-    kernel: 'tfp.mcmc.TransitionKernel') -> 'Tuple[fun_mc_lib.FloatNest, Any]':
+    current_state: fun_mc_lib.FloatNest,
+    kernel_results: Optional[Any],
+    kernel: tfp.mcmc.TransitionKernel,
+) -> tuple[fun_mc_lib.FloatNest, Any]:
   """Wraps a `tfp.mcmc.TransitionKernel` as a `TransitionOperator`.
 
   Args:
@@ -113,7 +127,10 @@ def transition_kernel_wrapper(
     extra: An empty tuple.
   """
   flat_current_state = util.flatten_tree(current_state)
-  flat_current_state, kernel_results = kernel.one_step(flat_current_state,
-                                                       kernel_results)
-  return (util.unflatten_tree(current_state,
-                              flat_current_state), kernel_results), ()
+  flat_current_state, kernel_results = kernel.one_step(
+      flat_current_state, kernel_results
+  )
+  return (
+      util.unflatten_tree(current_state, flat_current_state),
+      kernel_results,
+  ), ()

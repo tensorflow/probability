@@ -15,6 +15,7 @@
 """Tests for the JointDistributionSequential."""
 
 import collections
+import inspect
 
 # Dependency imports
 from absl.testing import parameterized
@@ -23,6 +24,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.bijectors import scale
 from tensorflow_probability.python.bijectors import softplus
 from tensorflow_probability.python.distributions import bernoulli
@@ -46,8 +48,6 @@ from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.util import deferred_tensor
-
-from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
 # Defer creating test dists (by hiding them in functions) until we know what
@@ -108,15 +108,9 @@ class JointDistributionSequentialTest(test_util.TestCase):
         ],
         validate_args=True)
 
-    self.assertEqual(
-        (
-            ('e', ()),
-            ('scale', ('e',)),
-            ('loc', ()),
-            ('m', ('loc', 'scale')),
-            ('x', ('m',)),
-        ),
-        d.resolve_graph())
+    keys = ('e', 'scale', 'loc', 'm', 'x')
+    deps = ((), ('e',), (), ('loc', 'scale'), ('m',))
+    self.assertEqual(tuple(zip(keys, deps)), d.resolve_graph())
 
     xs = d.sample(seed=test_util.test_seed())
     self.assertLen(xs, 5)
@@ -149,9 +143,15 @@ class JointDistributionSequentialTest(test_util.TestCase):
       self.assertAllEqual(expected, actual_tensorshape)
       self.assertAllEqual(expected, actual_shapetensor)
 
-    expected_jlp = sum(d_.log_prob(x) for d_, x in zip(ds, xs))
+    expected_lp_parts = [d_.log_prob(x) for d_, x in zip(ds, xs)]
+    expected_jlp = sum(expected_lp_parts)
     actual_jlp = d.log_prob(xs)
     self.assertAllEqual(*self.evaluate([expected_jlp, actual_jlp]))
+    # Verify different log_prob_parts calling conventions.
+    self.assertAllCloseNested(expected_lp_parts, d.log_prob_parts(xs))
+    self.assertAllCloseNested(expected_lp_parts, d.log_prob_parts(*xs))
+    self.assertAllCloseNested(expected_lp_parts,
+                              d.log_prob_parts(**dict(zip(keys, xs))))
 
   def test_kl_divergence(self):
     d0 = jds.JointDistributionSequential([
@@ -312,7 +312,7 @@ class JointDistributionSequentialTest(test_util.TestCase):
     self.assertEqual((2, 3), lp.shape)
 
   def test_argspec(self):
-    argspec = tf_inspect.getfullargspec(Dummy)
+    argspec = inspect.getfullargspec(Dummy)
     self.assertAllEqual(['me', 'arg1', 'arg2', 'arg3'], argspec.args)
     self.assertIs(None, argspec.varargs)
     self.assertIs('named', argspec.varkw)
@@ -430,11 +430,11 @@ class JointDistributionSequentialTest(test_util.TestCase):
         *value[:1], **dict(value_with_names[1:])))
     self.assertAllEqual(lp_value_positional, lp_args_then_kwargs)
 
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, r'Joint distribution expected values for [0-9] components'):
       d.log_prob(badvar=27.)
 
-    with self.assertRaisesRegexp(ValueError, 'unexpected keyword argument'):
+    with self.assertRaisesRegex(ValueError, 'unexpected keyword argument'):
       d.log_prob(*value, extra_arg=27.)
 
   def test_can_call_prob_with_args_and_kwargs(self):
@@ -706,12 +706,12 @@ class JointDistributionSequentialTest(test_util.TestCase):
 
     # test event shapes
     event_shapes = [[2, None], [2], [4]]
-    self.assertAllEqual(
+    self.assertAllEqualNested(
         [shape.as_list()
          for shape in joint_bijector.forward_event_shape(event_shapes)],
         [bijectors[i].forward_event_shape(event_shapes[i]).as_list()
          for i in range(3)])
-    self.assertAllEqual(
+    self.assertAllEqualNested(
         [shape.as_list()
          for shape in joint_bijector.inverse_event_shape(event_shapes)],
         [bijectors[i].inverse_event_shape(event_shapes[i]).as_list()
@@ -873,7 +873,8 @@ class JointDistributionSequentialTest(test_util.TestCase):
 
     non_ct_jd = jds.JointDistributionSequential([
         normal.Normal(loc=0., scale=1.),
-        test_util.NonCompositeTensorExp()(normal.Normal(loc=0., scale=1.)),
+        bijector_test_util.NonCompositeTensorExp()(
+            normal.Normal(loc=0., scale=1.)),
     ],
                                                 validate_args=True)
     self.assertNotIsInstance(non_ct_jd, tf.__internal__.CompositeTensor)
@@ -924,7 +925,7 @@ class ResolveDistributionNamesTest(test_util.TestCase):
     self.assertAllEqual(dist_names, ['z', 'y'])
 
   def test_inconsistent_names_raise_error(self):
-    with self.assertRaisesRegexp(ValueError, 'Inconsistent names'):
+    with self.assertRaisesRegex(ValueError, 'Inconsistent names'):
       # Refers to first variable as both `z` and `x`.
       jds._resolve_distribution_names(
           dist_fn_args=[None, ['z'], ['x', 'w']],
@@ -932,7 +933,7 @@ class ResolveDistributionNamesTest(test_util.TestCase):
           leaf_name='y',
           instance_names=[None, None, None])
 
-    with self.assertRaisesRegexp(ValueError, 'Inconsistent names'):
+    with self.assertRaisesRegex(ValueError, 'Inconsistent names'):
       # Refers to first variable as `x`, but it was explicitly named `z`.
       jds._resolve_distribution_names(
           dist_fn_args=[None, ['x']],

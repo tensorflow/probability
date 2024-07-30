@@ -14,9 +14,15 @@
 # ============================================================================
 """Build defs for TF/NumPy/JAX-variadic libraries & tests."""
 
+# Placeholder: load PyCcLinkParamsInfo
+# Placeholder: load PyInfo
+# Placeholder: load native py_library
+# Placeholder: load native py_test
+
 NO_REWRITE_NEEDED = [
     "internal:all_util",
     "internal:docstring_util",
+    "internal:lazy_loader",
     "internal:reparameterization",
     "python/layers",
     "platform_google",
@@ -105,8 +111,8 @@ def _substrate_runfiles_symlinks_impl(ctx):
             has_py2_only_sources.append(dep[PyInfo].has_py2_only_sources)
             has_py3_only_sources.append(dep[PyInfo].has_py3_only_sources)
 
-#         if PyCcLinkParamsProvider in dep:  # DisableOnExport
-#             cc_infos.append(dep[PyCcLinkParamsProvider].cc_info)  # DisableOnExport
+#         if PyCcLinkParamsInfo in dep:  # DisableOnExport
+#             cc_infos.append(dep[PyCcLinkParamsInfo].cc_info)  # DisableOnExport
 
         if CcInfo in dep:
             cc_infos.append(dep[CcInfo])
@@ -208,6 +214,7 @@ def multi_substrate_py_library(
     remove_deps = [
         "//third_party/py/tensorflow",
         "//third_party/py/tensorflow:tensorflow",
+        "//tensorflow_probability/python/internal:tf_keras",
     ]
 
     trimmed_deps = [dep for dep in deps if (dep not in substrates_omit_deps and
@@ -225,7 +232,7 @@ def multi_substrate_py_library(
                 REWRITER_TARGET,
                 ",".join(resolved_omit_deps_numpy),
             ),
-            exec_tools = [REWRITER_TARGET],
+            tools = [REWRITER_TARGET],
         )
     native.py_library(
         name = "{}.numpy.raw".format(name),
@@ -257,7 +264,7 @@ def multi_substrate_py_library(
                 REWRITER_TARGET,
                 ",".join(resolved_omit_deps_jax),
             ),
-            exec_tools = [REWRITER_TARGET],
+            tools = [REWRITER_TARGET],
         )
     native.py_library(
         name = "{}.jax.raw".format(name),
@@ -330,6 +337,13 @@ def multi_substrate_py_test(
     tags.append("multi_substrate")
 
     test_targets = []
+    remove_deps = [
+        "//third_party/py/tensorflow",
+        "//third_party/py/tensorflow:tensorflow",
+        "//tensorflow_probability/python/internal:tf_keras",
+    ]
+
+    trimmed_deps = [dep for dep in deps if dep not in remove_deps]
 
     if "tf" not in disabled_substrates:
         native.py_test(
@@ -355,14 +369,14 @@ def multi_substrate_py_test(
                 srcs = srcs,
                 outs = numpy_srcs,
                 cmd = "$(location {}) $(SRCS) > $@".format(REWRITER_TARGET),
-                exec_tools = [REWRITER_TARGET],
+                tools = [REWRITER_TARGET],
             )
         native.py_test(
             name = "{}.numpy".format(name),
             size = numpy_size or size,
             srcs = numpy_srcs,
             main = _substrate_src(main or "{}.py".format(name), "numpy"),
-            deps = _substrate_deps(deps, "numpy"),
+            deps = _substrate_deps(trimmed_deps, "numpy"),
             tags = tags + ["tfp_numpy"] + numpy_tags,
             srcs_version = srcs_version,
             python_version = "PY3",
@@ -380,9 +394,9 @@ def multi_substrate_py_test(
                 srcs = srcs,
                 outs = jax_srcs,
                 cmd = "$(location {}) $(SRCS) --numpy_to_jax > $@".format(REWRITER_TARGET),
-                exec_tools = [REWRITER_TARGET],
+                tools = [REWRITER_TARGET],
             )
-        jax_deps = _substrate_deps(deps, "jax") + jax_extra_deps
+        jax_deps = _substrate_deps(trimmed_deps, "jax") + jax_extra_deps
         # [internal] Add JAX build dep
         native.py_test(
             name = "{}.jax".format(name),

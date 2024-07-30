@@ -15,6 +15,7 @@
 # Description:
 #   TensorFlow Probability ODE solvers.
 
+# Placeholder: py_test
 load(
     "//tensorflow_probability/python:build_defs.bzl",
     "multi_substrate_py_library",
@@ -22,6 +23,7 @@ load(
 )
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],

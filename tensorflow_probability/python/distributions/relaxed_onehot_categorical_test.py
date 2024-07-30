@@ -88,7 +88,7 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
 
   def assertRaises(self, error_class, msg):
     if tf.executing_eagerly():
-      return self.assertRaisesRegexp(error_class, msg)
+      return self.assertRaisesRegex(error_class, msg)
     return self.assertRaisesOpError(msg)
 
   def testProbs(self):
@@ -330,7 +330,7 @@ class ExpRelaxedOneHotCategoricalFromVariableTest(test_util.TestCase):
 
   def testAssertionsLogits(self):
     logits = deferred_tensor.TransformedVariable(0., tfb.Identity(), shape=None)
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Argument `logits` must have rank at least 1.'):
       d = roc.ExpRelaxedOneHotCategorical(
           0.7, logits=logits, validate_args=True)

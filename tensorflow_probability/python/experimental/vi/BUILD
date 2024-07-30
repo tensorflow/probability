@@ -24,6 +24,7 @@ load(
 licenses(["notice"])
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -65,8 +66,10 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/distributions:uniform",
         "//tensorflow_probability/python/experimental/util",
         "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/internal:trainable_state_util",
         "//tensorflow_probability/python/util",
     ],
@@ -105,7 +108,7 @@ multi_substrate_py_test(
     size = "large",
     srcs = ["automatic_structured_vi_test.py"],
     numpy_tags = ["notap"],
-    shard_count = 4,
+    shard_count = 12,
     deps = [
         ":automatic_structured_vi",
         # absl/testing:parameterized dep,
@@ -139,6 +142,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:custom_gradient",
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/math:gradient",
         "//tensorflow_probability/python/math:minimize",
         "//tensorflow_probability/python/vi:optimization",
@@ -178,6 +182,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/distributions:student_t",
         "//tensorflow_probability/python/experimental/vi/util",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/vi:optimization",
     ],
 )

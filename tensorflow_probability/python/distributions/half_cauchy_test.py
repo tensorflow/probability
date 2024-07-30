@@ -278,7 +278,7 @@ class _HalfCauchyTest(object):
     scale = self._create_placeholder_with_default(1., name='scale')
     dist = half_cauchy.HalfCauchy(
         loc, scale, allow_nan_stats=False, validate_args=True)
-    with self.assertRaisesRegexp(ValueError, 'is undefined'):
+    with self.assertRaisesRegex(ValueError, 'is undefined'):
       self.evaluate(dist.mean())
 
     dist = half_cauchy.HalfCauchy(
@@ -292,7 +292,7 @@ class _HalfCauchyTest(object):
 
     dist = half_cauchy.HalfCauchy(
         loc, scale, allow_nan_stats=False, validate_args=True)
-    with self.assertRaisesRegexp(ValueError, 'is undefined'):
+    with self.assertRaisesRegex(ValueError, 'is undefined'):
       self.evaluate(dist.variance())
 
     dist = half_cauchy.HalfCauchy(
@@ -306,7 +306,7 @@ class _HalfCauchyTest(object):
 
     dist = half_cauchy.HalfCauchy(
         loc, scale, allow_nan_stats=False, validate_args=True)
-    with self.assertRaisesRegexp(ValueError, 'is undefined'):
+    with self.assertRaisesRegex(ValueError, 'is undefined'):
       self.evaluate(dist.stddev())
 
     dist = half_cauchy.HalfCauchy(

@@ -24,7 +24,7 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.util import SeedStream
-from tensorflow.python.ops import parallel_for  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.ops.parallel_for import control_flow_ops  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
@@ -99,7 +99,7 @@ def iid_sample(sample_fn, sample_shape):
       if static_n == 1:
         draws = pfor_loop_body(0)
       else:
-        draws = parallel_for.pfor(pfor_loop_body, n)
+        draws = control_flow_ops.pfor(pfor_loop_body, n)
       return tf.nest.map_structure(unflatten, draws, expand_composites=True)
 
   return iid_sample_fn
@@ -285,8 +285,14 @@ def make_rank_polymorphic(fn, core_ndims, name=None):
         vectorized_arg_actual_core_ndims.append(actual_core_nd)
 
         batch_ndims = arg_nd - actual_core_nd
-        batch_shapes.append(arg_shape[:batch_ndims])
-        core_shapes.append(arg_shape[batch_ndims:])
+        batch_ndims_ = tf.get_static_value(batch_ndims)
+        if batch_ndims_ is not None:
+          batch_shapes.append(arg_shape[:batch_ndims_])
+          core_shapes.append(arg_shape[batch_ndims_:])
+        else:
+          arg_shape = tf.convert_to_tensor(arg_shape)
+          batch_shapes.append(arg_shape[:batch_ndims])
+          core_shapes.append(arg_shape[batch_ndims:])
 
       # Flatten all of the batch dimensions into one.
       broadcast_batch_shape = (

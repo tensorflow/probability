@@ -19,10 +19,12 @@ import importlib
 BACKEND = None  # Rewritten by backends/rewrite.py.
 
 
-def multi_backend_test(globals_dict,
-                       relative_module_name,
-                       backends=('jax', 'tensorflow'),
-                       test_case=None):
+def multi_backend_test(
+    globals_dict,
+    relative_module_name,
+    backends=('jax', 'tensorflow'),
+    test_case=None,
+):
   """Multi-backend test decorator.
 
   The end goal of this decorator is that the decorated test case is removed, and
@@ -61,14 +63,16 @@ def multi_backend_test(globals_dict,
     return lambda test_case: multi_backend_test(  # pylint: disable=g-long-lambda
         globals_dict=globals_dict,
         relative_module_name=relative_module_name,
-        test_case=test_case)
+        test_case=test_case,
+    )
 
   if BACKEND is not None:
     return test_case
 
   if relative_module_name == '__main__':
     raise ValueError(
-        'module_name should be written out manually, not by passing __name__.')
+        'module_name should be written out manually, not by passing __name__.'
+    )
 
   # This assumes `test_util` is 1 levels deep inside of `fun_mc`. If we
   # move it, we'd change the `-1` to equal the (negative) nesting level.
@@ -81,16 +85,19 @@ def multi_backend_test(globals_dict,
   new_test_case_names = []
   for backend in backends:
     new_module_name_comps = (
-        root_name_comps + ['dynamic', 'backend_{}'.format(backend)] +
-        relative_module_name_comps)
+        root_name_comps
+        + ['dynamic', 'backend_{}'.format(backend)]
+        + relative_module_name_comps
+    )
     # Rewrite the module.
     new_module = importlib.import_module('.'.join(new_module_name_comps))
 
     # Subclass the test case so that we can rename it (absl uses the class name
     # in its UI).
     base_new_test = getattr(new_module, test_case.__name__)
-    new_test = type('{}_{}'.format(test_case.__name__, backend),
-                    (base_new_test,), {})
+    new_test = type(
+        '{}_{}'.format(test_case.__name__, backend), (base_new_test,), {}
+    )
     new_test_case_names.append(new_test.__name__)
     globals_dict[new_test.__name__] = new_test
 

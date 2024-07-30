@@ -114,8 +114,8 @@ class MultivariateStudentTTestFloat32StaticShape(
               validate_args=True).sample(seed=test_util.test_seed()))
 
   def testBadScaleDType(self):
-    with self.assertRaisesRegexp(TypeError,
-                                 '`scale` must have floating-point dtype.'):
+    with self.assertRaisesRegex(TypeError,
+                                '`scale` must have floating-point dtype.'):
       mvst.MultivariateStudentTLinearOperator(
           loc=[0.],
           df=1.,
@@ -123,8 +123,8 @@ class MultivariateStudentTTestFloat32StaticShape(
               num_rows=1, dtype=tf.int32, is_non_singular=True))
 
   def testNotPositiveDefinite(self):
-    with self.assertRaisesRegexp(ValueError,
-                                 '`scale` must be non-singular.'):
+    with self.assertRaisesRegex(ValueError,
+                                '`scale` must be non-singular.'):
       mvst.MultivariateStudentTLinearOperator(
           loc=self._input([0.]),
           df=self._input(1.),
@@ -391,6 +391,7 @@ class MultivariateStudentTTestFloat32StaticShape(
     normalization = tf.exp(tf.reduce_logsumexp(
         log_probs)) * (spacings[1] - spacings[0])**2
     self.assertAllClose(1., self.evaluate(normalization), atol=1e-3)
+    self.assertDTypeEqual(log_probs, self.dtype)
 
     mode_log_prob = dist.log_prob(dist.mode())
     self.assertTrue(np.all(self.evaluate(mode_log_prob >= log_probs)))

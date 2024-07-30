@@ -19,6 +19,7 @@ from fun_mc.backends import rewrite
 from fun_mc.dynamic.backend_tensorflow import api  # pytype: disable=import-error
 # pylint: disable=wildcard-import
 from fun_mc.dynamic.backend_tensorflow.api import *  # pytype: disable=import-error
+
 del rewrite
 
 __all__ = api.__all__

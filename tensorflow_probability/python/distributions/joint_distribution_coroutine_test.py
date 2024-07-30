@@ -202,8 +202,8 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     # Properties `event_shape` and `batch_shape` should be defined
     # even before any sampling calls have occurred.
-    self.assertAllEqual(joint.event_shape, [[], [], [20], [20]])
-    self.assertAllEqual(joint.batch_shape, [[], [], [], []])
+    self.assertAllEqualNested(list(joint.event_shape), [[], [], [20], [20]])
+    self.assertAllEqualNested(list(joint.batch_shape), [[], [], [], []])
 
     ds, _ = joint.sample_distributions(seed=test_util.test_seed())
     self.assertLen(ds, 4)
@@ -436,7 +436,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     joint = jdc.JointDistributionCoroutine(dist, validate_args=True)
 
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         Exception,
         'must be wrapped in `Root`'):
       self.evaluate(joint.sample(2, seed=test_util.test_seed()))
@@ -473,11 +473,11 @@ class JointDistributionCoroutineTest(test_util.TestCase):
         *value[:1], **dict(value_with_names[1:])))
     self.assertAllEqual(lp_value_positional, lp_args_then_kwargs)
 
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, r'Joint distribution expected values for [0-9] components'):
       d.log_prob(badvar=27.)
 
-    with self.assertRaisesRegexp(ValueError, 'unexpected keyword argument'):
+    with self.assertRaisesRegex(ValueError, 'unexpected keyword argument'):
       d.log_prob(*value, extra_arg=27.)
 
   def test_log_prob_with_manual_kwargs(self):
@@ -495,7 +495,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
       yield Root(normal.Normal(0., 1., name='a'))
       yield Root(normal.Normal(0., 1., name='a'))
 
-    with self.assertRaisesRegexp(ValueError, 'Duplicated distribution name: a'):
+    with self.assertRaisesRegex(ValueError, 'Duplicated distribution name: a'):
       dist.log_prob((1, 2))
 
   @parameterized.named_parameters(
@@ -532,7 +532,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     joint = jdc.JointDistributionCoroutine(dist, validate_args=True)
 
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         Exception,
         'are not consistent with `sample_shape`'):
       self.evaluate(joint.sample([3, 5], seed=test_util.test_seed()))
@@ -551,7 +551,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     joint = jdc.JointDistributionCoroutine(dist, validate_args=True)
 
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         Exception,
         'are not consistent with `sample_shape`'):
       self.evaluate(joint.sample([3, 5], seed=test_util.test_seed()))
@@ -999,12 +999,12 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     # test event shapes
     event_shapes = [[2, None], [2], [4]]
-    self.assertAllEqual(
+    self.assertAllEqualNested(
         [shape.as_list()
          for shape in joint_bijector.forward_event_shape(event_shapes)],
         [bijectors[i].forward_event_shape(event_shapes[i]).as_list()
          for i in range(3)])
-    self.assertAllEqual(
+    self.assertAllEqualNested(
         [shape.as_list()
          for shape in joint_bijector.inverse_event_shape(event_shapes)],
         [bijectors[i].inverse_event_shape(event_shapes[i]).as_list()
@@ -1307,7 +1307,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     warnings.simplefilter('always')
     with warnings.catch_warnings(record=True) as w:
       d.sample(seed=test_util.test_seed())
-    self.assertRegexpMatches(
+    self.assertRegex(
         str(w[0].message),
         r'Falling back to stateful sampling for distribution #1.*'
         r'of type.*StatefulNormal.*component name "loc" and `dist.name` '
@@ -1337,7 +1337,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     d = jdc.JointDistributionCoroutine(dist, validate_args=True)
 
-    with self.assertRaisesRegexp(TypeError, r'Expected int for argument'):
+    with self.assertRaisesRegex(TypeError, r'Expected int for argument'):
       d.sample(seed=samplers.zeros_seed())
 
   def test_pinning(self):

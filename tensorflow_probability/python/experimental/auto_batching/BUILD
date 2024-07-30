@@ -15,7 +15,11 @@
 # Description:
 #   An auto-batching system that keeps track of an explicit program counter.
 
+# Placeholder: py_library
+# Placeholder: py_test
+
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],

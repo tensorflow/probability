@@ -22,11 +22,14 @@ except ImportError:
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
+from tensorflow_probability.python.internal import tf_keras
+from tensorflow_probability.python.layers import dense_variational
+from tensorflow_probability.python.layers import util
+from tensorflow_probability.python.random import random_ops
+from tensorflow_probability.python.util import seed_stream
 
 
 class Counter(object):
@@ -44,7 +47,7 @@ class Counter(object):
     return self._value
 
 
-class MockDistribution(tfd.Independent):
+class MockDistribution(independent.Independent):
   """Monitors layer calls to the underlying distribution."""
 
   def __init__(self, result_sample, result_log_prob, loc=None, scale=None):
@@ -52,10 +55,10 @@ class MockDistribution(tfd.Independent):
     self.result_log_prob = result_log_prob
     self.result_loc = loc
     self.result_scale = scale
-    self.result_distribution = tfd.Normal(loc=0.0, scale=1.0)
+    self.result_distribution = normal.Normal(loc=0.0, scale=1.0)
     if loc is not None and scale is not None:
-      self.result_distribution = tfd.Normal(loc=self.result_loc,
-                                            scale=self.result_scale)
+      self.result_distribution = normal.Normal(loc=self.result_loc,
+                                               scale=self.result_scale)
     self.called_log_prob = Counter()
     self.called_sample = Counter()
     self.called_loc = Counter()
@@ -108,19 +111,21 @@ class DenseVariational(test_util.TestCase):
       # Deserialized Keras objects do not perform lexical scoping. Any modules
       # that the function requires must be imported within the function.
       import tensorflow.compat.v2 as tf  # pylint: disable=g-import-not-at-top,redefined-outer-name,reimported
-      import tensorflow_probability as tfp  # pylint: disable=g-import-not-at-top,redefined-outer-name,reimported
-      tfd = tfp.distributions  # pylint: disable=redefined-outer-name
+      from tensorflow_probability.python.distributions import independent  # pylint: disable=g-import-not-at-top,redefined-outer-name,reimported
+      from tensorflow_probability.python.distributions import normal  # pylint: disable=g-import-not-at-top,redefined-outer-name,reimported
 
-      dist = tfd.Normal(loc=tf.zeros(shape, dtype), scale=tf.ones(shape, dtype))
+      dist = normal.Normal(
+          loc=tf.zeros(shape, dtype), scale=tf.ones(shape, dtype))
       batch_ndims = tf.size(dist.batch_shape_tensor())
-      return tfd.Independent(dist, reinterpreted_batch_ndims=batch_ndims)
+      return independent.Independent(
+          dist, reinterpreted_batch_ndims=batch_ndims)
 
     kwargs = {'units': 3,
               'kernel_posterior_fn': kernel_posterior_fn,
               'kernel_prior_fn': None,
               'bias_posterior_fn': None,
               'bias_prior_fn': None}
-    with tf.keras.utils.CustomObjectScope({layer_class.__name__: layer_class}):
+    with tf_keras.utils.CustomObjectScope({layer_class.__name__: layer_class}):
       # TODO(scottzhu): reenable the test when the repo switch change reach
       # the TF PIP package.
       self.skipTest('Skip the test until the TF and Keras has a new PIP.')
@@ -152,8 +157,8 @@ class DenseVariational(test_util.TestCase):
     with self.cached_session():
       layer = layer_class(
           units=2,
-          bias_posterior_fn=tfp.layers.default_mean_field_normal_fn(),
-          bias_prior_fn=tfp.layers.default_multivariate_normal_fn)
+          bias_posterior_fn=util.default_mean_field_normal_fn(),
+          bias_prior_fn=util.default_multivariate_normal_fn)
       inputs = tf.random.uniform([2, 3], seed=1)
 
       # No keys.
@@ -213,31 +218,31 @@ class DenseVariational(test_util.TestCase):
             layer, inputs, outputs, kl_penalty)
 
   def testKerasLayerReparameterization(self):
-    self._testKerasLayer(tfp.layers.DenseReparameterization)
+    self._testKerasLayer(dense_variational.DenseReparameterization)
 
   def testKerasLayerLocalReparameterization(self):
-    self._testKerasLayer(tfp.layers.DenseLocalReparameterization)
+    self._testKerasLayer(dense_variational.DenseLocalReparameterization)
 
   def testKerasLayerFlipout(self):
-    self._testKerasLayer(tfp.layers.DenseFlipout)
+    self._testKerasLayer(dense_variational.DenseFlipout)
 
   def testKLPenaltyKernelReparameterization(self):
-    self._testKLPenaltyKernel(tfp.layers.DenseReparameterization)
+    self._testKLPenaltyKernel(dense_variational.DenseReparameterization)
 
   def testKLPenaltyKernelLocalReparameterization(self):
-    self._testKLPenaltyKernel(tfp.layers.DenseLocalReparameterization)
+    self._testKLPenaltyKernel(dense_variational.DenseLocalReparameterization)
 
   def testKLPenaltyKernelFlipout(self):
-    self._testKLPenaltyKernel(tfp.layers.DenseFlipout)
+    self._testKLPenaltyKernel(dense_variational.DenseFlipout)
 
   def testKLPenaltyBothReparameterization(self):
-    self._testKLPenaltyBoth(tfp.layers.DenseReparameterization)
+    self._testKLPenaltyBoth(dense_variational.DenseReparameterization)
 
   def testKLPenaltyBothLocalReparameterization(self):
-    self._testKLPenaltyBoth(tfp.layers.DenseLocalReparameterization)
+    self._testKLPenaltyBoth(dense_variational.DenseLocalReparameterization)
 
   def testKLPenaltyBothFlipout(self):
-    self._testKLPenaltyBoth(tfp.layers.DenseFlipout)
+    self._testKLPenaltyBoth(dense_variational.DenseFlipout)
 
   def testDenseReparameterization(self):
     batch_size, in_size, out_size = 2, 3, 4
@@ -245,7 +250,7 @@ class DenseVariational(test_util.TestCase):
       (kernel_posterior, kernel_prior, kernel_divergence,
        bias_posterior, bias_prior, bias_divergence, layer, inputs,
        outputs, kl_penalty) = self._testDenseSetUp(
-           tfp.layers.DenseReparameterization,
+           dense_variational.DenseReparameterization,
            batch_size, in_size, out_size)
 
       expected_outputs = (
@@ -309,11 +314,11 @@ class DenseVariational(test_util.TestCase):
       (kernel_posterior, kernel_prior, kernel_divergence,
        bias_posterior, bias_prior, bias_divergence, layer, inputs,
        outputs, kl_penalty) = self._testDenseSetUp(
-           tfp.layers.DenseLocalReparameterization,
+           dense_variational.DenseLocalReparameterization,
            batch_size, in_size, out_size)
 
       tf.random.set_seed(9068)
-      expected_kernel_posterior_affine = tfd.Normal(
+      expected_kernel_posterior_affine = normal.Normal(
           loc=tf.matmul(inputs, kernel_posterior.result_loc),
           scale=tf.matmul(
               inputs**2., kernel_posterior.result_scale**2)**0.5)
@@ -374,26 +379,26 @@ class DenseVariational(test_util.TestCase):
       (kernel_posterior, kernel_prior, kernel_divergence,
        bias_posterior, bias_prior, bias_divergence, layer, inputs,
        outputs, kl_penalty) = self._testDenseSetUp(
-           tfp.layers.DenseFlipout,
+           dense_variational.DenseFlipout,
            batch_size, in_size, out_size, seed=44)
 
       tf.random.set_seed(9069)
-      expected_kernel_posterior_affine = tfd.Normal(
+      expected_kernel_posterior_affine = normal.Normal(
           loc=tf.zeros_like(kernel_posterior.result_loc),
           scale=kernel_posterior.result_scale)
       expected_kernel_posterior_affine_tensor = (
           expected_kernel_posterior_affine.sample(seed=42))
 
-      seed_stream = tfp.util.SeedStream(layer.seed, salt='DenseFlipout')
+      seed = seed_stream.SeedStream(layer.seed, salt='DenseFlipout')
 
-      sign_input = tfp.random.rademacher(
+      sign_input = random_ops.rademacher(
           [batch_size, in_size],
           dtype=inputs.dtype,
-          seed=seed_stream())
-      sign_output = tfp.random.rademacher(
+          seed=seed())
+      sign_output = random_ops.rademacher(
           [batch_size, out_size],
           dtype=inputs.dtype,
-          seed=seed_stream())
+          seed=seed())
       perturbed_inputs = tf.matmul(
           inputs * sign_input, expected_kernel_posterior_affine_tensor)
       perturbed_inputs *= sign_output
@@ -463,7 +468,7 @@ class DenseVariational(test_util.TestCase):
           scale=tf.random.uniform([out_size], seed=seed()),
           result_log_prob=tf.random.uniform([out_size], seed=seed()),
           result_sample=tf.random.uniform([out_size], seed=seed()))
-      layer_one = tfp.layers.DenseFlipout(
+      layer_one = dense_variational.DenseFlipout(
           units=out_size,
           kernel_posterior_fn=lambda *args: kernel_posterior,
           kernel_posterior_tensor_fn=lambda d: d.sample(seed=42),
@@ -472,7 +477,7 @@ class DenseVariational(test_util.TestCase):
           bias_posterior_tensor_fn=lambda d: d.sample(seed=43),
           bias_divergence_fn=None,
           seed=44)
-      layer_two = tfp.layers.DenseFlipout(
+      layer_two = dense_variational.DenseFlipout(
           units=out_size,
           kernel_posterior_fn=lambda *args: kernel_posterior,
           kernel_posterior_tensor_fn=lambda d: d.sample(seed=42),
@@ -496,10 +501,10 @@ class DenseVariational(test_util.TestCase):
     y = np.random.uniform(
         -1., 1., size=(data_size, out_size)).astype(np.float32)
 
-    model = tf.keras.Sequential([
-        tfp.layers.DenseReparameterization(6, activation=tf.nn.relu),
-        tfp.layers.DenseFlipout(6, activation=tf.nn.relu),
-        tfp.layers.DenseLocalReparameterization(out_size)
+    model = tf_keras.Sequential([
+        dense_variational.DenseReparameterization(6, activation=tf.nn.relu),
+        dense_variational.DenseFlipout(6, activation=tf.nn.relu),
+        dense_variational.DenseLocalReparameterization(out_size)
     ])
 
     model.compile(loss='mse', optimizer='adam')
@@ -510,10 +515,10 @@ class DenseVariational(test_util.TestCase):
     self.assertAllEqual(batch_output.shape, [batch_size, out_size])
 
   def testGradients(self):
-    net = tf.keras.Sequential([
-        tfp.layers.DenseReparameterization(1),
-        tfp.layers.DenseFlipout(1),
-        tfp.layers.DenseLocalReparameterization(1)
+    net = tf_keras.Sequential([
+        dense_variational.DenseReparameterization(1),
+        dense_variational.DenseFlipout(1),
+        dense_variational.DenseLocalReparameterization(1)
     ])
     with tf.GradientTape() as tape:
       y = net(tf.zeros([1, 1]))

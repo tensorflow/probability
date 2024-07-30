@@ -14,7 +14,10 @@
 # ============================================================================
 # Build rules for TensorFlow Probability debugging utilities.
 
+# Placeholder: py_library
+
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],

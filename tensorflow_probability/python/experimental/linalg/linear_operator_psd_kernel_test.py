@@ -271,15 +271,17 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
     feature_dim = 3
 
     def kernel_fn(eq_params, poly_params):
-      return (exponentiated_quadratic.ExponentiatedQuadratic(**eq_params) *
-              polynomial.Polynomial(**poly_params))
+      return (exponentiated_quadratic.ExponentiatedQuadratic(*eq_params) *
+              polynomial.Polynomial(bias_amplitude=poly_params[0],
+                                    shift=poly_params[1]))
 
+    # TODO(b/284106340): Return this to a dictionary.
     kernel_args = (
-        dict(length_scale=tf.random.uniform([], .5, 1.5, dtype=tf.float64),
-             amplitude=tf.random.uniform([], 1.5, 2.5, dtype=tf.float64)),
-        dict(bias_variance=tf.random.uniform([feature_dim], .5, 1.5,
-                                             dtype=tf.float64),
-             shift=tf.random.normal([feature_dim], dtype=tf.float64)))
+        (tf.random.uniform([], 1.5, 2.5, dtype=tf.float64),  # amplitude
+         tf.random.uniform([], .5, 1.5, dtype=tf.float64)),  # length_scale
+        (tf.random.uniform([feature_dim], .5, 1.5,  # bias_amplitude
+                           dtype=tf.float64),
+         tf.random.normal([feature_dim], dtype=tf.float64)))  # shift
 
     x1 = tf.random.normal([5, feature_dim], dtype=tf.float64)
     x2 = tf.random.normal([7, feature_dim], dtype=tf.float64)

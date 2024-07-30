@@ -41,6 +41,7 @@ __all__ = [
     'eye',
     'inv',
     'logdet',
+    'lstsq',
     'lu',
     'matmul',
     'matvec',
@@ -53,17 +54,16 @@ __all__ = [
     'slogdet',
     'solve',
     'svd',
+    'tensor_diag',
     'tensordot',
     'trace',
     'triangular_solve',
-    # 'cross',
+    'cross',
     # 'expm',
     # 'global_norm',
     # 'logm',
-    # 'lstsq',
     # 'l2_normalize'
     # 'sqrtm',
-    # 'tensor_diag',
     # 'tensor_diag_part',
     # 'tridiagonal_solve',
 ]
@@ -82,23 +82,171 @@ def _band_part(input, num_lower, num_upper, name=None):  # pylint: disable=redef
   return result
 
 
+def _create_solve_broadcastable_inputs(a, b):
+  """Internal method to handle broadcasting / reshaping for solves.
+
+  Args:
+    a: `Tensor` of shape `[B1, ..., Bk, N, N]`.
+    b: `Tensor` of shape `[C1, ..., Cl, N, M]`.
+
+  Returns:
+    a: Reshaped version of `a` suitable for solves.
+    b: Reshaped version of `b` suitable for solves.
+    b_batch_dims: List of dimensions of `b` that have been reshaped away in `b`.
+    result_permutation: Permutation of dimensions of the result of the solve,
+      that produces the same shape as naively computing
+      `solve(broadcast(a), broadcast(b))`.
+  """
+
+  # Returns reshaped inputs along with a list of batch dimensions and where
+  # they should be in the result.
+
+  # We mainly take advantage of the fact that we can compute a solve with a
+  # matrix `a` and batch of matrices `b` of shapes `[N, N]` and `[B, N, M]` via
+  # a solve with matrix `a` and a matrix `b'` of shapes `[N, N]` and `[N, M *
+  # B]`, where `b'` is related to `b` via a transpose in reshape.
+  # In general we can do this for arbitrary batch dimensions on both matrices by
+  # a combination of transposing and broadcasting.
+
+  a = ops.convert_to_tensor(a)
+  b = ops.convert_to_tensor(b)
+  import jax.numpy as jnp  # pylint: disable=g-import-not-at-top
+  import numpy as onp  # pylint: disable=g-import-not-at-top,reimported
+
+  # Special case batch dimensions are equal, only one tensor has batch
+  # dimensions, or batch dimensions are the same.
+
+  # If there are zero dimensions, just broadcast arguments and pass through.
+  if 0 in a.shape or 0 in b.shape:
+    a = a + np.zeros(b.shape[:-2] + (1, 1), dtype=a.dtype)
+    b = b + np.zeros(a.shape[:-2] + (1, 1), dtype=b.dtype)
+    return a, b, None, None
+
+  if a.shape[:-2] == b.shape[:-2]:
+    return a, b, None, None
+
+  # If a has batch dimensions and b doesn't, we need to explicitly broadcast.
+  if len(a.shape) > 2 and len(b.shape) == 2:
+    b = jnp.broadcast_to(b, a.shape[:-2] + b.shape[-2:])
+    return a, b, None, None
+
+  # If b has batch dimensions and a doesn't
+  if len(b.shape) > 2 and len(a.shape) == 2:
+    # Move all batch dimensions to the right.
+    transpose_dims = [len(b.shape) - 2, len(b.shape) - 1]
+    transpose_dims.extend(range(0, len(b.shape) - 2))
+    new_b = jnp.transpose(b, axes=transpose_dims)
+    new_b = new_b.reshape(new_b.shape[0], -1)
+
+    # Undo the transpose.
+    result_permutation = list(range(2, len(b.shape))) + [0, 1]
+    return a, new_b, b.shape[:-2], result_permutation
+
+  # Both inputs have batch dimensions that are unequal.
+  batch_a = a.shape[:-2]
+  batch_b = b.shape[:-2]
+
+  reversed_batch_a = list(reversed(batch_a))
+  reversed_batch_b = list(reversed(batch_b))
+
+  keep_a_dims = []
+  keep_b_dims = []
+  transpose_b_dims = []
+  result_permutation = []
+
+  b_batch_dims = []
+
+  # Iterate backwards over dimensions since the batch shapes might be of
+  # different sizes.
+  for i in range(min(len(batch_a), len(batch_b))):
+    if reversed_batch_a[i] == reversed_batch_b[i]:
+      keep_a_dims.append(i)
+      keep_b_dims.append(i)
+    else:
+      if reversed_batch_a[i] == 1 and reversed_batch_b[i] != 1:
+        transpose_b_dims.append(i)
+        b_batch_dims.append(reversed_batch_b[i])
+      else:
+        keep_a_dims.append(i)
+        keep_b_dims.append(i)
+
+  # Add extra dimensions of the larger list
+  if len(batch_a) > len(batch_b):
+    keep_a_dims.extend(range(len(batch_b), len(batch_a)))
+  elif len(batch_b) > len(batch_a):
+    transpose_b_dims.extend(range(len(batch_a), len(batch_b)))
+    b_batch_dims.extend(reversed_batch_b[len(batch_a):])
+
+  # We can compute the permutation of the broadcasted result that
+  # produces the result with the dimensions permuted as we do. We can then
+  # invert that permutation via an argsort.
+  result_batch_size = max(len(batch_a), len(batch_b))
+  result_permutation = [result_batch_size - 1 - x for x in reversed(
+      keep_a_dims)]
+  result_permutation.extend([result_batch_size + 1, result_batch_size + 2])
+  result_permutation.extend(
+      [result_batch_size - 1 - x for x in reversed(transpose_b_dims)])
+  result_permutation = onp.argsort(onp.array(result_permutation), axis=-1)
+
+  keep_a_dims = [len(batch_a) - 1 - x for x in reversed(keep_a_dims)]
+  keep_b_dims = [len(batch_b) - 1 - x for x in reversed(keep_b_dims)]
+  transpose_b_dims = [len(batch_b) - 1 - x for x in reversed(transpose_b_dims)]
+
+  b_batch_dims = list(reversed(b_batch_dims))
+
+  # Reshape away possible one dimensions.
+  new_a_shape = onp.take(
+      onp.array(a.shape[:-2]), onp.array(keep_a_dims, dtype=onp.int64))
+  new_a_shape = tuple(new_a_shape) + a.shape[-2:]
+  new_a = a.reshape(*new_a_shape)
+
+  new_b = jnp.transpose(
+      b, keep_b_dims + [len(b.shape) - 2, len(b.shape) - 1] + transpose_b_dims)
+  new_b_shape = onp.take(
+      onp.array(b.shape[:-2]), onp.array(keep_b_dims, dtype=onp.int64))
+  new_b_shape = tuple(new_b_shape) + (b.shape[-2], -1)
+  new_b = new_b.reshape(*new_b_shape)
+  if new_a.shape[:-2] != new_b.shape[:-2]:
+    new_b = jnp.broadcast_to(new_b, new_a.shape[:-2] + new_b.shape[-2:])
+
+  return new_a, new_b, b_batch_dims, result_permutation
+
+
+def _reshape_solve_result(result, b_batch_dims, result_permutation):
+  """Reshapes result of a solve to the original shapes."""
+  import jax.numpy as jnp  # pylint: disable=g-import-not-at-top
+  import numpy as onp  # pylint: disable=g-import-not-at-top,reimported
+
+  if b_batch_dims is None:
+    return result
+
+  new_shape = list(result.shape[:-1])
+  new_shape.append(result.shape[-1] // int(onp.prod(onp.array(b_batch_dims))))
+  new_shape.extend(b_batch_dims)
+  new_result = result.reshape(*new_shape)
+  return jnp.transpose(new_result, result_permutation)
+
+
 def _cholesky_solve(chol, rhs, name=None):  # pylint: disable=unused-argument
   """Scipy cho_solve does not broadcast, so we must do so explicitly."""
   chol = ops.convert_to_tensor(chol)
   rhs = ops.convert_to_tensor(rhs)
-  if JAX_MODE:  # But JAX uses XLA, which can do a batched solve.
-    chol = chol + np.zeros(rhs.shape[:-2] + (1, 1), dtype=chol.dtype)
-    rhs = rhs + np.zeros(chol.shape[:-2] + (1, 1), dtype=rhs.dtype)
-    return scipy_linalg.cho_solve((chol, True), rhs)
+  if JAX_MODE:
+    (chol_broadcast,
+     rhs_broadcast,
+     rhs_batch_dims,
+     result_permutation) = _create_solve_broadcastable_inputs(chol, rhs)
+    result = scipy_linalg.cho_solve((chol_broadcast, True), rhs_broadcast)
+    return _reshape_solve_result(result, rhs_batch_dims, result_permutation)
   try:
-    bcast = np.broadcast(chol[..., :1], rhs)
+    bcast_shp = np.broadcast_shapes(chol.shape[:-2], rhs.shape[:-2])
   except ValueError as e:
-    raise ValueError('Error with inputs shaped `chol`={}, rhs={}:\n{}'.format(
-        chol.shape, rhs.shape, str(e)))
+    raise ValueError(
+        f'Error with inputs shaped `chol`={chol.shape}, rhs={rhs.shape}') from e
   dim = chol.shape[-1]
-  chol = np.broadcast_to(chol, bcast.shape[:-1] + (dim,))
-  rhs = np.broadcast_to(rhs, bcast.shape)
-  nbatch = int(np.prod(chol.shape[:-2]))
+  chol = np.broadcast_to(chol, bcast_shp + (dim, dim))
+  rhs = np.broadcast_to(rhs, bcast_shp + (dim, rhs.shape[-1],))
+  nbatch = int(np.prod(bcast_shp))
   flat_chol = chol.reshape(nbatch, dim, dim)
   flat_rhs = rhs.reshape(nbatch, dim, rhs.shape[-1])
   result = np.empty_like(flat_rhs)
@@ -202,6 +350,25 @@ def _lu(input, output_idx_type=np.int32, name=None):  # pylint: disable=redefine
   return Lu(flat_lu.reshape(*input.shape), flat_piv.reshape(*input.shape[:-1]))
 
 
+def _lstsq(matrix, rhs, l2_regularizer=0.0, fast=True, name=None):
+  """JAX/NumPy variant of tf.linalg.lstsq."""
+  del l2_regularizer, name
+  if fast:
+    raise ValueError('`fast=True` is not supported')
+  if matrix.ndim > 2:
+    if JAX_MODE:
+      import jax  # pylint: disable=g-import-not-at-top
+      return jax.vmap(functools.partial(_lstsq, fast=False))(matrix, rhs)
+    res = np.array([_lstsq(mat, r, fast=False) for mat, r in zip(matrix, rhs)])
+    if matrix.shape[0] == 0:
+      res = res.reshape(matrix.shape[:-2] + (matrix.shape[-1], rhs.shape[-1]))
+    return res
+  rcond = None
+  if JAX_MODE and matrix.dtype == np.float32:
+    rcond = 0.  # https://github.com/google/jax/issues/15591
+  return np.linalg.lstsq(matrix, rhs, rcond=rcond)[0]
+
+
 def _matrix_transpose(a, name='matrix_transpose', conjugate=False):  # pylint: disable=unused-argument
   a = np.array(a)
   if a.ndim < 2:
@@ -286,19 +453,24 @@ def _solve(matrix, rhs, adjoint=False, name=None):  # pylint: disable=redefined-
   del name
   if adjoint:
     matrix = _matrix_transpose(matrix, conjugate=True)
-  if JAX_MODE:  # But JAX uses XLA, which can do a batched solve.
-    matrix = matrix + np.zeros(rhs.shape[:-2] + (1, 1), dtype=matrix.dtype)
-    rhs = rhs + np.zeros(matrix.shape[:-2] + (1, 1), dtype=rhs.dtype)
-    return np.linalg.solve(matrix, rhs)
+  if JAX_MODE:
+    (matrix_broadcast,
+     rhs_broadcast,
+     rhs_batch_dims,
+     result_permutation) = _create_solve_broadcastable_inputs(matrix, rhs)
+    result = np.linalg.solve(matrix_broadcast, rhs_broadcast)
+    return _reshape_solve_result(
+        result, rhs_batch_dims, result_permutation)
   try:
-    bcast = np.broadcast(matrix[..., :1], rhs)
+    bcast_shp = np.broadcast_shapes(matrix.shape[:-2], rhs.shape[:-2])
   except ValueError as e:
-    raise ValueError('Error with inputs shaped `matrix`={}, rhs={}:\n{}'.format(
-        matrix.shape, rhs.shape, str(e)))
+    raise ValueError(
+        f'Error with inputs shaped `matrix`={matrix.shape}, rhs={rhs.shape}'
+        ) from e
   dim = matrix.shape[-1]
-  matrix = np.broadcast_to(matrix, bcast.shape[:-1] + (dim,))
-  rhs = np.broadcast_to(rhs, bcast.shape)
-  nbatch = int(np.prod(matrix.shape[:-2]))
+  matrix = np.broadcast_to(matrix, bcast_shp + (dim, dim))
+  rhs = np.broadcast_to(rhs, bcast_shp + (dim, rhs.shape[-1]))
+  nbatch = int(np.prod(bcast_shp))
   flat_mat = matrix.reshape(nbatch, dim, dim)
   flat_rhs = rhs.reshape(nbatch, dim, rhs.shape[-1])
   result = np.empty(flat_rhs.shape)
@@ -325,6 +497,24 @@ def _tensordot(a, b, axes, name=None):  # pylint: disable=redefined-outer-name
   return np.tensordot(a, b, axes=axes)
 
 
+def _tensor_diag(diagonal, name=None):  # pylint: disable=redefined-outer-name
+  """tf.linalg.tensor_diag reimpl."""
+  del name
+  if diagonal.ndim == 0:
+    return diagonal
+  out = np.zeros((diagonal.shape[0], diagonal.shape[0]) +
+                 diagonal.shape[1:] + diagonal.shape[1:],
+                 dtype=diagonal.dtype)
+  for i in range(diagonal.shape[0]):
+    if JAX_MODE:
+      out = out.at[i, i].set(_tensor_diag(diagonal[i]))
+    else:
+      out[i, i] = _tensor_diag(diagonal[i])
+  axes = ([0] + list(range(2, diagonal.ndim + 1)) +
+          [1] + list(range(diagonal.ndim + 1, diagonal.ndim * 2)))
+  return np.transpose(out, axes)
+
+
 def _trace(x, name=None):
   del name
   return np.trace(x, axis1=-1, axis2=-2)
@@ -333,23 +523,28 @@ def _trace(x, name=None):
 def _triangular_solve(matrix, rhs, lower=True, adjoint=False, name=None):  # pylint: disable=redefined-outer-name
   """Scipy solve does not broadcast, so we must do so explicitly."""
   del name
-  if JAX_MODE:  # But JAX uses XLA, which can do a batched solve.
-    matrix = matrix + np.zeros(rhs.shape[:-2] + (1, 1), dtype=matrix.dtype)
-    rhs = rhs + np.zeros(matrix.shape[:-2] + (1, 1), dtype=rhs.dtype)
-    return scipy_linalg.solve_triangular(matrix, rhs, lower=lower,
-                                         trans='C' if adjoint else 'N')
+  if JAX_MODE:
+    (matrix_broadcast,
+     rhs_broadcast,
+     rhs_batch_dims,
+     result_permutation) = _create_solve_broadcastable_inputs(matrix, rhs)
+    result = scipy_linalg.solve_triangular(
+        matrix_broadcast, rhs_broadcast, lower=lower,
+        trans='C' if adjoint else 'N')
+    return _reshape_solve_result(result, rhs_batch_dims, result_permutation)
   try:
-    bcast = np.broadcast(matrix[..., :1], rhs)
+    bcast_shp = np.broadcast_shapes(matrix.shape[:-2], rhs.shape[:-2])
   except ValueError as e:
-    raise ValueError('Error with inputs shaped `matrix`={}, rhs={}:\n{}'.format(
-        matrix.shape, rhs.shape, str(e)))
+    raise ValueError(
+        f'Error with inputs shaped `matrix`={matrix.shape}, rhs={rhs.shape}'
+        ) from e
   dim = matrix.shape[-1]
-  matrix = np.broadcast_to(matrix, bcast.shape[:-1] + (dim,))
-  rhs = np.broadcast_to(rhs, bcast.shape)
-  nbatch = int(np.prod(matrix.shape[:-2]))
+  matrix = np.broadcast_to(matrix, bcast_shp + (dim, dim))
+  rhs = np.broadcast_to(rhs, bcast_shp + (dim, rhs.shape[-1]))
+  nbatch = int(np.prod(bcast_shp))
   flat_mat = matrix.reshape(nbatch, dim, dim)
   flat_rhs = rhs.reshape(nbatch, dim, rhs.shape[-1])
-  result = np.empty(flat_rhs.shape)
+  result = np.empty(flat_rhs.shape, dtype=flat_rhs.dtype)
   if np.size(result):
     # ValueError: On entry to STRTRS parameter number 7 had an illegal value.
     for i, (mat, rh) in enumerate(zip(flat_mat, flat_rhs)):
@@ -376,6 +571,10 @@ cholesky_solve = utils.copy_docstring(
     'tf.linalg.cholesky_solve',
     _cholesky_solve)
 
+cross = utils.copy_docstring(
+    'tf.linalg.cross',
+    lambda a, b, name=None: np.cross(a, b))
+
 det = utils.copy_docstring(
     'tf.linalg.det',
     lambda input, name=None: np.linalg.det(input))
@@ -393,7 +592,7 @@ eig = utils.copy_docstring('tf.linalg.eig', _eig)
 
 eigh = utils.copy_docstring(
     'tf.linalg.eigh',
-    lambda tensor, name=None: np.linalg.eigh(tensor))
+    lambda tensor, name=None: tuple(np.linalg.eigh(tensor)))
 
 eigvals = utils.copy_docstring('tf.linalg.eigvals', _eigvals)
 
@@ -421,6 +620,10 @@ lu = utils.copy_docstring(
     'tf.linalg.lu',
     _lu)
 
+lstsq = utils.copy_docstring(
+    'tf.linalg.lstsq',
+    _lstsq)
+
 matmul = utils.copy_docstring(
     'tf.linalg.matmul',
     _matmul)
@@ -429,26 +632,14 @@ matvec = utils.copy_docstring(
     'tf.linalg.matvec',
     _matvec)
 
-# TODO(b/140157055): Remove the try/except.
-matrix_rank = lambda input, name=None: np.linalg.matrix_rank(input)
-
-try:
-  matrix_rank = utils.copy_docstring(
-      'tf.linalg.matrix_rank',
-      lambda input, name=None: np.linalg.matrix_rank(input))
-except AttributeError:
-  pass
+matrix_rank = utils.copy_docstring(
+    'tf.linalg.matrix_rank',
+    lambda input, name=None: np.linalg.matrix_rank(input))
 
 norm = utils.copy_docstring('tf.norm', _norm)
 
-# TODO(b/140157055): Remove the try/except.
-pinv = lambda input, name=None: np.linalg.pinv(input)
-
-try:
-  pinv = utils.copy_docstring(
-      'tf.linalg.pinv', lambda input, name=None: np.linalg.pinv(input))
-except AttributeError:
-  pass
+pinv = utils.copy_docstring(
+    'tf.linalg.pinv', lambda input, name=None: np.linalg.pinv(input))
 
 qr = utils.copy_docstring('tf.linalg.qr', _qr)
 
@@ -478,6 +669,10 @@ svd = utils.copy_docstring(
 tensordot = utils.copy_docstring(
     'tf.linalg.tensordot',
     _tensordot)
+
+tensor_diag = utils.copy_docstring(
+    'tf.linalg.tensor_diag',
+    _tensor_diag)
 
 trace = utils.copy_docstring(
     'tf.linalg.trace',

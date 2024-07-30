@@ -17,25 +17,26 @@
 # Dependency imports
 import numpy as np
 
-import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import tf_keras
+from tensorflow_probability.python.layers import initializers
 
 
 @test_util.test_all_tf_execution_regimes
 class BlockwiseInitializerTest(test_util.TestCase):
 
   def test_works_correctly(self):
-    init = tfp.layers.BlockwiseInitializer(['glorot_uniform', 'zeros'], [3, 4])
+    init = initializers.BlockwiseInitializer(
+        ['glorot_uniform', 'zeros'], [3, 4])
     x = init([2, 1, 7])
     self.assertEqual((2, 1, 7), x.shape)
     x_ = self.evaluate(x)
     self.assertAllEqual(np.zeros([2, 1, 4]), x_[..., 3:])
 
   def test_de_serialization(self):
-    s = tf.initializers.serialize(
-        tfp.layers.BlockwiseInitializer(['glorot_uniform', 'zeros'], [3, 4]))
-    init_clone = tf.initializers.deserialize(s)
+    s = tf_keras.initializers.serialize(
+        initializers.BlockwiseInitializer(['glorot_uniform', 'zeros'], [3, 4]))
+    init_clone = tf_keras.initializers.deserialize(s)
     x = init_clone([2, 1, 7])
     self.assertEqual((2, 1, 7), x.shape)
     x_ = self.evaluate(x)

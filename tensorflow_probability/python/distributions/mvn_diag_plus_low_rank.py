@@ -17,9 +17,9 @@
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import mvn_linear_operator
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
@@ -219,9 +219,6 @@ class MultivariateNormalDiagPlusLowRank(
         indicate the result is undefined. When `False`, an exception is raised
         if one or more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
-
-    Raises:
-      ValueError: if at most `scale_identity_multiplier` is specified.
     """
     parameters = dict(locals())
     if all(x is None for x in [loc, scale_diag, scale_perturb_factor]):
@@ -252,9 +249,9 @@ class MultivariateNormalDiagPlusLowRank(
       else:
         # This might not be tape-safe if shape unknown and assigned to later.
         if loc is not None:
-          num_rows = distribution_util.dimension_size(loc, -1)
+          num_rows = ps.dimension_size(loc, -1)
         else:
-          num_rows = distribution_util.dimension_size(scale_perturb_factor, -2)
+          num_rows = ps.dimension_size(scale_perturb_factor, -2)
         scale = tf.linalg.LinearOperatorIdentity(
             num_rows=num_rows,
             dtype=dtype,

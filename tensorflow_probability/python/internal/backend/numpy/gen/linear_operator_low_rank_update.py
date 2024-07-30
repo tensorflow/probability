@@ -34,6 +34,7 @@
 """Perturb a `LinearOperator` with a rank `K` update."""
 
 from tensorflow_probability.python.internal.backend.numpy import ops
+# from tensorflow.python.framework import tensor_conversion
 from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shape
 from tensorflow_probability.python.internal.backend.numpy import numpy_array as array_ops
 from tensorflow_probability.python.internal.backend.numpy import linalg_impl as linalg_ops

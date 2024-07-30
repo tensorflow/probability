@@ -21,6 +21,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import broadcast_util as bu
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     'batched_las_vegas_algorithm',
@@ -89,9 +90,14 @@ def batched_las_vegas_algorithm(
 
       trial_seed, new_seed = samplers.split_seed(seed)
       new_values, new_good_values_mask = batched_las_vegas_trial_fn(trial_seed)
+      # TODO(b/117888585): Remove this workaround for shape inference issues.
+      tensorshape_util.set_shape(new_good_values_mask, good_values_mask.shape)
 
       def pick(new, old):
-        return bu.where_left_justified_mask(new_good_values_mask, new, old)
+        ret = bu.where_left_justified_mask(new_good_values_mask, new, old)
+        # TODO(b/117888585): Remove this workaround for shape inference issues.
+        tensorshape_util.set_shape(ret, old.shape)
+        return ret
 
       values = tf.nest.map_structure(pick, new_values, values)
 
@@ -101,6 +107,7 @@ def batched_las_vegas_algorithm(
 
     (values, final_successes, num_iters, _) = tf.while_loop(
         cond, body, (values, good_values_mask, num_iters, loop_seed))
+    values = tf.nest.map_structure(tf.stop_gradient, values)
     return values, final_successes, num_iters
 
 

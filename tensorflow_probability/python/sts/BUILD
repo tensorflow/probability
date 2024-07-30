@@ -24,6 +24,7 @@ load(
 licenses(["notice"])
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -112,6 +113,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/distributions:exponential",
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/optimizer",
         "//tensorflow_probability/python/sts/components:local_linear_trend",
         "//tensorflow_probability/python/sts/components:seasonal",
@@ -180,7 +182,7 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["forecast_test.py"],
     numpy_tags = ["notap"],
-    shard_count = 6,
+    shard_count = 10,
     deps = [
         ":fitting",
         ":forecast",
@@ -218,6 +220,7 @@ multi_substrate_py_test(
         ":holiday_effects",
         # holidays dep,
         # numpy dep,
+        # pandas dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
     ],

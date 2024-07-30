@@ -153,7 +153,7 @@ class CholeskyLKJTest(test_util.TestCase):
   def testDimensionGuard(self, dtype):
     testee_lkj = cholesky_lkj.CholeskyLKJ(
         dimension=3, concentration=dtype([1., 4.]))
-    with self.assertRaisesRegexp(ValueError, 'dimension mismatch'):
+    with self.assertRaisesRegex(ValueError, 'dimension mismatch'):
       testee_lkj.log_prob(tf.eye(4))
 
   def testZeroDimension(self, dtype):

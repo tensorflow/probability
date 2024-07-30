@@ -224,32 +224,18 @@ def pairwise_square_distance_matrix(x1, x2, feature_ndims):
   row_norm_x2 = sum_rightmost_ndims_preserving_shape(
       tf.square(x2), feature_ndims)[..., tf.newaxis, :]
 
+  x1_rank = ps.rank(x1)
+  x2_rank = ps.rank(x2)
+
   reshaped_x1 = tf.reshape(x1, ps.concat(
-      [ps.shape(x1)[:-feature_ndims], [
-          ps.reduce_prod(ps.shape(x1)[-feature_ndims:])]], axis=0))
+      [ps.shape(x1)[:x1_rank - feature_ndims], [
+          ps.reduce_prod(ps.shape(x1)[x1_rank - feature_ndims:])]], axis=0))
   reshaped_x2 = tf.reshape(x2, ps.concat(
-      [ps.shape(x2)[:-feature_ndims], [
-          ps.reduce_prod(ps.shape(x2)[-feature_ndims:])]], axis=0))
+      [ps.shape(x2)[:x2_rank - feature_ndims], [
+          ps.reduce_prod(ps.shape(x2)[x2_rank - feature_ndims:])]], axis=0))
   pairwise_sq = row_norm_x1 + row_norm_x2 - 2 * tf.linalg.matmul(
       reshaped_x1, reshaped_x2, transpose_b=True)
-  pairwise_sq = tf.clip_by_value(pairwise_sq, 0., np.inf)
-
-  # If we statically know that `x1` and `x2` have the same number of examples,
-  # then we check if they are equal so that we can ensure that the diagonal
-  # distances are zero in this case.
-  num_examples1 = tf.compat.dimension_value(x1.shape[-feature_ndims - 1])
-  num_examples2 = tf.compat.dimension_value(x2.shape[-feature_ndims - 1])
-  if num_examples1 is not None and num_examples2 is not None:
-    if num_examples1 == num_examples2:
-      all_equal = tf.reduce_all(
-          tf.equal(x1, x2), axis=range(-1, -feature_ndims - 2, -1))
-      eye = tf.eye(num_examples1, dtype=pairwise_sq.dtype)
-      pairwise_sq = tf.where(
-          all_equal[..., tf.newaxis, tf.newaxis] & (eye == 1.),
-          tf.zeros([], dtype=pairwise_sq.dtype),
-          pairwise_sq)
-
-  return pairwise_sq
+  return tf.clip_by_value(pairwise_sq, 0., np.inf)
 
 
 def pairwise_square_distance_tensor(
@@ -281,21 +267,23 @@ def pairwise_square_distance_tensor(
   """
   # Collapse all the example dimensions and then expand after.
   x1_shape = tf.shape(x1)
+  x1_rank = ps.rank(x1)
   x1_example_shape = x1_shape[
-      -(feature_ndims + x1_example_ndims):-feature_ndims]
+      x1_rank - (feature_ndims + x1_example_ndims):x1_rank - feature_ndims]
 
   x2_shape = tf.shape(x2)
+  x2_rank = ps.rank(x2)
   x2_example_shape = x2_shape[
-      -(feature_ndims + x2_example_ndims):-feature_ndims]
+      x2_rank - (feature_ndims + x2_example_ndims):x2_rank - feature_ndims]
 
   x1 = tf.reshape(x1, tf.concat(
-      [x1_shape[:-(feature_ndims + x1_example_ndims)],
+      [x1_shape[:x1_rank - (feature_ndims + x1_example_ndims)],
        [-1],
-       x1_shape[-feature_ndims:]], axis=0))
+       x1_shape[x1_rank - feature_ndims:]], axis=0))
   x2 = tf.reshape(x2, tf.concat(
-      [x2_shape[:-(feature_ndims + x2_example_ndims)],
+      [x2_shape[:x2_rank - (feature_ndims + x2_example_ndims)],
        [-1],
-       x2_shape[-feature_ndims:]], axis=0))
+       x2_shape[x2_rank - feature_ndims:]], axis=0))
   pairwise = pairwise_square_distance_matrix(
       x1, x2, feature_ndims=feature_ndims)
   # Now we need to undo the transformation.

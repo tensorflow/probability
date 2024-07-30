@@ -14,7 +14,7 @@
 # ============================================================================
 """Tests for dtype_util."""
 
-import collections
+import dataclasses
 
 # Dependency imports
 from absl.testing import parameterized
@@ -25,6 +25,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_util
 
 
+NUMPY_MODE = False
 JAX_MODE = False
 
 
@@ -51,15 +52,97 @@ class DtypeUtilTest(test_util.TestCase):
         tf.float16, dtype_util.common_dtype(
             [x, None], dtype_hint=tf.float32))
 
-    fake_tensor = collections.namedtuple('fake_tensor', ['dtype'])
+    fake_tensor = dataclasses.make_dataclass('fake_tensor', ['dtype'])
     self.assertEqual(
         tf.float16, dtype_util.common_dtype(
             [fake_tensor(dtype=None), None, x], dtype_hint=tf.float32))
+    self.assertEqual(
+        tf.float32, dtype_util.common_dtype(
+            [fake_tensor(dtype=tf.float32), None]))
 
   def testCommonDtypeFromLinop(self):
     x = tf.linalg.LinearOperatorDiag(tf.ones(3, tf.float16))
     self.assertEqual(
         tf.float16, dtype_util.common_dtype([x], dtype_hint=tf.float32))
+
+  def testCommonStructuredDtype(self):
+    structured_dtype_obj = dataclasses.make_dataclass(
+        'structured_dtype_obj', ['dtype'])
+    x = structured_dtype_obj({'a': tf.float32, 'b': (None, None)})
+    y = structured_dtype_obj({'a': None, 'b': (None, tf.float64)})
+    z = structured_dtype_obj({'a': None, 'b': (None, None)})
+    w = structured_dtype_obj(None)
+
+    # Check that structured dtypes unify correctly.
+    self.assertAllAssertsNested(
+        self.assertEqual,
+        dtype_util.common_dtype([w, x, y, z]),
+        {'a': tf.float32, 'b': (None, tf.float64)})
+
+    # Check that dict `args` works and that `dtype_hint` works.
+    dtype_hint = {'a': tf.int32, 'b': (tf.int32, None)}
+    self.assertAllAssertsNested(
+        self.assertEqual,
+        dtype_util.common_dtype(
+            {'x': x, 'y': y, 'z': z}, dtype_hint=dtype_hint),
+        {'a': tf.float32, 'b': (tf.int32, tf.float64)})
+    self.assertAllAssertsNested(
+        self.assertEqual,
+        dtype_util.common_dtype([w], dtype_hint=dtype_hint),
+        dtype_hint)
+
+    # Check that non-nested dtype_hint broadcasts.
+    self.assertAllAssertsNested(
+        self.assertEqual,
+        dtype_util.common_dtype([y, z], dtype_hint=tf.int32),
+        {'a': tf.int32, 'b': (tf.int32, tf.float64)})
+
+    # Check that structured `dtype_hint` behaves as expected.
+    s = {'a': [tf.ones([3], tf.float32), 4.],
+         'b': (np.float64(2.), None)}
+    self.assertAllAssertsNested(
+        self.assertEqual,
+        dtype_util.common_dtype([x, s], dtype_hint=z.dtype),
+        {'a': tf.float32, 'b': (tf.float64, None)})
+    self.assertAllAssertsNested(
+        self.assertEqual,
+        dtype_util.common_dtype([y, s], dtype_hint=z.dtype),
+        {'a': tf.float32, 'b': (tf.float64, tf.float64)})
+
+    t = {'a': [[1., 2., 3.]], 'b': {'c': np.float64(1.), 'd': np.float64(2.)}}
+    self.assertAllAssertsNested(
+        self.assertEqual,
+        dtype_util.common_dtype(
+            [w, t],
+            dtype_hint={'a': tf.float32, 'b': tf.float32}),
+        {'a': tf.float32, 'b': tf.float64})
+
+    with self.assertRaisesRegex(ValueError, 'the same nested structure'):
+      dtype_util.common_dtype([x, s])
+
+    with self.assertRaisesRegex(ValueError, 'the same nested structure'):
+      dtype_util.common_dtype([x, t], dtype_hint={'a': None, 'b': None})
+
+    with self.assertRaisesRegex(
+        ValueError, 'must have a shallow structure that matches'):
+      dtype_util.common_dtype([{'a': np.float64(3.), 'b': [3, 2], 'c': 3.}],
+                              dtype_hint=dtype_hint)
+
+    if not dtype_util.SKIP_DTYPE_CHECKS:
+      with self.assertRaisesRegex(
+          TypeError, 'contains elements with incompatible dtypes'):
+        dtype_util.common_dtype(
+            [{'a': np.float64(3.),
+              'b': (tf.ones([3], dtype=tf.float32),
+                    tf.ones([2], dtype=tf.float16))}],
+            dtype_hint={'a': None, 'b': None})
+
+      with self.assertRaisesRegex(TypeError, 'Found incompatible dtypes'):
+        dtype_util.common_dtype([x, {'a': np.float64(3.), 'b': (3, 2)}],
+                                dtype_hint=dtype_hint)
+
+      with self.assertRaisesRegex(TypeError, 'Found incompatible dtypes'):
+        dtype_util.common_dtype([x, structured_dtype_obj(dtype_hint)])
 
   @parameterized.named_parameters(
       dict(testcase_name='Float32', dtype=tf.float32,
@@ -96,7 +179,9 @@ class DtypeUtilTest(test_util.TestCase):
       disable_numpy=True,
       reason='`convert_to_tensor` respects array dtypes in numpy backend.')
   def testConvertToDtype(self, tensor_or_dtype, dtype, dtype_hint):
-    if np.issctype(tensor_or_dtype):
+    if isinstance(tensor_or_dtype, np.generic) or hasattr(
+        tensor_or_dtype, 'dtype'
+    ):
       example_tensor = np.zeros([], tensor_or_dtype)
     elif isinstance(tensor_or_dtype, tf.DType):
       example_tensor = tf.zeros([], tensor_or_dtype)
@@ -120,7 +205,7 @@ class DtypeUtilTest(test_util.TestCase):
       disable_jax=True,
       reason='`convert_to_tensor` only raises in TF mode.')
   def testConvertToDTypeRaises(self, tensor_or_dtype, dtype, dtype_hint):
-    if np.issctype(tensor_or_dtype):
+    if isinstance(tensor_or_dtype, np.generic):
       example_tensor = np.zeros([], tensor_or_dtype)
     elif isinstance(tensor_or_dtype, tf.DType):
       example_tensor = tf.zeros([], tensor_or_dtype)
@@ -162,9 +247,10 @@ class FloatDTypeTest(test_util.TestCase):
     self.assertRaises(ValueError, dtype_util.assert_same_float_dtype,
                       [const_float], tf.int32)
 
-    if not hasattr(tf, 'SparseTensor'):
-      # No SparseTensor in numpy/jax mode.
-      return
+  @test_util.disable_test_for_backend(disable_numpy=True, disable_jax=True,
+                                      reason='SparseTensor')
+  def test_sparse(self):
+    const_float = tf.constant(3.0, dtype=tf.float32)
     sparse_float = tf.SparseTensor(
         tf.constant([[111], [232]], tf.int64),
         tf.constant([23.4, -43.2], tf.float32),
@@ -206,6 +292,14 @@ class FloatDTypeTest(test_util.TestCase):
     self.assertEqual(dtype_util.size(np.float32), 4)
     self.assertEqual(dtype_util.size(np.float64), 8)
 
+  @parameterized.named_parameters(
+      ('float32', tf.float32, True),
+      ('bfloat16', 'bfloat16', True),
+      ('not_int8', tf.int8, False))
+  def test_is_floating(self, dtype, expected):
+    if NUMPY_MODE and dtype == 'bfloat16':
+      self.skipTest('No bfloat16 in numpy')
+    self.assertEqual(dtype_util.is_floating(dtype), expected)
 
 if __name__ == '__main__':
   test_util.main()

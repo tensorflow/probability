@@ -481,7 +481,7 @@ class DirichletMultinomialFromVariableTest(test_util.TestCase):
     total_count = tf.constant(10.0, dtype=tf.float16)
     too_many_classes = 2**11 + 1
     concentration = tf.Variable(tf.ones(too_many_classes, tf.float16))
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Number of classes exceeds `dtype` precision'):
       dm.DirichletMultinomial(total_count, concentration, validate_args=True)
 

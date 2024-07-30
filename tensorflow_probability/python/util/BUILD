@@ -18,6 +18,7 @@
 load("//tensorflow_probability/python:build_defs.bzl", "multi_substrate_py_library", "multi_substrate_py_test")
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -47,6 +48,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:name_util",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 
@@ -60,6 +62,7 @@ multi_substrate_py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:bijector",
+        "//tensorflow_probability/python/bijectors:bijector_test_util",
         "//tensorflow_probability/python/bijectors:exp",
         "//tensorflow_probability/python/bijectors:fill_scale_tril",
         "//tensorflow_probability/python/bijectors:inline",

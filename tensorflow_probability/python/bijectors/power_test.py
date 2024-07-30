@@ -107,7 +107,7 @@ class RaiseBijectorTest(test_util.TestCase):
         rtol=1e-7)
 
   def testZeroPowerRaisesError(self):
-    with self.assertRaisesRegexp(Exception, 'must be non-zero'):
+    with self.assertRaisesRegex(Exception, 'must be non-zero'):
       b = power_lib.Power(power=0., validate_args=True)
       b.forward(1.)
 

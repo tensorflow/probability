@@ -18,7 +18,6 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import fill_scale_tril as fill_scale_tril_bijector
 from tensorflow_probability.python.distributions import mvn_linear_operator
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -210,7 +209,7 @@ class MultivariateNormalTriL(
       self._scale_tril = scale_tril
       if scale_tril is None:
         scale = tf.linalg.LinearOperatorIdentity(
-            num_rows=distribution_util.dimension_size(loc, -1),
+            num_rows=ps.dimension_size(loc, -1),
             dtype=loc.dtype,
             is_self_adjoint=True,
             is_positive_definite=True,

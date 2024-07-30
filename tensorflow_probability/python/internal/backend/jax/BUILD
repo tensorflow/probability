@@ -14,9 +14,14 @@
 # ============================================================================
 # Description: JAX backend.
 
+# Placeholder: py_binary
+# Placeholder: py_library
+# Placeholder: py_test
+
 licenses(["notice"])
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -28,6 +33,7 @@ FILENAMES = [
     "bitwise",
     "compat",
     "composite_tensor",
+    "composite_tensor_gradient",
     "config",
     "control_flow",
     "data_structures",
@@ -43,7 +49,6 @@ FILENAMES = [
     "linalg_impl",
     "misc",
     "nest",
-    "nested_structure_coder",
     "nn",
     "numpy_array",
     "numpy_logging",
@@ -63,6 +68,7 @@ FILENAMES = [
     "test_lib",
     "tf_inspect",
     "type_spec",
+    "type_spec_registry",
     "variable_utils",
     "variables",
     "v1",
@@ -73,12 +79,8 @@ FILENAMES = [
 GEN_FILENAMES = [
     "gen/__init__",
     "gen/tensor_shape",
-    "gen/adjoint_registrations",
-    "gen/cholesky_registrations",
-    "gen/inverse_registrations",
     "gen/linear_operator_addition",
     "gen/linear_operator_adjoint",
-    "gen/linear_operator_algebra",
     "gen/linear_operator_block_diag",
     "gen/linear_operator_block_lower_triangular",
     "gen/linear_operator_full_matrix",
@@ -96,10 +98,8 @@ GEN_FILENAMES = [
     "gen/linear_operator_toeplitz",
     "gen/linear_operator_util",
     "gen/linear_operator_zeros",
-    "gen/matmul_registrations",
-    "gen/registrations_util",
+    "gen/property_hint_util",
     "gen/slicing",
-    "gen/solve_registrations",
 ]
 
 [
@@ -150,8 +150,7 @@ py_test(
         # absl/testing:parameterized dep,
         # hypothesis dep,
         # jax dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:test_util.jax",
     ],
 )
 
@@ -160,7 +159,7 @@ py_test(
     srcs = ["numpy_test.py"],
     main = "numpy_test.py",
     shard_count = 8,
-    tags = ["tfp_jax"],
+    tags = ["tf1-broken"],  # This is broken in TF1 due to backwards incompatibilities with convolutions.
     deps = [
         ":jax",
         ":jax_testlib",

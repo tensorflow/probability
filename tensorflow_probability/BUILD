@@ -17,10 +17,24 @@
 #   methods, including modeling and Bayesian inference. APIs here are
 #   meant to evolve over time.
 
+# Placeholder: py_library
+
+# copybara:uncomment_begin
+# load("//tools/build_defs/license:license.bzl", "license")
+# 
+# package(default_applicable_licenses = [":license"])
+# 
+# license(
+#     name = "license",
+#     package_name = "tensorflow_probability",
+# )
+# copybara:uncomment_end
+
 licenses(["notice"])
 
 exports_files(["LICENSE"])
 
+# The public target for the TensorFlow version of TFP.
 py_library(
     name = "tensorflow_probability",
     srcs = ["__init__.py"],
@@ -29,7 +43,6 @@ py_library(
 #         "//tensorflow_probability/google/staging",  # DisableOnExport
 #         "//tensorflow_probability/google/tfp_google",  # DisableOnExport
         "//tensorflow_probability/python",
-        "//tensorflow_probability/substrates",
     ],
 )
 

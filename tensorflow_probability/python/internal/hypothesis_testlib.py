@@ -231,6 +231,7 @@ class Support(object):
   VECTOR_UNCONSTRAINED = 'VECTOR_UNCONSTRAINED'
   VECTOR_SIZE_TRIANGULAR = 'VECTOR_SIZE_TRIANGULAR'
   VECTOR_POSITIVE_WITH_L1_NORM_1_SIZE_GT1 = 'VECTOR_POSITIVE_WITH_L1_NORM_1_SIZE_GT1'
+  VECTOR_WITH_L2_NORM_1_SIZE_GT1 = 'VECTOR_WITH_L2_NORM_1_SIZE_GT1'
   VECTOR_STRICTLY_INCREASING = 'VECTOR_STRICTLY_INCREASING'
   MATRIX_UNCONSTRAINED = 'MATRIX_UNCONSTRAINED'
   MATRIX_LOWER_TRIL = 'MATRIX_LOWER_TRIL'
@@ -280,6 +281,10 @@ def _vector_constrainer(support):
     x = x / tf.linalg.norm(x, ord=1, axis=-1, keepdims=True)
     return tf.math.abs(x)
 
+  def l2norm(x):
+    norm_sq = tf.reduce_sum(tf.square(x), axis=-1, keepdims=True)
+    return tf.concat([2 * x, norm_sq - 1], axis=-1) / (norm_sq + 1)
+
   constrainers = {
       Support.VECTOR_UNCONSTRAINED:
           identity_fn,
@@ -289,6 +294,8 @@ def _vector_constrainer(support):
           l1norm,
       Support.VECTOR_SIZE_TRIANGULAR:
           identity_fn,
+      Support.VECTOR_WITH_L2_NORM_1_SIZE_GT1:
+          l2norm,
   }
   if support not in constrainers:
     raise NotImplementedError(support)

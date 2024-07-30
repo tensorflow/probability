@@ -41,7 +41,7 @@ class HalfNormalTest(test_util.TestCase):
 
   def assertRaisesError(self, msg):
     if tf.executing_eagerly():
-      return self.assertRaisesRegexp(Exception, msg)
+      return self.assertRaisesRegex(Exception, msg)
     return self.assertRaisesOpError(msg)
 
   def _testParamShapes(self, sample_shape, expected):

@@ -35,7 +35,7 @@ def _validate_tf_environment(package):
       inadequate.
   """
   try:
-    import tensorflow.compat.v1 as tf
+    import tensorflow as tf
   except (ImportError, ModuleNotFoundError):
     # Print more informative error message, then reraise.
     print('\n\nFailed to import TensorFlow. Please note that TensorFlow is not '
@@ -51,7 +51,7 @@ def _validate_tf_environment(package):
   #
   # Update this whenever we need to depend on a newer TensorFlow release.
   #
-  required_tensorflow_version = '2.9'
+  required_tensorflow_version = '2.16'
 #   required_tensorflow_version = '1.15'  # Needed internally -- DisableOnExport
 
   if (distutils.version.LooseVersion(tf.__version__) <
@@ -73,6 +73,20 @@ def _validate_tf_environment(package):
         'run `tf.config.experimental.enable_tensor_float_32_execution(False)`. '
         'For more detail, see https://github.com/tensorflow/community/pull/287.'
         )
+
+  if required_tensorflow_version[0] == '2':
+    try:
+      import tf_keras  # pylint: disable=unused-import
+    except (ImportError, ModuleNotFoundError):
+      # Print more informative error message, then reraise.
+      print('\n\nFailed to import TF-Keras. Please note that TF-Keras is not '
+            'installed by default when you install TensorFlow Probability. '
+            'This is so that JAX-only users do not have to install TensorFlow '
+            'or TF-Keras. To use TensorFlow Probability with TensorFlow, '
+            'please install the tf-keras or tf-keras-nightly package.\n'
+            'This can be be done through installing the '
+            'tensorflow-probability[tf] extra.\n\n')
+      raise
 
 
 # Declare these explicitly to appease pytype, which otherwise misses them,

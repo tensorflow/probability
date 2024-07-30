@@ -21,7 +21,6 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
-from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math import generic as tfp_math
 
 
@@ -674,23 +673,9 @@ def hyp2f1_small_argument(a, b, c, z, name=None):
           ps.broadcast_shape,
           [ps.shape(x) for x in [a, b, c]])
 
-      _, grad_z = _fix_gradient_for_broadcasting(
-          tf.ones(broadcast_shape, dtype=z.dtype),
-          z, tf.ones_like(grad_z), grad_z)
+      _, grad_z = tfp_math.fix_gradient_for_broadcasting(
+          [tf.ones(broadcast_shape, dtype=z.dtype), z],
+          [tf.ones_like(grad_z), grad_z])
       return None, None, None, grad_z
 
     return result, grad
-
-
-def _fix_gradient_for_broadcasting(a, b, grad_a, grad_b):
-  """Reduces broadcast dimensions for a custom gradient."""
-  if (tensorshape_util.is_fully_defined(a.shape) and
-      tensorshape_util.is_fully_defined(b.shape) and
-      a.shape == b.shape):
-    return [grad_a, grad_b]
-  a_shape = tf.shape(a)
-  b_shape = tf.shape(b)
-  ra, rb = tf.raw_ops.BroadcastGradientArgs(s0=a_shape, s1=b_shape)
-  grad_a = tf.reshape(tf.reduce_sum(grad_a, axis=ra), a_shape)
-  grad_b = tf.reshape(tf.reduce_sum(grad_b, axis=rb), b_shape)
-  return [grad_a, grad_b]

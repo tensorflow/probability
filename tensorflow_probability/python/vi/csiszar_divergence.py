@@ -15,6 +15,8 @@
 """Csiszar f-Divergence and helpers."""
 
 import enum
+import functools
+import traceback
 import warnings
 
 # Dependency imports
@@ -26,6 +28,7 @@ from tensorflow_probability.python import monte_carlo
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal.reparameterization import FULLY_REPARAMETERIZED
 from tensorflow_probability.python.stats.leave_one_out import log_soomean_exp
 
@@ -53,6 +56,32 @@ __all__ = [
     'total_variation',
     'triangular',
 ]
+
+
+def _call_fn_maybe_with_seed(fn, args, *, seed=None):
+  """Try calling `fn` with or without a `seed` arg."""
+  try:
+    return nest_util.call_fn(functools.partial(fn, seed=seed), args)
+  except Exception as e1_:  # pylint: disable=broad-exception-caught
+    e1 = e1_
+
+  # Don't call this inside the above except, so we don't get e1 to be in the
+  # context of e2, which is confusing.
+  try:
+    return nest_util.call_fn(fn, args)
+  except Exception as e2:  # pylint: disable=broad-exception-caught
+    # For Python 3.9 compatibility, we call format_exception in this odd way.
+    tb1 = ''.join(
+        traceback.format_exception(None, value=e1, tb=e1.__traceback__)
+    )
+    tb2 = ''.join(
+        traceback.format_exception(None, value=e2, tb=e2.__traceback__)
+    )
+    raise RuntimeError(
+        f'Attempted to detect if {fn} requires a `seed`, but failed.\n'
+        f'Calling it with seed raised:\n\n{tb1}\n\n'
+        f'Calling it without the seed raised:\n\n{tb2}'
+    ) from None
 
 
 class GradientEstimators(enum.Enum):
@@ -1059,6 +1088,8 @@ def monte_carlo_variational_loss(
                            num_draws=importance_sample_size,
                            num_batch_draws=sample_size,
                            seed=seed)
+
+    sample_seed, target_seed = samplers.split_seed(seed, 2)
     if gradient_estimator == GradientEstimators.SCORE_FUNCTION:
       if tf.get_static_value(importance_sample_size) != 1:
         # TODO(b/213378570): Support score function gradients for
@@ -1067,7 +1098,7 @@ def monte_carlo_variational_loss(
                          'losses with `importance_sample_size != 1`.')
       # Score fn objective requires explicit gradients of `log_prob`.
       q_samples = surrogate_posterior.sample(
-          [sample_size * importance_sample_size], seed=seed)
+          [sample_size * importance_sample_size], seed=sample_seed)
       q_lp = None
     else:
       if any(reparameterization_type != FULLY_REPARAMETERIZED
@@ -1080,7 +1111,7 @@ def monte_carlo_variational_loss(
       # Attempt to avoid bijector inverses by computing the surrogate log prob
       # during the forward sampling pass.
       q_samples, q_lp = surrogate_posterior.experimental_sample_and_log_prob(
-          [sample_size * importance_sample_size], seed=seed)
+          [sample_size * importance_sample_size], seed=sample_seed)
 
     return monte_carlo.expectation(
         f=_make_importance_weighted_divergence_fn(
@@ -1090,8 +1121,8 @@ def monte_carlo_variational_loss(
             precomputed_surrogate_log_prob=q_lp,
             importance_sample_size=importance_sample_size,
             gradient_estimator=gradient_estimator,
-            stopped_surrogate_posterior=(
-                stopped_surrogate_posterior)),
+            stopped_surrogate_posterior=stopped_surrogate_posterior,
+            seed=target_seed),
         samples=q_samples,
         # Log-prob is only used if `gradient_estimator == SCORE_FUNCTION`.
         log_prob=surrogate_posterior.log_prob,
@@ -1106,18 +1137,19 @@ def _make_importance_weighted_divergence_fn(
     precomputed_surrogate_log_prob=None,
     importance_sample_size=1,
     gradient_estimator=GradientEstimators.REPARAMETERIZATION,
-    stopped_surrogate_posterior=None):
+    stopped_surrogate_posterior=None,
+    seed=None):
   """Defines a function to compute an importance-weighted divergence."""
 
   def divergence_fn(q_samples):
     q_lp = precomputed_surrogate_log_prob
-    target_log_prob = nest_util.call_fn(target_log_prob_fn, q_samples)
+    target_log_prob = _call_fn_maybe_with_seed(
+        target_log_prob_fn, q_samples, seed=seed)
 
     if gradient_estimator == GradientEstimators.DOUBLY_REPARAMETERIZED:
       # Sticking-the-landing is the special case of doubly-reparameterized
       # gradients with `importance_sample_size=1`.
       q_lp = stopped_surrogate_posterior.log_prob(q_samples)
-      log_weights = target_log_prob - q_lp
     else:
       if q_lp is None:
         q_lp = surrogate_posterior.log_prob(q_samples)
@@ -1128,7 +1160,8 @@ def _make_importance_weighted_divergence_fn(
     q_lp = precomputed_surrogate_log_prob
     if q_lp is None:
       q_lp = surrogate_posterior.log_prob(q_samples)
-    target_log_prob = nest_util.call_fn(target_log_prob_fn, q_samples)
+    target_log_prob = _call_fn_maybe_with_seed(
+        target_log_prob_fn, q_samples, seed=seed)
     log_weights = target_log_prob - q_lp
 
     # Explicitly break out `importance_sample_size` as a separate axis.
@@ -1243,10 +1276,12 @@ def csiszar_vimco(f,
       raise ValueError('Must specify num_draws > 1.')
     stop = tf.stop_gradient  # For readability.
 
-    q_sample = q.sample(sample_shape=[num_draws, num_batch_draws], seed=seed)
+    sample_seed, target_seed = samplers.split_seed(seed, 2)
+    q_sample = q.sample(sample_shape=[num_draws, num_batch_draws],
+                        seed=sample_seed)
     x = tf.nest.map_structure(stop, q_sample)
     logqx = q.log_prob(x)
-    logu = nest_util.call_fn(p_log_prob, x) - logqx
+    logu = _call_fn_maybe_with_seed(p_log_prob, x, seed=target_seed) - logqx
     f_log_sooavg_u, f_log_avg_u = map(f, log_soomean_exp(logu, axis=0))
 
     dotprod = tf.reduce_sum(

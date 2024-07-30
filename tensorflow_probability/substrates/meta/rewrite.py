@@ -36,8 +36,7 @@ TF_REPLACEMENTS = {
         'from tensorflow_probability.python.internal.backend.numpy.compat '
         'import v2',
     'import tensorflow_probability as tfp':
-        'import tensorflow_probability as tfp; '
-        'tfp = tfp.substrates.numpy',
+        'from tensorflow_probability.substrates import numpy as tfp',
     ('from tensorflow.python.framework '
      'import composite_tensor'):
         ('from tensorflow_probability.python.internal.backend.numpy '
@@ -67,12 +66,13 @@ TF_REPLACEMENTS = {
         'from tensorflow_probability.python.internal.backend.numpy.private',
     'from tensorflow.python.ops.linalg':
         'from tensorflow_probability.python.internal.backend.numpy.gen',
-    'from tensorflow.python.ops import parallel_for':
+    ('from tensorflow.python.ops.parallel_for '
+     'import control_flow_ops'):
         'from tensorflow_probability.python.internal.backend.numpy '
-        'import functional_ops as parallel_for',
-    'from tensorflow.python.ops import control_flow_ops':
+        'import functional_ops as control_flow_ops',
+    'from tensorflow.python.ops import control_flow_case':
         'from tensorflow_probability.python.internal.backend.numpy '
-        'import control_flow as control_flow_ops',
+        'import control_flow as control_flow_case',
     ('from tensorflow.python.saved_model '
      'import nested_structure_coder'):
         ('from tensorflow_probability.python.internal.backend.numpy '
@@ -85,7 +85,10 @@ TF_REPLACEMENTS = {
         'pass',
     ('from tensorflow.python '
      'import pywrap_tensorflow as c_api'):
-        'pass'
+        'pass',
+    'from tensorflow_probability.python.internal import tf_keras':
+        ('from tensorflow_probability.python.internal.backend.numpy '
+         'import keras as tf_keras'),
 }
 
 DISABLED_BY_PKG = {
@@ -93,9 +96,10 @@ DISABLED_BY_PKG = {
         ('auto_batching', 'composite_tensor', 'linalg',
          'marginalize', 'nn', 'sequential', 'substrates'),
 }
-LIBS = ('bijectors', 'distributions', 'experimental', 'math', 'mcmc',
-        'monte_carlo', 'optimizer', 'random', 'staging', 'stats', 'sts',
-        'util', 'vi')
+LIBS = ('autosts', 'bijectors', 'distributions', 'experimental', 'glm', 'math',
+        'mcmc', 'monte_carlo', 'optimizer', 'random', 'staging', 'stats', 'sts',
+        'tfp_google', 'util', 'vi')
+DISTRIBUTION_INTERNALS = ('stochastic_process_util',)
 INTERNALS = ('assert_util', 'auto_composite_tensor',
              'batched_rejection_sampler',
              'batch_shape_lib', 'broadcast_util', 'cache_util',
@@ -166,12 +170,19 @@ def main(argv):
       'tensorflow_probability.substrates.numpy.google import {}'.format(lib)
       for lib in LIBS
   })
+  # pylint: disable=g-complex-comprehension
+  replacements.update({
+      'tensorflow_probability.python.distributions.internal.{}'.format(
+          internal):
+      'tensorflow_probability.substrates.numpy.distributions.'
+      'internal.{}'.format(internal)
+      for internal in DISTRIBUTION_INTERNALS
+  })
   replacements.update({
       'tensorflow_probability.python.internal.{}'.format(internal):
       'tensorflow_probability.substrates.numpy.internal.{}'.format(internal)
       for internal in INTERNALS
   })
-  # pylint: disable=g-complex-comprehension
   replacements.update({
       'tensorflow_probability.python.internal import {}'.format(internal):
           'tensorflow_probability.substrates.numpy.internal import {}'.format(
@@ -247,6 +258,9 @@ def main(argv):
   if FLAGS.numpy_to_jax:
     contents = contents.replace('tfp.substrates.numpy', 'tfp.substrates.jax')
     contents = contents.replace('substrates.numpy', 'substrates.jax')
+    contents = contents.replace(
+        'tensorflow_probability.substrates import numpy',
+        'tensorflow_probability.substrates import jax')
     contents = contents.replace('backend.numpy', 'backend.jax')
     contents = contents.replace('backend import numpy as tf',
                                 'backend import jax as tf')

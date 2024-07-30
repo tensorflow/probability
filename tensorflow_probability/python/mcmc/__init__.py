@@ -36,7 +36,7 @@ from tensorflow_probability.python.mcmc.sample import CheckpointableStatesAndTra
 from tensorflow_probability.python.mcmc.sample import sample_chain
 from tensorflow_probability.python.mcmc.sample import StatesAndTrace
 from tensorflow_probability.python.mcmc.sample_annealed_importance import sample_annealed_importance_chain
-from tensorflow_probability.python.mcmc.sample_halton_sequence import sample_halton_sequence
+from tensorflow_probability.python.mcmc.sample_halton_sequence_lib import sample_halton_sequence
 from tensorflow_probability.python.mcmc.simple_step_size_adaptation import SimpleStepSizeAdaptation
 from tensorflow_probability.python.mcmc.slice_sampler_kernel import SliceSampler
 from tensorflow_probability.python.mcmc.transformed_kernel import TransformedTransitionKernel

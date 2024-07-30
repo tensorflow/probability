@@ -21,7 +21,6 @@ from tensorflow_probability.python.distributions import exponential
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import prefer_static as ps
-from tensorflow_probability.python.math.generic import log_cumsum_exp
 from tensorflow_probability.python.math.gradient import value_and_gradient
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
@@ -35,7 +34,7 @@ __all__ = [
 
 
 def resample(particles, log_weights, resample_fn, target_log_weights=None,
-             seed=None):
+             particles_dim=0, seed=None):
   """Resamples the current particles according to provided weights.
 
   Args:
@@ -55,6 +54,10 @@ def resample(particles, log_weights, resample_fn, target_log_weights=None,
       `None`, the target measure is implicitly taken to be the normalized
       log weights (`log_weights - tf.reduce_logsumexp(log_weights, axis=0)`).
       Default value: `None`.
+    particles_dim: Python `int` axis of each state `Tensor` indexing into the
+      particles. This is almost always zero, but nonzero values may be necessary
+      when running SMC in nested contexts.
+      Default value: `0`.
     seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
   Returns:
@@ -70,15 +73,25 @@ def resample(particles, log_weights, resample_fn, target_log_weights=None,
       resampling are uniformly equal to `-log(num_particles)`.
   """
   with tf.name_scope('resample'):
-    num_particles = ps.size0(log_weights)
+    num_particles = ps.dimension_size(log_weights, particles_dim)
+
     log_num_particles = tf.math.log(tf.cast(num_particles, log_weights.dtype))
 
     # Normalize the weights and sample the ancestral indices.
-    log_probs = tf.math.log_softmax(log_weights, axis=0)
-    resampled_indices = resample_fn(log_probs, num_particles, (), seed=seed)
+    log_probs = tf.math.log_softmax(log_weights, axis=particles_dim)
+    if particles_dim == 0:
+      # For resample functions that don't yet support the
+      # particles_dim argument.
+      resampled_indices = resample_fn(log_probs, num_particles, (), seed=seed)
+    else:
+      resampled_indices = resample_fn(log_probs, num_particles, (),
+                                      particles_dim=particles_dim, seed=seed)
 
     gather_ancestors = lambda x: (  # pylint: disable=g-long-lambda
-        mcmc_util.index_remapping_gather(x, resampled_indices, axis=0))
+        mcmc_util.index_remapping_gather(x,
+                                         resampled_indices,
+                                         axis=particles_dim,
+                                         indices_axis=particles_dim))
     resampled_particles = tf.nest.map_structure(gather_ancestors, particles)
     if target_log_weights is None:
       log_weights_after_resampling = tf.fill(ps.shape(log_weights),
@@ -135,7 +148,7 @@ def _resample_using_log_points(log_probs, sample_shape, log_points, name=None):
          tf.zeros(points_shape, dtype=tf.int32)],
         axis=-1)
     log_marker_positions = tf.broadcast_to(
-        log_cumsum_exp(log_probs, axis=-1),
+        tf.math.cumulative_logsumexp(log_probs, axis=-1),
         markers_shape)
     log_markers_and_points = ps.concat(
         [log_marker_positions, log_points], axis=-1)
@@ -243,7 +256,7 @@ def resample_independent(log_probs, event_size, sample_shape,
 
 # TODO(b/153689734): rewrite so as not to use `move_dimension`.
 def resample_systematic(log_probs, event_size, sample_shape,
-                        seed=None, name=None):
+                        particles_dim=0, seed=None, name=None):
   """A systematic resampler for sequential Monte Carlo.
 
   The value returned from this function is similar to sampling with
@@ -273,6 +286,9 @@ def resample_systematic(log_probs, event_size, sample_shape,
       The remaining dimensions are batch dimensions.
     event_size: the dimension of the vector considered a single draw.
     sample_shape: the `sample_shape` determining the number of draws.
+    particles_dim: Python `int` axis of each state `Tensor` indexing into the
+      particles. This is almost always zero, but nonzero values may be necessary
+      when running SMC in nested contexts.
     seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
       Default value: None (i.e. no seed).
     name: Python `str` name for ops created by this method.
@@ -294,7 +310,9 @@ def resample_systematic(log_probs, event_size, sample_shape,
   """
   with tf.name_scope(name or 'resample_systematic') as name:
     log_probs = tf.convert_to_tensor(log_probs, dtype_hint=tf.float32)
-    log_probs = dist_util.move_dimension(log_probs, source_idx=0, dest_idx=-1)
+    log_probs = dist_util.move_dimension(log_probs,
+                                         source_idx=particles_dim,
+                                         dest_idx=-1)
     working_shape = ps.concat([sample_shape,
                                ps.shape(log_probs)[:-1]], axis=0)
     points_shape = ps.concat([working_shape, [event_size]], axis=0)
@@ -311,7 +329,9 @@ def resample_systematic(log_probs, event_size, sample_shape,
     log_points = tf.broadcast_to(tf.math.log(even_spacing), points_shape)
 
     resampled = _resample_using_log_points(log_probs, sample_shape, log_points)
-    return dist_util.move_dimension(resampled, source_idx=-1, dest_idx=0)
+    return dist_util.move_dimension(resampled,
+                                    source_idx=-1,
+                                    dest_idx=particles_dim)
 
 
 # TODO(b/153689734): rewrite so as not to use `move_dimension`.

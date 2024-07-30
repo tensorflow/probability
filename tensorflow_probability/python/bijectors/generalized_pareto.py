@@ -30,7 +30,9 @@ __all__ = [
 ]
 
 
-class GeneralizedPareto(bijector_lib.AutoCompositeTensorBijector):
+class GeneralizedPareto(
+    bijector_lib.CoordinatewiseBijectorMixin,
+    bijector_lib.AutoCompositeTensorBijector):
   """Bijector mapping R**n to non-negative reals.
 
   Forward computation maps R**n to the support of the `GeneralizedPareto`
@@ -99,38 +101,64 @@ class GeneralizedPareto(bijector_lib.AutoCompositeTensorBijector):
   def concentration(self):
     return self._concentration
 
-  def _negative_concentration_bijector(self):
+  def _classify_conc(self):
+    scale_div_conc = self.scale / self.concentration
+    # Guard against overflow when scale >> concentration
+    use_negative = (self._concentration < 0.) & tf.math.is_finite(
+        scale_div_conc
+    )
+    return use_negative, tf.where(
+        use_negative, scale_div_conc, tf.ones_like(scale_div_conc)
+    )
+
+  def _negative_concentration_bijector(self, scale_div_conc=None):
     # Constructed dynamically so that `loc + scale / concentration` is
     # tape-safe.
+    if scale_div_conc is None:
+      scale_div_conc = self.scale / self.concentration
     loc = tf.convert_to_tensor(self.loc)
-    high = loc + tf.math.abs(self.scale / self.concentration)
+    high = loc + tf.math.abs(scale_div_conc)
     return sigmoid_bijector.Sigmoid(
         low=loc, high=high, validate_args=self.validate_args)
 
   def _forward(self, x):
-    return tf.where(self._concentration < 0.,
-                    self._negative_concentration_bijector().forward(x),
-                    self._non_negative_concentration_bijector.forward(x))
+    use_negative, scale_div_conc = self._classify_conc()
+    return tf.where(
+        use_negative,
+        self._negative_concentration_bijector(scale_div_conc).forward(x),
+        self._non_negative_concentration_bijector.forward(x),
+    )
 
   def _inverse(self, y):
-    return tf.where(self._concentration < 0.,
-                    self._negative_concentration_bijector().inverse(y),
-                    self._non_negative_concentration_bijector.inverse(y))
+    use_negative, scale_div_conc = self._classify_conc()
+    return tf.where(
+        use_negative,
+        self._negative_concentration_bijector(scale_div_conc).inverse(y),
+        self._non_negative_concentration_bijector.inverse(y),
+    )
 
   def _forward_log_det_jacobian(self, x):
     event_ndims = self.forward_min_event_ndims
+    use_negative, scale_div_conc = self._classify_conc()
     return tf.where(
-        self._concentration < 0.,
-        self._negative_concentration_bijector().forward_log_det_jacobian(
-            x, event_ndims=event_ndims),
+        use_negative,
+        self._negative_concentration_bijector(
+            scale_div_conc
+        ).forward_log_det_jacobian(x, event_ndims=event_ndims),
         self._non_negative_concentration_bijector.forward_log_det_jacobian(
-            x, event_ndims=event_ndims))
+            x, event_ndims=event_ndims
+        ),
+    )
 
   def _inverse_log_det_jacobian(self, y):
     event_ndims = self.inverse_min_event_ndims
+    use_negative, scale_div_conc = self._classify_conc()
     return tf.where(
-        self._concentration < 0.,
-        self._negative_concentration_bijector().inverse_log_det_jacobian(
-            y, event_ndims=event_ndims),
+        use_negative,
+        self._negative_concentration_bijector(
+            scale_div_conc
+        ).inverse_log_det_jacobian(y, event_ndims=event_ndims),
         self._non_negative_concentration_bijector.inverse_log_det_jacobian(
-            y, event_ndims=event_ndims))
+            y, event_ndims=event_ndims
+        ),
+    )

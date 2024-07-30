@@ -50,6 +50,12 @@ from tensorflow_probability.python.math.linalg import cholesky_concat
 from tensorflow_probability.python.math.linalg import cholesky_update
 from tensorflow_probability.python.math.linalg import fill_triangular
 from tensorflow_probability.python.math.linalg import fill_triangular_inverse
+from tensorflow_probability.python.math.linalg import hpsd_logdet
+from tensorflow_probability.python.math.linalg import hpsd_quadratic_form_solve
+from tensorflow_probability.python.math.linalg import hpsd_quadratic_form_solvevec
+from tensorflow_probability.python.math.linalg import hpsd_solve
+from tensorflow_probability.python.math.linalg import hpsd_solvevec
+from tensorflow_probability.python.math.linalg import low_rank_cholesky
 from tensorflow_probability.python.math.linalg import lu_matrix_inverse
 from tensorflow_probability.python.math.linalg import lu_reconstruct
 from tensorflow_probability.python.math.linalg import lu_solve
@@ -84,15 +90,8 @@ from tensorflow_probability.python.math.special import logerfc
 from tensorflow_probability.python.math.special import logerfcx
 from tensorflow_probability.python.math.special import owens_t
 from tensorflow_probability.python.math.special import round_exponential_bump_function
-from tensorflow_probability.python.random import rademacher as random_rademacher
-from tensorflow_probability.python.random import rayleigh as random_rayleigh
 
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
-
-random_rademacher = deprecation.deprecated(
-    '2020-09-20', 'Use tfp.random.rademacher')(random_rademacher)
-random_rayleigh = deprecation.deprecated(
-    '2020-09-20', 'Use tfp.random.rayleigh')(random_rayleigh)
 
 _allowed_symbols = [
     'atan_difference',
@@ -121,6 +120,11 @@ _allowed_symbols = [
     'fill_triangular',
     'fill_triangular_inverse',
     'gram_schmidt',
+    'hpsd_logdet',
+    'hpsd_solve',
+    'hpsd_solvevec',
+    'hpsd_quadratic_form_solve',
+    'hpsd_quadratic_form_solvevec',
     'interp_regular_1d_grid',
     'lambertw',
     'lambertw_winitzki_approx',
@@ -138,6 +142,7 @@ _allowed_symbols = [
     'log_gamma_correction',
     'log_gamma_difference',
     'log_sub_exp',
+    'low_rank_cholesky',
     'lu_matrix_inverse',
     'lu_reconstruct',
     'lu_solve',
@@ -148,8 +153,6 @@ _allowed_symbols = [
     'owens_t',
     'pivoted_cholesky',
     'psd_kernels',
-    'random_rademacher',
-    'random_rayleigh',
     'reduce_kahan_sum',
     'reduce_log_harmonic_mean_exp',
     'reduce_logmeanexp',

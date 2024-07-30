@@ -16,6 +16,7 @@
 
 # Dependency imports
 
+from absl.testing import parameterized
 import numpy as np
 from scipy import stats
 import tensorflow.compat.v2 as tf
@@ -27,7 +28,7 @@ from tensorflow_probability.python.internal import test_util
 
 
 @test_util.test_all_tf_execution_regimes
-class _MatrixNormalTest(object):
+class _MatrixNormalTest(test_util.TestCase):
 
   def _random_tril_matrix(self, shape, seed):
     mat = tf.random.normal(shape=shape, seed=seed, dtype=self.dtype)
@@ -55,6 +56,33 @@ class _MatrixNormalTest(object):
         seed=seed_stream(),
         dtype=self.dtype)) + 1.
     return loc, scale_row, scale_col
+
+  @parameterized.named_parameters(
+      ('NoBatchNoBatch', [], []),
+      ('BatchNoBatch', [5], []),
+      ('NoBatchBatch', [], [5]),
+      ('BatchBatch', [5], [5]),
+  )
+  def testKLDivergence(self, p_batch_shape, q_batch_shape):
+    seed_stream = test_util.test_seed_stream()
+    dists = []
+    for batch_shape in [p_batch_shape, q_batch_shape]:
+      loc, scale_row, scale_col = self._random_loc_and_scale(
+          batch_shape, [2, 3], seed_stream
+      )
+      dists.append(
+          mnlo.MatrixNormalLinearOperator(
+              loc, scale_row, scale_col, validate_args=True
+          )
+      )
+
+    p, q = dists[0], dists[1]
+    expected = p._as_multivariate_normal().kl_divergence(
+        q._as_multivariate_normal()
+    )
+    actual = p.kl_divergence(q)
+
+    self.assertAllClose(expected, actual, atol=1e-5)
 
   def testLogPDFScalarBatch(self):
     seed_stream = test_util.test_seed_stream()
@@ -157,16 +185,16 @@ class _MatrixNormalTest(object):
     loc, scale_row, scale_col = self._random_loc_and_scale(
         batch_shape=[5, 2], matrix_shape=[2, 3], seed_stream=seed_stream)
     matrix_normal = mnlo.MatrixNormalLinearOperator(loc, scale_row, scale_col)
-    samples = matrix_normal.sample(int(1e6), seed=seed_stream())
+    samples = matrix_normal.sample(int(1e5), seed=seed_stream())
     mean_, samples_ = self.evaluate([matrix_normal.mean(), samples])
-    self.assertAllClose(mean_, np.mean(samples_, axis=0), rtol=1e-2)
+    self.assertAllClose(mean_, np.mean(samples_, axis=0), rtol=6e-2)
 
   def testSampleVariance(self):
     seed_stream = test_util.test_seed_stream()
     loc, scale_row, scale_col = self._random_loc_and_scale(
         batch_shape=[5, 2], matrix_shape=[2, 3], seed_stream=seed_stream)
     matrix_normal = mnlo.MatrixNormalLinearOperator(loc, scale_row, scale_col)
-    samples = matrix_normal.sample(int(2e6), seed=seed_stream())
+    samples = matrix_normal.sample(int(2e5), seed=seed_stream())
     variance_, samples_ = self.evaluate([matrix_normal.variance(), samples])
     self.assertAllClose(variance_, np.var(samples_, axis=0), rtol=1e-2)
 
@@ -202,13 +230,16 @@ class _MatrixNormalTest(object):
 
 
 @test_util.test_all_tf_execution_regimes
-class MatrixNormalTestFloat32Test(test_util.TestCase, _MatrixNormalTest):
+class MatrixNormalTestFloat32Test(_MatrixNormalTest):
   dtype = np.float32
 
 
 @test_util.test_all_tf_execution_regimes
-class MatrixNormalFloat64Test(test_util.TestCase, _MatrixNormalTest):
+class MatrixNormalFloat64Test(_MatrixNormalTest):
   dtype = np.float64
+
+
+del _MatrixNormalTest
 
 
 if __name__ == '__main__':

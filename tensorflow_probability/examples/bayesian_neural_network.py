@@ -37,6 +37,7 @@ from matplotlib.backends import backend_agg
 import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import tf_keras
 
 tf.enable_v2_behavior()
 
@@ -143,12 +144,12 @@ def plot_heldout_prediction(input_vals, probs,
 
     ax = fig.add_subplot(n, 3, 3*i + 2)
     for prob_sample in probs:
-      sns.barplot(np.arange(10), prob_sample[i, :], alpha=0.1, ax=ax)
+      sns.barplot(x=np.arange(10), y=prob_sample[i, :], alpha=0.1, ax=ax)
       ax.set_ylim([0, 1])
     ax.set_title('posterior samples')
 
     ax = fig.add_subplot(n, 3, 3*i + 3)
-    sns.barplot(np.arange(10), np.mean(probs[:, i, :], axis=0), ax=ax)
+    sns.barplot(x=np.arange(10), y=np.mean(probs[:, i, :], axis=0), ax=ax)
     ax.set_ylim([0, 1])
     ax.set_title('predictive probs')
   fig.suptitle(title)
@@ -174,26 +175,26 @@ def create_model():
   # and two fully connected dense layers. We use the Flipout
   # Monte Carlo estimator for these layers, which enables lower variance
   # stochastic gradients than naive reparameterization.
-  model = tf.keras.models.Sequential([
+  model = tf_keras.models.Sequential([
       tfp.layers.Convolution2DFlipout(
           6, kernel_size=5, padding='SAME',
           kernel_divergence_fn=kl_divergence_function,
           activation=tf.nn.relu),
-      tf.keras.layers.MaxPooling2D(
+      tf_keras.layers.MaxPooling2D(
           pool_size=[2, 2], strides=[2, 2],
           padding='SAME'),
       tfp.layers.Convolution2DFlipout(
           16, kernel_size=5, padding='SAME',
           kernel_divergence_fn=kl_divergence_function,
           activation=tf.nn.relu),
-      tf.keras.layers.MaxPooling2D(
+      tf_keras.layers.MaxPooling2D(
           pool_size=[2, 2], strides=[2, 2],
           padding='SAME'),
       tfp.layers.Convolution2DFlipout(
           120, kernel_size=5, padding='SAME',
           kernel_divergence_fn=kl_divergence_function,
           activation=tf.nn.relu),
-      tf.keras.layers.Flatten(),
+      tf_keras.layers.Flatten(),
       tfp.layers.DenseFlipout(
           84, kernel_divergence_fn=kl_divergence_function,
           activation=tf.nn.relu),
@@ -203,7 +204,7 @@ def create_model():
   ])
 
   # Model compilation.
-  optimizer = tf.keras.optimizers.Adam(lr=FLAGS.learning_rate)
+  optimizer = tf_keras.optimizers.Adam(lr=FLAGS.learning_rate)
   # We use the categorical_crossentropy loss since the MNIST dataset contains
   # ten labels. The Keras API will then automatically add the
   # Kullback-Leibler divergence (contained on the individual layers of
@@ -214,7 +215,7 @@ def create_model():
   return model
 
 
-class MNISTSequence(tf.keras.utils.Sequence):
+class MNISTSequence(tf_keras.utils.Sequence):
   """Produces a sequence of MNIST digits with labels."""
 
   def __init__(self, data=None, batch_size=128, fake_data_size=None):
@@ -272,7 +273,7 @@ class MNISTSequence(tf.keras.utils.Sequence):
     images = 2 * (images / 255.) - 1.
     images = images[..., tf.newaxis]
 
-    labels = tf.keras.utils.to_categorical(labels)
+    labels = tf_keras.utils.to_categorical(labels)
     return images, labels
 
   def __len__(self):
@@ -298,7 +299,7 @@ def main(argv):
     heldout_seq = MNISTSequence(batch_size=FLAGS.batch_size,
                                 fake_data_size=NUM_HELDOUT_EXAMPLES)
   else:
-    train_set, heldout_set = tf.keras.datasets.mnist.load_data()
+    train_set, heldout_set = tf_keras.datasets.mnist.load_data()
     train_seq = MNISTSequence(data=train_set, batch_size=FLAGS.batch_size)
     heldout_seq = MNISTSequence(data=heldout_set, batch_size=FLAGS.batch_size)
 

@@ -17,6 +17,7 @@
 import collections
 import functools
 import numpy as np
+import numpy as onp  # Disable JAX rewrite.  # pylint: disable=reimported
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy.numpy_array import _reverse
@@ -61,6 +62,7 @@ __all__ = [
     'count_nonzero',
     'cumprod',
     'cumsum',
+    'cumulative_logsumexp',
     'digamma',
     'divide',
     'divide_no_nan',
@@ -164,10 +166,15 @@ __all__ = [
 
 def _astuple(x):
   """Attempt to convert the given argument to be a Python tuple."""
-  try:
-    return (int(x),)
-  except TypeError:
-    pass
+  # Numpy used to allow casting a size-1 ndarray to python scalar literal types.
+  # In version 1.25 this was deprecated, causing a warning to be issued in the
+  # below try/except. To avoid that, we just fall through in the case of an
+  # np.ndarray.
+  if not isinstance(x, onp.ndarray):
+    try:
+      return (int(x),)
+    except TypeError:
+      pass
 
   try:
     return tuple(x)
@@ -258,6 +265,23 @@ def _cumop(op, x, axis=0, exclusive=False, reverse=False, name=None,
 
 _cumprod = utils.partial(_cumop, np.cumprod, initial_value=1.)
 _cumsum = utils.partial(_cumop, np.cumsum, initial_value=0.)
+
+
+def _cumulative_logsumexp(x, axis=0, exclusive=False, reverse=False, name=None):
+  del name
+  axis = int(axis)
+  if axis < 0:
+    axis = axis + len(x.shape)
+  if JAX_MODE:
+    op = jax.lax.cumlogsumexp
+  else:
+    op = np.logaddexp.accumulate
+  return _cumop(
+      op, x,
+      axis=axis,
+      exclusive=exclusive,
+      reverse=reverse,
+      initial_value=-np.inf)
 
 
 def _equal(x, y, name=None):
@@ -559,6 +583,11 @@ cumprod = utils.copy_docstring(
 cumsum = utils.copy_docstring(
     'tf.math.cumsum',
     _cumsum)
+
+cumulative_logsumexp = utils.copy_docstring(
+    'tf.math.cumulative_logsumexp',
+    _cumulative_logsumexp)
+
 
 digamma = utils.copy_docstring(
     'tf.math.digamma',

@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-from absl.testing import absltest
 import jax
 from fun_mc import using_jax as fun_mc
+from absl.testing import absltest
 
 
 class JaxIntegrationTest(absltest.TestCase):
@@ -26,7 +26,7 @@ class JaxIntegrationTest(absltest.TestCase):
 
     x, _ = fun_mc.trace(state=0., fn=fun, num_steps=5)
 
-    self.assertIsInstance(x, jax.xla.DeviceArray)
+    self.assertIsInstance(x, jax.Array)
 
 
 if __name__ == '__main__':

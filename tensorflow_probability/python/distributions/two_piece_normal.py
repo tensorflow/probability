@@ -499,7 +499,7 @@ def quantile(value, loc, scale, skewness):
   return loc + adj_scale * tf.math.sqrt(two * gamma_quantile)
 
 
-def _two_piece_normal_sample_no_gradient(shape, skewness, seed):
+def _two_piece_normal_sample_no_gradient(sample_shape, skewness, seed):
   """Generate samples from Two-Piece Normal distribution.
 
   The distribution is the Two-Piece Normal distribution with location zero,
@@ -510,19 +510,19 @@ def _two_piece_normal_sample_no_gradient(shape, skewness, seed):
   ```
 
   Args:
-    shape: 0D or 1D int32 Tensor. Shape of the generated samples.
+    sample_shape: 0D or 1D `int32` `Tensor`. Shape of the generated samples.
     skewness: Floating-point tensor; the skewness(es) of the distribution(s).
     seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
   Returns:
-    A tensor with prepended dimensions `shape`.
+    A tensor with shape `sample_shape`.
   """
   uniform_seed, normal_seed = samplers.split_seed(
       seed, salt='two_piece_normal_split')
   uniform_samples = samplers.uniform(
-      shape, maxval=1., dtype=skewness.dtype, seed=uniform_seed)
+      sample_shape, maxval=1., dtype=skewness.dtype, seed=uniform_seed)
   normal_samples = samplers.normal(
-      shape, dtype=skewness.dtype, seed=normal_seed)
+      sample_shape, dtype=skewness.dtype, seed=normal_seed)
 
   return tf.abs(normal_samples) * tf.where(
       uniform_samples < tf.math.reciprocal(1. + skewness**2),
@@ -536,12 +536,12 @@ def _two_piece_normal_sample_gradient(skewness, samples):
   This function computes the implicit reparameterization gradients [1]:
 
   ```none
-  dz / dskewness = -(dF(z; skewness) / dskewness) / p(z; skewness)
+  dz / dskewness = -(dF(z; 0, 1, skewness) / dskewness) / p(z; 0, 1, skewness)
   ```
 
-  where `F(z; skewness)` and `p(z; skewness)` are the cdf and the pdf of the
-  Two-Piece Normal distribution with location zero, scale one, and skewness
-  `skewness`.
+  where `F(z; 0, 1, skewness)` and `p(z; 0, 1, skewness)` are the cdf and the
+  pdf of the Two-Piece Normal distribution with location zero, scale one, and
+  skewness `skewness`.
 
   Args:
     skewness: Floating-point tensor; the skewness(es) of the distribution(s).
@@ -579,14 +579,14 @@ def _two_piece_normal_sample_gradient(skewness, samples):
   return tf.where(left_piece, grad_left_piece, grad_right_piece)
 
 
-def _two_piece_normal_sample_fwd(shape, skewness, seed):
+def _two_piece_normal_sample_fwd(sample_shape, skewness, seed):
   """Compute output, aux (collaborates with _two_piece_normal_sample_bwd)."""
-  samples = _two_piece_normal_sample_no_gradient(shape, skewness, seed)
+  samples = _two_piece_normal_sample_no_gradient(sample_shape, skewness, seed)
   return samples, (skewness, samples)
 
 
 def _two_piece_normal_sample_bwd(_, aux, dy):
-  """The gradients of Two Piece Normal samples w.r.t. skewness."""
+  """The gradients of Two Piece Normal samples w.r.t. `skewness`."""
   skewness, samples = aux
   broadcast_skewness = tf.broadcast_to(skewness, ps.shape(samples))
 
@@ -600,16 +600,16 @@ def _two_piece_normal_sample_bwd(_, aux, dy):
   return tf.reduce_sum(grad, axis=ps.range(num_sample_dimensions)), None
 
 
-def _two_piece_normal_sample_jvp(shape, primals, tangents):
+def _two_piece_normal_sample_jvp(sample_shape, primals, tangents):
   """Compute primals and tangents using implicit derivative."""
   skewness, seed = primals
   dskewness, dseed = tangents
   del dseed
 
-  broadcast_skewness = tf.broadcast_to(skewness, shape)
-  broadcast_dskewness = tf.broadcast_to(dskewness, shape)
+  broadcast_skewness = tf.broadcast_to(skewness, sample_shape)
+  broadcast_dskewness = tf.broadcast_to(dskewness, sample_shape)
 
-  samples = _two_piece_normal_sample_no_gradient(shape, skewness, seed)
+  samples = _two_piece_normal_sample_no_gradient(sample_shape, skewness, seed)
   dsamples = broadcast_dskewness * _two_piece_normal_sample_gradient(
       broadcast_skewness, samples)
 
@@ -621,7 +621,7 @@ def _two_piece_normal_sample_jvp(shape, primals, tangents):
     vjp_bwd=_two_piece_normal_sample_bwd,
     jvp_fn=_two_piece_normal_sample_jvp,
     nondiff_argnums=(0,))
-def _two_piece_normal_sample_with_gradient(shape, skewness, seed):
+def _two_piece_normal_sample_with_gradient(sample_shape, skewness, seed):
   """Generate samples from Two-Piece Normal distribution.
 
   The distribution is the Two-Piece Normal distribution with location zero,
@@ -634,12 +634,12 @@ def _two_piece_normal_sample_with_gradient(shape, skewness, seed):
   The samples are pathwise differentiable using the approach of [1].
 
   Args:
-    shape: 0D or 1D int32 Tensor. Shape of the generated samples.
+    sample_shape: 0D or 1D `int32` `Tensor`. Shape of the generated samples.
     skewness: Floating-point tensor; the skewness(es) of the distribution(s).
     seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
   Returns:
-    A tensor with prepended dimensions `shape`.
+    A tensor with shape `sample_shape`.
 
   References:
     [1]: Michael Figurnov, Shakir Mohamed, and Andriy Mnih.
@@ -647,10 +647,10 @@ def _two_piece_normal_sample_with_gradient(shape, skewness, seed):
          Information Processing Systems_, 31, 2018.
          https://arxiv.org/abs/1805.08498
   """
-  return _two_piece_normal_sample_no_gradient(shape, skewness, seed)
+  return _two_piece_normal_sample_no_gradient(sample_shape, skewness, seed)
 
 
-def random_two_piece_normal(shape, skewness, seed=None):
+def random_two_piece_normal(sample_shape, skewness, seed=None):
   """Generate samples from Two-Piece Normal distribution.
 
   The distribution is the Two-Piece Normal distribution with location zero,
@@ -662,15 +662,15 @@ def random_two_piece_normal(shape, skewness, seed=None):
 
   The samples are pathwise differentiable using the approach of [1].
 
-  Note that skewness can be negative.
+  Note that `skewness` can be negative.
 
   Args:
-    shape: The output sample shape.
+    sample_shape: 0D or 1D `int32` `Tensor`. Shape of the generated samples.
     skewness: The skewness(es) of the distribution(s).
     seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
   Returns:
-    A tensor with prepended dimensions `shape`.
+    A tensor with shape `sample_shape`.
 
   References:
     [1]: Michael Figurnov, Shakir Mohamed, and Andriy Mnih.
@@ -678,8 +678,9 @@ def random_two_piece_normal(shape, skewness, seed=None):
          Information Processing Systems_, 31, 2018.
          https://arxiv.org/abs/1805.08498
   """
-  shape = ps.convert_to_shape_tensor(shape, dtype_hint=tf.int32)
+  sample_shape = ps.convert_to_shape_tensor(sample_shape, dtype_hint=tf.int32)
   skewness = tf.convert_to_tensor(skewness)
   seed = samplers.sanitize_seed(seed, salt='two_piece_normal')
 
-  return _two_piece_normal_sample_with_gradient(shape, tf.abs(skewness), seed)
+  return _two_piece_normal_sample_with_gradient(
+      sample_shape, tf.abs(skewness), seed)

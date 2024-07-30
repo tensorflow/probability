@@ -29,11 +29,11 @@ class _CumsumBijectorTest(test_util.TestCase):
   """Tests correctness of the cumsum bijector."""
 
   def testInvalidAxis(self):
-    with self.assertRaisesRegexp(ValueError,
-                                 r'Argument `axis` must be negative.*'):
+    with self.assertRaisesRegex(ValueError,
+                                r'Argument `axis` must be negative.*'):
       cumsum.Cumsum(axis=0, validate_args=True)
-    with self.assertRaisesRegexp(TypeError,
-                                 r'Argument `axis` is not an `int` type\.*'):
+    with self.assertRaisesRegex(TypeError,
+                                r'Argument `axis` is not an `int` type\.*'):
       cumsum.Cumsum(axis=-1., validate_args=True)
 
   def testBijector(self):

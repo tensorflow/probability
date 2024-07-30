@@ -122,7 +122,7 @@ class InferenceGymTestCaseTest(test_util.InferenceGymTestCase):
     expected_type = {
         'backend_tensorflow': otf.Tensor,
         'backend_numpy': np.ndarray,
-        'backend_jax': jax.xla.DeviceArray,
+        'backend_jax': jax.Array,
     }[BACKEND]
     self.assertIsInstance(a, expected_type)
 
@@ -175,7 +175,7 @@ class InferenceGymTestCaseTest(test_util.InferenceGymTestCase):
   def testBadGroundTruthWithHMC(self):
     """Tests that an error is raised if the ground truth is wrong."""
     model = TestModel(ground_truth_mean=-1000.)
-    with self.assertRaisesRegexp(AssertionError, 'Not equal to tolerance'):
+    with self.assertRaisesRegex(AssertionError, 'Not equal to tolerance'):
       self.validate_ground_truth_using_hmc(
           model,
           num_chains=4,
@@ -195,7 +195,7 @@ class InferenceGymTestCaseTest(test_util.InferenceGymTestCase):
   def testBadGroundTruthWithMC(self):
     """Tests that an error is raised if the ground truth is wrong."""
     model = TestModel(ground_truth_mean=-10.)
-    with self.assertRaisesRegexp(AssertionError, 'Not equal to tolerance'):
+    with self.assertRaisesRegex(AssertionError, 'Not equal to tolerance'):
       self.validate_ground_truth_using_monte_carlo(
           model,
           num_samples=4000,
@@ -210,8 +210,8 @@ class InferenceGymTestCaseTest(test_util.InferenceGymTestCase):
   def testBadMaterialization(self):
     """Tests that an error is raised if dataset materialization is wrong."""
     dataset = np.zeros(5)
-    with self.assertRaisesRegexp(AssertionError,
-                                 'Erroneously materialized dataset'):
+    with self.assertRaisesRegex(AssertionError,
+                                'Erroneously materialized dataset'):
       self.validate_deferred_materialization(
           functools.partial(TestModelWithDataset, materialize_dataset=True),
           dataset=dataset)

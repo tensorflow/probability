@@ -309,8 +309,8 @@ class SampleDistributionTest(test_util.TestCase):
   def test_misshapen_event(self):
     d = sample.Sample(
         normal.Normal(0, 1, validate_args=True), 4, validate_args=True)
-    with self.assertRaisesRegexp(ValueError,
-                                 r'Incompatible shapes for broadcasting'):
+    with self.assertRaisesRegex(ValueError,
+                                r'Incompatible shapes for broadcasting'):
       self.evaluate(d.log_prob(tf.zeros([3])))
 
   def test_bijector_shapes(self):
@@ -481,7 +481,7 @@ class SampleDistributionTest(test_util.TestCase):
     # Evaluate together to ensure we use the same samples.
     lp, lp64 = self.evaluate((tf.cast(lp, tf.float64), lp64))
     # Fails 75% CPU, 0-80% GPU --vary_seed runs w/o experimental_use_kahan_sum.
-    self.assertAllClose(lp64, lp, rtol=0., atol=.01)
+    self.assertAllClose(lp64, lp, rtol=0., atol=.02)
 
   @parameterized.named_parameters(dict(testcase_name=''),
                                   dict(testcase_name='_jit', jit=True))

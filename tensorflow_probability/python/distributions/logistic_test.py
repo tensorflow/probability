@@ -210,7 +210,7 @@ class LogisticTest(test_util.TestCase):
   def testAssertParamsAreFloats(self):
     loc = tf.convert_to_tensor(0, dtype=tf.int32)
     scale = tf.convert_to_tensor(1, dtype=tf.int32)
-    with self.assertRaisesRegexp(ValueError, "Expected floating point"):
+    with self.assertRaisesRegex(ValueError, "Expected floating point"):
       logistic.Logistic(loc=loc, scale=scale)
 
 

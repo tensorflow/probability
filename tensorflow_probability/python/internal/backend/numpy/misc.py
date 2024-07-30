@@ -60,8 +60,12 @@ def _argsort(values, axis=-1, direction='ASCENDING', stable=False, name=None):  
     values = np.negative(values)
   else:
     raise ValueError('Unrecognized direction: {}.'.format(direction))
-  return np.argsort(
-      values, axis, kind='stable' if stable else 'quicksort').astype(np.int32)
+  try:
+    # stable keyword introduced in NumPy 2.0.
+    return np.argsort(values, axis, stable=stable).astype(np.int32)
+  except TypeError:
+    return np.argsort(
+        values, axis, kind='stable' if stable else 'quicksort').astype(np.int32)
 
 
 def _histogram_fixed_width(values, value_range, nbins=100, dtype=np.int32,
@@ -103,18 +107,24 @@ def _sort(values, axis=-1, direction='ASCENDING', name=None):  # pylint: disable
     values = np.negative(values)
   else:
     raise ValueError('Unrecognized direction: {}.'.format(direction))
-  result = np.sort(values, axis, kind='stable')
+  try:
+    # NumPy 2.0
+    result = np.sort(values, axis, stable=True)
+  except TypeError:
+    result = np.sort(values, axis, kind='stable')
   if direction == 'DESCENDING':
     return np.negative(result)
   return result
 
 
 # TODO(b/140685491): Add unit-test.
-def _tensor_scatter_nd_add(tensor, indices, updates, name=None):  # pylint: disable=unused-argument
+def _tensor_scatter_nd_add(
+    tensor, indices, updates, bad_indices_policy='', name=None):  # pylint: disable=unused-argument
   """Numpy implementation of `tf.tensor_scatter_nd_add`."""
   indices = _convert_to_tensor(indices)
   tensor = _convert_to_tensor(tensor)
   updates = _convert_to_tensor(updates)
+  del bad_indices_policy
   indices = tuple(
       indices[..., i] for i in range(indices.shape[-1]))  # TODO(b/140685491)
   if JAX_MODE:
@@ -124,11 +134,13 @@ def _tensor_scatter_nd_add(tensor, indices, updates, name=None):  # pylint: disa
 
 
 # TODO(b/140685491): Add unit-test.
-def _tensor_scatter_nd_sub(tensor, indices, updates, name=None):  # pylint: disable=unused-argument
+def _tensor_scatter_nd_sub(
+    tensor, indices, updates, bad_indices_policy='', name=None):  # pylint: disable=unused-argument
   """Numpy implementation of `tf.tensor_scatter_nd_sub`."""
   indices = _convert_to_tensor(indices)
   tensor = _convert_to_tensor(tensor)
   updates = _convert_to_tensor(updates)
+  del bad_indices_policy
   indices = tuple(
       indices[..., i] for i in range(indices.shape[-1]))  # TODO(b/140685491)
   if JAX_MODE:
@@ -138,11 +150,13 @@ def _tensor_scatter_nd_sub(tensor, indices, updates, name=None):  # pylint: disa
 
 
 # TODO(b/140685491): Add unit-test.
-def _tensor_scatter_nd_update(tensor, indices, updates, name=None):  # pylint: disable=unused-argument
+def _tensor_scatter_nd_update(
+    tensor, indices, updates, bad_indices_policy='', name=None):  # pylint: disable=unused-argument
   """Numpy implementation of `tf.tensor_scatter_nd_update`."""
   indices = _convert_to_tensor(indices)
   tensor = _convert_to_tensor(tensor)
   updates = _convert_to_tensor(updates)
+  del bad_indices_policy
   indices = tuple(
       indices[..., i] for i in range(indices.shape[-1]))  # TODO(b/140685491)
   if JAX_MODE:

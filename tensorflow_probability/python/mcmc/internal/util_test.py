@@ -214,11 +214,11 @@ class GradientTest(test_util.TestCase):
         for i, arg in enumerate(fn_args)
     ]
     if tf.executing_eagerly():
-      with self.assertRaisesRegexp(
+      with self.assertRaisesRegex(
           ValueError, 'Encountered `None`.*\n.*fn_arg_list.*\n.*None'):
         util.maybe_call_fn_and_grads(fn, fn_args)
     else:
-      with self.assertRaisesRegexp(
+      with self.assertRaisesRegex(
           ValueError, 'Encountered `None`.*\n.*fn_arg_list.*arg1.*\n.*None'):
         util.maybe_call_fn_and_grads(fn, fn_args)
 

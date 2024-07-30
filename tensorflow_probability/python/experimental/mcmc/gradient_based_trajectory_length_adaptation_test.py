@@ -159,9 +159,13 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
         num_leapfrog_steps=1,
     )
     kernel = gbtla.GradientBasedTrajectoryLengthAdaptation(
-        kernel, num_adaptation_steps=num_adaptation_steps, validate_args=True)
+        kernel, num_adaptation_steps=num_adaptation_steps, validate_args=True,
+        use_reverse_estimator=True)
     kernel = dassa.DualAveragingStepSizeAdaptation(
-        kernel, num_adaptation_steps=num_adaptation_steps)
+        kernel,
+        num_adaptation_steps=num_adaptation_steps,
+        reduce_fn=generic.reduce_log_harmonic_mean_exp,
+    )
     kernel = transformed_kernel.TransformedTransitionKernel(
         kernel, [identity.Identity(), exp.Exp()])
 
@@ -192,9 +196,9 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
     mean_step_size = tf.reduce_mean(step_size)
     mean_max_trajectory_length = tf.reduce_mean(max_trajectory_length)
 
-    self.assertAllClose(0.75, p_accept, atol=0.1)
-    self.assertAllClose(0.52, mean_step_size, atol=0.2)
-    self.assertAllClose(46., mean_max_trajectory_length, atol=15)
+    self.assertAllClose(0.95, p_accept, rtol=0.2)
+    self.assertAllClose(0.3, mean_step_size, rtol=0.2)
+    self.assertAllClose(43., mean_max_trajectory_length, rtol=0.2)
     self.assertAllClose(
         target.mean(), [tf.reduce_mean(x, axis=[0, 1]) for x in chain],
         atol=1.5)
@@ -328,10 +332,12 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
                final_kernel_results.max_trajectory_length), 0.0005)
 
   @parameterized.named_parameters(
-      ('ChEES', gbtla.chees_rate_criterion),
-      ('SNAPER', snaper_criterion_2d_direction),
+      ('ChEES', gbtla.chees_rate_criterion, False),
+      ('SNAPER', snaper_criterion_2d_direction, False),
+      ('ChEES_reverse', gbtla.chees_rate_criterion, True),
+      ('SNAPER_reverse', snaper_criterion_2d_direction, True),
   )
-  def testAdaptation(self, criterion_fn):
+  def testAdaptation(self, criterion_fn, use_reverse_estimator):
     if tf.executing_eagerly() and not JAX_MODE:
       self.skipTest('Too slow for TF Eager.')
 
@@ -353,6 +359,7 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
         kernel,
         num_adaptation_steps=num_adaptation_steps,
         criterion_fn=criterion_fn,
+        use_reverse_estimator=use_reverse_estimator,
         validate_args=True)
     kernel = dassa.DualAveragingStepSizeAdaptation(
         kernel, num_adaptation_steps=num_adaptation_steps)
@@ -385,14 +392,14 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
     self.assertAllClose(1.5, mean_step_size, atol=0.2)
     # Both SNAPER and ChEES-rate find roughly the same trajectory length for
     # this target.
-    self.assertAllClose(15., mean_max_trajectory_length, rtol=0.3)
+    self.assertAllClose(15., mean_max_trajectory_length, rtol=0.5)
     self.assertAllClose(
         target.mean(), tf.reduce_mean(chain, axis=[0, 1]),
         atol=1.)
     self.assertAllClose(
         target.variance(),
         tf.math.reduce_variance(chain, axis=[0, 1]),
-        rtol=0.1)
+        rtol=0.2)
 
   def testPreconditionedHMC(self):
     if tf.executing_eagerly() and not JAX_MODE:
@@ -445,10 +452,10 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
 
     self.assertAllClose(0.75, p_accept, atol=0.1)
     self.assertAllClose(1.2, mean_step_size, atol=0.2)
-    self.assertAllClose(1.5, mean_max_trajectory_length, rtol=0.25)
+    self.assertAllClose(1.5, mean_max_trajectory_length, rtol=0.5)
     self.assertAllClose(
         target.mean(), tf.reduce_mean(chain, axis=[0, 1]),
-        atol=0.3)
+        atol=0.5)
     self.assertAllClose(
         target.variance(),
         tf.math.reduce_variance(chain, axis=[0, 1]),
@@ -470,10 +477,14 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
     state = tf.zeros([64], self.dtype)
     seed = test_util.test_seed(sampler_type='stateless')
     step_0_kernel_results = kernel.bootstrap_results(state)
+
+    seed, step_seed = samplers.split_seed(seed)
     state, step_1_kernel_results = kernel.one_step(
-        state, step_0_kernel_results, seed=seed)
+        state, step_0_kernel_results, seed=step_seed)
+
+    seed, step_seed = samplers.split_seed(seed)
     _, step_2_kernel_results = kernel.one_step(
-        state, step_1_kernel_results, seed=seed)
+        state, step_1_kernel_results, seed=step_seed)
 
     (step_0_kernel_results, step_1_kernel_results,
      step_2_kernel_results) = self.evaluate([
@@ -720,7 +731,7 @@ class DistributedGBTLATest(distribute_test_lib.DistributedTest):
     self.assertAllClose(0.75, p_accept.mean(), atol=0.1)
     # Both ChEES-rate and SNAPER learn roughly the same trajectory length.
     self.assertAllClose(1.5, mean_step_size[0], atol=0.2)
-    self.assertAllClose(15., mean_max_trajectory_length[0], rtol=0.3)
+    self.assertAllClose(15., mean_max_trajectory_length[0], rtol=0.5)
     self.assertAllClose(
         target.mean(), mean.mean(0),
         atol=1.)

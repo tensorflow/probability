@@ -28,6 +28,8 @@ from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import poisson
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
+from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.math import gradient
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 
@@ -110,12 +112,10 @@ class ExponentialFamily(tf.Module):
 
   def _call(self, predicted_linear_response):
     """Default implementation of the __call__ computation."""
-    with tf.GradientTape(watch_accessed_variables=False) as tape:
-      tape.watch(predicted_linear_response)
-      likelihood = self.as_distribution(predicted_linear_response)
-      mean = likelihood.mean()
-    variance = likelihood.variance()
-    grad_mean = tape.gradient(mean, predicted_linear_response)
+    mean_fn = lambda t: self.as_distribution(t).mean()
+    mean, grad_mean = gradient.value_and_gradient(
+        mean_fn, predicted_linear_response)
+    variance = self.as_distribution(predicted_linear_response).variance()
     return mean, variance, grad_mean
 
   def __call__(self, predicted_linear_response, name=None):
@@ -325,8 +325,8 @@ class Binomial(ExponentialFamily):
     super(Binomial, self).__init__(name=name)
 
   def _call(self, r):
-    mean = self._total_count * tf.nn.sigmoid(r)
-    variance = grad_mean = mean * tf.nn.sigmoid(-r)
+    mean = self._total_count * tf.math.sigmoid(r)
+    variance = grad_mean = mean * tf.math.sigmoid(-r)
     return mean, variance, grad_mean
 
   def _as_distribution(self, r):
@@ -466,7 +466,7 @@ class Normal(ExponentialFamily):
     mean = tf.identity(r)
     grad_mean = tf.ones_like(r)
     s = tf.cast(self._scale, r.dtype)
-    variance = tf.fill(tf.shape(r), s**2.)
+    variance = tf.fill(ps.shape(r), s**2.)
     return mean, variance, grad_mean
 
   def _as_distribution(self, r):

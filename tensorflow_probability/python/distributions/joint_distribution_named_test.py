@@ -21,6 +21,7 @@ import collections
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.bijectors import scale
 from tensorflow_probability.python.distributions import bernoulli
 from tensorflow_probability.python.distributions import beta
@@ -91,15 +92,9 @@ class JointDistributionNamedTest(test_util.TestCase):
         validate_args=True)
     # pylint: enable=bad-whitespace
 
-    self.assertEqual(
-        (
-            ('e', ()),
-            ('scale', ('e',)),
-            ('loc', ()),
-            ('m', ('loc', 'scale')),
-            ('x', ('m',)),
-        ),
-        d.resolve_graph())
+    keys = ('e', 'scale', 'loc', 'm', 'x')
+    deps = ((), ('e',), (), ('loc', 'scale'), ('m',))
+    self.assertEqual(tuple(zip(keys, deps)), d.resolve_graph())
 
     xs = d.sample(seed=test_util.test_seed())
     self.assertLen(xs, 5)
@@ -137,10 +132,14 @@ class JointDistributionNamedTest(test_util.TestCase):
       self.assertAllEqual(expected_event_shape[k], event_tensorshape[k])
       self.assertAllEqual(expected_event_shape[k], event_shape_tensor_[k])
 
-    expected_jlp = sum(ds[k].log_prob(xs[k]) for k in ds.keys())
+    expected_lp_parts = {k: ds[k].log_prob(xs[k]) for k in ds.keys()}
+    expected_jlp = sum(expected_lp_parts.values())
     actual_jlp = d.log_prob(xs)
-    self.assertAllClose(*self.evaluate([expected_jlp, actual_jlp]),
-                        atol=0., rtol=1e-4)
+    self.assertAllClose(expected_jlp, actual_jlp, atol=0., rtol=1e-4)
+    self.assertAllCloseNested(expected_lp_parts, d.log_prob_parts(xs),
+                              atol=0., rtol=1e-4)
+    self.assertAllCloseNested(expected_lp_parts, d.log_prob_parts(**xs),
+                              atol=0., rtol=1e-4)
 
   def test_namedtuple_sample_log_prob(self):
     Model = collections.namedtuple('Model', ['e', 'scale', 'loc', 'm', 'x'])  # pylint: disable=invalid-name
@@ -197,10 +196,18 @@ class JointDistributionNamedTest(test_util.TestCase):
       self.assertAllEqual(expected, actual_tensorshape)
       self.assertAllEqual(expected, actual_shape_tensor_)
 
-    expected_jlp = sum(d.log_prob(x) for d, x in zip(ds, xs))
+    expected_lp_parts = type(d.dtype)(*[d.log_prob(x) for d, x in zip(ds, xs)])
+    expected_jlp = sum(expected_lp_parts)
     actual_jlp = d.log_prob(xs)
-    self.assertAllClose(*self.evaluate([expected_jlp, actual_jlp]),
-                        atol=0., rtol=1e-4)
+    self.assertAllClose(expected_jlp, actual_jlp, atol=0., rtol=1e-4)
+    self.assertAllCloseNested(
+        expected_lp_parts, d.log_prob_parts(xs), atol=0., rtol=1e-4)
+    self.assertAllCloseNested(
+        expected_lp_parts, d.log_prob_parts(**xs._asdict()), atol=0., rtol=1e-4)
+    self.assertAllCloseNested(
+        expected_lp_parts, d.log_prob_parts(tuple(xs)), atol=0., rtol=1e-4)
+    self.assertAllCloseNested(
+        expected_lp_parts, d.log_prob_parts(*xs), atol=0., rtol=1e-4)
 
   def test_ordereddict_sample_log_prob(self):
     build_ordereddict = lambda e, scale, loc, m, x: collections.OrderedDict([  # pylint: disable=g-long-lambda
@@ -261,10 +268,18 @@ class JointDistributionNamedTest(test_util.TestCase):
       self.assertAllEqual(expected, actual_tensorshape)
       self.assertAllEqual(expected, actual_shape_tensor_)
 
-    expected_jlp = sum(d.log_prob(x) for d, x in zip(ds.values(), xs.values()))
+    expected_lp_parts = build_ordereddict(
+        *(d.log_prob(x) for d, x in zip(ds.values(), xs.values())))
+    expected_jlp = sum(expected_lp_parts.values())
     actual_jlp = d.log_prob(xs)
     self.assertAllClose(*self.evaluate([expected_jlp, actual_jlp]),
                         atol=0., rtol=1e-4)
+    self.assertAllCloseNested(
+        expected_lp_parts, d.log_prob_parts(xs), atol=0., rtol=1e-4)
+    self.assertAllCloseNested(
+        expected_lp_parts, d.log_prob_parts(**xs), atol=0., rtol=1e-4)
+    self.assertAllCloseNested(
+        expected_lp_parts, d.log_prob_parts(*xs.values()), atol=0., rtol=1e-4)
 
   def test_can_call_log_prob_with_kwargs(self):
 
@@ -293,9 +308,9 @@ class JointDistributionNamedTest(test_util.TestCase):
     lp_kwargs = self.evaluate(d.log_prob(a=a, e=e, x=x))
     self.assertAllClose(lp_value_positional, lp_kwargs)
 
-    with self.assertRaisesRegexp(ValueError,
-                                 'Joint distribution with unordered variables '
-                                 "can't take positional args"):
+    with self.assertRaisesRegex(ValueError,
+                                'Joint distribution with unordered variables '
+                                "can't take positional args"):
       lp_kwargs = d.log_prob(e, a, x)
 
   @parameterized.named_parameters(
@@ -661,7 +676,7 @@ class JointDistributionNamedTest(test_util.TestCase):
     b = d.experimental_default_event_space_bijector()
     y = self.evaluate(d.sample(seed=test_util.test_seed()))
     y_ = self.evaluate(b.forward(b.inverse(y)))
-    self.assertAllClose(y, y_)
+    self.assertAllCloseNested(y, y_)
 
     # Verify that event shapes are passed through and flattened/unflattened
     # correctly.
@@ -775,7 +790,7 @@ class JointDistributionNamedTest(test_util.TestCase):
             e=normal.Normal(loc=0, scale=2.),
             m=transformed_distribution.TransformedDistribution(
                 normal.Normal(loc=-1., scale=1.),
-                test_util.NonCompositeTensorExp()),
+                bijector_test_util.NonCompositeTensorExp()),
         ))
     self.assertNotIsInstance(non_ct_jd, tf.__internal__.CompositeTensor)
 

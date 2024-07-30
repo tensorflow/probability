@@ -34,7 +34,6 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions import hypothesis_testlib as dhps
-from tensorflow_probability.python.experimental.util import composite_tensor
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
@@ -111,6 +110,7 @@ SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
 LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
     'Bates',  # tf.repeat and tf.range do not vectorize. (b/157665707)
     'BetaQuotient',
+    'NoncentralChi2',  # Fails in TF1
     'NormalInverseGaussian',  # Fails in TF1.
     'Skellam',  # Fails in TF1.
     'TruncatedNormal',  # Numerical problem: b/150811273
@@ -172,6 +172,7 @@ XLA_LOGPROB_ATOL.update({
     'Kumaraswamy': 4e-5,
     'Logistic': 3e-6,
     'Multinomial': 2e-4,
+    'NoncentralChi2': 1e-4,
     'OneHotCategorical': 1e-5,
     'PERT': 1e-5,
     'PowerSpherical': 2e-5,
@@ -226,6 +227,7 @@ XLA_LOGPROB_RTOL.update({
 
 COMPOSITE_TENSOR_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-6)
 COMPOSITE_TENSOR_LOGPROB_RTOL.update({
+    'GammaGamma': 1e-5,
     'WishartTriL': 1e-5,
 })
 
@@ -419,10 +421,9 @@ class DistributionCompositeTensorTest(test_util.TestCase):
     hp.note('Drew samples {}'.format(sample1))
 
     # Sample from the distribution after composite tensoring
-    composite_dist = composite_tensor.as_composite(dist)
-    flat = tf.nest.flatten(composite_dist, expand_composites=True)
+    flat = tf.nest.flatten(dist, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(
-        composite_dist, flat, expand_composites=True)
+        dist, flat, expand_composites=True)
     sample2 = self.evaluate(unflat.sample(num_samples, seed=seed))
     hp.note('Drew samples {}'.format(sample2))
 

@@ -122,8 +122,8 @@ class HagerZhangTest(test_util.TestCase):
                     sum(r.func_evals for r in results_mapped))
 
   def test_batch_bracket_failures(self):
-    # To bracket successfully, we must find the narrow window with positive
-    # derivative -- roughly [1.39, 2.72].
+    # To bracket successfully, we must find the narrow window with non-negative
+    # derivative -- good values are roughly [1.39, 2.72].
     def _fdf(x):
       z = x - 1
       return ValueAndGradient(
@@ -131,18 +131,21 @@ class HagerZhangTest(test_util.TestCase):
           f=tf.math.exp(-z) - tf.math.exp(-z*z),
           df=2*z*tf.math.exp(-z*z) - tf.math.exp(-z))
 
-    start = tf.convert_to_tensor([0.01, 0.1, 1.0, 1.5, 2.0, 3.0])
+    start = tf.convert_to_tensor([0.01, 0.1, 1.0, 1.5, 2.0, -5.0])
     results = self.evaluate(hager_zhang(
         _fdf, initial_step_size=start))
 
     # Bracketing will do something like: check `5^0 * start`, `5^1 * start`,
-    # `5^2 * start`, ..., looking for a point where the derivative is positive.
-    # This search will find a point with positive derivative when `start` is
-    # `0.1`, `1.5`, or `2.0`, but will fail for the other values.
-    self.assertAllEqual([False, True, False, True, True, False],
-                        results.converged)
-    self.assertAllEqual([True, False, True, False, False, True],
-                        results.failed)
+    # `5^2 * start`, ..., looking for a point where the derivative is
+    # non-negative. The search will start to fail for negative values where the
+    # function is highly positive and goes steeply downward (but since it's far
+    # enough out fails to bracket).
+    self.assertAllEqual(
+        [True, True, True, True, True, False],
+        results.converged)
+    self.assertAllEqual(
+        [False, False, False, False, False, True],
+        results.failed)
 
     val_0 = self.evaluate(_fdf(tf.convert_to_tensor(0.0)))
     self.assertAllEqual(

@@ -21,6 +21,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -178,10 +179,10 @@ class _BatchConcat(distribution_lib.Distribution):
         axis=parameter_properties.ShapeParameterProperties())
 
   def _broadcast(self, x, sample_shape):
-    """Broadcasts x to target batch_shape.
+    """Broadcasts x's batch dims (except self.axis) to match self.batch_shape.
 
     Specifically, x is broadcasted to have shape
-    `sample_shape + target_batch + ndims`
+    `sample_shape + target_batch + event_shape`
     where target_batch == self.batch_shape except along the concatenation axis.
 
     Args:
@@ -194,14 +195,16 @@ class _BatchConcat(distribution_lib.Distribution):
     x_shape = ps.shape(x)
 
     batch_shape = self._calculate_batch_shape()
-    sample_batch_ndims = ps.shape(sample_shape)[0] + ps.shape(batch_shape)[0]
-    rest_tensor = ps.split(x_shape,
-                           [sample_batch_ndims, ps.rank(x)-sample_batch_ndims])
-    target_shape = ps.concat([sample_shape,
-                              batch_shape[:self._axis],
-                              [x_shape[self._axis + ps.shape(sample_shape)[0]]],
-                              batch_shape[self._axis+1:],
-                              rest_tensor[1]], axis=0)
+    sample_batch_ndims = ps.size(sample_shape) + ps.size(batch_shape)
+    _, x_event_shape = ps.split(
+        x_shape, [sample_batch_ndims,
+                  ps.rank(x) - sample_batch_ndims])
+    target_shape = ps.concat([
+        sample_shape, batch_shape[:self._axis],
+        [x_shape[self._axis + ps.size(sample_shape)]],
+        batch_shape[self._axis + 1:], x_event_shape
+    ],
+                             axis=0)
     return tf.broadcast_to(x, target_shape)
 
   def _calculate_batch_shape(self):
@@ -220,9 +223,9 @@ class _BatchConcat(distribution_lib.Distribution):
 
   def _split_sample(self, x):
     result_batch_shape = self._calculate_batch_shape()
-    sample_shape_size = (ps.rank(x)
-                         - ps.shape(result_batch_shape)[0]
-                         - ps.rank(self.event_shape))
+    sample_shape_size = (ps.rank(x) -
+                         ps.size(result_batch_shape) -
+                         ps.size(self.event_shape_tensor()))
     all_batch_shapes = [d.batch_shape.as_list()
                         if tensorshape_util.is_fully_defined(d.batch_shape)
                         else d.batch_shape_tensor() for d in self.distributions]
@@ -497,7 +500,7 @@ class BatchConcat(
       else:
         distributions = kwargs.get('distributions')
 
-      if not all(isinstance(d, tf.__internal__.CompositeTensor)
+      if not all(auto_composite_tensor.is_composite_tensor(d)
                  for d in distributions):
         return _BatchConcat(*args, **kwargs)
     return super(BatchConcat, cls).__new__(cls)

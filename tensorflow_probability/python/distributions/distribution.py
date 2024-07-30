@@ -812,9 +812,13 @@ class Distribution(_BaseDistribution):
           '{} does not support batch slicing; must implement '
           '_parameter_properties.'.format(type(self)))
     params_event_ndims = {}
+
+    from tensorflow_probability.python.internal import parameter_properties  # pylint: disable=g-import-not-at-top
     for (k, param) in properties.items():
       ndims = param.instance_event_ndims(self)
-      if param.is_tensor and ndims is not None:
+      if param.is_tensor and (
+          ndims is not parameter_properties.NO_EVENT_NDIMS and
+          ndims is not None):
         params_event_ndims[k] = ndims
     return params_event_ndims
 
@@ -1180,7 +1184,7 @@ class Distribution(_BaseDistribution):
     samples = tf.nest.map_structure(
         lambda x: tf.reshape(x, ps.concat([sample_shape, ps.shape(x)[1:]], 0)),
         samples)
-    return self._set_sample_static_shape(samples, sample_shape)
+    return self._set_sample_static_shape(samples, sample_shape, **kwargs)
 
   def sample(self, sample_shape=(), seed=None, name='sample', **kwargs):
     """Generate samples of the specified shape.
@@ -1894,7 +1898,7 @@ class Distribution(_BaseDistribution):
     log_prob = self.log_prob(value, **kwargs)
     tangent_space = None
     if hasattr(self, '_experimental_tangent_space'):
-      tangent_space = self._experimental_tangent_space
+      tangent_space = self._experimental_tangent_space(value)
     elif backward_compat:
       # Import here rather than top-level to avoid circular import.
       # pylint: disable=g-import-not-at-top
@@ -1982,7 +1986,7 @@ class Distribution(_BaseDistribution):
     x = distribution_util.expand_to_vector(x, tensor_name=name)
     return x, prod
 
-  def _set_sample_static_shape(self, x, sample_shape):
+  def _set_sample_static_shape(self, x, sample_shape, **kwargs):
     """Helper to `sample`; sets static shape info."""
     batch_shape = self.batch_shape
     if (tf.nest.is_nested(self.dtype)
@@ -2122,8 +2126,8 @@ class DiscreteDistributionMixin(object):
   ```
   """
 
-  @property
-  def _experimental_tangent_space(self):
+  def _experimental_tangent_space(self, x):
+    del x
     from tensorflow_probability.python.experimental import tangent_spaces  # pylint: disable=g-import-not-at-top
     return tangent_spaces.ZeroSpace()
 

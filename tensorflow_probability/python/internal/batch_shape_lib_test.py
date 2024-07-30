@@ -18,6 +18,7 @@
 
 from absl import logging
 from absl.testing import parameterized
+import mock
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
@@ -34,7 +35,6 @@ from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.platform import test as tf_test  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -188,11 +188,11 @@ class BatchShapeInferenceTests(test_util.TestCase):
 class ParametersAsKwargsTest(test_util.TestCase):
   # This doesn't really deserve to be a separate test class, but is split
   # out from BatchShapeInferenceTests because the `test_graph_and_eager_modes`
-  # decorator interacts poorly with the `tf_test.mock.patch.object` decorator.
+  # decorator interacts poorly with the `mock.patch.object` decorator.
 
   @test_util.numpy_disable_test_missing_functionality('tf_logging')
   @test_util.jax_disable_test_missing_functionality('tf_logging')
-  @tf_test.mock.patch.object(logging, 'warning', autospec=True)
+  @mock.patch.object(logging, 'warning', autospec=True)
   def test_parameters_as_kwargs(self, mock_warning):
     dist = normal.Normal(loc=tf.zeros([2]), scale=tf.ones([5, 1]))
     self.assertAllEqual(

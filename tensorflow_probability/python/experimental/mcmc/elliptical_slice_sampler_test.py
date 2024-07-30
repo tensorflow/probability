@@ -18,6 +18,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.experimental.mcmc import elliptical_slice_sampler
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.mcmc import sample
 
@@ -115,10 +116,10 @@ class _EllipticalSliceSamplerTest(test_util.TestCase):
 
     self.assertAllClose(samples0_[::2], samples1_, atol=1e-5, rtol=1e-5)
 
+  @test_util.numpy_disable_gradient_test('too slow')
   def testNormalNormalSampleMultipleDatapoints(self):
     if not tf.executing_eagerly():
       self.skipTest('This test runs only in eager mode to reduce test weight.')
-    tf.compat.v1.enable_control_flow_v2()
 
     # Two independent chains, of states of shape [3].
     prior_stddev = self.dtype(np.exp(np.random.rand(2, 3)))
@@ -162,6 +163,33 @@ class _EllipticalSliceSamplerTest(test_util.TestCase):
     # Computed exactly from the formula in normal-normal posterior.
     self.assertAllClose(posterior_mean, mean, rtol=2e-2, atol=6e-2)
     self.assertAllClose(posterior_variance, variance, rtol=5e-1)
+
+  def testTupleShapes(self):
+
+    def normal_sampler(seed):
+      shapes = [(8, 31, 3), (8,)]
+      seeds = samplers.split_seed(seed, len(shapes))
+      return tuple(
+          normal.Normal(0, 1).sample(shp, seed=seed)
+          for shp, seed in zip(shapes, seeds))
+    params = normal_sampler(test_util.test_seed())
+
+    def normal_log_likelihood(p0, p1):
+      return (tf.reduce_sum(normal.Normal(0, 1).log_prob(p0), axis=(-1, -2)) +
+              normal.Normal(0, 1).log_prob(p1))
+
+    kernel = elliptical_slice_sampler.EllipticalSliceSampler(
+        normal_sampler_fn=normal_sampler,
+        log_likelihood_fn=normal_log_likelihood,
+    )
+    samples = tf.function(sample.sample_chain)(
+        num_results=3,
+        current_state=params,
+        kernel=kernel,
+        num_burnin_steps=int(4),
+        seed=test_util.test_seed(),
+        trace_fn=None)
+    self.evaluate(samples)
 
 
 class EllipticalSliceSamplerTestFloat32(_EllipticalSliceSamplerTest):

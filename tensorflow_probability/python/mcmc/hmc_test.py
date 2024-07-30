@@ -40,6 +40,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import tf_keras
 from tensorflow_probability.python.math import generic
 from tensorflow_probability.python.mcmc import hmc
 from tensorflow_probability.python.mcmc import sample as sample_lib
@@ -973,7 +974,7 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
   def make_weights_prior(self, dims, sigma):
     return mvn_diag.MultivariateNormalDiag(
         loc=tf.zeros([dims], dtype=sigma.dtype),
-        scale_identity_multiplier=sigma)
+        scale_diag=sigma * tf.ones([dims], dtype=sigma.dtype))
 
   def make_response_likelihood(self, w, x):
     if tensorshape_util.rank(w.shape) == 1:
@@ -986,7 +987,7 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
   def test_mcem_converges(self):
     # Setup assumptions.
     dtype = np.float32
-    num_samples = 500
+    num_samples = 300
     dims = 10
 
     weights_prior_true_scale = np.array(0.3, dtype)
@@ -997,7 +998,7 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
     sigma = deferred_tensor.TransformedVariable(
         name='sigma', initial_value=np.array(1, dtype), bijector=exp.Exp())
 
-    optimizer = tf.optimizers.SGD(learning_rate=0.01)
+    optimizer = tf_keras.optimizers.SGD(learning_rate=0.01)
 
     # TODO(b/144045420): eliminate the need for this tf.function decorator. The
     # reason it was added was that the test code is written to work in both
@@ -1013,9 +1014,9 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
         tf.TensorSpec(shape=[], dtype=tf.float32),
     ])
     def mcem_iter(weights_chain_start, step_size):
-      prior = self.make_weights_prior(dims, sigma)
 
       def unnormalized_posterior_log_prob(w):
+        prior = self.make_weights_prior(dims, sigma)
         likelihood = self.make_response_likelihood(w, x)
         return (prior.log_prob(w) +
                 tf.reduce_sum(likelihood.log_prob(y), axis=-1))  # [m]
@@ -1158,18 +1159,12 @@ class ReproducibleFromSeedTest(test_util.TestCase):
         k.target_log_prob_fn(states[n - 1]),
         tr_nm1.accepted_results.target_log_prob)
 
-    def compare_fn(x, y):
-      # TODO(b/223267515): PRNGKeyArrays have no dtype.
-      if hasattr(x, 'dtype'):
-        self.assertAllClose(x, y)
-      else:
-        self.assertSeedsEqual(x, y)
-
     # Rerun the kernel with the seed that it reported it used
-    state, kr = k.one_step(states[n - 1], tr_nm1, seed=tr_n.seed)
+    state, kr = k.one_step(
+        states[n - 1], tr_nm1, seed=test_util.clone_seed(tr_n.seed))
     # Check that the results are the same
     self.assertAllClose(state, states[n])
-    self.assertAllAssertsNested(compare_fn, kr, tr_n)
+    self.assertAllClose(kr, tr_n)
 
 
 @test_util.test_all_tf_execution_regimes

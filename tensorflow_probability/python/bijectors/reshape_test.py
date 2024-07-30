@@ -212,7 +212,7 @@ class ReshapeBijectorTestStatic(test_util.TestCase, _ReshapeBijectorTest):
     return shape_in, shape_out
 
   def assertRaisesError(self, msg):
-    return self.assertRaisesRegexp(Exception, msg)
+    return self.assertRaisesRegex(Exception, msg)
 
   def testEventShape(self):
     shape_in_static = tf.TensorShape([2, 3])
@@ -348,7 +348,7 @@ class ReshapeBijectorTestDynamic(test_util.TestCase, _ReshapeBijectorTest):
 
   def assertRaisesError(self, msg):
     if tf.executing_eagerly():
-      return self.assertRaisesRegexp(Exception, msg)
+      return self.assertRaisesRegex(Exception, msg)
     return self.assertRaisesOpError(msg)
 
   def testEventShape(self):
@@ -405,12 +405,12 @@ class ReshapeBijectorTestDynamic(test_util.TestCase, _ReshapeBijectorTest):
     unknown_shape = tf1.placeholder_with_default([2, 2], shape=None)
     known_shape = [2, 2]
 
-    with self.assertRaisesRegexp(NotImplementedError,
-                                 'must be statically known.'):
+    with self.assertRaisesRegex(NotImplementedError,
+                                'must be statically known.'):
       reshape.Reshape(event_shape_out=unknown_shape)
 
-    with self.assertRaisesRegexp(NotImplementedError,
-                                 'must be statically known.'):
+    with self.assertRaisesRegex(NotImplementedError,
+                                'must be statically known.'):
       reshape.Reshape(event_shape_out=known_shape, event_shape_in=unknown_shape)
 
   def testScalarInVectorOut(self):

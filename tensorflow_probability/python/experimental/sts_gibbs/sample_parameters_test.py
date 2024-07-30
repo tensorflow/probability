@@ -20,7 +20,6 @@ from tensorflow_probability.python.bijectors import square
 from tensorflow_probability.python.distributions import inverse_gamma
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.experimental.sts_gibbs import sample_parameters
-from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 
 
@@ -29,8 +28,9 @@ class NormalScalePosteriorInverseGammaConjugate(test_util.TestCase):
 
   def testNoObservations(self):
     distribution = inverse_gamma.InverseGamma(16., 4.)
-    posterior_distribution = sample_parameters.normal_scale_posterior_inverse_gamma_conjugate(
-        distribution, observations=tf.constant([], dtype=tf.float32))
+    posterior_distribution = (
+        sample_parameters.normal_scale_posterior_inverse_gamma_conjugate(
+            distribution, observations=tf.constant([], dtype=tf.float32)))
     self.assertIsInstance(posterior_distribution,
                           transformed_distribution.TransformedDistribution)
     self.assertIsInstance(posterior_distribution.bijector, invert.Invert)
@@ -48,8 +48,9 @@ class NormalScalePosteriorInverseGammaConjugate(test_util.TestCase):
     scale = 4.
     distribution = inverse_gamma.InverseGamma(
         concentration=concentration, scale=scale)
-    posterior_distribution = sample_parameters.normal_scale_posterior_inverse_gamma_conjugate(
-        distribution, observations=tf.constant([10.]))
+    posterior_distribution = (
+        sample_parameters.normal_scale_posterior_inverse_gamma_conjugate(
+            distribution, observations=tf.constant([10.])))
     self.assertAllEqual(
         concentration + 0.5,  # Add half the number of observations
         posterior_distribution.distribution.concentration)
@@ -62,8 +63,9 @@ class NormalScalePosteriorInverseGammaConjugate(test_util.TestCase):
     scale = 4.
     distribution = inverse_gamma.InverseGamma(
         concentration=concentration, scale=scale)
-    posterior_distribution = sample_parameters.normal_scale_posterior_inverse_gamma_conjugate(
-        distribution, observations=tf.constant([10., 4.]))
+    posterior_distribution = (
+        sample_parameters.normal_scale_posterior_inverse_gamma_conjugate(
+            distribution, observations=tf.constant([10., 4.])))
     self.assertAllEqual(
         concentration + 1,  # Add half the number of observations
         posterior_distribution.distribution.concentration)
@@ -74,16 +76,18 @@ class NormalScalePosteriorInverseGammaConjugate(test_util.TestCase):
   def testUpperBoundPropagatedFromPrior(self):
     # If no upper bound is provided, expect there to be none.
     distribution = inverse_gamma.InverseGamma(16., 4.)
-    posterior_distribution = sample_parameters.normal_scale_posterior_inverse_gamma_conjugate(
-        distribution, observations=tf.constant([], dtype=tf.float32))
+    posterior_distribution = (
+        sample_parameters.normal_scale_posterior_inverse_gamma_conjugate(
+            distribution, observations=tf.constant([], dtype=tf.float32)))
     self.assertFalse(hasattr(posterior_distribution, 'upper_bound'))
     self.assertFalse(
         hasattr(posterior_distribution.distribution, 'upper_bound'))
 
     distribution = inverse_gamma.InverseGamma(16., 4.)
     distribution.upper_bound = 16.
-    posterior_distribution = sample_parameters.normal_scale_posterior_inverse_gamma_conjugate(
-        distribution, observations=tf.constant([], dtype=tf.float32))
+    posterior_distribution = (
+        sample_parameters.normal_scale_posterior_inverse_gamma_conjugate(
+            distribution, observations=tf.constant([], dtype=tf.float32)))
     self.assertAllEqual(posterior_distribution.distribution.upper_bound, 16.)
     self.assertAllEqual(
         posterior_distribution.upper_bound,
@@ -97,7 +101,7 @@ class SampleWithOptionalUpperBoundTest(test_util.TestCase):
 
   def testBasic(self):
     distribution = inverse_gamma.InverseGamma(16., 4.)
-    seed = samplers.sanitize_seed((0, 1))
+    seed = test_util.test_seed()
     unbounded_result = sample_parameters.sample_with_optional_upper_bound(
         distribution, seed=seed)
     # Whatever the result, we want to get that value again minus a fixed offset.

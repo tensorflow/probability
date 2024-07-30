@@ -14,7 +14,10 @@
 # ============================================================================
 # Ground truth computation.
 
+# Placeholder: py_binary
+
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
         "//inference_gym:__subpackages__",

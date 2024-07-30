@@ -200,7 +200,7 @@ class TrainableLinearOperators(test_util.TestCase):
 
     operators = (tf.linalg.LinearOperatorIdentity(2),
                  tf.linalg.LinearOperatorDiag)
-    with self.assertRaisesRegexp(ValueError, '`block_dims` must be defined'):
+    with self.assertRaisesRegex(ValueError, '`block_dims` must be defined'):
       trainable_linear_operators.build_trainable_linear_operator_block(
           operators)
 

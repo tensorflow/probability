@@ -28,7 +28,9 @@ __all__ = [
 ]
 
 
-class GeneralizedExtremeValueCDF(bijector.AutoCompositeTensorBijector):
+class GeneralizedExtremeValueCDF(
+    bijector.CoordinatewiseBijectorMixin,
+    bijector.AutoCompositeTensorBijector):
   """Compute the GeneralizedExtremeValue CDF.
 
   Compute `Y = g(X) = exp(-t(X))`,

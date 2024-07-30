@@ -86,9 +86,10 @@ class Autoregressive(distribution.Distribution):
   def _normal_fn(event_size):
     n = event_size * (event_size + 1) // 2
     p = tf.Variable(tfd.Normal(loc=0., scale=1.).sample(n))
-    affine = tfb.FillScaleTriL(tfp.math.fill_triangular(0.25 * p))
+    ar_matrix = tf.linalg.set_diag(tfp.math.fill_triangular(0.25 * p),
+        tf.zeros(event_size))
     def _fn(samples):
-      scale = tf.exp(affine(samples))
+      scale = tf.exp(tf.linalg.matvec(ar_matrix, samples))
       return tfd.Independent(
           tfd.Normal(loc=0., scale=scale, validate_args=True),
           reinterpreted_batch_ndims=1)
@@ -291,14 +292,24 @@ class Autoregressive(distribution.Distribution):
 
     seed = stateful_seed if is_stateful_sampler else stateless_seed
 
+    # This runs for 1 more step than strictly necessary because there is no
+    # guarantee that the samples produced by the sample(n) above is the same as
+    # batched sample() below.
     if num_steps_static is not None:
       for _ in range(num_steps_static):
         # pylint: disable=not-callable
-        samples = self.distribution_fn(samples).sample(seed=seed)
+        samples = self.distribution_fn(samples).sample(
+            seed=samplers.clone_seed(seed)
+        )
     else:
       # pylint: disable=not-callable
-      samples = tf.foldl(lambda s, _: self.distribution_fn(s).sample(seed=seed),
-                         elems=tf.range(0, num_steps), initializer=samples)
+      samples = tf.foldl(
+          lambda s, _: self.distribution_fn(s).sample(
+              seed=samplers.clone_seed(seed)
+          ),
+          elems=tf.range(0, num_steps),
+          initializer=samples,
+      )
     return samples
 
   def _log_prob(self, value):

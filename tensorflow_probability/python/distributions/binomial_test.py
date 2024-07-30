@@ -37,7 +37,7 @@ class BinomialTest(test_util.TestCase):
         ValueError, 'Construct `Binomial` with `probs` or `logits`'):
       self.evaluate(binomial_lib.Binomial(total_count=10))
 
-    with self.assertRaisesRegexp(ValueError, 'but not both'):
+    with self.assertRaisesRegex(ValueError, 'but not both'):
       self.evaluate(binomial_lib.Binomial(total_count=10, probs=0.5, logits=0.))
 
   def testInvalidProbabilities(self):

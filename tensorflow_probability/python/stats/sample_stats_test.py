@@ -396,7 +396,7 @@ class CovarianceTest(test_util.TestCase):
     x = rng.randn(100, 3, 2)
     y = x + 0.1 * rng.randn(100, 3, 2)
 
-    with self.assertRaisesRegexp(ValueError, 'must be contiguous'):
+    with self.assertRaisesRegex(ValueError, 'must be contiguous'):
       sample_stats.covariance(x, y, sample_axis=1, event_axis=[0, 2])
 
   def test_overlapping_axis_raises(self):
@@ -405,7 +405,7 @@ class CovarianceTest(test_util.TestCase):
     x = rng.randn(100, 3, 2)
     y = x + 0.1 * rng.randn(100, 3, 2)
 
-    with self.assertRaisesRegexp(ValueError, 'overlapped'):
+    with self.assertRaisesRegex(ValueError, 'overlapped'):
       sample_stats.covariance(x, y, sample_axis=[0, 1], event_axis=[1, 2])
 
   def test_batch_vector_shape_dtype_ok(self):
@@ -701,7 +701,7 @@ class LogAverageProbsTest(test_util.TestCase):
 
   def test_bad_axis_static(self):
     logits = tf.random.normal([10, 3, 4], seed=test_util.test_seed())
-    with self.assertRaisesRegexp(ValueError, r'.*must be distinct.'):
+    with self.assertRaisesRegex(ValueError, r'.*must be distinct.'):
       sample_stats.log_average_probs(
           logits, sample_axis=[0, 1, 2], event_axis=-1, validate_args=True)
 

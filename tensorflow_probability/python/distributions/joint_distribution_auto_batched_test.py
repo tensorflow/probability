@@ -25,6 +25,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.bijectors import exp
 from tensorflow_probability.python.bijectors import softplus
 from tensorflow_probability.python.distributions import bernoulli
@@ -97,8 +98,8 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
 
     # Properties `event_shape` and `batch_shape` should be defined
     # even before any sampling calls have occurred.
-    self.assertAllEqual(joint._model_flatten(joint.event_shape),
-                        [[], [], [20], [20]])
+    self.assertAllEqualNested(joint._model_flatten(joint.event_shape),
+                              [[], [], [20], [20]])
     self.assertAllEqual(joint.batch_shape, [])
 
     is_scalar = joint._model_flatten(joint.is_scalar_event())
@@ -177,8 +178,8 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
 
     joint = jd_class(models[jd_class], batch_ndims=1, validate_args=True)
 
-    self.assertAllEqual(joint._model_flatten(joint.event_shape),
-                        [[], [], [20], [20]])
+    self.assertAllEqualNested(joint._model_flatten(joint.event_shape),
+                              [[], [], [20], [20]])
     self.assertAllEqual(joint.batch_shape, [2])
 
     is_scalar = joint._model_flatten(joint.is_scalar_event())
@@ -287,7 +288,7 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     # This model's broadcasting behavior is a footgun (it can break inference
     # routines and cause silently incorrect optimization); it should be
     # disallowed by `validate_args`.
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         Exception,
         ('Component batch shapes are inconsistent|'
          'Broadcasting probably indicates an error in model specification')):
@@ -300,7 +301,7 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     # performance wins when evaluating a shared value over multiple models.
     jda_broadcasting = jda_class(jd_auto_models[jda_class], batch_ndims=1)
 
-    self.assertAllEqual(
+    self.assertAllEqualNested(
         jda_broadcasting._model_flatten(jda_broadcasting.event_shape),
         [[], []])
     self.assertAllEqual(jda_broadcasting.batch_shape, [5])
@@ -520,7 +521,8 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
   def test_sample_distributions_not_composite_tensor_raises_error(self):
     def coroutine_model():
       yield transformed_distribution.TransformedDistribution(
-          normal.Normal(0., 1.), test_util.NonCompositeTensorExp(), name='td')
+          normal.Normal(0., 1.), bijector_test_util.NonCompositeTensorExp(),
+          name='td')
 
     joint = jdab.JointDistributionCoroutineAutoBatched(coroutine_model)
 

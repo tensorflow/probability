@@ -252,6 +252,51 @@ class HagerZhangLibTest(test_util.TestCase):
     self.assertLess(result.left.df, 0)  # Opposite slopes.
     self.assertGreaterEqual(result.right.df, 0)
 
+  def test_bracket_accepts_interval_zero_derivative(self):
+    """Tests that bracketing accepts f' = 0 for the right endpoint."""
+    wolfe_threshold = 1e-6
+
+    # This example is taken from the unconstrained beale function.
+    def beale(z):
+      # Constrain to [-4.5, 4.5]
+      z = 4.5 * tf.math.sigmoid(z) - 4.5 * tf.math.sigmoid(-z)
+      x = z[..., 0]
+      y = z[..., 1]
+      return ((1.5 - x + x * y)**2 +
+              (2.25 - x + x * y**2)**2 +
+              (2.625 - x + x * y**3)**2)
+
+    def beale_ls(t):
+      t = tf.convert_to_tensor(t, dtype=tf.float32)
+      def _internal_ls(t):
+        # Choose an initial point and step such that the step goes out towards
+        # infinity. In that way, we guarantee the gradients are zero at the
+        # step but aren't a suitable minima as the function increases away
+        # from the point (3., 0.5).
+        x = np.array([0.6, 1.35]).astype(np.float32)
+        # Large step that pushes the function to a flat region of space.
+        p = np.array([-100., -100.]).astype(np.float32)
+        return beale(x + t * p)
+      f, df = value_and_gradient(_internal_ls, t)
+      return ValueAndGradient(x=t, f=tf.squeeze(f), df=tf.squeeze(df))
+
+    val_a = beale_ls(0.0)  # Value at zero.
+    val_b = beale_ls(1.0)  # Value at initial step.
+    f_lim = val_a.f + (wolfe_threshold * tf.abs(val_a.f))
+
+    result = self.evaluate(
+        hzl.bracket(beale_ls, _interval(val_a, val_b), f_lim, max_iterations=5))
+
+    # The left endpoint has negative derivative, the right has zero derivative.
+    # This should be a valid interval a priori.
+    self.assertFalse(result.failed)
+    self.assertEqual(result.iteration, 0)  # Zero expansion.
+    self.assertEqual(result.num_evals, 0)  # Zero evaluations.
+    self.assertEqual(result.left.x, 0.)
+    self.assertEqual(result.right.x, 1.)
+    self.assertLess(result.left.df, 0)  # Opposite slopes.
+    self.assertGreaterEqual(result.right.df, 0)
+
   def test_bracket_batching(self):
     """Tests that bracketing works in batching mode."""
     wolfe_threshold = 1e-6

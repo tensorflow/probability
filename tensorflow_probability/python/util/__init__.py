@@ -15,6 +15,7 @@
 """TensorFlow Probability python utilities."""
 
 from tensorflow_probability.python.internal import all_util
+from tensorflow_probability.python.internal.parameter_properties import BatchedComponentProperties
 from tensorflow_probability.python.internal.parameter_properties import ParameterProperties
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 from tensorflow_probability.python.util.deferred_tensor import TransformedVariable
@@ -22,6 +23,7 @@ from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 _allowed_symbols = [
+    'BatchedComponentProperties',
     'DeferredTensor',
     'ParameterProperties',
     'TransformedVariable',

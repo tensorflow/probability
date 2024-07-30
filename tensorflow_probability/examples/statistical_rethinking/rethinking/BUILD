@@ -15,7 +15,11 @@
 # Description:
 #   Functions and boilerplate for the Statistical Rethinking notebooks
 
+# Placeholder: py_library
+# Placeholder: py_test
+
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability/examples:__subpackages__",
     ],

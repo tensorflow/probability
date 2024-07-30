@@ -15,7 +15,11 @@
 # Description:
 #   TensorFlow Probability layers.
 
+# Placeholder: py_library
+# Placeholder: py_test
+
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -50,6 +54,7 @@ py_library(
         "//tensorflow_probability/python/distributions:kullback_leibler",
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:docstring_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/random",
         "//tensorflow_probability/python/util:seed_stream",
     ],
@@ -59,12 +64,18 @@ py_test(
     name = "conv_variational_test",
     size = "medium",
     srcs = ["conv_variational_test.py"],
+    shard_count = 2,
     deps = [
-        # keras/testing_infra:test_utils dep,
+        ":conv_variational",
+        ":util",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
+        "//tensorflow_probability/python/random:random_ops",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -80,6 +91,7 @@ py_library(
         "//tensorflow_probability/python/distributions:kullback_leibler",
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:docstring_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/random",
         "//tensorflow_probability/python/util",
     ],
@@ -90,11 +102,15 @@ py_test(
     size = "medium",
     srcs = ["dense_variational_test.py"],
     deps = [
-        # keras/testing_infra:test_utils dep,
+        ":dense_variational",
+        ":util",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -106,6 +122,7 @@ py_library(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:kullback_leibler",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )
@@ -115,10 +132,16 @@ py_test(
     size = "small",
     srcs = ["dense_variational_v2_test.py"],
     deps = [
+        ":dense_variational_v2",
+        ":distribution_layer",
+        ":variable_input",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 
@@ -143,6 +166,7 @@ py_library(
         "//tensorflow_probability/python/distributions:poisson",
         "//tensorflow_probability/python/distributions:transformed_distribution",
         "//tensorflow_probability/python/distributions:variational_gaussian_process",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/layers/internal",
     ],
 )
@@ -153,11 +177,31 @@ py_test(
     srcs = ["distribution_layer_test.py"],
     shard_count = 5,
     deps = [
+        ":distribution_layer",
+        ":variable_input",
         # numpy dep,
         # six dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/bijectors:exp",
+        "//tensorflow_probability/python/bijectors:fill_scale_tril",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/distributions:bernoulli",
+        "//tensorflow_probability/python/distributions:categorical",
+        "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:kullback_leibler",
+        "//tensorflow_probability/python/distributions:logistic",
+        "//tensorflow_probability/python/distributions:mixture_same_family",
+        "//tensorflow_probability/python/distributions:mvn_diag",
+        "//tensorflow_probability/python/distributions:mvn_tril",
+        "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/distributions:poisson",
+        "//tensorflow_probability/python/distributions:uniform",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
+        "//tensorflow_probability/python/math:generic",
+        "//tensorflow_probability/python/math/psd_kernels:exponentiated_quadratic",
+        "//tensorflow_probability/python/util:deferred_tensor",
     ],
 )
 
@@ -168,6 +212,7 @@ py_library(
     ],
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 
@@ -176,9 +221,9 @@ py_test(
     size = "small",
     srcs = ["initializers_test.py"],
     deps = [
-        # tensorflow dep,
-        "//tensorflow_probability",
+        ":initializers",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 
@@ -189,6 +234,7 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:masked_autoregressive",
         "//tensorflow_probability/python/distributions:transformed_distribution",
+        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 
@@ -197,10 +243,14 @@ py_test(
     size = "small",
     srcs = ["masked_autoregressive_test.py"],
     deps = [
+        ":distribution_layer",
+        ":masked_autoregressive",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/bijectors:masked_autoregressive",
+        "//tensorflow_probability/python/distributions:mvn_diag",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 
@@ -215,6 +265,8 @@ py_library(
         "//tensorflow_probability/python/distributions:deterministic",
         "//tensorflow_probability/python/distributions:independent",
         "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/internal:tf_keras",
+        "//tensorflow_probability/python/util",
     ],
 )
 
@@ -225,6 +277,7 @@ py_library(
     ],
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 
@@ -233,9 +286,13 @@ py_test(
     size = "small",
     srcs = ["variable_input_test.py"],
     deps = [
+        ":distribution_layer",
+        ":variable_input",
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 
@@ -246,6 +303,7 @@ py_library(
     ],
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 
@@ -258,6 +316,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/layers:weight_norm",
     ],
 )

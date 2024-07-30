@@ -22,7 +22,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
-from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import generic
 
 
 __all__ = [
@@ -501,7 +501,7 @@ def _betainc_bwd(aux, g):
   """Reverse mode impl for betainc."""
   a, b, x = aux
   pa, pb, px = _betainc_partials(a, b, x)
-  return _fix_gradient_for_broadcasting(
+  return generic.fix_gradient_for_broadcasting(
       [a, b, x], [pa * g, pb * g, px * g])
 
 
@@ -824,7 +824,7 @@ def _betaincinv_bwd(aux, g):
   a, b, y = aux
   # pylint: disable=unbalanced-tuple-unpacking
   pa, pb, py = _betaincinv_partials(a, b, y)
-  return _fix_gradient_for_broadcasting(
+  return generic.fix_gradient_for_broadcasting(
       [a, b, y], [pa * g, pb * g, py * g])
 
 
@@ -1520,7 +1520,7 @@ def _igammainv_bwd(aux, g):
   x = _igammainv_custom_gradient(a, p)
   # Use the fact that igamma and igammainv are inverses to compute the gradient.
   pa, pp = _igammainv_partials(a, x)
-  return _fix_gradient_for_broadcasting([a, p], [pa * g, pp * g])
+  return generic.fix_gradient_for_broadcasting([a, p], [pa * g, pp * g])
 
 
 def _igammainv_jvp(primals, tangents):
@@ -1585,7 +1585,7 @@ def _igammacinv_bwd(aux, g):
   x = _igammacinv_custom_gradient(a, p)
   pa, pp = _igammainv_partials(a, x)
   pp = -pp
-  return _fix_gradient_for_broadcasting([a, p], [pa * g, pp * g])
+  return generic.fix_gradient_for_broadcasting([a, p], [pa * g, pp * g])
 
 
 def _igammacinv_jvp(primals, tangents):
@@ -1895,35 +1895,12 @@ def log_gamma_correction(x, name=None):
         -0.165322962780713e-02,
     ], dtype=dtype)
 
-    inverse_x = 1 / x
+    inverse_x = tf.math.reciprocal(x)
     inverse_x_squared = inverse_x * inverse_x
     accum = minimax_coeff[5]
     for i in reversed(range(5)):
       accum = accum * inverse_x_squared + minimax_coeff[i]
     return accum * inverse_x
-
-
-def _fix_gradient_for_broadcasting(primals, grads):
-  """Ensure `grads` have same shape as `primals`."""
-  if len(primals) != len(grads):
-    raise ValueError('Expected same number of `x` and `grads`')
-  if (all(tensorshape_util.is_fully_defined(x.shape) for x in primals) and
-      all(x.shape == primals[0].shape for x in primals)):
-    return grads
-  # Compute the leave one out broadcast shapes, and use that to compute
-  # the axes.
-  new_grads = []
-  primal_shapes = [tf.shape(x) for x in primals]
-  for i in range(len(primals)):
-    loo_primal_shapes = primal_shapes[:i] + primal_shapes[i+1:]
-    x_shape = tf.shape(primals[i])
-    loo_broadcast_shape = functools.reduce(
-        tf.broadcast_dynamic_shape, loo_primal_shapes)
-    rx, _ = tf.raw_ops.BroadcastGradientArgs(
-        s0=x_shape, s1=loo_broadcast_shape)
-    new_grads.append(
-        tf.reshape(tf.reduce_sum(grads[i], axis=rx), shape=x_shape))
-  return new_grads
 
 
 def _log_gamma_difference_big_y(x, y):
@@ -1946,7 +1923,12 @@ def _log_gamma_difference_big_y(x, y):
     lgamma_diff: Floating-point Tensor, the difference lgamma(y) - lgamma(x+y),
       computed elementwise.
   """
-  cancelled_stirling = (-1 * (x + y - 0.5) * tf.math.log1p(x / y)
+  dtype = dtype_util.common_dtype([x, y], tf.float32)
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  half = numpy_dtype(0.5)
+  one = numpy_dtype(1.)
+
+  cancelled_stirling = (-one * (x + y - half) * tf.math.log1p(x / y)
                         - x * tf.math.log(y) + x)
   correction = log_gamma_correction(y) - log_gamma_correction(x + y)
   return correction + cancelled_stirling
@@ -1977,7 +1959,7 @@ def _log_gamma_difference_bwd(aux, g):
   # `_log_gamma_difference`.
   px = -tf.math.digamma(x + y)
   py = tf.math.digamma(y) + px
-  return _fix_gradient_for_broadcasting([x, y], [px * g, py * g])
+  return generic.fix_gradient_for_broadcasting([x, y], [px * g, py * g])
 
 
 def _log_gamma_difference_jvp(primals, tangents):
@@ -2034,16 +2016,20 @@ def _lbeta_naive_gradient(x, y):
   """Computes log(Beta(x, y)) with autodiff gradients only."""
   # Flip args if needed so y >= x.  Beta is mathematically symmetric but our
   # method for computing it is not.
+  dtype = dtype_util.common_dtype([x, y], tf.float32)
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  half = numpy_dtype(0.5)
+
   x, y = tf.minimum(x, y), tf.maximum(x, y)
 
   log2pi = tf.constant(np.log(2 * np.pi), dtype=x.dtype)
   # Two large arguments case: y >= x >= 8.
-  log_beta_two_large = (0.5 * log2pi
-                        - 0.5 * tf.math.log(y)
+  log_beta_two_large = (half * log2pi
+                        - half * tf.math.log(y)
                         + log_gamma_correction(x)
                         + log_gamma_correction(y)
                         - log_gamma_correction(x + y)
-                        + (x - 0.5) * tf.math.log(x / (x + y))
+                        + (x - half) * tf.math.log(x / (x + y))
                         - y * tf.math.log1p(x / y))
 
   # One large argument case: x < 8, y >= 8.
@@ -2077,7 +2063,7 @@ def _lbeta_bwd(aux, g):
   total_digamma = tf.math.digamma(x + y)
   px = tf.math.digamma(x) - total_digamma
   py = tf.math.digamma(y) - total_digamma
-  return _fix_gradient_for_broadcasting([x, y], [px * g, py * g])
+  return generic.fix_gradient_for_broadcasting([x, y], [px * g, py * g])
 
 
 def _lbeta_jvp(primals, tangents):
@@ -2573,7 +2559,7 @@ def _owens_t_bwd(aux, g):
         tf.math.erf(a * h / np.sqrt(2)) / (2 * np.sqrt(2 * np.pi)))
   pa = (tf.math.exp(-0.5 * (tf.math.square(a) + 1) * tf.math.square(h)) /
         (2 * np.pi * (tf.math.square(a) + 1.)))
-  return _fix_gradient_for_broadcasting([h, a], [ph * g, pa * g])
+  return generic.fix_gradient_for_broadcasting([h, a], [ph * g, pa * g])
 
 
 def _owens_t_jvp(primals, tangents):

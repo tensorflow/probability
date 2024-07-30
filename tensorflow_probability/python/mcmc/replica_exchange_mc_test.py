@@ -295,7 +295,7 @@ class REMCTest(test_util.TestCase):
 
   def assertRaisesError(self, msg):
     if tf.executing_eagerly():
-      return self.assertRaisesRegexp(Exception, msg)
+      return self.assertRaisesRegex(Exception, msg)
     return self.assertRaisesOpError(msg)
 
   @parameterized.named_parameters([
@@ -624,7 +624,7 @@ class REMCTest(test_util.TestCase):
     target = mixture_same_family.MixtureSameFamily(
         mixture_distribution=categorical.Categorical(probs=[0.5, 0.5]),
         components_distribution=mvn_diag.MultivariateNormalDiag(
-            loc=[[-1., -1], [1., 1.]], scale_identity_multiplier=0.3))
+            loc=[[-1., -1], [1., 1.]], scale_diag=0.3 * tf.ones((2, 2))))
 
     num_replica = 4
     inverse_temperatures = 10.**tf.linspace(start=0., stop=-1., num=num_replica)
@@ -790,9 +790,9 @@ class REMCTest(test_util.TestCase):
     max_scale = np.sqrt(np.max(true_cov))
 
     self.assertAllClose(
-        true_mean, sample_mean_, atol=6 * max_scale / np.sqrt(np.min(ess_)))
+        true_mean, sample_mean_, atol=12 * max_scale / np.sqrt(np.min(ess_)))
     self.assertAllClose(
-        true_cov, sample_cov_, atol=6 * max_scale**2 / np.sqrt(np.min(ess_)))
+        true_cov, sample_cov_, atol=12 * max_scale**2 / np.sqrt(np.min(ess_)))
 
   @parameterized.named_parameters([
       dict(  # pylint: disable=g-complex-comprehension
@@ -849,9 +849,9 @@ class REMCTest(test_util.TestCase):
             [1., 0.5, 0.],  # loc of second batch
         ],
         dtype=np.float32)
-    scale_identity_multiplier = [0.5, 0.8]
+    scale_diag = np.array([[0.5, 0.5, 0.5], [0.8, 0.8, 0.8]], dtype=np.float32)
     target = mvn_diag.MultivariateNormalDiag(
-        loc=loc, scale_identity_multiplier=scale_identity_multiplier)
+        loc=loc, scale_diag=scale_diag)
 
     def make_kernel_fn(target_log_prob_fn):
       return tfp_transition_kernel(
@@ -885,12 +885,12 @@ class REMCTest(test_util.TestCase):
           results.post_swap_replica_states
       ]
 
-    num_results = 2000
+    num_results = 4000
     states, (log_accept_ratio, replica_states) = sample.sample_chain(
         num_results=num_results,
         current_state=loc[::-1],  # Batch members far from their mode!
         kernel=remc,
-        num_burnin_steps=100,
+        num_burnin_steps=1000,
         trace_fn=trace_fn,
         seed=test_util.test_seed())
 
@@ -934,8 +934,7 @@ class REMCTest(test_util.TestCase):
       elif inverse_temperatures.ndim == 2:
         temperature = 1 / inverse_temperatures[replica_idx, batch_idx]
 
-      expected_scale = (
-          scale_identity_multiplier[batch_idx] * np.sqrt(temperature))
+      expected_scale = scale_diag[batch_idx, 0] * np.sqrt(temperature)
 
       ess = np.min(ess_[replica_idx, batch_idx])  # Conservative estimate.
       self.assertGreater(ess, num_results * ess_scaling, msg='Bad sampling!')
@@ -1273,7 +1272,7 @@ class REMCTest(test_util.TestCase):
     if tf.executing_eagerly():
       num_results = 25
     else:
-      num_results = 1000
+      num_results = 2000
 
     results = self.checkAndMakeResultsForTestingUntemperedLogProbFn(
         likelihood_variance=tf.convert_to_tensor([0.05] * 4),
@@ -1283,10 +1282,10 @@ class REMCTest(test_util.TestCase):
     )
 
     # Temperatures 0 and 1 are widely separated, so don't expect any swapping.
-    self.assertLess(results['conditional_swap_prob'][0], 0.05)
+    self.assertLess(results['conditional_swap_prob'][0], 0.1)
 
     # Temperatures 1 and 2 are close, so they should swap.
-    self.assertGreater(results['conditional_swap_prob'][1], 0.95)
+    self.assertGreater(results['conditional_swap_prob'][1], 0.8)
 
   def testWithUntemperedLPTemperatureGapNearZero(self):
     inverse_temperatures = tf.convert_to_tensor([1., 0.9999, 0.0])

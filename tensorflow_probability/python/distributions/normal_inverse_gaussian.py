@@ -37,11 +37,35 @@ __all__ = [
 
 
 def _log1px2(x):
+  """Safely compute log(1 + x ** 2).
+
+  For small x, use log1p(x ** 2). For large x(x >> 1), use 2 * log(x). Also
+  avoid nan grad using double-where for x ~= 0.
+
+  Args:
+    x: float `Tensor`.
+
+  Returns:
+    y: log(1 + x ** 2).
+  """
+  # The idea with this is to use 2 log(x) when x** 2 >> 1, so that adding 1
+  # doesn't matter. This happens when x >> 1 / sqrt(eps). But this causes
+  # grad problems for zero input:
+  #
+  # If x is zero, the log(1 + x**2) is log(1) = 0. But then 2 * log(x) is
+  # 2 * log(0) = 2 * -Inf, which causes problems. So for 0 input, we need a safe
+  # value for the negative case and use the double-where trick
+  # (see, eg, https://github.com/google/jax/issues/1052)
+  finfo = np.finfo(dtype_util.as_numpy_dtype(x.dtype))
+  is_basically_zero = tf.abs(x) < finfo.tiny
+  safe_x = tf.where(is_basically_zero, tf.ones_like(x), x)
   return tf.where(
-      tf.abs(x) * np.sqrt(np.finfo(
-          dtype_util.as_numpy_dtype(x.dtype)).eps) <= 1.,
-      tf.math.log1p(x**2.),
-      2 * tf.math.log(tf.math.abs(x)))
+      is_basically_zero,
+      tf.abs(x),
+      tf.where(
+          tf.abs(x) * np.sqrt(finfo.eps) <= 1.,
+          tf.math.log1p(safe_x**2.),
+          2 * tf.math.log(tf.math.abs(safe_x))))
 
 
 class NormalInverseGaussian(distribution.AutoCompositeTensorDistribution):

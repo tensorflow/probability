@@ -15,9 +15,13 @@
 # Description:
 #   Gibbs sampling for Bayesian structural time series models
 
+# Placeholder: py_library
+# Placeholder: py_test
+
 licenses(["notice"])
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -58,6 +62,7 @@ py_test(
     name = "anomaly_detection_test",
     size = "large",
     srcs = ["anomaly_detection_test.py"],
+    shard_count = 3,
     deps = [
         ":anomaly_detection",
         # absl/testing:parameterized dep,

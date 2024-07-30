@@ -26,19 +26,24 @@ import hypothesis as hp
 import hypothesis.extra.numpy as hnp
 import hypothesis.strategies as hps
 import mock
-import numpy as np  # Rewritten by script to import jax.numpy
-import numpy as onp  # pylint: disable=reimported
-import scipy.special as scipy_special
 import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
+
+# NOTE: As of Jan 4, 2022, TensorFlow must be imported before JAX to avoid
+# TensorFlow crashing when imported (when using tf-nightly).
+#
+# pylint: disable=g-bad-import-order
+import numpy as np  # Rewritten by script to import jax.numpy
+import numpy as onp  # pylint: disable=reimported
+import scipy.special as scipy_special
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.internal.backend import numpy as nptf
 from tensorflow_probability.python.internal.backend.numpy import functional_ops as np_pfor
-from tensorflow.python.ops import parallel_for as tf_pfor  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.ops.parallel_for import control_flow_ops as tf_pfor_control_flow_ops  # pylint: disable=g-direct-tensorflow-import
 
 
 # Allows us to test low-level TF:XLA match.
@@ -297,8 +302,9 @@ def matmul_compatible_pairs(draw,
                             elements=None):
   elements = elements or floats(dtype=dtype)
   x_strategy = x_strategy or single_arrays(
-      shape=shapes(min_dims=2, max_dims=5), dtype=dtype, elements=elements)
-  x = draw(x_strategy)
+      shape=shapes(min_dims=2, max_dims=5, min_side=0),
+      dtype=dtype, elements=elements)
+  x = draw(x_strategy).astype(dtype)
   x_shape = tuple(map(int, x.shape))
   y_shape = x_shape[:-2] + x_shape[-1:] + (draw(hps.integers(1, 10)),)
   y = draw(hnp.arrays(dtype, y_shape, elements=elements))
@@ -309,7 +315,7 @@ def matmul_compatible_pairs(draw,
 def pd_matrices(draw, eps=1.):
   x = draw(
       single_arrays(
-          shape=shapes(min_dims=2),
+          shape=shapes(min_dims=2, min_side=0),
           elements=floats(min_value=-1e3, max_value=1e3)))
   y = np.swapaxes(x, -1, -2)
   if x.shape[-1] < x.shape[-2]:  # Ensure resultant matrix not rank-deficient.
@@ -607,6 +613,15 @@ def top_k_params(draw):
   array = draw(single_arrays(dtype=np.float32, unique=True, shape=array_shape))
   k = draw(hps.integers(1, int(array.shape[-1])))
   return array, k
+
+
+@hps.composite
+def lstsq_params(draw):
+  matrix, rhs = draw(matmul_compatible_pairs(x_strategy=pd_matrices()))
+  return (matrix,
+          rhs,
+          0.,  # l2_regularization
+          False)  # fast=False
 
 
 @hps.composite
@@ -933,7 +948,8 @@ NUMPY_TEST_CASES = [
         'linalg.eig', [pd_matrices()],
         post_processor=_eig_post_process,
         xla_disabled=True),
-    TestCase('linalg.eigh', [pd_matrices()], post_processor=_eig_post_process),
+    TestCase('linalg.eigh', [pd_matrices()],
+             post_processor=_eig_post_process),
     TestCase(
         'linalg.eigvals', [pd_matrices()],
         post_processor=_eig_post_process,
@@ -985,7 +1001,8 @@ NUMPY_TEST_CASES = [
         'linalg.svd', [single_arrays(
             shape=shapes(min_dims=2),
             elements=floats(min_value=-1e10, max_value=1e10))],
-        post_processor=_svd_post_process),
+        post_processor=_svd_post_process,
+        atol=2e-5),
     TestCase(
         'linalg.qr', [
             qr_params(),
@@ -1104,7 +1121,9 @@ NUMPY_TEST_CASES = [
         xla_const_args=(1,)),
     TestCase(
         'math.reduce_prod', [
-            array_axis_tuples(allow_multi_axis=True),
+            array_axis_tuples(
+                # TODO(b/298224187) TF produces 0, np NaN for large elements.
+                elements=floats(-1e6, 1e6), allow_multi_axis=True),
             array_axis_tuples(dtype=np.int32, allow_multi_axis=True)
         ],
         xla_const_args=(1,)),
@@ -1159,7 +1178,7 @@ NUMPY_TEST_CASES = [
                     allow_nan=False,
                     allow_infinity=False))
         ],
-        xla_rtol=1e-4),
+        atol=1e-4),
     TestCase('math.softmax', [
         single_arrays(
             shape=shapes(min_dims=1),
@@ -1177,6 +1196,17 @@ NUMPY_TEST_CASES = [
             x_strategy=pd_matrices().map(np.linalg.cholesky))
     ]),
 
+    # ArgSpec(args=['matrix', 'rhs', 'adjoint', 'name'], varargs=None,
+    # keywords=None, defaults=(True, False, None))
+    TestCase('linalg.solve', [
+        matmul_compatible_pairs(x_strategy=pd_matrices())
+    ]),
+
+    TestCase('linalg.lstsq', [lstsq_params()],
+             xla_disabled=True),  # Missing kernel.
+
+    TestCase('linalg.tensor_diag', [single_arrays(shape=shapes(min_dims=1))]),
+
     # ArgSpec(args=['shape_x', 'shape_y'], varargs=None, keywords=None,
     #         defaults=None)
     TestCase('broadcast_dynamic_shape', []),
@@ -1190,8 +1220,12 @@ NUMPY_TEST_CASES = [
     #         keywords=None, defaults=(0, False, False, None))
     TestCase(
         'math.cumprod', [
-            hps.tuples(array_axis_tuples(), hps.booleans(),
-                       hps.booleans()).map(lambda x: x[0] + (x[1], x[2]))
+            hps.tuples(
+                array_axis_tuples(
+                    # TODO(b/298224187) TF produces 0, np NaN for large inputs.
+                    elements=floats(min_value=-1e12, max_value=1e12)),
+                hps.booleans(),
+                hps.booleans()).map(lambda x: x[0] + (x[1], x[2]))
         ],
         xla_const_args=(1, 2, 3)),
     TestCase(
@@ -1202,6 +1236,16 @@ NUMPY_TEST_CASES = [
                 hps.booleans(),
                 hps.booleans()).map(lambda x: x[0] + (x[1], x[2]))
         ],
+        xla_const_args=(1, 2, 3)),
+    TestCase(
+        'math.cumulative_logsumexp', [
+            hps.tuples(
+                array_axis_tuples(
+                    elements=floats(min_value=-1e12, max_value=1e12)),
+                hps.booleans(),
+                hps.booleans()).map(lambda x: x[0] + (x[1], x[2]))
+        ],
+        rtol=6e-5,
         xla_const_args=(1, 2, 3)),
 ]
 
@@ -1223,9 +1267,11 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     ]),
     TestCase('math.abs', [single_arrays()]),
     TestCase('math.acos', [single_arrays(elements=floats(-1., 1.))]),
-    TestCase('math.acosh', [single_arrays(elements=positive_floats())]),
+    TestCase('math.acosh', [single_arrays(elements=positive_floats())],
+             atol=1e-4),
     TestCase('math.asin', [single_arrays(elements=floats(-1., 1.))]),
-    TestCase('math.asinh', [single_arrays(elements=positive_floats())]),
+    TestCase('math.asinh', [single_arrays(elements=positive_floats())],
+             atol=1e-4),
     TestCase('math.atan', [single_arrays()]),
     TestCase('math.atanh', [single_arrays(elements=floats(-1., 1.))]),
     TestCase(
@@ -1259,7 +1305,8 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('math.is_inf', [single_arrays()]),
     TestCase('math.is_nan', [single_arrays()]),
     TestCase('math.lgamma', [single_arrays(elements=positive_floats())]),
-    TestCase('math.log', [single_arrays(elements=positive_floats())]),
+    TestCase('math.log', [single_arrays(elements=positive_floats())],
+             atol=1e-4),
     TestCase('math.log1p',
              [single_arrays(elements=floats(min_value=-1 + 1e-6))],
              xla_atol=1e-4, xla_rtol=1e-4),
@@ -1268,7 +1315,8 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
              xla_atol=1e-4, xla_rtol=1e-4),
     TestCase('math.logical_not',
              [single_arrays(dtype=np.bool_, elements=hps.booleans())]),
-    TestCase('math.ndtri', [single_arrays(elements=floats(0., 1.))]),
+    TestCase('math.ndtri', [single_arrays(elements=floats(1e-7, 1. - 1e-7))],
+             xla_atol=1e-4, xla_rtol=4e-3),
     TestCase('math.negative', [single_arrays()]),
     TestCase('math.reciprocal', [single_arrays()]),
     TestCase('math.rint', [single_arrays()]),
@@ -1278,11 +1326,11 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('math.sign', [single_arrays()]),
     TestCase('math.sin', [single_arrays()]),
     TestCase('math.sinh', [single_arrays(elements=floats(-100., 100.))]),
-    TestCase('math.softplus', [single_arrays()]),
+    TestCase('math.softplus', [single_arrays()], atol=1e-4),
     TestCase('math.sqrt', [single_arrays(elements=positive_floats())]),
     TestCase('math.square', [single_arrays()]),
     TestCase('math.tan', [single_arrays()]),
-    TestCase('math.tanh', [single_arrays()]),
+    TestCase('math.tanh', [single_arrays()], atol=1e-4),
 
     # ArgSpec(args=['x', 'q', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
@@ -1329,9 +1377,11 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('math.xdivy',
              [n_same_shape(n=2, elements=[floats(), non_zero_floats()])]),
     TestCase('math.xlogy',
-             [n_same_shape(n=2, elements=[floats(), positive_floats()])]),
+             [n_same_shape(n=2, elements=[floats(), positive_floats()])],
+             atol=1e-4, rtol=1e-3),
     TestCase('math.xlog1py',
-             [n_same_shape(n=2, elements=[floats(), positive_floats()])]),
+             [n_same_shape(n=2, elements=[floats(), positive_floats()])],
+             atol=1e-4, rtol=1e-3),
     TestCase('nn.conv2d', [conv2d_params()], disabled=NUMPY_MODE),
     TestCase(
         'nn.sparse_softmax_cross_entropy_with_logits', [sparse_xent_params()],
@@ -1651,6 +1701,10 @@ class NumpyTest(test_util.TestCase):
                          [-2000. * state[0] * state[1] - 1.,
                           1000. * (1. - state[0]**2)]]).dtype)
 
+  def test_unstack_with_zero_dimension(self):
+    self.assertAllEqual([], nptf.unstack(nptf.zeros((5, 3, 0)), axis=-1))
+    self.assertAllEqual([], nptf.unstack(nptf.zeros((4, 0, 2)), axis=1))
+
   def test_concat_infers_dtype(self):
     self.assertEqual(np.int32, nptf.concat([[1], []], 0).dtype)
     self.assertEqual(np.float32, nptf.concat([[], [1]], 0).dtype)
@@ -1754,7 +1808,7 @@ class NumpyTest(test_util.TestCase):
              np.arange(10).astype(np.int32).reshape(5, 2))
     init = np.zeros_like(elems[1][0])
     fn = lambda x, y_z: x + y_z[0] - y_z[1]
-    with self.assertRaisesRegexp(ValueError, r'.*size.*'):
+    with self.assertRaisesRegex(ValueError, r'.*size.*'):
       nptf.foldl(fn, elems, initializer=init)
 
   def test_foldl_struct_in_single_out(self):
@@ -1779,7 +1833,7 @@ class NumpyTest(test_util.TestCase):
 
   def test_pfor(self):
     self.assertAllEqual(
-        self.evaluate(tf_pfor.pfor(lambda x: tf.ones([]), 7)),
+        self.evaluate(tf_pfor_control_flow_ops.pfor(lambda x: tf.ones([]), 7)),
         np_pfor.pfor(lambda x: nptf.ones([]), 7))
 
   def test_pfor_with_closure(self):
@@ -1790,7 +1844,7 @@ class NumpyTest(test_util.TestCase):
     def np_fn(x):
       return nptf.gather(val, x)**2
     self.assertAllEqual(
-        self.evaluate(tf_pfor.pfor(tf_fn, 7)),
+        self.evaluate(tf_pfor_control_flow_ops.pfor(tf_fn, 7)),
         np_pfor.pfor(np_fn, 7))
 
   def test_pfor_with_closure_multi_out(self):
@@ -1801,7 +1855,7 @@ class NumpyTest(test_util.TestCase):
     def np_fn(x):
       return nptf.gather(val, x)**2, nptf.gather(val, x)
     self.assertAllEqual(
-        self.evaluate(tf_pfor.pfor(tf_fn, 7)),
+        self.evaluate(tf_pfor_control_flow_ops.pfor(tf_fn, 7)),
         np_pfor.pfor(np_fn, 7))
 
   def test_convert_variable_to_tensor(self):
@@ -1812,6 +1866,11 @@ class NumpyTest(test_util.TestCase):
     self.assertEqual(type(np.array([0.])), type(x))
     self.assertEqual(np.float64, x.dtype)
     self.assertAllEqual([0., 1., 2.], x)
+
+  def test_convert_variable_to_tensor_with_dtype_hint(self):
+    v = nptf.Variable(np.int32(0))
+    x = nptf.convert_to_tensor(v, dtype_hint=tf.float32)
+    self.assertEqual(np.int32, x.dtype)
 
   def test_get_static_value(self):
     x = nptf.get_static_value(nptf.zeros((3, 2), dtype=nptf.float32))
@@ -1946,7 +2005,6 @@ class NumpyTest(test_util.TestCase):
           tensorflow_value = post_processor(tensorflow_value)
 
         if assert_shape_only:
-
           def assert_same_shape(x, y):
             self.assertAllEqual(x.shape, y.shape)
 
@@ -1998,6 +2056,18 @@ class NumpyTest(test_util.TestCase):
     self.assertLen(tree_util.tree_leaves(linop), 2)
     self.assertListEqual([a.shape for a in tree_util.tree_leaves(linop)],
                          [(4, 3), (3, 2)])
+
+    full = nptf.linalg.LinearOperatorFullMatrix(
+        onp.array([[1.0, 2.0], [3.0, 4.0]]))
+    adjoint = full.adjoint()
+    inverse = full.inverse()
+    self.assertLen(tree_util.tree_leaves(adjoint), 1)
+    self.assertLen(tree_util.tree_leaves(inverse), 1)
+    adjoint2 = nptf.linalg.LinearOperatorAdjoint(full)
+    inverse2 = nptf.linalg.LinearOperatorInversion(full)
+    self.assertLen(tree_util.tree_leaves(adjoint2), 1)
+    self.assertLen(tree_util.tree_leaves(inverse2), 1)
+
 
 if __name__ == '__main__':
   # A rewrite oddity: the test_util we import here doesn't come from a rewritten

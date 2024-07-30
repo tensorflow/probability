@@ -227,7 +227,7 @@ def _one_hot(  # pylint: disable=unused-argument
   return y_out
 
 
-def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin,unused-argument
+def _ones_like(input, dtype=None, name=None, layout=None):  # pylint: disable=redefined-builtin,unused-argument
   return np.ones_like(ops.convert_to_tensor(input),
                       dtype=utils.numpy_dtype(dtype))
 
@@ -259,9 +259,9 @@ def _range(start, limit=None, delta=1, dtype=None, name='range'):  # pylint: dis
   delta = onp.array(delta, dtype=infer_dtype(delta))
   if dtype is None:
     dtype_hierarchy = [np.int32, np.int64, np.float32, np.float64]
-    inferred_dtype = max([arg.dtype for arg in [start, limit, delta]
-                          if arg is not None],
-                         key=dtype_hierarchy.index)
+    inferred_dtype = max(
+        (arg.dtype for arg in (start, limit, delta) if arg is not None),
+        key=dtype_hierarchy.index)
   else:
     inferred_dtype = dtype
   return np.arange(start, limit, delta).astype(inferred_dtype)
@@ -382,9 +382,11 @@ def _unstack(value, num=None, axis=0, name='unstack'):
   value = ops.convert_to_tensor(value)
   if axis == 0:
     return list(value)
-  return list(
-      np.squeeze(x, axis=axis)
-      for x in np.split(value, value.shape[axis] if num is None else num, axis))
+  if num is None:
+    num = value.shape[axis]
+  if num == 0:
+    return []
+  return list(np.squeeze(x, axis=axis) for x in np.split(value, num, axis))
 
 
 def _where(condition, x=None, y=None, name='where'):  # pylint: disable=unused-argument
@@ -393,7 +395,7 @@ def _where(condition, x=None, y=None, name='where'):  # pylint: disable=unused-a
   return np.where(condition, x, y)
 
 
-def _zeros_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin,unused-argument
+def _zeros_like(input, dtype=None, name=None, layout=None):  # pylint: disable=redefined-builtin,unused-argument
   return np.zeros_like(input, dtype=utils.numpy_dtype(dtype))
 
 
@@ -411,7 +413,11 @@ expand_dims = utils.copy_docstring(
 
 fill = utils.copy_docstring(
     'tf.fill',
-    lambda dims, value, name=None: np.full(dims, ops.convert_to_tensor(value)))
+    lambda dims, value, name=None, layout=None: np.full(  # pylint: disable=g-long-lambda
+        dims,
+        ops.convert_to_tensor(value),
+    ),
+)
 
 gather = utils.copy_docstring(
     'tf.gather',
@@ -441,12 +447,15 @@ one_hot = utils.copy_docstring(
 
 ones = utils.copy_docstring(
     'tf.ones',
-    lambda shape, dtype=np.float32, name=None: np.ones(  # pylint: disable=g-long-lambda
-        shape, utils.numpy_dtype(dtype)))
+    lambda shape, dtype=np.float32, name=None, layout=None: np.ones(  # pylint: disable=g-long-lambda
+        shape, utils.numpy_dtype(dtype)
+    ),
+)
 
 ones_like = utils.copy_docstring(
     'tf.ones_like',
-    _ones_like)
+    _ones_like,
+)
 
 pad = utils.copy_docstring(
     'tf.pad',
@@ -520,9 +529,12 @@ where = utils.copy_docstring(
 
 zeros = utils.copy_docstring(
     'tf.zeros',
-    lambda shape, dtype=np.float32, name=None: np.zeros(  # pylint: disable=g-long-lambda
-        shape, utils.numpy_dtype(dtype)))
+    lambda shape, dtype=np.float32, name=None, layout=None: np.zeros(  # pylint: disable=g-long-lambda
+        shape, utils.numpy_dtype(dtype)
+    ),
+)
 
 zeros_like = utils.copy_docstring(
     'tf.zeros_like',
-    _zeros_like)
+    _zeros_like,
+)

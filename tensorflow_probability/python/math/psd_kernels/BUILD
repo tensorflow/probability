@@ -14,6 +14,8 @@
 # ============================================================================
 # Library for representation of positive-semidefinite kernel functions.
 
+# Placeholder: py_library
+# Placeholder: py_test
 load(
     "//tensorflow_probability/python:build_defs.bzl",
     "multi_substrate_py_library",
@@ -23,6 +25,7 @@ load(
 licenses(["notice"])
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
 #         "//tensorflow_probability/google:friends",  # DisableOnExport
@@ -39,6 +42,7 @@ multi_substrate_py_library(
         ":exponentiated_quadratic",
         ":feature_scaled",
         ":feature_transformed",
+        ":gamma_exponential",
         ":kumaraswamy_transformed",
         ":matern",
         ":parabolic",
@@ -62,6 +66,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:nest_util",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:slicing",
         "//tensorflow_probability/python/internal:tensorshape_util",
@@ -79,6 +84,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math/psd_kernels/internal:test_util",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
     ],
 )
@@ -159,6 +165,34 @@ multi_substrate_py_test(
     srcs = ["exp_sin_squared_test.py"],
     deps = [
         ":exp_sin_squared",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "gamma_exponential",
+    srcs = ["gamma_exponential.py"],
+    deps = [
+        ":positive_semidefinite_kernel",
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:sigmoid",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/math/psd_kernels/internal:util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "gamma_exponential_test",
+    size = "small",
+    srcs = ["gamma_exponential_test.py"],
+    deps = [
+        ":exponentiated_quadratic",
+        ":gamma_exponential",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
@@ -261,6 +295,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/bijectors:softplus",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
         "//tensorflow_probability/python/util",
     ],
@@ -290,6 +325,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/bijectors:invert",
         "//tensorflow_probability/python/distributions:cholesky_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:nest_util",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
@@ -310,6 +346,8 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
+        "//tensorflow_probability/python/math/psd_kernels/internal:test_util",
     ],
 )
 

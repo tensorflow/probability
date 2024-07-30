@@ -25,10 +25,8 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal.backend import numpy as nptf
 
-from tensorflow.python.client import pywrap_tf_session as c_api  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.framework import ops  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.framework import tensor_util  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.ops import control_flow_ops  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.ops import control_flow_case  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 JAX_MODE = False
@@ -51,11 +49,12 @@ nptf.register_tensor_conversion_function(
     tf.TensorShape, nptf.ops._convert_tensorshape_to_tensor)  # pylint: disable=protected-access
 
 
-def _prefer_static(original_fn, static_fn):
+def _prefer_static(original_fn, static_fn, disable_spec_check=False):
   """Wraps original_fn, preferring to call static_fn when inputs are static."""
-  original_spec = tf_inspect.getfullargspec(original_fn)
-  static_spec = tf_inspect.getfullargspec(static_fn)
-  if original_spec != static_spec:
+  original_spec = (
+      tf_inspect.getfullargspec(original_fn)._replace(annotations={}))
+  static_spec = tf_inspect.getfullargspec(static_fn)._replace(annotations={})
+  if not disable_spec_check and original_spec != static_spec:
     raise ValueError(
         'Arg specs do not match: original={}, static={}, fn={}'.format(
             original_spec, static_spec, original_fn))
@@ -77,11 +76,11 @@ def _prefer_static(original_fn, static_fn):
   return wrap(original_fn)
 
 
-def _copy_docstring(original_fn, new_fn):
+def _copy_docstring(original_fn, new_fn, disable_spec_check=False):
   """Wraps new_fn with the doc of original_fn."""
   original_spec = tf_inspect.getfullargspec(original_fn)
   new_spec = tf_inspect.getfullargspec(new_fn)
-  if original_spec != new_spec:
+  if not disable_spec_check and original_spec != new_spec:
     raise ValueError(
         'Arg specs do not match: original={}, new={}, fn={}'.format(
             original_spec, new_spec, original_fn))
@@ -108,16 +107,10 @@ def _get_static_value(pred):
   if tf.is_tensor(pred):
     pred_value = tf.get_static_value(tf.convert_to_tensor(pred))
 
-    # Explicitly check for ops.Tensor, to avoid an AttributeError
+    # Explicitly check for tf.Tensor, to avoid an AttributeError
     # when requesting `KerasTensor.graph`.
-    if pred_value is None and isinstance(pred, ops.Tensor):
-      if hasattr(tensor_util, 'try_evaluate_constant'):
-        pred_value = tensor_util.try_evaluate_constant(pred)
-      else:
-        # TODO(feyu): remove this branch after try_evaluate_constant is in
-        # tf-nightly.
-        pred_value = c_api.TF_TryEvaluateConstant_wrapper(
-            pred.graph._c_graph, pred._as_tf_output())  # pylint: disable=protected-access
+    if pred_value is None and isinstance(pred, tf.Tensor):
+      pred_value = tensor_util.try_evaluate_constant(pred)
     return pred_value
   return pred
 
@@ -293,8 +286,13 @@ def case(pred_fn_pairs, default=None, exclusive=False, name='smart_case'):
         return pred
       return p
     pred_fn_pairs = [(maybe_static(pred), fn) for pred, fn in pred_fn_pairs]
-  return control_flow_ops._case_helper(  # pylint: disable=protected-access
-      cond, pred_fn_pairs, default, exclusive, name, allow_python_preds=True)
+  return control_flow_case._case_helper(  # pylint: disable=protected-access
+      cond,
+      pred_fn_pairs,
+      default,
+      exclusive,
+      name,
+      allow_python_preds=True)
 
 
 def size0(x, name=None):
@@ -359,13 +357,16 @@ def shape_slice(x, slice_):
   return x_shape[slice_]
 
 
-def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin
+def _ones_like(input, dtype=None, name=None, layout=None):  # pylint: disable=redefined-builtin
+  del layout
   s = _shape(input)
   s_ = tf.get_static_value(s)
   if s_ is not None:
     return np.ones(s_, dtype_util.as_numpy_dtype(dtype or input.dtype))
   return tf.ones(s, dtype or input.dtype, name)
-ones_like = _copy_docstring(tf.ones_like, _ones_like)
+
+
+ones_like = _copy_docstring(tf.ones_like, _ones_like, disable_spec_check=True)
 
 
 def _rank(input, name=None):  # pylint: disable=redefined-builtin,unused-argument
@@ -406,10 +407,24 @@ setdiff1d = _copy_docstring(
     _setdiff1d)
 
 
-def _size(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-builtin
+def _get_size_out_type():
+  # Historically, tf.int32 is the default for out_type for tf.size.
+  # Support limited cases where tf.int64 is the default.
+  # TODO(b/282720125) Long-term, if tf.int64 becomes the default for out_type,
+  # only handle this case (i.e. delete _get_size_out_type and use
+  # `out_type=tf.int64` in _size's signature.)
+  return tf_inspect.getfullargspec(tf.size).defaults[0]
+
+
+def _size(input, out_type=_get_size_out_type(), name=None):  # pylint: disable=redefined-builtin,missing-docstring
+  if out_type is None:
+    # Only Tensorflow has a flag to control the default ouput of tf.size and
+    # uses out_type=None in the signature. For Jax and numpy, out_type is never
+    # None.
+    out_type = tf.size([]).dtype
   if not hasattr(input, 'shape'):
     x = np.array(input)
-    input = tf.convert_to_tensor(input) if x.dtype is np.object_ else x
+    input = tf.convert_to_tensor(input) if x.dtype == np.object_ else x
   n = tensorshape_util.num_elements(tf.TensorShape(input.shape))
   if n is None:
     return tf.size(input, out_type=out_type, name=name)
@@ -417,10 +432,24 @@ def _size(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-bui
 size = _copy_docstring(tf.size, _size)
 
 
-def _shape(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-builtin,missing-docstring
+def _get_shape_out_type():
+  # Historically, tf.int32 is the default for out_type for tf.shape.
+  # Support limited cases where tf.int64 is the default.
+  # TODO(b/282720125) Long-term, if tf.int64 becomes the default for out_type,
+  # only handle this case (i.e. delete _get_shape_out_type and use
+  # `out_type=tf.int64` in _shape's signature.)
+  return tf_inspect.getfullargspec(tf.shape).defaults[0]
+
+
+def _shape(input, out_type=_get_shape_out_type(), name=None):  # pylint: disable=redefined-builtin,missing-docstring
+  if out_type is None:
+    # Only Tensorflow has a flag to control the default ouput of tf.shape and
+    # uses out_type=None in the signature. For Jax and numpy, out_type is never
+    # None.
+    out_type = tf.shape([]).dtype
   if not hasattr(input, 'shape'):
     x = np.array(input)
-    input = tf.convert_to_tensor(input) if x.dtype is np.object_ else x
+    input = tf.convert_to_tensor(input) if x.dtype == np.object_ else x
   if tensorshape_util.is_fully_defined(input.shape):
     return np.array(tensorshape_util.as_list(input.shape)).astype(
         _numpy_dtype(out_type))
@@ -430,13 +459,18 @@ def _shape(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-bu
 shape = _copy_docstring(tf.shape, _shape)
 
 
-def _zeros_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin
+def _zeros_like(input, dtype=None, name=None, layout=None):  # pylint: disable=redefined-builtin
+  del layout
   s = _shape(input)
   s_ = tf.get_static_value(s)
   if s_ is not None:
     return np.zeros(s, _numpy_dtype(dtype or input.dtype))
   return tf.zeros(s, dtype or s.dtype, name)
-zeros_like = _copy_docstring(tf.zeros_like, _zeros_like)
+
+
+zeros_like = _copy_docstring(
+    tf.zeros_like, _zeros_like, disable_spec_check=True
+)
 
 
 def non_negative_axis(axis, rank, name=None):  # pylint:disable=redefined-outer-name
@@ -487,9 +521,11 @@ cumprod = _prefer_static(tf.math.cumprod, nptf.math.cumprod)
 cumsum = _prefer_static(tf.math.cumsum, nptf.math.cumsum)
 equal = _prefer_static(tf.equal, nptf.equal)
 not_equal = _prefer_static(tf.not_equal, nptf.not_equal)
+expand_dims = _prefer_static(tf.expand_dims, nptf.expand_dims)
 expm1 = _prefer_static(tf.math.expm1, nptf.math.expm1)
+eye = _prefer_static(tf.eye, nptf.eye)
 floor = _prefer_static(tf.math.floor, nptf.math.floor)
-fill = _prefer_static(tf.fill, nptf.fill)
+fill = _prefer_static(tf.fill, nptf.fill, disable_spec_check=True)
 gather = _prefer_static(tf.gather, nptf.gather)
 greater = _prefer_static(tf.greater, nptf.greater)
 identity = _prefer_static(tf.identity, nptf.identity)
@@ -509,7 +545,7 @@ maximum = _prefer_static(tf.maximum, nptf.maximum)
 minimum = _prefer_static(tf.minimum, nptf.minimum)
 nextafter = _prefer_static(tf.math.nextafter, nptf.math.nextafter)
 one_hot = _prefer_static(tf.one_hot, nptf.one_hot)
-ones = _prefer_static(tf.ones, nptf.ones)
+ones = _prefer_static(tf.ones, nptf.ones, disable_spec_check=True)
 pad = _prefer_static(tf.pad, nptf.pad)
 pow = _prefer_static(tf.math.pow, nptf.pow)  # pylint: disable=redefined-builtin
 range = _prefer_static(tf.range, nptf.range)  # pylint: disable=redefined-builtin
@@ -540,4 +576,4 @@ top_k = _prefer_static(tf.math.top_k, nptf.math.top_k)
 unique = _prefer_static(tf.unique, nptf.unique)
 unstack = _prefer_static(tf.unstack, nptf.unstack)
 where = _prefer_static(tf.where, nptf.where)
-zeros = _prefer_static(tf.zeros, nptf.zeros)
+zeros = _prefer_static(tf.zeros, nptf.zeros, disable_spec_check=True)

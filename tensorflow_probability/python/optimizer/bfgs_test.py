@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for the unconstrained BFGS optimizer."""
 
-import functools
-
 from absl.testing import parameterized
 import numpy as np
 from scipy.stats import special_ortho_group
@@ -30,7 +28,6 @@ from tensorflow_probability.python.optimizer import bfgs_utils
 
 
 def _make_val_and_grad_fn(value_fn):
-  @functools.wraps(value_fn)
   def val_and_grad(x):
     return gradient.value_and_gradient(value_fn, x)
   return val_and_grad
@@ -293,7 +290,12 @@ class BfgsTest(test_util.TestCase):
     self.assertLessEqual(final_gradient_norm, 1e-5)
     self.assertArrayNear(results.position, np.array([1.0, 1.0]), 1e-5)
 
-  def test_himmelblau(self):
+  @parameterized.parameters(
+      [(1, 1), (3, 2), 30],
+      [(-2, 2), (-2.805118, 3.131312), 17],
+      [(-1, -1), (-3.779310, -3.283186), 30],
+      [(1, -2), (3.584428, -1.848126), 26])
+  def test_himmelblau(self, start, expected_minima, expected_evals):
     """Tests minimization on the Himmelblau's function.
 
     Himmelblau's function is a standard optimization test case. The function is
@@ -305,30 +307,25 @@ class BfgsTest(test_util.TestCase):
     (-3.779310, -3.283186), (3.584428, -1.848126).
 
     All these minima may be reached from appropriate starting points.
+
+    Args:
+      start: Start position.
+      expected_minima: Location of minima that this optimization gets to.
+      expected_evals: Number of expected function evaluations.
     """
     @_make_val_and_grad_fn
     def himmelblau(coord):
       x, y = coord[0], coord[1]
       return (x * x + y - 11) ** 2 + (x + y * y - 7) ** 2
 
-    starts_and_targets = [
-        # Start Point, Target Minimum, Num evaluations expected.
-        [(1, 1), (3, 2), 30],
-        [(-2, 2), (-2.805118, 3.131312), 23],
-        [(-1, -1), (-3.779310, -3.283186), 29],
-        [(1, -2), (3.584428, -1.848126), 28]
-    ]
-    dtype = 'float64'
-    for start, expected_minima, expected_evals in starts_and_targets:
-      start = tf.constant(start, dtype=dtype)
-      results = self.evaluate(
-          bfgs.minimize(himmelblau, initial_position=start, tolerance=1e-8))
-      print(results)
-      self.assertTrue(results.converged)
-      self.assertArrayNear(results.position,
-                           np.array(expected_minima, dtype=dtype),
-                           1e-5)
-      self.assertEqual(results.num_objective_evaluations, expected_evals)
+    start = tf.constant(start, dtype=np.float64)
+    results = self.evaluate(
+        bfgs.minimize(himmelblau, initial_position=start, tolerance=1e-8))
+    self.assertTrue(results.converged)
+    self.assertArrayNear(results.position,
+                         np.array(expected_minima, dtype=np.float64),
+                         1e-5)
+    self.assertEqual(results.num_objective_evaluations, expected_evals)
 
   def test_himmelblau_batch_all(self):
     @_make_val_and_grad_fn
@@ -428,7 +425,51 @@ class BfgsTest(test_util.TestCase):
     for actual, expected in zip(batch_results.position[batch_results.converged],
                                 expected_minima[batch_results.converged]):
       self.assertArrayNear(actual, expected, 1e-5)
-    self.assertEqual(batch_results.num_objective_evaluations, 32)
+    self.assertEqual(batch_results.num_objective_evaluations, 31)
+
+  def test_scale_initial_inverse_hessian(self):
+    """Tests optional scaling of the initial inverse Hessian estimate.
+
+    Shows that the choice of the option determines the behaviour inside
+    the BFGS optimisation.
+    """
+    @_make_val_and_grad_fn
+    def sin_x_times_sin_y(coord):
+      x, y = coord[0], coord[1]
+      return tf.math.sin(x) + tf.math.sin(y)
+
+    start = tf.constant((1, -2), dtype=np.float64)
+
+    results = {}
+    for scale in (True, False):
+      for max_iter in (1, 2, 50):
+        results[scale, max_iter] = self.evaluate(
+            bfgs.minimize(
+                sin_x_times_sin_y,
+                initial_position=start,
+                tolerance=1e-8,
+                scale_initial_inverse_hessian=scale,
+                max_iterations=max_iter,
+            )
+        )
+
+    expected_positions = {
+        # Positions traced by the optimisation on the first iteration
+        # are not affected by the choice of `scale_initial_inverse_hessian`.
+        (True, 1): (-0.62581634, -0.7477782),
+        (False, 1): (-0.62581634, -0.7477782),
+        # However, gradient calculations on the first iteration _are_ affected,
+        # and this affects positions identified on the second iteration.
+        (True, 2): (-1.70200959, -0.37774139),
+        (False, 2): (-1.24714478, -0.55028845),
+        # Both approaches converge to the same maximum eventually (although
+        # this is not guaranteed, it depends on the exact problem being solved).
+        (True, 50): (-1.57079633, -1.57079633),
+        (False, 50): (-1.57079633, -1.57079633),
+    }
+
+    for key, res in results.items():
+      self.assertArrayNear(res.position, expected_positions[key], 1e-6)
 
   def test_data_fitting(self):
     """Tests MLE estimation for a simple geometric GLM."""
@@ -464,7 +505,7 @@ class BfgsTest(test_util.TestCase):
             neg_log_likelihood, initial_position=start, tolerance=1e-6))
     expected_minima = np.array(
         [-0.020460034354, 0.171708568111, 0.021200423717], dtype='float64')
-    expected_evals = 19
+    expected_evals = 18
     self.assertArrayNear(results.position, expected_minima, 1e-6)
     self.assertEqual(results.num_objective_evaluations, expected_evals)
 
@@ -528,12 +569,11 @@ class BfgsTest(test_util.TestCase):
 
     # Test with a vector of unknown dimension, and a fully unknown shape.
     for shape in ([None], None):
-      start = tf1.placeholder(tf.float32, shape=shape)
+      start = tf1.placeholder_with_default([0.6, 0.8], shape=shape)
       bfgs_op = bfgs.minimize(quadratic, initial_position=start, tolerance=1e-8)
       self.assertFalse(bfgs_op.position.shape.is_fully_defined())
 
-      with self.cached_session() as session:
-        results = session.run(bfgs_op, feed_dict={start: [0.6, 0.8]})
+      results = self.evaluate(bfgs_op)
       self.assertTrue(results.converged)
       self.assertLessEqual(_norm(results.objective_gradient), 1e-8)
       self.assertArrayNear(results.position, minimum, 1e-5)

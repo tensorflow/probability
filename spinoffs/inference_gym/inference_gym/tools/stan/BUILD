@@ -14,7 +14,10 @@
 # ============================================================================
 # Ground truth computation using Stan.
 
+# Placeholder: py_library
+
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
         "//inference_gym:__subpackages__",

@@ -16,10 +16,12 @@
 #   Functional MC API.
 
 # [internal] load pytype.bzl (pytype_library)
+# Placeholder: py_test
 
 licenses(["notice"])
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//visibility:public",
     ],
@@ -53,7 +55,7 @@ py_library(
     name = "backend",
     srcs = ["backend.py"],
     deps = [
-        "//fun_mc/dynamic/backend_tensorflow:backend",
+        "//fun_mc/dynamic/backend_jax:backend",
     ],
 )
 
@@ -106,6 +108,7 @@ py_test(
     shard_count = 8,
     deps = [
         ":fun_mc",
+        ":prefab",
         ":test_util",
         # absl/testing:parameterized dep,
         # scipy dep,
@@ -132,6 +135,7 @@ py_test(
     shard_count = 2,
     deps = [
         ":fun_mc",
+        ":malt",
         ":test_util",
         # jax dep,
         # tensorflow dep,
@@ -157,6 +161,7 @@ py_test(
     shard_count = 2,
     deps = [
         ":fun_mc",
+        ":sga_hmc",
         ":test_util",
         # jax dep,
         # tensorflow dep,
@@ -183,6 +188,7 @@ py_test(
     shard_count = 2,
     deps = [
         ":fun_mc",
+        ":prefab",
         ":test_util",
         # jax dep,
         # tensorflow dep,
@@ -198,7 +204,6 @@ py_library(
     deps = [
         ":backend",
         ":fun_mc_lib",
-        # tensorflow_probability dep,
     ],
 )
 

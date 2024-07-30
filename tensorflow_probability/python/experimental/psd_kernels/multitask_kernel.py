@@ -14,13 +14,10 @@
 # ============================================================================
 """MultiTask kernels."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
@@ -140,8 +137,10 @@ class MultiTaskKernel(psd_kernel.AutoCompositeTensorPsdKernel):
     # ==> [6, 6]
     """
     with tf.name_scope(name):
-      x1 = tf.convert_to_tensor(x1, name='x1', dtype_hint=self.dtype)
-      x2 = tf.convert_to_tensor(x2, name='x2', dtype_hint=self.dtype)
+      x1 = nest_util.convert_to_nested_tensor(
+          x1, name='x1', dtype_hint=self.dtype, allow_packing=True)
+      x2 = nest_util.convert_to_nested_tensor(
+          x2, name='x2', dtype_hint=self.dtype, allow_packing=True)
       return self._matrix_over_all_tasks(x1, x2)
 
   def _matrix_over_all_tasks(self, x1, x2):
@@ -179,11 +178,11 @@ class Independent(MultiTaskKernel):
   def _matrix_over_all_tasks(self, x1, x2):
     # Because the kernel computations are independent of task,
     # we can use a Kronecker product of an identity matrix.
-    task_kernel_matrix = tf.linalg.LinearOperatorIdentity(
-        num_rows=self.num_tasks,
-        dtype=self.dtype)
     base_kernel_matrix = tf.linalg.LinearOperatorFullMatrix(
         self.base_kernel.matrix(x1, x2))
+    task_kernel_matrix = tf.linalg.LinearOperatorIdentity(
+        num_rows=self.num_tasks,
+        dtype=base_kernel_matrix.dtype)
     return tf.linalg.LinearOperatorKronecker(
         [base_kernel_matrix, task_kernel_matrix])
 
@@ -194,17 +193,36 @@ class Separable(MultiTaskKernel):
   def __init__(self,
                num_tasks,
                base_kernel,
-               task_kernel_matrix_linop,
+               task_kernel_matrix_linop=None,
+               task_kernel_scale_linop=None,
                name='Separable',
                validate_args=False):
 
     parameters = dict(locals())
     with tf.name_scope(name):
-      dtype = dtype_util.common_dtype(
-          [task_kernel_matrix_linop, base_kernel], tf.float32)
-      self._base_kernel = base_kernel
+      if ((task_kernel_matrix_linop is not None and
+           task_kernel_scale_linop is not None) or
+          (task_kernel_matrix_linop is None and
+           task_kernel_scale_linop is None)):
+        raise ValueError(
+            'Expected only one of `task_kernel_matrix_linop` and '
+            '`task_kernel_scale_linop`.')
+      if tf.nest.is_nested(base_kernel.feature_ndims):
+        dtype = dtype_util.common_dtype([base_kernel], tf.float32)
+        float_dtype = dtype_util.common_dtype(
+            [task_kernel_matrix_linop, task_kernel_scale_linop], tf.float32)
+      else:
+        dtype = dtype_util.common_dtype(
+            [task_kernel_matrix_linop,
+             task_kernel_scale_linop, base_kernel], tf.float32)
+        float_dtype = dtype
       self._task_kernel_matrix_linop = tensor_util.convert_nonref_to_tensor(
-          task_kernel_matrix_linop, dtype, name='task_kernel_matrix_linop')
+          task_kernel_matrix_linop, float_dtype,
+          name='task_kernel_matrix_linop')
+      self._task_kernel_scale_linop = tensor_util.convert_nonref_to_tensor(
+          task_kernel_scale_linop, float_dtype,
+          name='task_kernel_scale_linop')
+      self._base_kernel = base_kernel
       super(Separable, self).__init__(
           num_tasks=num_tasks,
           dtype=dtype,
@@ -221,17 +239,26 @@ class Separable(MultiTaskKernel):
   def task_kernel_matrix_linop(self):
     return self._task_kernel_matrix_linop
 
+  @property
+  def task_kernel_scale_linop(self):
+    return self._task_kernel_scale_linop
+
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):
     return dict(
         base_kernel=parameter_properties.BatchedComponentProperties(),
         task_kernel_matrix_linop=(
+            parameter_properties.BatchedComponentProperties()),
+        task_kernel_scale_linop=(
             parameter_properties.BatchedComponentProperties()))
 
   def _matrix_over_all_tasks(self, x1, x2):
     # Because the kernel computations are independent of task,
     # we can use a Kronecker product of an identity matrix.
+    task_linop = self.task_kernel_matrix_linop
+    if self.task_kernel_scale_linop is not None:
+      task_linop = (self._task_kernel_scale_linop @
+                    self._task_kernel_scale_linop.adjoint())
     base_kernel_matrix = tf.linalg.LinearOperatorFullMatrix(
         self.base_kernel.matrix(x1, x2))
-    return tf.linalg.LinearOperatorKronecker(
-        [base_kernel_matrix, self._task_kernel_matrix_linop])
+    return tf.linalg.LinearOperatorKronecker([base_kernel_matrix, task_linop])

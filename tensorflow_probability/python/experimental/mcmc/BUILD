@@ -18,6 +18,8 @@
 #   //tensorflow_probability/python/internal/auto_batching
 #   internally.
 
+# Placeholder: py_library
+# Placeholder: py_test
 load(
     "//tensorflow_probability/python:build_defs.bzl",
     "multi_substrate_py_library",
@@ -25,6 +27,7 @@ load(
 )
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -39,7 +42,6 @@ multi_substrate_py_library(
         ":preconditioned_hmc",
     ],
     substrates_omit_deps = [
-        ":elliptical_slice_sampler",
         ":kernel_builder",
         ":kernel_outputs",
         ":nuts_autobatching",
@@ -209,6 +211,7 @@ multi_substrate_py_test(
     timeout = "long",
     srcs = ["diagonal_mass_matrix_adaptation_test.py"],
     disabled_substrates = ["numpy"],
+    shard_count = 3,
     deps = [
         ":diagonal_mass_matrix_adaptation",
         ":preconditioned_hmc",
@@ -297,7 +300,6 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/distributions:student_t",
         "//tensorflow_probability/python/distributions:wishart",
         "//tensorflow_probability/python/distributions/internal:statistical_testing",
-        "//tensorflow_probability/python/experimental/util",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribute_lib",
         "//tensorflow_probability/python/internal:distribute_test_lib",
@@ -334,6 +336,7 @@ multi_substrate_py_test(
     timeout = "long",
     srcs = ["preconditioned_hmc_test.py"],
     disabled_substrates = ["numpy"],
+    shard_count = 3,
     deps = [
         ":preconditioned_hmc",
         # tensorflow dep,
@@ -348,7 +351,6 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/distributions:wishart",
         "//tensorflow_probability/python/experimental/distributions:mvn_precision_factor_linop",
-        "//tensorflow_probability/python/experimental/util",
         "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:distribute_lib",
         "//tensorflow_probability/python/internal:distribute_test_lib",
@@ -390,7 +392,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "elliptical_slice_sampler",
     srcs = ["elliptical_slice_sampler.py"],
     deps = [
@@ -402,7 +404,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "elliptical_slice_sampler_test",
     size = "large",
     timeout = "long",
@@ -411,7 +413,7 @@ py_test(
     deps = [
         ":elliptical_slice_sampler",
         # numpy dep,
-        # tensorflow:tensorflow_no_contrib dep,
+        # tensorflow dep,
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/mcmc:sample",
@@ -423,7 +425,7 @@ py_library(
     srcs = ["nuts_autobatching.py"],
     deps = [
         # numpy dep,
-        # tensorflow:tensorflow_no_contrib dep,
+        # tensorflow dep,
         "//tensorflow_probability/python/experimental/auto_batching",
         "//tensorflow_probability/python/math:gradient",
         "//tensorflow_probability/python/mcmc:kernel",
@@ -554,13 +556,16 @@ multi_substrate_py_test(
     size = "large",
     srcs = ["particle_filter_test.py"],
     numpy_tags = ["notap"],
+    shard_count = 3,
     deps = [
         ":particle_filter",
+        ":sequential_monte_carlo_kernel",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:shift",
         "//tensorflow_probability/python/distributions:bernoulli",
         "//tensorflow_probability/python/distributions:deterministic",
+        "//tensorflow_probability/python/distributions:independent",
         "//tensorflow_probability/python/distributions:joint_distribution_auto_batched",
         "//tensorflow_probability/python/distributions:joint_distribution_named",
         "//tensorflow_probability/python/distributions:linear_gaussian_ssm",
@@ -701,7 +706,6 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/math:generic",
         "//tensorflow_probability/python/math:gradient",
         "//tensorflow_probability/python/mcmc/internal:util",
     ],
@@ -965,6 +969,7 @@ multi_substrate_py_library(
     deps = [
         ":reducer",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:loop_util",
         "//tensorflow_probability/python/mcmc/internal:util",
     ],
 )
@@ -1135,7 +1140,6 @@ multi_substrate_py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        # tensorflow:tensorflow_no_contrib dep,
         "//tensorflow_probability/python/bijectors:exp",
         "//tensorflow_probability/python/bijectors:identity",
         "//tensorflow_probability/python/distributions:beta",

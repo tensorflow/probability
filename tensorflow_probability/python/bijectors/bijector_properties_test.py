@@ -84,6 +84,19 @@ COMPOSITE_TENSOR_RTOL.update({
 })
 COMPOSITE_TENSOR_ATOL = collections.defaultdict(lambda: 1e-6)
 
+SLICING_RTOL = collections.defaultdict(lambda: 1e-5)
+SLICING_ATOL = collections.defaultdict(lambda: 1e-5)
+SLICING_ATOL.update({
+    'Householder': 1e-4,
+})
+
+INSTANTIABLE_BUT_NOT_SLICEABLE = [
+    # TODO(b/146897388): These are sliceable but have parameter dependent
+    # support. Perhaps re-write the slicing test to enable these bijectors.
+    'FrechetCDF',
+    'GeneralizedExtremeValueCDF'
+]
+
 
 def is_invert(bijector):
   return isinstance(bijector, (tfb.Invert, invert_lib._Invert))
@@ -133,7 +146,7 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
     batch_shape: An optional `TensorShape`.  The batch shape of the resulting
       bijector.  Hypothesis will pick one if omitted.
     event_dim: Optional Python int giving the size of each of the underlying
-      distribution's parameters' event dimensions.  This is shared across all
+      bijector's parameters' event dimensions.  This is shared across all
       parameters, permitting square event matrices, compatible location and
       scale Tensors, etc. If omitted, Hypothesis will choose one.
     enable_vars: TODO(bjp): Make this `True` all the time and put variable
@@ -826,6 +839,98 @@ class BijectorPropertiesTest(test_util.TestCase):
     assert_no_none_grad(bijector, 'forward', wrt_vars, grads)
 
     self.assertConvertVariablesToTensorsWorks(bijector)
+
+
+@test_util.test_all_tf_execution_regimes
+class BijectorSlicingTest(test_util.TestCase):
+
+  def _draw_domain_tensor(self, bijector, data, event_dim, sample_shape=()):
+    codomain_event_shape = [event_dim] * bijector.inverse_min_event_ndims
+    codomain_event_shape = constrain_inverse_shape(
+        bijector, codomain_event_shape)
+    shp = bijector.inverse_event_shape(codomain_event_shape).as_list()
+    xs = tf.identity(data.draw(domain_tensors(bijector, shape=shp)), name='xs')
+
+    return xs
+
+  def _test_slicing(self, data, bijector_name, bijector, event_dim):
+    batch_shape = bijector.experimental_batch_shape()
+    slices = data.draw(tfp_hps.valid_slices(batch_shape))
+    slice_str = 'bijector[{}]'.format(', '.join(tfp_hps.stringify_slices(
+        slices)))
+    # Make sure the slice string appears in Hypothesis' attempted example log
+    hp.note('Using slice ' + slice_str)
+    if not slices:  # Nothing further to check.
+      return
+
+    sliced_bijector = bijector[slices]
+
+    # This should have no effect on a trivially instantiable bijector.
+    if bijector_name in bhps.trivially_instantiable_bijectors():
+      self.assertAllEqual(
+          bijector.experimental_batch_shape(),
+          sliced_bijector.experimental_batch_shape())
+      return
+
+    sliced_zeros = np.zeros(batch_shape)[slices]
+    hp.note('Using sliced bijector {}.'.format(sliced_bijector))
+    # Check that slicing modifies batch shape as expected.
+    self.assertAllEqual(
+        sliced_zeros.shape, sliced_bijector.experimental_batch_shape())
+
+    if not sliced_zeros.size:
+      # TODO(b/128924708): Fix bijectors that fail on degenerate empty
+      #     shapes.
+      return
+
+    xs = self._draw_domain_tensor(bijector, data, event_dim)
+    with tfp_hps.no_tf_rank_errors():
+      forward = self.evaluate(bijector.forward(xs))
+      sliced_bijector_forward = self.evaluate(sliced_bijector.forward(xs))
+
+    # Come up with the slices for samples (which must also include event dims).
+    forward_slices = (
+        tuple(slices) if isinstance(slices, collections.abc.Sequence) else
+        (slices,))
+    if Ellipsis not in forward_slices:
+      forward_slices += (Ellipsis,)
+    forward_slices += tuple([slice(None)] * bijector.inverse_min_event_ndims)
+
+    sliced_forward = forward[forward_slices]
+
+    # Check that slicing the bijector computation has the same shape as
+    # using the sliced bijector and computing results.
+    self.assertAllEqual(sliced_forward.shape, sliced_bijector_forward.shape)
+    self.assertAllClose(
+        sliced_forward,
+        sliced_bijector_forward,
+        atol=SLICING_ATOL[bijector_name],
+        rtol=SLICING_RTOL[bijector_name])
+
+  @parameterized.named_parameters(
+      {'testcase_name': bname, 'bijector_name': bname}
+      for bname in (set(bhps.INSTANTIABLE_BIJECTORS) -
+                    set(INSTANTIABLE_BUT_NOT_SLICEABLE)))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testBijectors(self, bijector_name, data):
+    event_dim = data.draw(hps.integers(min_value=2, max_value=6))
+    bijector = data.draw(
+        bijectors(bijector_name=bijector_name,
+                  event_dim=event_dim,
+                  enable_vars=False,
+                  batch_shape=data.draw(
+                      tfp_hps.shapes(min_ndims=0, max_ndims=2, max_side=5)),
+                  validate_args=True))
+
+    # Check that all bijectors still register as non-iterable despite
+    # defining __getitem__.  (Because __getitem__ magically makes an object
+    # iterable for some reason.)
+    with self.assertRaisesRegex(TypeError, 'not iterable'):
+      iter(bijector)
+
+    # Test slicing
+    self._test_slicing(data, bijector_name, bijector, event_dim)
 
 
 def ensure_nonzero(x):

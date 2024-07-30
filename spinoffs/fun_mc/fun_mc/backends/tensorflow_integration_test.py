@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-from absl.testing import absltest
 import tensorflow.compat.v2 as tf
 from fun_mc import using_tensorflow as fun_mc
+from absl.testing import absltest
+
+tf.experimental.numpy.experimental_enable_numpy_behavior()
 
 
 class TensorFlowIntegrationTest(absltest.TestCase):

@@ -381,6 +381,22 @@ class ShapeTest(test_util.TestCase):
       rank = ps.rank_from_shape(shape_tensor_fn=lambda: ps.shape(v_dynamic))
       self.assertEqual(self.evaluate(rank), expected_rank)
 
+  def test_tensorshape(self):
+    self.assertAllEqual([0], ps.shape(tf.TensorShape([])))
+    self.assertAllEqual([1], ps.shape(tf.TensorShape(3)))
+    self.assertAllEqual([1], ps.shape(tf.TensorShape([2])))
+    self.assertAllEqual([2], ps.shape(tf.TensorShape([19, 17])))
+    self.assertAllEqual([3], ps.shape(tf.TensorShape([2, 1, 4])))
+
+    with self.assertRaisesRegex(
+        ValueError, 'Cannot convert a partially known TensorShape'):
+      ps.shape(tf.TensorShape(None))
+
+    with self.assertRaisesRegex(
+        ValueError, 'Cannot convert a partially known TensorShape'):
+      # Should we support this?  tf.shape fails on this input.
+      ps.shape(tf.TensorShape([3, None, 4]))
+
 
 @test_util.test_all_tf_execution_regimes
 class SetDiff1DTest(test_util.TestCase):
@@ -418,6 +434,18 @@ class SizeTest(test_util.TestCase):
     x = tf1.placeholder_with_default(
         tf.random.normal([3, 4, 5], seed=test_util.test_seed()), shape=None)
     self.assertAllEqual(3 * 4 * 5, self.evaluate(ps.size(x)))
+
+  def test_tensorshape(self):
+    self.assertAllEqual(1, ps.size(tf.TensorShape(3)))
+    self.assertAllEqual(1, ps.size(tf.TensorShape([2])))
+    self.assertAllEqual(2, ps.size(tf.TensorShape([19, 17])))
+    self.assertAllEqual(3, ps.size(tf.TensorShape([2, 1, 4])))
+
+    with self.assertRaises(Exception):
+      ps.size(tf.TensorShape(None))
+
+    with self.assertRaises(Exception):
+      ps.size(tf.TensorShape([3, None, 4]))
 
 
 @test_util.test_all_tf_execution_regimes

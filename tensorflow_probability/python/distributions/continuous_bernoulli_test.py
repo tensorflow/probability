@@ -342,7 +342,7 @@ class ContinuousBernoulliTest(test_util.TestCase):
       seed = test_util.test_seed() if seed is None else seed
       if tf.executing_eagerly():
         tf1.set_random_seed(seed)
-      return seed
+      return test_util.clone_seed(seed)
 
     seed = _seed()
     self.assertAllClose(
@@ -616,11 +616,11 @@ class ContinuousBernoulliSlicingTest(test_util.TestCase):
     )
     if tf.executing_eagerly():
       return
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         (ValueError, tf.errors.InvalidArgumentError),
         'Index out of range.*input has only 4 dims'):
       check(make_slicer[19, tf.newaxis, 2, ..., :, 0, 4])
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         (ValueError, tf.errors.InvalidArgumentError),
         'slice index.*out of bounds',
     ):

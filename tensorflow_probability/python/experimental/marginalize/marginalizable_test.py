@@ -34,6 +34,7 @@ from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import poisson
 from tensorflow_probability.python.distributions import sample as sample_dist_lib
 import tensorflow_probability.python.experimental.marginalize as marginalize
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
 
 
@@ -46,10 +47,6 @@ def _conform(ts):
   shape = functools.reduce(
       tf.broadcast_static_shape, [a.shape for a in ts])
   return [tf.broadcast_to(a, shape) for a in ts]
-
-
-def _cat(*ts):
-  return tf.concat(ts, axis=0)
 
 
 def _stack(*ts):
@@ -209,7 +206,7 @@ class _MarginalizeTest(
     n_steps = 4
     infer_step = 2
 
-    observations = [-1.0, 0.0, 1.0, 2.0]
+    observations = np.array([-1.0, 0.0, 1.0, 2.0], np.float32)
 
     initial_prob = tf.constant([0.6, 0.4], dtype=tf.float32)
     transition_matrix = tf.constant([[0.6, 0.4],
@@ -309,7 +306,7 @@ class _MarginalizeTest(
                0.4 * tf.roll(o, shift=[1, 0], axis=[-2, -1]))
 
           # Reshape just last two dimensions.
-          p = tf.reshape(p, _cat(p.shape[:-2], [-1]))
+          p = tf.reshape(p, ps.concat([ps.shape(p)[:-2], [-1]], axis=0))
           xy = yield categorical.Categorical(probs=p, dtype=tf.int32)
           x[i] = xy // n
           y[i] = xy % n
@@ -342,6 +339,7 @@ class _MarginalizeTest(
     # order chosen by `tf.einsum` closer matches `_tree_example` above.
     self.assertAllClose(p, q)
 
+  @test_util.numpy_disable_gradient_test
   def test_marginalized_gradient(self):
     n = 10
 

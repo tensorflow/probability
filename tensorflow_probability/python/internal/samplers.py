@@ -31,6 +31,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 
 __all__ = [
     'categorical',
+    'clone_seed',
     'fold_in',
     'gamma',
     'is_stateful_seed',
@@ -51,7 +52,7 @@ SEED_DTYPE = np.uint32 if JAX_MODE else np.int32
 def zeros_seed():
   if JAX_MODE:
     import jax  # pylint: disable=g-import-not-at-top
-    return jax.random.PRNGKey(0)
+    return jax.random.key(0)
   return tf.constant([0, 0], dtype=SEED_DTYPE)
 
 
@@ -131,14 +132,26 @@ def sanitize_seed(seed, salt=None, name=None):
                                maxval=np.iinfo(SEED_DTYPE).max,
                                dtype=SEED_DTYPE, name='seed')
 
+    # TODO(b/223267515): In JAX mode, raise a user-friendly error if seed is
+    # not a PRNGKey.
+
     # TODO(b/159209541): Consider ignoring salts for stateless seeds, for
     # performance and because using stateless seeds already requires the
     # discipline of splitting.
 
     if salt is not None:
-      salt = int(hashlib.sha512(str(salt).encode('utf-8')).hexdigest(), 16)
+      salt = int(hashlib.sha512(str(salt).encode('utf-8')).hexdigest(), 16) % (
+          2**31 - 1
+      )
       seed = fold_in(seed, salt)
 
+    if JAX_MODE:
+      import jax  # pylint: disable=g-import-not-at-top
+      # Typed keys are returned as is, otherwise wrap them.
+      if jax.dtypes.issubdtype(seed.dtype, jax.dtypes.prng_key):
+        return seed
+      else:
+        return jax.random.wrap_key_data(seed)
     return tf.convert_to_tensor(seed, dtype=SEED_DTYPE, name='seed')
 
 
@@ -155,8 +168,10 @@ def get_integer_seed(seed):
   if isinstance(seed, six.integer_types):
     return seed % (2**31)
   seed = sanitize_seed(seed)
+  # maxval is exclusive, so technically this doesn't generate all possible
+  # non-negative integers, but it's good enough for our purposes.
   integer_seed = tf.random.stateless_uniform(
-      shape=[], seed=seed, minval=0, maxval=2**31, dtype=tf.int32)
+      shape=[], seed=seed, minval=0, maxval=2**31 - 1, dtype=tf.int32)
   if JAX_MODE:
     # This function isn't ever used in a jit context, so we can eagerly convert
     # it to an integer to simplify caller's code.
@@ -215,6 +230,16 @@ def split_seed(seed, n=2, salt=None, name=None):
     if isinstance(n, six.integer_types):
       seeds = tf.unstack(seeds)
     return seeds
+
+
+def clone_seed(seed):
+  """Clones a seed so it can be reused without causing a JAX KeyReuseError."""
+  if JAX_MODE:
+    from jax import random as jaxrand  # pylint: disable=g-import-not-at-top
+    if hasattr(jaxrand, 'clone'):
+      # JAX v0.4.26+
+      return jaxrand.clone(seed)
+  return seed
 
 
 def categorical(

@@ -174,7 +174,7 @@ class _ScanAssociativeTest(test_util.TestCase):
     def extended_add(a, b):
       return (a[0] + b[0], a[1] + b[1])
 
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         Exception, 'Inputs must have the same size along the given axis'):
       self.evaluate(
           scan_associative(
@@ -202,7 +202,7 @@ class _ScanAssociativeTest(test_util.TestCase):
     elems = self.evaluate(
         uniform.Uniform(-1., 1.).sample([512], seed=test_util.test_seed()))
 
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         Exception, 'Input `Tensor`s must have dimension less than'):
       self.evaluate(
           scan_associative(

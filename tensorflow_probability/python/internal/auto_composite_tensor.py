@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.framework import composite_tensor
 from tensorflow.python.framework import type_spec
+from tensorflow.python.framework import type_spec_registry
 from tensorflow.python.ops import resource_variable_ops
 from tensorflow.python.util import tf_inspect
 from tensorflow.python.util import variable_utils
@@ -39,6 +40,29 @@ __all__ = [
 
 _DEFERRED_ASSERTION_CONTEXT = threading.local()
 _DEFERRED_ASSERTION_CONTEXT.is_deferred = False
+
+
+def is_composite_tensor(value):
+  """Returns True for CTs and non-CT custom pytrees in JAX mode.
+
+  Args:
+    value: A TFP component (e.g. a distribution or bijector instance) or object
+      that behaves as one.
+
+  Returns:
+    value_is_composite: bool, True if `value` is a `CompositeTensor` in TF mode
+      or a non-leaf pytree in JAX mode.
+  """
+  if isinstance(value, composite_tensor.CompositeTensor):
+    return True
+  if JAX_MODE:
+    from jax import tree_util  # pylint: disable=g-import-not-at-top
+    # If `value` is not a pytree leaf, then it must be an instance of a class
+    # that was specially registered as a pytree or that inherits from a class
+    # representing a nested structure.
+    treedef = tree_util.tree_structure(value)
+    return not tree_util.treedef_is_leaf(treedef)
+  return False
 
 
 def is_deferred_assertion_context():
@@ -131,15 +155,16 @@ def _extract_type_spec_recursively(value):
   `value` is a collection containing `Tensor` values, recursively supplant them
   with their respective `TypeSpec`s in a collection of parallel stucture.
 
-  If `value` is nont of the above, return it unchanged.
+  If `value` is none of the above, return it unchanged.
 
   Args:
     value: a Python `object` to (possibly) turn into a (collection of)
     `tf.TypeSpec`(s).
 
   Returns:
-    spec: the `TypeSpec` or collection of `TypeSpec`s corresponding to `value`
-    or `value`, if no `Tensor`s are found.
+    spec: the `TypeSpec` or collection of `TypeSpec`s corresponding to `value`;
+    `value`, if no `Tensor`s are found; or `None` to indicate that `value` is
+    registered as a JAX pytree.
   """
   if isinstance(value, composite_tensor.CompositeTensor):
     return value._type_spec  # pylint: disable=protected-access
@@ -160,6 +185,14 @@ def _extract_type_spec_recursively(value):
             'Found `{}` with both Tensor and non-Tensor parts: {}'.format(
                 type(value), value))
       return specs
+  elif JAX_MODE:  # Handle custom pytrees.
+    from jax import tree_util  # pylint: disable=g-import-not-at-top
+    treedef = tree_util.tree_structure(value)
+    # Return None so that the object identity comparison in
+    # `_AutoCompositeTensorTypeSpec.from_instance` is False, indicating that
+    # `value` should be treated as a "Tensor" param.
+    if not tree_util.treedef_is_leaf(treedef):
+      return None
   return value
 
 
@@ -490,7 +523,7 @@ class AutoCompositeTensor(composite_tensor.CompositeTensor):
 def type_spec_register(name, allow_overwrite=True):
   """Decorator used to register a unique name for a TypeSpec subclass.
 
-  Unlike TensorFlow's `type_spec.register`, this function allows a new
+  Unlike TensorFlow's `type_spec_registry.register`, this function allows a new
   `TypeSpec` to be registered with a `name` that already appears in the
   registry (overwriting the `TypeSpec` already registered with that name). This
   allows for re-definition of `AutoCompositeTensor` subclasses in test
@@ -507,10 +540,10 @@ def type_spec_register(name, allow_overwrite=True):
     A class decorator that registers the decorated class with the given name.
   """
   # pylint: disable=protected-access
-  if allow_overwrite and name in type_spec._NAME_TO_TYPE_SPEC:
-    type_spec._TYPE_SPEC_TO_NAME.pop(
-        type_spec._NAME_TO_TYPE_SPEC.pop(name))
-  return type_spec.register(name)
+  if allow_overwrite and name in type_spec_registry._NAME_TO_TYPE_SPEC:
+    type_spec_registry._TYPE_SPEC_TO_NAME.pop(
+        type_spec_registry._NAME_TO_TYPE_SPEC.pop(name))
+  return type_spec_registry.register(name)
 
 
 def auto_composite_tensor(

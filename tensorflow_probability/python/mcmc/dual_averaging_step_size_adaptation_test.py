@@ -44,6 +44,8 @@ from tensorflow_probability.python.mcmc import simple_step_size_adaptation as ss
 
 
 JAX_MODE = False
+NUMPY_MODE = False
+TF_MODE = not (JAX_MODE or NUMPY_MODE)
 
 _INITIAL_T = 10.0
 _EXPLORATION_SHRINKAGE = 0.05
@@ -732,6 +734,8 @@ class DistributedDualAveragingStepSizeAdaptationTest(
   @test_util.numpy_disable_test_missing_functionality(
       'NumPy backend does not support distributed computation.')
   def test_kernel_can_shard_chains_across_devices(self, reduce_fn):
+    if (tf.executing_eagerly() and TF_MODE):
+      self.skipTest('Not supported in Eager.')
 
     def target_log_prob(a, b):
       return (normal.Normal(0., 1.).log_prob(a) +

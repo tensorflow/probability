@@ -104,7 +104,7 @@ MUTEX_PARAMS = (
     set(['rate1', 'log_rate1']),
     set(['rate2', 'log_rate2']),
     set(['scale', 'log_scale']),
-    set(['scale', 'scale_tril', 'scale_diag', 'scale_identity_multiplier']),
+    set(['scale', 'scale_tril', 'scale_diag']),
 )
 
 
@@ -195,187 +195,131 @@ def fix_bates(d):
 
 
 CONSTRAINTS = {
-    'atol':
-        tf.math.softplus,
-    'rtol':
-        tf.math.softplus,
-    'Dirichlet.concentration':
-        tfp_hps.softplus_plus_eps(),
-    'concentration':
-        tfp_hps.softplus_plus_eps(),
-    'GeneralizedPareto.concentration':  # Permits +ve and -ve concentrations.
-        lambda x: tf.math.tanh(x) * 0.24,
-    'concentration0':
-        tfp_hps.softplus_plus_eps(),
-    'concentration1':
-        tfp_hps.softplus_plus_eps(),
-    'concentration0_numerator':
-        tfp_hps.softplus_plus_eps(),
-    'concentration1_numerator':
-        tfp_hps.softplus_plus_eps(1.),
-    'concentration0_denominator':
-        tfp_hps.softplus_plus_eps(),
-    'concentration1_denominator':
-        tfp_hps.softplus_plus_eps(1.),
-    'covariance_matrix':
-        tfp_hps.positive_definite,
-    'df':
-        tfp_hps.softplus_plus_eps(),
-    'DeterminantalPointProcess.eigenvalues':
-        tfp_hps.softplus_plus_eps(),
-    'eigenvectors':
-        tfp_hps.orthonormal,
-    'InverseGaussian.loc':
-        tfp_hps.softplus_plus_eps(),
-    'JohnsonSU.tailweight':
-        tfp_hps.softplus_plus_eps(),
-    'PowerSpherical.mean_direction':
-        lambda x: tf.math.l2_normalize(tf.math.sigmoid(x) + 1e-6, -1),
-    'VonMisesFisher.mean_direction':  # max ndims is 3 to avoid instability.
-        lambda x: tf.math.l2_normalize(tf.math.sigmoid(x[..., :3]) + 1e-6, -1),
-    'Categorical.probs':
-        tf.math.softmax,
-    'ExpRelaxedOneHotCategorical.probs':
-        tf.math.softmax,
-    'RelaxedOneHotCategorical.probs':
-        tf.math.softmax,
-    'FiniteDiscrete.probs':
-        tf.math.softmax,
-    'Multinomial.probs':
-        tf.math.softmax,
-    'OneHotCategorical.probs':
-        tf.math.softmax,
-    'RelaxedCategorical.probs':
-        tf.math.softmax,
+    'atol': tf.math.softplus,
+    'rtol': tf.math.softplus,
+    'Dirichlet.concentration': tfp_hps.softplus_plus_eps(),
+    'concentration': tfp_hps.softplus_plus_eps(),
+    'GeneralizedPareto.concentration': (  # Permits +ve and -ve concentrations.
+        lambda x: tf.math.tanh(x) * 0.24
+    ),
+    'concentration0': tfp_hps.softplus_plus_eps(),
+    'concentration1': tfp_hps.softplus_plus_eps(),
+    'concentration0_numerator': tfp_hps.softplus_plus_eps(),
+    'concentration1_numerator': tfp_hps.softplus_plus_eps(1.0),
+    'concentration0_denominator': tfp_hps.softplus_plus_eps(),
+    'concentration1_denominator': tfp_hps.softplus_plus_eps(1.0),
+    'covariance_matrix': tfp_hps.positive_definite,
+    'df': tfp_hps.softplus_plus_eps(),
+    'DeterminantalPointProcess.eigenvalues': tfp_hps.softplus_plus_eps(),
+    'eigenvectors': tfp_hps.orthonormal,
+    'InverseGaussian.loc': tfp_hps.softplus_plus_eps(),
+    'JohnsonSU.tailweight': tfp_hps.softplus_plus_eps(),
+    'PowerSpherical.mean_direction': lambda x: tf.math.l2_normalize(
+        tf.math.sigmoid(x) + 1e-6, -1
+    ),
+    'VonMisesFisher.mean_direction': (  # max ndims is 3 to avoid instability.
+        lambda x: tf.math.l2_normalize(tf.math.sigmoid(x[..., :3]) + 1e-6, -1)
+    ),
+    'Categorical.probs': tf.math.softmax,
+    'ExpRelaxedOneHotCategorical.probs': tf.math.softmax,
+    'RelaxedOneHotCategorical.probs': tf.math.softmax,
+    'FiniteDiscrete.probs': tf.math.softmax,
+    'Multinomial.probs': tf.math.softmax,
+    'OneHotCategorical.probs': tf.math.softmax,
+    'RelaxedCategorical.probs': tf.math.softmax,
     'Zipf.power':
-        # Strictly > 1.  See also b/175929563 (rejection sampler
-        # iterates too much and emits `nan` for powers too close to 1).
-        tfp_hps.softplus_plus_eps(1 + 1e-4),
-    'ContinuousBernoulli.probs':
-        tf.sigmoid,
+    # Strictly > 1.  See also b/175929563 (rejection sampler
+    # iterates too much and emits `nan` for powers too close to 1).
+    tfp_hps.softplus_plus_eps(1 + 1e-4),
+    'ContinuousBernoulli.probs': tf.sigmoid,
     'Geometric.logits':  # TODO(b/128410109): re-enable down to -50
-        # Capping at 15. so that probability is less than 1, and entropy is
-        # defined. b/147394924
-        lambda x: tf.minimum(tf.maximum(x, -16.), 15.),  # works around the bug
-    'Geometric.probs':
-        constrain_between_eps_and_one_minus_eps(),
-    'Binomial.probs':
-        tf.sigmoid,
+    # Capping at 15. so that probability is less than 1, and entropy is
+    # defined. b/147394924
+    lambda x: tf.minimum(tf.maximum(x, -16.0), 15.0),  # works around the bug
+    'Geometric.probs': constrain_between_eps_and_one_minus_eps(),
+    'Binomial.probs': tf.sigmoid,
     # Constrain probs away from 0 to avoid immense samples.
     # See b/178842153.
-    'NegativeBinomial.logits':
-        lambda x: tf.minimum(x, 15.),
-    'NegativeBinomial.probs':
-        constrain_between_eps_and_one_minus_eps(eps0=0., eps1=1e-6),
-    'Bernoulli.probs':
-        tf.sigmoid,
-    'PlackettLuce.scores':
-        tfp_hps.softplus_plus_eps(),
-    'ProbitBernoulli.probs':
-        tf.sigmoid,
-    'RelaxedBernoulli.probs':
-        tf.sigmoid,
+    'NegativeBinomial.logits': lambda x: tf.minimum(x, 15.0),
+    'NegativeBinomial.probs': constrain_between_eps_and_one_minus_eps(
+        eps0=0.0, eps1=1e-6
+    ),
+    'Bernoulli.probs': tf.sigmoid,
+    'PlackettLuce.scores': tfp_hps.softplus_plus_eps(),
+    'ProbitBernoulli.probs': tf.sigmoid,
+    'RelaxedBernoulli.probs': tf.sigmoid,
     'cutpoints':
-        # Permit values that aren't too large
-        lambda x: ascending.Ascending().forward(10 * tf.math.tanh(x)),
+    # Permit values that aren't too large
+    lambda x: ascending.Ascending().forward(10 * tf.math.tanh(x)),
     # Capping log_rate because of weird semantics of Poisson with very
     # large rates (see b/178842153).
-    'log_rate':
-        lambda x: tf.minimum(tf.maximum(x, -16.), 15.),
+    'log_rate': lambda x: tf.minimum(tf.maximum(x, -16.0), 15.0),
     # Capping log_rate1 and log_rate2 to 15. This is because if both are large
     # (meaning the rates are `inf`), then the Skellam distribution is undefined.
-    'log_rate1':
-        lambda x: tf.minimum(tf.maximum(x, -16.), 15.),
-    'log_rate2':
-        lambda x: tf.minimum(tf.maximum(x, -16.), 15.),
-    'log_scale':
-        lambda x: tf.maximum(x, -16.),
-    'mixing_concentration':
-        tfp_hps.softplus_plus_eps(),
-    'mixing_rate':
-        tfp_hps.softplus_plus_eps(),
-    'rate':
-        tfp_hps.softplus_plus_eps(),
-    'rate1':
-        tfp_hps.softplus_plus_eps(),
-    'rate2':
-        tfp_hps.softplus_plus_eps(),
-    'scale':
-        tfp_hps.softplus_plus_eps(),
-    'GeneralizedPareto.scale':  # Avoid underflow in support bijector.
-        tfp_hps.softplus_plus_eps(1e-2),
-    'Wishart.scale':
-        tfp_hps.positive_definite,
-    'scale_diag':
-        tfp_hps.softplus_plus_eps(),
-    'scale_identity_multiplier':
-        tfp_hps.softplus_plus_eps(),
-    'scale_tril':
-        tfp_hps.lower_tril_positive_definite,
-    'tailweight':
-        tfp_hps.softplus_plus_eps(),
-    'temperature':
-        tfp_hps.softplus_plus_eps(),
-    'total_count':
-        lambda x: tf.floor(tf.sigmoid(x / 100) * 100) + 1,
-    'Bates':
-        fix_bates,
-    'Bernoulli':
-        lambda d: dict(d, dtype=tf.float32),
-    'CholeskyLKJ':
-        fix_lkj,
-    'LKJ':
-        fix_lkj,
+    'log_rate1': lambda x: tf.minimum(tf.maximum(x, -16.0), 15.0),
+    'log_rate2': lambda x: tf.minimum(tf.maximum(x, -16.0), 15.0),
+    'log_scale': lambda x: tf.maximum(x, -16.0),
+    'mixing_concentration': tfp_hps.softplus_plus_eps(),
+    'mixing_rate': tfp_hps.softplus_plus_eps(),
+    'rate': tfp_hps.softplus_plus_eps(),
+    'rate1': tfp_hps.softplus_plus_eps(),
+    'rate2': tfp_hps.softplus_plus_eps(),
+    'scale': tfp_hps.softplus_plus_eps(),
+    'GeneralizedPareto.scale': (  # Avoid underflow in support bijector.
+        tfp_hps.softplus_plus_eps(1e-2)
+    ),
+    'Wishart.scale': tfp_hps.positive_definite,
+    'scale_diag': tfp_hps.softplus_plus_eps(),
+    'scale_tril': tfp_hps.lower_tril_positive_definite,
+    'tailweight': tfp_hps.softplus_plus_eps(),
+    'temperature': tfp_hps.softplus_plus_eps(),
+    'total_count': lambda x: tf.floor(tf.sigmoid(x / 100) * 100) + 1,
+    'concentration_shape': tfp_hps.shapes(min_ndims=1, min_lastdimsize=2),
+    'Bates': fix_bates,
+    'Bernoulli': lambda d: dict(d, dtype=tf.float32),
+    'CholeskyLKJ': fix_lkj,
+    'LKJ': fix_lkj,
     'MultivariateNormalDiagPlusLowRank.scale_diag':
-        # Ensure that the diagonal component is large enough to avoid being
-        # overwhelmed  by the (singular) low-rank perturbation.
-        tfp_hps.softplus_plus_eps(1. + 1e-6),
-    'MultivariateNormalDiagPlusLowRank.scale_perturb_diag':
-        tfp_hps.softplus_plus_eps(),
+    # Ensure that the diagonal component is large enough to avoid being
+    # overwhelmed  by the (singular) low-rank perturbation.
+    tfp_hps.softplus_plus_eps(1.0 + 1e-6),
+    'MultivariateNormalDiagPlusLowRank.scale_perturb_diag': (
+        tfp_hps.softplus_plus_eps()
+    ),
     'MultivariateNormalDiagPlusLowRank.scale_perturb_factor':
-        # Prevent large low-rank perturbations from creating numerically
-        # singular matrices.
-        tf.math.tanh,
+    # Prevent large low-rank perturbations from creating numerically
+    # singular matrices.
+    tf.math.tanh,
     'MultivariateNormalDiagPlusLowRankCovariance.cov_diag_factor':
-        # Ensure that the diagonal component is large enough to avoid being
-        # overwhelmed  by the (singular) low-rank perturbation.
-        tfp_hps.softplus_plus_eps(1. + 1e-6),
+    # Ensure that the diagonal component is large enough to avoid being
+    # overwhelmed  by the (singular) low-rank perturbation.
+    tfp_hps.softplus_plus_eps(1.0 + 1e-6),
     'MultivariateNormalDiagPlusLowRankCovariance.cov_perturb_factor':
-        # Prevent large low-rank perturbations from creating numerically
-        # singular matrices.
-        tf.math.tanh,
-    'NormalInverseGaussian':
-        fix_normal_inverse_gaussian,
-    'PERT':
-        fix_pert,
-    'Triangular':
-        fix_triangular,
-    'TruncatedCauchy':
-        lambda d: dict(  # pylint:disable=g-long-lambda
-            d,
-            high=tfp_hps.ensure_high_gt_low(
-                d['low'], d['high'])),
-    'TruncatedNormal':
-        fix_truncated_normal,
-    'Uniform':
-        lambda d: dict(  # pylint:disable=g-long-lambda
-            d,
-            high=tfp_hps.ensure_high_gt_low(
-                d['low'], d['high'])),
-    'SphericalUniform':
-        fix_spherical_uniform,
-    'Wishart':
-        fix_wishart,
-    'WishartTriL':
-        fix_wishart,
-    'Zipf':
-        lambda d: dict(d, dtype=tf.float32),
-    'FiniteDiscrete':
-        fix_finite_discrete,
-    'GeneralizedNormal.power':
-        tfp_hps.softplus_plus_eps(),
-    'TwoPieceNormal.skewness':
-        tfp_hps.softplus_plus_eps(),
+    # Prevent large low-rank perturbations from creating numerically
+    # singular matrices.
+    tf.math.tanh,
+    'NormalInverseGaussian': fix_normal_inverse_gaussian,
+    'OrderedLogistic': lambda d: dict(d, dtype=tf.float32),
+    'OnehotCategorical': lambda d: dict(d, dtype=tf.float32),
+    'PERT': fix_pert,
+    'StoppingRatioLogistic': lambda d: dict(d, dtype=tf.float32),
+    'Triangular': fix_triangular,
+    'TruncatedCauchy': lambda d: dict(  # pylint:disable=g-long-lambda
+        d, high=tfp_hps.ensure_high_gt_low(d['low'], d['high'])
+    ),
+    'TruncatedNormal': fix_truncated_normal,
+    'Uniform': lambda d: dict(  # pylint:disable=g-long-lambda
+        d, high=tfp_hps.ensure_high_gt_low(d['low'], d['high'])
+    ),
+    'SphericalUniform': fix_spherical_uniform,
+    'Wishart': fix_wishart,
+    'WishartTriL': fix_wishart,
+    'Zipf': lambda d: dict(d, dtype=tf.float32),
+    'FiniteDiscrete': fix_finite_discrete,
+    'GeneralizedNormal.power': tfp_hps.softplus_plus_eps(),
+    'TwoPieceNormal.skewness': tfp_hps.softplus_plus_eps(),
+    'TwoPieceStudentT.skewness': tfp_hps.softplus_plus_eps(),
+    'NoncentralChi2.noncentrality': tf.math.softplus,
 }
 
 
@@ -1473,7 +1417,10 @@ def mixtures(draw,
   # the weird edge case gets fixed.
   def nested_eligibility_filter(dist_name):
     # TODO(b/204209547): Re-enable Categorical.
-    if dist_name in ['Categorical', 'MixtureSameFamily']:
+    if dist_name in ['Categorical',
+                     'OrderedLogistic',
+                     'StoppingRatioLogistic',
+                     'MixtureSameFamily']:
       return False
     return eligibility_filter(dist_name)
 

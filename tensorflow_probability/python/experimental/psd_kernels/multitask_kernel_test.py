@@ -27,27 +27,28 @@ from tensorflow_probability.python.math.psd_kernels import exponentiated_quadrat
 
 
 @test_util.test_all_tf_execution_regimes
-class MultiTaskKernelTest(test_util.TestCase):
+class _MultiTaskKernelTest(object):
 
   def testIndependentShape(self):
-    amplitude = np.random.uniform(2, 3., size=[3, 1, 2]).astype(np.float32)
-    length_scale = np.random.uniform(2, 3., size=[1, 3, 1]).astype(np.float32)
+    amplitude = np.random.uniform(2, 3., size=[3, 1, 2]).astype(self.dtype)
+    length_scale = np.random.uniform(2, 3., size=[1, 3, 1]).astype(self.dtype)
     base_kernel = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude, length_scale)
     kernel = multitask_kernel.Independent(num_tasks=5, base_kernel=base_kernel)
     self.assertAllEqual([3, 3, 2], self.evaluate(kernel.batch_shape_tensor()))
     matrix_over_all_tasks = kernel.matrix_over_all_tasks(
-        tf.ones([4, 1, 1, 1, 3, 2]), tf.ones([5, 1, 1, 1, 1, 4, 2]))
+        np.ones([4, 1, 1, 1, 3, 2], dtype=self.dtype),
+        np.ones([5, 1, 1, 1, 1, 4, 2], dtype=self.dtype))
     self.assertAllEqual([5, 4, 3, 3, 2, 15, 20], self.evaluate(
         matrix_over_all_tasks.shape_tensor()))
 
   def testSeparableShape(self):
-    amplitude = np.random.uniform(2, 3., size=[3, 1, 2]).astype(np.float32)
-    length_scale = np.random.uniform(2, 3., size=[1, 3, 1]).astype(np.float32)
+    amplitude = np.random.uniform(2, 3., size=[3, 1, 2]).astype(self.dtype)
+    length_scale = np.random.uniform(2, 3., size=[1, 3, 1]).astype(self.dtype)
     base_kernel = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude, length_scale)
     task_kernel_matrix_linop = tf.linalg.LinearOperatorIdentity(
-        5, batch_shape=[4, 1, 1, 1])
+        5, batch_shape=[4, 1, 1, 1], dtype=self.dtype)
 
     kernel = multitask_kernel.Separable(
         num_tasks=5,
@@ -56,10 +57,54 @@ class MultiTaskKernelTest(test_util.TestCase):
     self.assertAllEqual(
         [4, 3, 3, 2], self.evaluate(kernel.batch_shape_tensor()))
     matrix_over_all_tasks = kernel.matrix_over_all_tasks(
-        tf.ones([4, 1, 1, 1, 3, 2]), tf.ones([5, 1, 1, 1, 1, 4, 2]))
+        np.ones([4, 1, 1, 1, 3, 2], dtype=self.dtype),
+        np.ones([5, 1, 1, 1, 1, 4, 2], dtype=self.dtype))
     self.assertAllEqual([5, 4, 3, 3, 2, 15, 20], self.evaluate(
         matrix_over_all_tasks.shape_tensor()))
 
+  def testSeparableScale(self):
+    amplitude = np.random.uniform(2, 3., size=[1, 2]).astype(self.dtype)
+    length_scale = np.random.uniform(2, 3., size=[3, 1]).astype(self.dtype)
+    base_kernel = exponentiated_quadratic.ExponentiatedQuadratic(
+        amplitude, length_scale)
+
+    task_kernel_matrix = np.random.randn(3, 1, 5, 5).astype(self.dtype)
+    task_kernel_matrix = np.matmul(
+        task_kernel_matrix, np.transpose(task_kernel_matrix, [0, 1, 3, 2]))
+    task_kernel_matrix = task_kernel_matrix + np.eye(5)
+    task_kernel_matrix = task_kernel_matrix.astype(self.dtype)
+    task_kernel_scale = np.linalg.cholesky(
+        task_kernel_matrix).astype(self.dtype)
+    task_kernel_matrix_linop = tf.linalg.LinearOperatorFullMatrix(
+        task_kernel_matrix)
+    task_kernel_scale_linop = tf.linalg.LinearOperatorFullMatrix(
+        task_kernel_scale)
+
+    kernel1 = multitask_kernel.Separable(
+        num_tasks=5,
+        base_kernel=base_kernel,
+        task_kernel_matrix_linop=task_kernel_matrix_linop)
+    kernel2 = multitask_kernel.Separable(
+        num_tasks=5,
+        base_kernel=base_kernel,
+        task_kernel_scale_linop=task_kernel_scale_linop)
+
+    x = np.random.randn(3, 2).astype(self.dtype)
+    y = np.random.randn(4, 2).astype(self.dtype)
+    matrix_over_all_tasks1 = kernel1.matrix_over_all_tasks(x, y)
+    matrix_over_all_tasks2 = kernel2.matrix_over_all_tasks(x, y)
+    matrix_over_all_tasks1, matrix_over_all_tasks2 = self.evaluate([
+        matrix_over_all_tasks1.to_dense(), matrix_over_all_tasks2.to_dense()])
+    self.assertAllClose(matrix_over_all_tasks1, matrix_over_all_tasks2)
+
+
+class MultiTaskKernelTestFloat32(test_util.TestCase, _MultiTaskKernelTest):
+  dtype = np.float32
+
+
+class MultiTaskKernelTestFloat64(test_util.TestCase, _MultiTaskKernelTest):
+  dtype = np.float64
+
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

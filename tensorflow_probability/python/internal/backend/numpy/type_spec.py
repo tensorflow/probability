@@ -14,30 +14,10 @@
 # ============================================================================
 """Numpy stub for `type_spec`."""
 
-import re
-
 __all__ = [
-    'lookup',
-    'register',
     'BatchableTypeSpec',
     'TypeSpec',
 ]
-
-_TYPE_SPEC_TO_NAME = {}
-_NAME_TO_TYPE_SPEC = {}
-_REGISTERED_NAME_RE = re.compile(r'^(\w+\.)+\w+$')
-
-
-def register(_):
-  """No-op for registering a `tf.TypeSpec` for `saved_model`."""
-  def decorator_fn(cls):
-    return cls
-  return decorator_fn
-
-
-def lookup(_):
-  # Raise ValueError instead of NotImplementedError to conform to TF.
-  raise ValueError('`TypeSpec`s are not registered in Numpy/JAX.')
 
 
 class TypeSpec(object):

@@ -17,9 +17,12 @@
 #   methods, including modeling and Bayesian inference. APIs here are
 #   meant to evolve over time.
 
+# Placeholder: py_library
+
 licenses(["notice"])
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -38,6 +41,7 @@ py_library(
         "//tensorflow_probability/python/glm",
         "//tensorflow_probability/python/internal",
         "//tensorflow_probability/python/internal:all_util",
+        "//tensorflow_probability/python/internal:lazy_loader",
         "//tensorflow_probability/python/layers",
         "//tensorflow_probability/python/math",
         "//tensorflow_probability/python/mcmc",

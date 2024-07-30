@@ -22,6 +22,7 @@ load(
 )
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -56,6 +57,7 @@ multi_substrate_py_test(
     ],
     deps = [
         ":manual_special_functions",
+        # mock dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",

@@ -470,8 +470,8 @@ class JointDistributionNamed(_JointDistributionNamed,
       else:
         model = kwargs.get('model')
 
-      if not all(isinstance(d, tf.__internal__.CompositeTensor) or callable(d)
-                 for d in tf.nest.flatten(model)):
+      if not all(auto_composite_tensor.is_composite_tensor(d)
+                 or callable(d) for d in tf.nest.flatten(model)):
         return _JointDistributionNamed(*args, **kwargs)
     return super(JointDistributionNamed, cls).__new__(cls)
 
@@ -509,7 +509,7 @@ class _JointDistributionNamedSpec(
     if self._callable_params:
       components = []
       for d in tf.nest.flatten(obj.model):
-        if isinstance(d, tf.__internal__.CompositeTensor):
+        if auto_composite_tensor.is_composite_tensor(d):
           components.append(d)
     else:
       components = obj.model
@@ -526,7 +526,7 @@ class _JointDistributionNamedSpec(
   def from_instance(cls, obj):
     model_param_specs, callable_model_params = [], []
     for d in tf.nest.flatten(obj.model):
-      if isinstance(d, tf.__internal__.CompositeTensor):
+      if auto_composite_tensor.is_composite_tensor(d):
         model_param_specs.append(d._type_spec)  # pylint: disable=protected-access
       else:
         callable_model_params.append(d)
@@ -556,8 +556,7 @@ class _JointDistributionNamedSpec(
       # there are no callable elements of `model`, in which case the nested
       # structure of `model` is recorded in `param_specs`.
       structure_with_callables = tf.nest.map_structure(
-          lambda x: (None if isinstance(x, tf.__internal__.CompositeTensor)  # pylint: disable=g-long-lambda
-                     else x),
+          lambda x: None if auto_composite_tensor.is_composite_tensor(x) else x,
           obj.model)
       spec._structure_with_callables = structure_with_callables
     return spec

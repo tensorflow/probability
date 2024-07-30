@@ -115,7 +115,7 @@ class BlockwiseTest(test_util.TestCase):
     self.assertAllClose(x_, y_)
 
   def testVaryingBatchShapeErrorStatic(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Distributions must have the same `batch_shape`'):
       blockwise.Blockwise(
           [
@@ -167,7 +167,7 @@ class BlockwiseTest(test_util.TestCase):
         validate_args=True,
     )
 
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'must have at least one dimension'):
       self.evaluate(dist.prob(3.))
 

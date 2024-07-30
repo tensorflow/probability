@@ -413,7 +413,7 @@ class FiniteDiscreteFromVariableTest(test_util.TestCase):
 
   def testAssertionLastDimensionOfOutcomesAndLogits(self):
     x = tf.Variable([0., -1., -2., -3.])
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'Last dimension of outcomes and logits must be equal size.'):
       d = finite_discrete.FiniteDiscrete([1., 2., 4.],
@@ -424,7 +424,7 @@ class FiniteDiscreteFromVariableTest(test_util.TestCase):
 
   def testAssertionLastDimensionOfOutcomesAndProbs(self):
     x = tf.Variable([0.1, 0.4, 0.3, 0.2])
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Last dimension of outcomes and probs must be equal size.'):
       d = finite_discrete.FiniteDiscrete([1., 2., 4.],
                                          probs=x,
@@ -434,7 +434,7 @@ class FiniteDiscreteFromVariableTest(test_util.TestCase):
 
   def testAssertionOutcomesRanks(self):
     x = tf.Variable([0.1, 0.4, 0.3, 0.2])
-    with self.assertRaisesRegexp(ValueError, 'Rank of outcomes must be 1.'):
+    with self.assertRaisesRegex(ValueError, 'Rank of outcomes must be 1.'):
       d = finite_discrete.FiniteDiscrete([[1., 2., 3., 4.], [5., 6., 7., 8.]],
                                          probs=x,
                                          validate_args=True)
@@ -443,7 +443,7 @@ class FiniteDiscreteFromVariableTest(test_util.TestCase):
 
   def testAssertionOutcomesSize(self):
     x = tf.Variable([])
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Size of outcomes must be greater than 0.'):
       d = finite_discrete.FiniteDiscrete(
           tf.zeros([0], tf.float32), probs=x, validate_args=True)

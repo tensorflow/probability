@@ -16,13 +16,15 @@
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python import layers as tfpl
+from tensorflow_probability.python.bijectors import masked_autoregressive as masked_autoregressive_lib
+from tensorflow_probability.python.distributions import mvn_diag
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import tf_keras
+from tensorflow_probability.python.layers import distribution_layer
+from tensorflow_probability.python.layers import masked_autoregressive
 
-tfk = tf.keras
-tfkl = tf.keras.layers
+tfk = tf_keras
+tfkl = tf_keras.layers
 
 
 @test_util.test_all_tf_execution_regimes
@@ -48,14 +50,16 @@ class AutoregressiveTransformTest(test_util.TestCase):
         # Given the empty input, return a standard normal distribution with
         # matching batch_shape and event_shape of [2].
         # pylint: disable=g-long-lambda
-        tfpl.DistributionLambda(lambda t: tfd.MultivariateNormalDiag(
-            loc=tf.zeros(tf.concat([tf.shape(t)[:-1], [2]], axis=0)),
-            scale_diag=[1., 1.])),
+        distribution_layer.DistributionLambda(
+            lambda t: mvn_diag.MultivariateNormalDiag(
+                loc=tf.zeros(tf.concat([tf.shape(t)[:-1], [2]], axis=0)),
+                scale_diag=[1., 1.])),
 
         # Transform the standard normal distribution with event_shape of [2] to
         # the target distribution with event_shape of [2].
-        tfpl.AutoregressiveTransform(tfb.AutoregressiveNetwork(
-            params=2, hidden_units=[10], activation='relu')),
+        masked_autoregressive.AutoregressiveTransform(
+            masked_autoregressive_lib.AutoregressiveNetwork(
+                params=2, hidden_units=[10], activation='relu')),
     ])
 
     model.compile(optimizer='adam', loss=lambda y, rv_y: -rv_y.log_prob(y))

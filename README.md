@@ -7,6 +7,10 @@ gradient-based inference via automatic differentiation, and scalability to
 large datasets and models via hardware acceleration (e.g., GPUs) and distributed
 computation.
 
+__TFP also works as "Tensor-friendly Probability" in pure JAX!__:
+`from tensorflow_probability.substrates import jax as tfp` --
+Learn more [here](https://www.tensorflow.org/probability/examples/TensorFlow_Probability_on_JAX).
+
 Our probabilistic machine learning tools are structured as follows.
 
 __Layer 0: TensorFlow.__ Numerical operations. In particular, the LinearOperator
@@ -152,7 +156,8 @@ python -m pip install --upgrade --user tf-nightly tfp-nightly
 You can also install from source. This requires the [Bazel](
 https://bazel.build/) build system. It is highly recommended that you install
 the nightly build of TensorFlow (`tf-nightly`) before trying to build
-TensorFlow Probability from source.
+TensorFlow Probability from source. The most recent version of Bazel that TFP
+currently supports is 6.4.0; support for 7.0.0+ is WIP.
 
 ```shell
 # sudo apt-get install bazel git python-pip  # Ubuntu; others, see above links.

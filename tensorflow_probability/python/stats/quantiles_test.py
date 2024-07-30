@@ -207,7 +207,7 @@ class FindBinsTest(test_util.TestCase):
   def test_too_few_edges_raises(self):
     x = [1., 2., 3., 4.]
     edges = [2.]
-    with self.assertRaisesRegexp(ValueError, '1 or more bin'):
+    with self.assertRaisesRegex(ValueError, '1 or more bin'):
       quantiles.find_bins(x, edges)
 
 
@@ -284,6 +284,17 @@ class HistogramTest(test_util.TestCase):
         # which is approximately Sqrt[1 / (p * N)].  Bound by 4 times this,
         # which means an unseeded test fails with probability 3e-5.
         rtol=4 / np.sqrt(0.25 * n_samples))
+
+  def test_reducing_all_axes_is_same_as_default(self):
+    x = tf.constant([[1, 2, 3], [1, 2, 3.]])
+    weights = tf.ones_like(x)
+    edges = tf.constant([0, 2.5, 10])
+    axis = [0, 1]
+    counts = quantiles.histogram(x, edges=edges, axis=axis, weights=weights)
+
+    counts_no_axis = quantiles.histogram(x, edges=edges, weights=weights)
+
+    self.assertAllClose(counts, counts_no_axis)
 
   def test_2d_uniform_reduce_axis_0_yes_weights(self):
     n_samples = 1000
@@ -617,7 +628,7 @@ class PercentileTestWithLinearInterpolation(
   _interpolation = 'linear'
 
   def test_integer_dtype_raises(self):
-    with self.assertRaisesRegexp(TypeError, 'not allowed with dtype'):
+    with self.assertRaisesRegex(TypeError, 'not allowed with dtype'):
       quantiles.percentile(x=[1, 2], q=30, interpolation='linear')
 
   def test_grads_at_sample_pts_with_no_preserve_gradients(self):
@@ -762,7 +773,7 @@ class PercentileTestWithMidpointInterpolation(
   _interpolation = 'midpoint'
 
   def test_integer_dtype_raises(self):
-    with self.assertRaisesRegexp(TypeError, 'not allowed with dtype'):
+    with self.assertRaisesRegex(TypeError, 'not allowed with dtype'):
       quantiles.percentile(x=[1, 2], q=30, interpolation='midpoint')
 
 
@@ -808,12 +819,12 @@ class PercentileTestWithNearestInterpolation(test_util.TestCase):
 
   def test_invalid_interpolation_raises(self):
     x = [1., 5., 3., 2., 4.]
-    with self.assertRaisesRegexp(ValueError, 'interpolation'):
+    with self.assertRaisesRegex(ValueError, 'interpolation'):
       quantiles.percentile(x, q=0.5, interpolation='bad')
 
   def test_2d_q_raises_static(self):
     x = [1., 5., 3., 2., 4.]
-    with self.assertRaisesRegexp(ValueError, 'Expected.*ndims'):
+    with self.assertRaisesRegex(ValueError, 'Expected.*ndims'):
       quantiles.percentile(x, q=[[0.5]])
 
   def test_2d_q_raises_dynamic(self):

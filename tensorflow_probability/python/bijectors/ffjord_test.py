@@ -18,21 +18,19 @@
 
 from absl.testing import parameterized
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import ffjord
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import gradient as tfp_gradient
 
-from tensorflow.python import tf2  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
-
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_graph_and_eager_modes
 @parameterized.named_parameters([
     ('float32', np.float32),
     ('float64', np.float64),
 ])
-class FFJORDBijectorTest(tfp_test_util.TestCase):
+class FFJORDBijectorTest(test_util.TestCase):
   """Tests correctness of the Y = g(X) = FFJORD(X) transformation."""
 
   def testBijector(self, dtype):
@@ -60,7 +58,7 @@ class FFJORDBijectorTest(tfp_test_util.TestCase):
     )
 
   def testBijectorConditionKwargs(self, dtype):
-    if not tf2.enabled():
+    if not tf1.control_flow_v2_enabled():
       self.skipTest('b/152464477')
 
     tf_dtype = tf.as_dtype(dtype)
@@ -103,7 +101,7 @@ class FFJORDBijectorTest(tfp_test_util.TestCase):
 
   def testJacobianScaling(self, dtype):
     tf_dtype = tf.as_dtype(dtype)
-    scaling_by_two_exp = np.log(2.0)
+    scaling_by_two_exp = np.log(2.0).astype(dtype)
     scale_ode_fn = lambda t, z: scaling_by_two_exp * z
     trace_augmentation_fn = ffjord.trace_jacobian_exact
     bijector = ffjord.FFJORD(
@@ -161,18 +159,17 @@ class FFJORDBijectorTest(tfp_test_util.TestCase):
     )
 
   def testHutchinsonsNormalEstimator(self, dtype):
-    seed = 42
     tf_dtype = tf.as_dtype(dtype)
     num_dims = 10
-    np.random.seed(seed=seed)
+    np.random.seed(seed=test_util.test_seed(sampler_type='integer'))
     matrix_diagonal = np.random.uniform(size=[num_dims]).astype(dtype)
-    scaling_matrix = np.diag(matrix_diagonal)
+    scaling_matrix = np.diag(matrix_diagonal).astype(dtype)
     one_time_scale_matrix = np.diag(np.exp(matrix_diagonal))
     scale_ode_fn = lambda t, z: tf.linalg.matvec(scaling_matrix, z)
 
     def trace_augmentation_fn(ode_fn, z_shape, dtype):
       return ffjord.trace_jacobian_hutchinson(
-          ode_fn, z_shape, dtype, num_samples=128, seed=seed)
+          ode_fn, z_shape, dtype, num_samples=128, seed=test_util.test_seed())
 
     bijector = ffjord.FFJORD(
         trace_augmentation_fn=trace_augmentation_fn,
@@ -202,4 +199,4 @@ class FFJORDBijectorTest(tfp_test_util.TestCase):
 
 
 if __name__ == '__main__':
-  tfp_test_util.main()
+  test_util.main()

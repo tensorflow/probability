@@ -14,6 +14,7 @@
 # ============================================================================
 """Generalized Linear Model Fisher Scoring."""
 
+import warnings
 import numpy as np
 
 import tensorflow.compat.v1 as tf1
@@ -21,7 +22,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matvecmul
 
 
@@ -31,6 +32,9 @@ __all__ = [
     'compute_predicted_linear_response',
     'convergence_criteria_small_relative_norm_weights_change',
 ]
+
+JAX_MODE = False
+NUMPY_MODE = False
 
 
 def fit(
@@ -179,6 +183,11 @@ def fit(
   ```
 
   """
+  if fast_unsafe_numerics and (JAX_MODE or NUMPY_MODE):
+    warnings.warn(
+        '`fast_unsafe_numerics` not supported in JAX/NumPy. Disabling.')
+    fast_unsafe_numerics = False
+
   with tf.name_scope(name or 'fit'):
     [
         model_matrix,
@@ -329,8 +338,11 @@ def fit_one_step(
       predictions based on new `model_coefficients`, i.e.,
       `tf.linalg.matvec(model_matrix, model_coefficients_next) + offset`.
   """
-  with tf.name_scope(name or 'fit_one_step'):
+  if fast_unsafe_numerics and (JAX_MODE or NUMPY_MODE):
+    warnings.warn('`fast_unsafe_numerics` not supported in JAX/NumPy.')
+    fast_unsafe_numerics = False
 
+  with tf.name_scope(name or 'fit_one_step'):
     [
         model_matrix,
         response,
@@ -402,14 +414,14 @@ def fit_one_step(
       # equivalent to adding the term
       # `-l2_regularizer ||coefficients||_2**2` to the log-likelihood.
       num_model_coefficients = num_cols(model_matrix)
-      batch_shape = tf.shape(model_matrix)[:-2]
+      batch_shape = ps.shape(model_matrix)[:-2]
       if l2_regularization_penalty_factor is None:
         eye = tf.eye(
             num_model_coefficients, batch_shape=batch_shape, dtype=a.dtype)
       else:
         eye = tf.linalg.tensor_diag(
             tf.cast(l2_regularization_penalty_factor, dtype=a.dtype))
-        broadcasted_shape = prefer_static.concat(
+        broadcasted_shape = ps.concat(
             [batch_shape, [num_model_coefficients, num_model_coefficients]],
             axis=0)
         eye = tf.broadcast_to(eye, broadcasted_shape)
@@ -420,9 +432,9 @@ def fit_one_step(
       l2_regularizer_ = np.array(0, dtype_util.as_numpy_dtype(a.dtype))
       return a_, b_, l2_regularizer_
 
-    a, b, l2_regularizer = prefer_static.cond(
-        prefer_static.reduce_all([
-            prefer_static.logical_or(
+    a, b, l2_regularizer = ps.cond(
+        ps.reduce_all([
+            ps.logical_or(
                 not(fast_unsafe_numerics),
                 l2_regularization_penalty_factor is not None),
             l2_regularizer > 0.
@@ -596,10 +608,10 @@ def prepare_args(model_matrix,
     use_default_model_coefficients = model_coefficients is None
     if use_default_model_coefficients:
       # User did not supply model coefficients; assume they're all zero.
-      batch_shape = tf.shape(model_matrix)[:-2]
-      num_columns = tf.shape(model_matrix)[-1]
+      batch_shape = ps.shape(model_matrix)[:-2]
+      num_columns = ps.shape(model_matrix)[-1]
       model_coefficients = tf.zeros(
-          shape=tf.concat([batch_shape, [num_columns]], axis=0),
+          shape=ps.concat([batch_shape, [num_columns]], axis=0),
           dtype=dtype, name='model_coefficients')
     else:
       # User did supply model coefficients; convert to Tensor in case it's
@@ -675,4 +687,4 @@ def num_cols(x):
   """Returns number of cols in a given `Tensor`."""
   if tf.compat.dimension_value(x.shape[-1]) is not None:
     return tf.compat.dimension_value(x.shape[-1])
-  return tf.shape(x)[-1]
+  return ps.shape(x)[-1]

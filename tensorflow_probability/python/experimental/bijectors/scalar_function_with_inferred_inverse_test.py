@@ -16,6 +16,7 @@
 
 from absl.testing import parameterized
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import chain
@@ -30,8 +31,6 @@ from tensorflow_probability.python.experimental.bijectors import scalar_function
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import gradient
-
-from tensorflow.python import tf2  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.test_all_tf_execution_regimes
@@ -228,7 +227,7 @@ class TestMakeGradientFunctionOfY(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test
   def test_grad_fn_of_y_grad_with_argument(self):
-    if not tf2.enabled():
+    if not tf1.control_flow_v2_enabled():
       self.skipTest('TF1 appears to find incorrect gradients. This is likely '
                     'not worth debugging.')
     p = tf.convert_to_tensor([2., 3., 4.])

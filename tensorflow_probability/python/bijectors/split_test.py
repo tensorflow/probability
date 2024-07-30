@@ -91,14 +91,14 @@ class _SplitBijectorTest(object):
 
   def testAssertRaisesNonVectorSplitSizes(self):
     split_sizes = self.build_input([[1, 2, 2]])
-    with self.assertRaisesRegexp(ValueError, 'must be an integer or 1-D'):
+    with self.assertRaisesRegex(ValueError, 'must be an integer or 1-D'):
       split.Split(split_sizes, validate_args=True)
 
   def testAssertRaisesWrongNumberOfOutputs(self):
     split_sizes = self.build_input([5, 3, -1])
     y = [np.random.rand(2, i) for i in [5, 3, 1, 2]]
     bijector = split.Split(split_sizes, validate_args=True)
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, "don't have the same sequence length"):
       self.evaluate(bijector.inverse(y))
 
@@ -106,14 +106,14 @@ class _SplitBijectorTest(object):
     num_splits = 3
     x = np.random.rand(4, 5, 6)
     bijector = split.Split(num_splits, axis=-2, validate_args=True)
-    with self.assertRaisesRegexp(ValueError, 'number of splits'):
+    with self.assertRaisesRegex(ValueError, 'number of splits'):
       self.evaluate(bijector.forward(x))
 
   def testAssertRaisesWrongNumSplits(self):
     num_splits = 4
     y = [np.random.rand(2, 3)] * 3
     bijector = split.Split(num_splits, validate_args=True)
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, "don't have the same sequence length"):
       self.evaluate(bijector.inverse(y))
 
@@ -165,7 +165,7 @@ class SplitBijectorTestStatic(test_util.TestCase, _SplitBijectorTest):
     return tf.convert_to_tensor(x)
 
   def assertRaisesError(self, msg):
-    return self.assertRaisesRegexp(Exception, msg)
+    return self.assertRaisesRegex(Exception, msg)
 
   @parameterized.named_parameters(
       {'testcase_name': 'fully_determined_split_sizes',
@@ -345,7 +345,7 @@ class SplitBijectorTestDynamic(test_util.TestCase, _SplitBijectorTest):
 
   def testAssertRaisesUnknownNumSplits(self):
     split_sizes = tf1.placeholder_with_default([-1, 2, 1], shape=[None])
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'must have a statically-known number of elements'):
       split.Split(num_or_size_splits=split_sizes, validate_args=True)
 

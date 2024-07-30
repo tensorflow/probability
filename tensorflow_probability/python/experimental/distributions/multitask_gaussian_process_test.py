@@ -14,11 +14,8 @@
 # ============================================================================
 """Tests for MultiTaskGaussianProcess."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 # Dependency imports
+from absl.testing import parameterized
 
 import numpy as np
 
@@ -33,6 +30,7 @@ from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic
+from tensorflow_probability.python.math.psd_kernels.internal import test_util as psd_kernel_test_util
 
 
 class InefficientSeparable(multitask_kernel.MultiTaskKernel):
@@ -152,8 +150,12 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
         observation_noise_variance=observation_noise_variance,
         validate_args=True)
 
-    index_points = np.random.uniform(-1., 1., [10, 4])
+    index_points = np.random.uniform(-1., 1., [5, 10, 4])
     observations = np.random.uniform(-1., 1., [10, num_tasks])
+
+    # Check that the internal batch_shape and event_shape methods work.
+    self.assertAllEqual([5], mtgp._batch_shape(index_points=index_points))  # pylint: disable=protected-access
+    self.assertAllEqual([10, 3], mtgp._event_shape(index_points=index_points))  # pylint: disable=protected-access
 
     multi_task_log_prob = mtgp.log_prob(
         observations, index_points=index_points)
@@ -176,6 +178,10 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
     for i in range(3):
       self.assertAllClose(
           single_task_var_, multi_task_var_[..., i], rtol=1e-3)
+
+    # Check that late-binding samples work.
+    self.evaluate(mtgp.sample(
+        seed=test_util.test_seed(), index_points=index_points))
 
   def testConstantMeanFunction(self):
     # 5x5 grid of index points in R^2 and flatten to 25x2
@@ -396,15 +402,15 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
         observation_noise_variance=observation_noise_variance,
         validate_args=True)
 
-    with self.assertRaisesRegexp(ValueError, 'match the number of tasks'):
+    with self.assertRaisesRegex(ValueError, 'match the number of tasks'):
       observations = np.linspace(-1., 1., 15).astype(np.float32)
       multitask_gp.log_prob(observations)
 
-    with self.assertRaisesRegexp(ValueError, 'match the number of tasks'):
+    with self.assertRaisesRegex(ValueError, 'match the number of tasks'):
       observations = np.linspace(-1., 1., 20).reshape(5, 4).astype(np.float32)
       multitask_gp.log_prob(observations)
 
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'match the second to last dimension'):
       observations = np.linspace(-1., 1., 18).reshape(6, 3).astype(np.float32)
       multitask_gp.log_prob(observations)
@@ -498,6 +504,88 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
     self.assertAllClose(
         self.evaluate(expected_mtgprm.log_prob(samples)),
         self.evaluate(actual_mtgprm.log_prob(samples)))
+
+  @parameterized.parameters(
+      {'foo_feature_shape': [5], 'bar_feature_shape': [3]},
+      {'foo_feature_shape': [3, 2], 'bar_feature_shape': [5]},
+      {'foo_feature_shape': [3, 2], 'bar_feature_shape': [4, 3]},
+  )
+  def testStructuredIndexPoints(self, foo_feature_shape, bar_feature_shape):
+    num_tasks = 4
+    base_kernel = exponentiated_quadratic.ExponentiatedQuadratic()
+    structured_kernel = psd_kernel_test_util.MultipartTestKernel(
+        base_kernel,
+        feature_ndims={'foo': len(foo_feature_shape),
+                       'bar': len(bar_feature_shape)})
+
+    foo_num_features = np.prod(foo_feature_shape)
+    bar_num_features = np.prod(bar_feature_shape)
+    batch_and_example_shape = [3, 2, 10]
+    index_points = np.random.uniform(
+        -1, 1, batch_and_example_shape + [foo_num_features + bar_num_features]
+        ).astype(np.float32)
+    split_index_points = tf.split(
+        index_points, [foo_num_features, bar_num_features], axis=-1)
+    structured_index_points = {
+        'foo': tf.reshape(split_index_points[0],
+                          batch_and_example_shape + foo_feature_shape),
+        'bar': tf.reshape(split_index_points[1],
+                          batch_and_example_shape + bar_feature_shape)}
+    task_kernel_matrix_linop = tf.linalg.LinearOperatorIdentity(num_tasks)
+    base_mtk = multitask_kernel.Separable(
+        num_tasks=num_tasks,
+        base_kernel=base_kernel,
+        task_kernel_matrix_linop=task_kernel_matrix_linop)
+    structured_mtk = multitask_kernel.Separable(
+        num_tasks=num_tasks,
+        base_kernel=structured_kernel,
+        task_kernel_matrix_linop=task_kernel_matrix_linop)
+    base_mtgp = multitask_gaussian_process.MultiTaskGaussianProcess(
+        base_mtk, index_points=index_points)
+    structured_mtgp = multitask_gaussian_process.MultiTaskGaussianProcess(
+        structured_mtk, index_points=structured_index_points)
+
+    self.assertAllEqual(base_mtgp.event_shape, structured_mtgp.event_shape)
+    self.assertAllEqual(base_mtgp.event_shape_tensor(),
+                        structured_mtgp.event_shape_tensor())
+    self.assertAllEqual(base_mtgp.batch_shape, structured_mtgp.batch_shape)
+    self.assertAllEqual(base_mtgp.batch_shape_tensor(),
+                        structured_mtgp.batch_shape_tensor())
+
+    s = structured_mtgp.sample(3, seed=test_util.test_seed())
+    self.assertAllClose(base_mtgp.log_prob(s), structured_mtgp.log_prob(s))
+    self.assertAllClose(base_mtgp.mean(), structured_mtgp.mean())
+    self.assertAllClose(base_mtgp.variance(), structured_mtgp.variance())
+
+    # Check that batch shapes and number of index points broadcast across
+    # different parts of index_points.
+    bcast_structured_index_points = {
+        'foo': np.random.uniform(
+            -1, 1, [2, 1] + foo_feature_shape).astype(np.float32),
+        'bar': np.random.uniform(
+            -1, 1, [3, 1, 10] + bar_feature_shape).astype(np.float32),
+    }
+    bcast_structured_mtgp = multitask_gaussian_process.MultiTaskGaussianProcess(
+        structured_mtk, index_points=bcast_structured_index_points)
+    self.assertAllEqual(base_mtgp.event_shape,
+                        bcast_structured_mtgp.event_shape)
+    self.assertAllEqual(base_mtgp.event_shape_tensor(),
+                        bcast_structured_mtgp.event_shape_tensor())
+    self.assertAllEqual(base_mtgp.batch_shape,
+                        bcast_structured_mtgp.batch_shape)
+    self.assertAllEqual(base_mtgp.batch_shape_tensor(),
+                        bcast_structured_mtgp.batch_shape_tensor())
+
+    # Iterable index points should be interpreted as single Tensors if the
+    # kernel is not structured.
+    index_points_list = tf.unstack(index_points)
+    mtgp_with_list = multitask_gaussian_process.MultiTaskGaussianProcess(
+        base_mtk, index_points=index_points_list)
+    self.assertAllEqual(base_mtgp.event_shape_tensor(),
+                        mtgp_with_list.event_shape_tensor())
+    self.assertAllEqual(base_mtgp.batch_shape_tensor(),
+                        mtgp_with_list.batch_shape_tensor())
+    self.assertAllClose(base_mtgp.log_prob(s), mtgp_with_list.log_prob(s))
 
 
 if __name__ == '__main__':

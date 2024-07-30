@@ -403,8 +403,8 @@ class JohnsonSUTest(test_util.TestCase):
     tailweight = tf.constant(2.0)
     mu = tf.constant(3.0)
     sigma = tf.constant(math.sqrt(3.0))
-    mu_v = sp_stats.johnsonsu.mean(1, 2, 3, math.sqrt(3.0))
-    sigma_v = sp_stats.johnsonsu.std(1, 2, 3, math.sqrt(3.0))
+    mu_v = sp_stats.johnsonsu.mean(1., 2., 3., math.sqrt(3.0))
+    sigma_v = sp_stats.johnsonsu.std(1., 2., 3., math.sqrt(3.0))
     n = tf.constant(100000)
     dist = johnson_su.JohnsonSU(
         skewness=skewness,
@@ -465,8 +465,8 @@ class JohnsonSUTest(test_util.TestCase):
         [[math.sqrt(2.0), math.sqrt(3.0)]] * batch_size)
 
     sp_stats_params = [
-        (1, 2, 3, math.sqrt(2.)),
-        (-1, 3, -3, math.sqrt(3.))
+        (1., 2., 3., math.sqrt(2.)),
+        (-1., 3., -3., math.sqrt(3.))
     ]
     mu_v = [sp_stats.johnsonsu.mean(*params) for params in sp_stats_params]
     sigma_v = [sp_stats.johnsonsu.std(*params) for params in sp_stats_params]
@@ -571,7 +571,7 @@ class JohnsonSUTest(test_util.TestCase):
 
   def testIncompatibleArgShapes(self):
     scale = tf1.placeholder_with_default(tf.ones([4, 1]), shape=None)
-    with self.assertRaisesRegexp(Exception, r'Incompatible shapes'):
+    with self.assertRaisesRegex(Exception, r'Incompatible shapes'):
       d = johnson_su.JohnsonSU(
           skewness=1.,
           tailweight=2.,

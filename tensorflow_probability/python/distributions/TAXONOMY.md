@@ -36,7 +36,7 @@ limitations under the License.
 [StoppingRatioLogistic](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/StoppingRatioLogistic),
 [Categorical](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/Categorical),
 [BetaBinomial](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/BetaBinomial),
-[Binormial](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/Binormial)
+[Binomial](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/Binomial)
 
 #### Distributions over [low, .., high]
 
@@ -177,8 +177,10 @@ ZeroInflatedNegativeBinomial,
 [Empirical](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/Empirical),
 [ExpRelaxedOneHotCategorical](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/ExpRelaxedOneHotCategorical)
 
-### Distributions over Linear Subspaces of R^n
+### Distributions over Unit Simplex in R^n
 
+[Dirichlet](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/Dirichlet)
+[FlatDirichlet](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/FlatDirichlet)
 [RelaxedOneHotCategorical](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/RelaxedOneHotCategorical)
 
 ### Distributions over Matrices
@@ -192,12 +194,12 @@ ZeroInflatedNegativeBinomial,
 
 [CholeskyLKJ](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/CholeskyLKJ)
 
-#### Distributions over Positive Definite Correlation Matrices
+#### Distributions over Positive Semi-definite Matrices
 
 [WishartLinearOperator](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/WishartLinearOperator),
 [WishartTriL](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/WishartTriL)
 
-#### Distributions over Positive Semi-definite Matrices
+#### Distributions over Positive Definite Correlation Matrices
 
 [LKJ](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/LKJ)
 

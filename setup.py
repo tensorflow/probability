@@ -48,6 +48,13 @@ if release:
 else:
   TFDS_PACKAGE = 'tfds-nightly'
 
+if release:
+  TF_PACKAGE = 'tensorflow >= 2.16'
+  KERAS_PACKAGE = 'tf-keras >= 2.16'
+else:
+  TF_PACKAGE = 'tf-nightly'
+  KERAS_PACKAGE = 'tf-keras-nightly'
+
 
 class BinaryDistribution(Distribution):
   """This class is needed in order to create OS specific wheels."""
@@ -70,6 +77,7 @@ setup(
     url='http://github.com/tensorflow/probability',
     license='Apache 2.0',
     packages=find_packages(),
+    python_requires='>=3.9',
     install_requires=REQUIRED_PACKAGES,
     # Add in any packaged data.
     include_package_data=True,
@@ -87,10 +95,10 @@ setup(
         'Intended Audience :: Science/Research',
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
         'Topic :: Scientific/Engineering',
         'Topic :: Scientific/Engineering :: Mathematics',
         'Topic :: Scientific/Engineering :: Artificial Intelligence',
@@ -101,6 +109,7 @@ setup(
     keywords='tensorflow probability statistics bayesian machine learning',
     extras_require={  # e.g. `pip install tfp-nightly[jax]`
         'jax': ['jax', 'jaxlib'],
+        'tf': [TF_PACKAGE, KERAS_PACKAGE],
         'tfds': [TFDS_PACKAGE],
     }
 )

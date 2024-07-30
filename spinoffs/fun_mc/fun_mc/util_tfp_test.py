@@ -17,20 +17,20 @@
 # Dependency imports
 
 from absl.testing import parameterized
-from jax.config import config as jax_config
+from jax import config as jax_config
 import numpy as np
 import tensorflow.compat.v2 as real_tf
-
 from fun_mc import backend
 from fun_mc import fun_mc_lib as fun_mc
 from fun_mc import test_util
 from fun_mc import util_tfp
 
-tf = backend.tf
+jnp = backend.jnp
 tfp = backend.tfp
 util = backend.util
 
 real_tf.enable_v2_behavior()
+real_tf.experimental.numpy.experimental_enable_numpy_behavior()
 jax_config.update('jax_enable_x64', True)
 
 
@@ -43,7 +43,8 @@ class DupBijector(tfp.bijectors.Bijector):
         inverse_min_event_ndims=[0, 0],
         validate_args=False,
         parameters={},
-        name='dup')
+        name='dup',
+    )
 
   def forward(self, x, **kwargs):
     return [x, x]
@@ -58,10 +59,10 @@ class DupBijector(tfp.bijectors.Bijector):
     return y_shape
 
   def forward_log_det_jacobian(self, x, event_ndims, **kwargs):
-    return 0.
+    return 0.0
 
   def inverse_log_det_jacobian(self, y, event_ndims, **kwargs):
-    return 0.
+    return 0.0
 
   def forward_dtype(self, x_dtype, **kwargs):
     return [x_dtype, x_dtype]
@@ -77,10 +78,9 @@ class UtilTFPTest(real_tf.test.TestCase, parameterized.TestCase):
     raise NotImplementedError()
 
   def _constant(self, value):
-    return tf.constant(value, self._dtype)
+    return jnp.array(value, self._dtype)
 
   def testWrapTransitionKernel(self):
-
     class TestKernel(tfp.mcmc.TransitionKernel):
 
       def one_step(self, current_state, previous_kernel_results):
@@ -93,45 +93,52 @@ class UtilTFPTest(real_tf.test.TestCase, parameterized.TestCase):
         return True
 
     def kernel(state, pkr):
-      return util_tfp.transition_kernel_wrapper(
-          state, pkr, TestKernel())
+      return util_tfp.transition_kernel_wrapper(state, pkr, TestKernel())
 
-    state = {'x': self._constant(0.), 'y': self._constant(1.)}
-    kr = 1.
+    state = {'x': self._constant(0.0), 'y': self._constant(1.0)}
+    kr = 1.0
     (final_state, final_kr), _ = fun_mc.trace(
         (state, kr),
         kernel,
         2,
         trace_fn=lambda *args: (),
     )
-    self.assertAllEqual({
-        'x': 2.,
-        'y': 3.
-    }, util.map_tree(np.array, final_state))
-    self.assertAllEqual(1. + 2., final_kr)
+    self.assertAllEqual(
+        {'x': 2.0, 'y': 3.0}, util.map_tree(np.array, final_state)
+    )
+    self.assertAllEqual(1.0 + 2.0, final_kr)
 
   def testBijectorToTransformFn(self):
     bijectors = [
         tfp.bijectors.Identity(),
-        tfp.bijectors.Scale(self._constant([
-            [1., 2.],
-            [3., 4.],
-        ]))
+        tfp.bijectors.Scale(
+            self._constant([
+                [1.0, 2.0],
+                [3.0, 4.0],
+            ])
+        ),
     ]
     state = [
-        tf.ones([2, 1], dtype=self._dtype),
-        tf.ones([2, 2], dtype=self._dtype)
+        jnp.ones([2, 1], dtype=self._dtype),
+        jnp.ones([2, 2], dtype=self._dtype),
     ]
     transform_fn = util_tfp.bijector_to_transform_fn(
-        bijectors, state_structure=state, batch_ndims=1)
+        bijectors, state_structure=state, batch_ndims=1
+    )
 
     fwd, (_, fwd_ldj1), fwd_ldj2 = fun_mc.call_transport_map_with_ldj(
-        transform_fn, state)
+        transform_fn, state
+    )
     self.assertAllClose(
-        [np.ones([2, 1]), np.array([
-            [1., 2.],
-            [3., 4],
-        ])], fwd)
+        [
+            np.ones([2, 1]),
+            np.array([
+                [1.0, 2.0],
+                [3.0, 4],
+            ]),
+        ],
+        fwd,
+    )
 
     true_fwd_ldj = np.array([
         np.log(1) + np.log(2),
@@ -143,38 +150,47 @@ class UtilTFPTest(real_tf.test.TestCase, parameterized.TestCase):
 
     inverse_transform_fn = util.inverse_fn(transform_fn)
     inv, (_, inv_ldj1), inv_ldj2 = fun_mc.call_transport_map_with_ldj(
-        inverse_transform_fn, state)
+        inverse_transform_fn, state
+    )
     self.assertAllClose(
-        [np.ones([2, 1]),
-         np.array([
-             [1., 1. / 2.],
-             [1. / 3., 1. / 4.],
-         ])], inv)
+        [
+            np.ones([2, 1]),
+            np.array([
+                [1.0, 1.0 / 2.0],
+                [1.0 / 3.0, 1.0 / 4.0],
+            ]),
+        ],
+        inv,
+    )
     self.assertAllClose(-true_fwd_ldj, inv_ldj1)
     self.assertAllClose(-true_fwd_ldj, inv_ldj2)
 
   def testBijectorToTransformFnMulti(self):
     bijector = DupBijector()
-    state = tf.ones([1, 2], dtype=self._dtype)
+    state = jnp.ones([1, 2], dtype=self._dtype)
     transform_fn = util_tfp.bijector_to_transform_fn(
-        bijector, state_structure=state, batch_ndims=1)
+        bijector, state_structure=state, batch_ndims=1
+    )
 
     fwd, (_, fwd_ldj1), fwd_ldj2 = fun_mc.call_transport_map_with_ldj(
-        transform_fn, state)
+        transform_fn, state
+    )
     self.assertAllClose([np.ones([1, 2]), np.ones([1, 2])], fwd)
 
-    self.assertAllClose(0., fwd_ldj1)
-    self.assertAllClose(0., fwd_ldj2)
+    self.assertAllClose(0.0, fwd_ldj1)
+    self.assertAllClose(0.0, fwd_ldj2)
 
     inverse_transform_fn = util.inverse_fn(transform_fn)
     inv, (_, inv_ldj1), inv_ldj2 = fun_mc.call_transport_map_with_ldj(
-        inverse_transform_fn, [
-            tf.ones([1, 2], dtype=self._dtype),
-            tf.ones([2, 1], dtype=self._dtype)
-        ])
+        inverse_transform_fn,
+        [
+            jnp.ones([1, 2], dtype=self._dtype),
+            jnp.ones([2, 1], dtype=self._dtype),
+        ],
+    )
     self.assertAllClose(np.ones([1, 2]), inv)
-    self.assertAllClose(0., inv_ldj1)
-    self.assertAllClose(0., inv_ldj2)
+    self.assertAllClose(0.0, inv_ldj1)
+    self.assertAllClose(0.0, inv_ldj2)
 
 
 @test_util.multi_backend_test(globals(), 'util_tfp_test')
@@ -182,7 +198,7 @@ class UtilTFPTest32(UtilTFPTest):
 
   @property
   def _dtype(self):
-    return tf.float32
+    return jnp.float32
 
 
 @test_util.multi_backend_test(globals(), 'util_tfp_test')
@@ -190,7 +206,7 @@ class UtilTFPTest64(UtilTFPTest):
 
   @property
   def _dtype(self):
-    return tf.float64
+    return jnp.float64
 
 
 del UtilTFPTest

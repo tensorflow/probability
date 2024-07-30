@@ -16,9 +16,13 @@
 
 licenses(["notice"])
 
-package(default_visibility = ["//visibility:public"])
+package(
+    # default_applicable_licenses
+    default_visibility = ["//visibility:public"],
+)
 
-pytype_strict_binary(
+# pytype_strict
+py_binary(
     name = "build_oryx_docs",
     srcs = ["build_oryx_docs.py"],
     deps = [

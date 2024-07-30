@@ -35,7 +35,6 @@ from tensorflow_probability.python.math import generic as math_generic
 from tensorflow_probability.python.math import gradient
 
 # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.util import deprecation
 from tensorflow.python.util import nest
 # pylint: enable=g-direct-tensorflow-import
 
@@ -641,15 +640,6 @@ class Bijector(tf.Module, metaclass=abc.ABCMeta):
     return self._inverse_min_event_ndims
 
   @property
-  @deprecation.deprecated(
-      '2021-08-01',
-      '`min_event_ndims` is now static for all bijectors; this property is '
-      'no longer needed.')
-  def has_static_min_event_ndims(self):
-    """Returns True if the bijector has statically-known `min_event_ndims`."""
-    return True
-
-  @property
   def is_constant_jacobian(self):
     """Returns true iff the Jacobian matrix is not a function of x.
 
@@ -1090,7 +1080,7 @@ class Bijector(tf.Module, metaclass=abc.ABCMeta):
   def __getitem__(self, slices):
     try:
       return slicing.batch_slice(
-          self, slices, bijector_x_event_ndims=self.forward_min_event_ndims)
+          self, {}, slices, bijector_x_event_ndims=self.forward_min_event_ndims)
     except ValueError as e:
       if (tf.nest.is_nested(self.forward_min_event_ndims)
           and not self._parts_interact):
@@ -1099,6 +1089,9 @@ class Bijector(tf.Module, metaclass=abc.ABCMeta):
                          '({}) does not imply a consistent batch shape.'.format(
                              self.name, self.forward_min_event_ndims)) from e
       raise e
+
+  def __iter__(self):
+    raise TypeError('{!r} object is not iterable'.format(type(self).__name__))
 
   def _broadcast_parameters_with_batch_shape(self, batch_shape, x_event_ndims):
     """Broadcasts each parameter's batch shape with the given `batch_shape`.
@@ -1289,10 +1282,13 @@ class Bijector(tf.Module, metaclass=abc.ABCMeta):
     Returns:
       params_event_ndims: Per-event parameter ranks, a `str->int dict`.
     """
-    return {
+
+    from tensorflow_probability.python.internal import parameter_properties  # pylint:disable=g-import-not-at-top
+    return {  # pylint:disable=g-complex-comprehension
         param_name: param.event_ndims
         for param_name, param in cls.parameter_properties().items()
-        if param.event_ndims is not None
+        if (param.event_ndims is not parameter_properties.NO_EVENT_NDIMS and
+            param.event_ndims is not None)
     }
 
   def _forward(self, x):
@@ -1673,6 +1669,14 @@ class Bijector(tf.Module, metaclass=abc.ABCMeta):
         `TangentSpace` has been called explicitly.
 
     """
+    return self._experimental_compute_density_correction(
+        x, tangent_space, backward_compat=backward_compat, **kwargs)
+
+  def _experimental_compute_density_correction(self,
+                                               x,
+                                               tangent_space,
+                                               backward_compat=False,
+                                               **kwargs):
     if backward_compat:
       return tangent_space.transform_dimension_preserving(x, self, **kwargs)
     else:
@@ -1949,6 +1953,23 @@ class Bijector(tf.Module, metaclass=abc.ABCMeta):
                 inverse_min_event_ndims=self.inverse_min_event_ndims,
                 dtype_x=_str_dtype(self.inverse_dtype()),
                 dtype_y=_str_dtype(self.forward_dtype())))
+
+
+class CoordinatewiseBijectorMixin(object):
+  """Mixin for Bijectors that operate coordinatewise.
+
+  This mixin identifies a `Bijector` as an coordinatewise bijector, which in
+  turn allows for potentially more efficient jacobian corrections when
+  transforming distributions over manifolds.
+  """
+
+  def _experimental_compute_density_correction(self,
+                                               x,
+                                               tangent_space,
+                                               backward_compat=False,
+                                               **kwargs):
+    del backward_compat
+    return tangent_space.transform_coordinatewise(x, self, **kwargs)
 
 
 class _AutoCompositeTensorBijectorMeta(abc.ABCMeta):

@@ -20,6 +20,7 @@ import functools
 from absl.testing import parameterized
 
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import pad
@@ -42,8 +43,6 @@ from tensorflow_probability.python.experimental.distributions import joint_distr
 from tensorflow_probability.python.internal import structural_tuple
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import generic
-
-from tensorflow.python import tf2  # pylint: disable=g-direct-tensorflow-import
 
 Root = jdc.JointDistributionCoroutine.Root
 
@@ -144,9 +143,9 @@ class JointDistributionPinnedParameterizedTest(test_util.TestCase):
     if jd_factory is jd_named or jd_factory is jd_named_autobatched:
       # JDNamed does not support unnamed args unless model is ordered.
       for args in tuple_args:
-        with self.assertRaisesRegexp(ValueError, r'unordered'):
+        with self.assertRaisesRegex(ValueError, r'unordered'):
           jdp.JointDistributionPinned(underlying, args)
-        with self.assertRaisesRegexp(ValueError, r'unordered'):
+        with self.assertRaisesRegex(ValueError, r'unordered'):
           jdp.JointDistributionPinned(underlying, *args)
       tuple_args = ()
 
@@ -416,7 +415,7 @@ class JointDistributionPinnedTest(test_util.TestCase):
       ('batch_scalar', [3], []),
       ('batch_batch', [3], [4]))
   def test_bijector_for_autobatched_model(self, pin_batch_shape, sample_shape):
-    if not tf2.enabled():
+    if not tf1.control_flow_v2_enabled():
       self.skipTest('b/183994961')
 
     @jdab.JointDistributionCoroutineAutoBatched
@@ -508,6 +507,26 @@ class JointDistributionPinnedTest(test_util.TestCase):
         normal.Normal(0., 1.).log_prob(2.), parts.unpinned.x)
     self.assertAllCloseNested(
         normal.Normal(2., 2.).log_prob(0.), parts.pinned.y)
+
+  def test_unpin(self):
+    root = jdc.JointDistributionCoroutine.Root
+
+    @jdc.JointDistributionCoroutine
+    def model():
+      loc = yield root(normal.Normal(0., 1., name='loc'))
+      scl = yield root(gamma.Gamma(1., 1., name='scl'))
+      _ = yield normal.Normal(loc, scl, name='y')
+
+    p = model.experimental_pin(y=0.5)
+    self.assertIs(model, p.unpin('y'))
+
+    p = model.experimental_pin(scl=1., y=0.5)
+    self.assertEqual(['scl'], list(p.unpin('y').pins))
+    self.assertEqual(['y'], list(p.unpin('scl').pins))
+    self.assertIs(model, p.unpin('y', 'scl'))
+    with self.assertRaisesWithPredicateMatch(
+        ValueError, r"Unrecognized.*'foo'.*['scl', 'y']"):
+      p.unpin('foo', 'y')
 
 
 if __name__ == '__main__':

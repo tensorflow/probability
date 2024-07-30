@@ -24,7 +24,9 @@ __all__ = [
 ]
 
 
-class Tanh(bijector.AutoCompositeTensorBijector):
+class Tanh(
+    bijector.CoordinatewiseBijectorMixin,
+    bijector.AutoCompositeTensorBijector):
   """Bijector that computes `Y = tanh(X)`, therefore `Y in (-1, 1)`.
 
   This can be achieved by an affine transform of the Sigmoid bijector, i.e.,

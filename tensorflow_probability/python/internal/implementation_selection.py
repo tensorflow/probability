@@ -59,16 +59,13 @@ def is_xla():
           control_flow_util.GraphOrParentsInXlaContext(ops.get_default_graph()))
 
 
-def _generate_defun_backend(func, unique_api_name, preferred_device=None):
-  # Import locally to avoid TF dependency for TFP-on-JAX.
-  from tensorflow.python.eager import function  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
-  function_attributes = {
-      _FUNCTION_API_NAME_ATTRIBUTE: unique_api_name
-  }
+def _function_with_backend(func, unique_api_name, preferred_device=None):
+  function_attributes = {_FUNCTION_API_NAME_ATTRIBUTE: unique_api_name}
   if preferred_device:
     function_attributes[_FUNCTION_DEVICE_ATTRIBUTE] = preferred_device
-  return function.defun_with_attributes(
-      func=func, attributes=function_attributes, autograph=False)
+  return tf.function(
+      func, autograph=False, experimental_attributes=function_attributes
+  )
 
 
 def never_runs_functions_eagerly(f):
@@ -140,22 +137,21 @@ def implementation_selecting(fn_name, default_fn, cpu_fn):
     if NUMPY_MODE:  # Numpy breakout.
       return cpu_fn(**kwargs)
 
-    # Import locally to avoid TF dependency for TFP-on-JAX.
-    from tensorflow.python.eager import function  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
-
     # Each time a `tf.function` is called, we will give it a unique
     # identifiable API name, so that Grappler won't get confused when it
     # sees multiple samplers in same graph, and it will be able
     # to pair up the different implementations across them.
     api_name = '{}_{}'.format(fn_name, str(uuid.uuid4()))
-    defun_default_fn = _generate_defun_backend(
+    default_fn_with_backend = _function_with_backend(
         default_fn, api_name)
-    defun_cpu_fn = _generate_defun_backend(
+    cpu_fn_with_backend = _function_with_backend(
         cpu_fn, api_name, preferred_device=_CPU_DEVICE_NAME)
 
     # Call the default sampling impl and register the CPU-specialized impl.
     # Grappler will kick in during session execution to optimize the graph.
-    samples, runtime = defun_default_fn(**kwargs)
-    function.register(defun_cpu_fn, **kwargs)
-    return samples, runtime
+    result, runtime = default_fn_with_backend(**kwargs)
+    concrete_func = cpu_fn_with_backend.get_concrete_function(**kwargs)
+    concrete_func.add_to_graph()
+    concrete_func.add_gradient_functions_to_graph()
+    return result, runtime
   return impl_selecting_fn

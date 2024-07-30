@@ -212,6 +212,7 @@ class SampleFoldTest(test_util.TestCase):
         kernel=fake_kernel,
         reducer=fake_reducer,
         seed=seed)
+    seed = test_util.clone_seed(seed)
     second_reduction_rslt, _, _ = sample_fold(
         num_steps=3,
         current_state=0.,
@@ -436,6 +437,7 @@ class SampleChainTest(test_util.TestCase):
     first_trace = sample_chain_with_burnin(
         num_results=5, current_state=0., kernel=first_fake_kernel,
         seed=seed).trace
+    seed = test_util.clone_seed(seed)
     second_trace = sample_chain_with_burnin(
         num_results=5,
         current_state=1.,  # difference should be irrelevant

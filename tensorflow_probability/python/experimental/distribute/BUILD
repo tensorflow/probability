@@ -23,6 +23,7 @@ load(
 licenses(["notice"])
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -46,6 +47,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/distributions:distribution",
         "//tensorflow_probability/python/distributions:log_prob_ratio",
         "//tensorflow_probability/python/experimental/bijectors:sharded",
+        "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:distribute_lib",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:samplers",
@@ -124,6 +126,7 @@ multi_substrate_py_test(
     size = "large",
     srcs = ["joint_distribution_test.py"],
     disabled_substrates = ["numpy"],
+    shard_count = 3,
     deps = [
         ":joint_distribution",
         ":sharded",

@@ -15,6 +15,8 @@
 # Description:
 #   Methods and objectives for variational inference.
 
+# Placeholder: py_library
+# Placeholder: py_test
 load(
     "//tensorflow_probability/python:build_defs.bzl",
     "multi_substrate_py_library",
@@ -24,6 +26,7 @@ load(
 licenses(["notice"])
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -52,6 +55,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:nest_util",
         "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/monte_carlo",
         "//tensorflow_probability/python/stats:leave_one_out",
     ],
@@ -145,6 +149,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/experimental/util",
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/math/psd_kernels:exponentiated_quadratic",
         "//tensorflow_probability/python/util:deferred_tensor",
     ],

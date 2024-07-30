@@ -21,6 +21,8 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
@@ -33,23 +35,18 @@ __all__ = [
 
 def _rotate_on_ellipse(state_parts, vectors, angle):
   new_state_parts = []
-  padded_angle = _right_pad_with_ones(angle, tf.rank(state_parts[0]))
   for state, vector in zip(state_parts, vectors):
+    padded_angle = _right_pad_with_ones(angle, ps.rank(state))
     new_state_parts.append(
         state * tf.cos(padded_angle) + vector * tf.sin(padded_angle))
   return new_state_parts
 
 
 def  _right_pad_with_ones(x, target_rank):
-  static_target_rank = tf.get_static_value(target_rank)
-  if x.shape.is_fully_defined() and static_target_rank is not None:
-    return tf.reshape(x, x.shape.concatenate([1] * (
-        int(static_target_rank) - x.shape.ndims)))
-  return tf.reshape(
-      x, tf.concat(
-          [tf.shape(x),
-           tf.ones(
-               [target_rank - tf.rank(x)], dtype=target_rank.dtype)], axis=0))
+  return tf.reshape(x, ps.concat(
+      [ps.shape(x),
+       ps.ones([target_rank - ps.rank(x)], dtype=target_rank.dtype)],
+      axis=0))
 
 
 class EllipticalSliceSamplerKernelResults(
@@ -239,7 +236,7 @@ class EllipticalSliceSampler(kernel_base.TransitionKernel):
         advance the chain.
 
     Raises:
-      TypeError: if `not log_likelihood.dtype.is_floating`.
+      TypeError: if `log_likelihood.dtype` is not floating point.
     """
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'elliptical_slice', 'one_step')):
@@ -259,19 +256,19 @@ class EllipticalSliceSampler(kernel_base.TransitionKernel):
       normal_samples = list(normal_samples) if mcmc_util.is_list_like(
           normal_samples) else [normal_samples]
       u = samplers.uniform(
-          shape=tf.shape(init_log_likelihood),
+          shape=ps.shape(init_log_likelihood),
           seed=u_seed,
-          dtype=init_log_likelihood.dtype.base_dtype,
+          dtype=dtype_util.base_dtype(init_log_likelihood.dtype),
       )
       threshold = init_log_likelihood + tf.math.log(u)
 
       starting_angle = samplers.uniform(
-          shape=tf.shape(init_log_likelihood),
+          shape=ps.shape(init_log_likelihood),
           minval=0.,
           maxval=2 * np.pi,
           name='angle',
           seed=angle_seed,
-          dtype=init_log_likelihood.dtype.base_dtype,
+          dtype=dtype_util.base_dtype(init_log_likelihood.dtype),
       )
       starting_angle_min = starting_angle - 2 * np.pi
       starting_angle_max = starting_angle
@@ -311,20 +308,20 @@ class EllipticalSliceSampler(kernel_base.TransitionKernel):
             angle,
             angle_max)
         new_angle = samplers.uniform(
-            shape=tf.shape(current_log_likelihood),
+            shape=ps.shape(current_log_likelihood),
             minval=angle_min,
             maxval=angle_max,
             seed=angle_seed,
-            dtype=angle.dtype.base_dtype
+            dtype=dtype_util.base_dtype(angle.dtype)
         )
         angle = tf.where(chain_not_done, new_angle, angle)
         next_state_parts = _rotate_on_ellipse(
             init_state_parts, normal_samples, angle)
 
         new_state_parts = []
-        broadcasted_chain_not_done = _right_pad_with_ones(
-            chain_not_done, tf.rank(next_state_parts[0]))
         for n_state, c_state in zip(next_state_parts, current_state_parts):
+          broadcasted_chain_not_done = _right_pad_with_ones(
+              chain_not_done, ps.rank(n_state))
           new_state_part = tf.where(
               broadcasted_chain_not_done, n_state, c_state)
           new_state_parts.append(new_state_part)
@@ -392,7 +389,7 @@ def _maybe_call_fn(fn,
                  else [fn_arg_list])
   if fn_result is None:
     fn_result = fn(*fn_arg_list)
-  if not fn_result.dtype.is_floating:
+  if not dtype_util.is_floating(fn_result.dtype):
     raise TypeError('`{}` must be a `Tensor` with `float` `dtype`.'.format(
         description))
   return fn_result

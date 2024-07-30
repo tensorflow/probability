@@ -178,7 +178,8 @@ def _detect_anomalies_inner(observed_time_series,
         seed=seed)
     if use_gibbs_predictive_dist:
       predictive_dist = gibbs_sampler.one_step_predictive(model,
-                                                          posterior_samples)
+                                                          posterior_samples,
+                                                          thin_every=10)
     else:
       # Rebuild the model using appropriate Seasonal components, throwing away
       # the seasonal effects fit by the Gibbs sampler. Instead, the predictive
@@ -330,8 +331,6 @@ def plot_predictions(predictions,
                      'supported. Saw shape: {}.'.format(
                          predictions.observed_time_series.shape))
 
-  num_steps = len(predictions.times)
-  time_delta = predictions.times[1] - predictions.times[0]
   time_period_length = predictions.times[-1] - predictions.times[0]
   if view_date_begin is None:
     view_date_begin = predictions.times[0] - 0.04 * time_period_length

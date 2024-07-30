@@ -18,6 +18,7 @@ Note: Many of these functions will eventually be migrated to core TensorFlow.
 """
 
 import collections
+import functools
 
 import numpy as np
 import tensorflow.compat.v2 as tf
@@ -26,8 +27,10 @@ from tensorflow_probability.python.internal import custom_gradient as tfp_custom
 from tensorflow_probability.python.internal import distribute_lib
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import variadic_reduce
 from tensorflow_probability.python.math.scan_associative import scan_associative
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -87,6 +90,9 @@ def log_combinations(n, counts, name='log_combinations'):
 
 # TODO(b/154562929): Remove this once the built-in op supports XLA.
 # TODO(b/156297366): Derivatives of this function may not always be correct.
+@deprecation.deprecated('2023-03-01',
+                        '`log_cumsum_exp` is deprecated; '
+                        ' Use `tf.math.cumulative_logsumexp` instead.')
 def log_cumsum_exp(x, axis=-1, name=None):
   """Computes log(cumsum(exp(x))).
 
@@ -252,6 +258,7 @@ def reduce_logmeanexp(input_tensor,
     log_mean_exp: The reduced tensor.
   """
   with tf.name_scope(name or 'reduce_logmeanexp'):
+    input_tensor = tf.convert_to_tensor(input_tensor)
     named_axes = distribute_lib.canonicalize_named_axis(experimental_named_axis)
     lse = distribute_lib.reduce_logsumexp(
         input_tensor,
@@ -835,3 +842,26 @@ def soft_sorting_matrix(x, temperature, name=None):
             pairwise_distances, axis=-1)[..., tf.newaxis])
     y = tf.nn.softmax(p_logits / temperature, axis=-1)
     return y
+
+
+def fix_gradient_for_broadcasting(primals, grads):
+  """Ensure `grads` have same shape as `primals`."""
+  if len(primals) != len(grads):
+    raise ValueError('Expected same number of `x` and `grads`')
+  if (all(tensorshape_util.is_fully_defined(x.shape) for x in primals) and
+      all(x.shape == primals[0].shape for x in primals)):
+    return grads
+  # Compute the leave one out broadcast shapes, and use that to compute
+  # the axes.
+  new_grads = []
+  primal_shapes = [tf.shape(x) for x in primals]
+  for i in range(len(primals)):
+    loo_primal_shapes = primal_shapes[:i] + primal_shapes[i+1:]
+    x_shape = tf.shape(primals[i])
+    loo_broadcast_shape = functools.reduce(
+        tf.broadcast_dynamic_shape, loo_primal_shapes)
+    rx, _ = tf.raw_ops.BroadcastGradientArgs(
+        s0=x_shape, s1=loo_broadcast_shape)
+    new_grads.append(
+        tf.reshape(tf.reduce_sum(grads[i], axis=rx), shape=x_shape))
+  return new_grads

@@ -320,7 +320,7 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
     ssm1 = self._dummy_model(dtype=self.dtype)
     ssm2 = self._dummy_model(dtype=np.float16)
 
-    with self.assertRaisesRegexp(Exception, 'dtype'):
+    with self.assertRaisesRegex(Exception, 'dtype'):
       _ = AdditiveStateSpaceModel(component_ssms=[ssm1, ssm2])
 
   @parameterized.named_parameters(

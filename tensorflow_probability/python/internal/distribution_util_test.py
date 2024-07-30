@@ -41,7 +41,7 @@ class ShapesFromLocAndScaleTest(test_util.TestCase):
   def test_static_loc_static_scale_non_matching_event_size_raises(self):
     loc = tf.zeros([2, 4])
     diag = tf.ones([5, 1, 3])
-    with self.assertRaisesRegexp(ValueError, 'could not be broadcast'):
+    with self.assertRaisesRegex(ValueError, 'could not be broadcast'):
       distribution_util.shapes_from_loc_and_scale(
           loc, tf.linalg.LinearOperatorDiag(diag))
 
@@ -233,7 +233,7 @@ class PadMixtureDimensionsTest(test_util.TestCase):
     gm = MixtureSameFamily(
         mixture_distribution=Categorical(probs=[0.3, 0.7]),
         components_distribution=MultivariateNormalDiag(
-            loc=[[-1., 1], [1, -1]], scale_identity_multiplier=[1.0, 0.5]))
+            loc=[[-1., 1], [1, -1]], scale_diag=[[1.0, 1.0], [0.5, 0.5]]))
 
     x = tf.constant([[1.0, 2.0], [3.0, 4.0]])
     x_pad = distribution_util.pad_mixture_dimensions(
@@ -735,7 +735,7 @@ class RotateTransposeTest(test_util.TestCase):
     return np.transpose(x, np.roll(np.arange(len(x.shape)), shift))
 
   def testRollStatic(self):
-    with self.assertRaisesRegexp(Exception, 'None'):
+    with self.assertRaisesRegex(Exception, 'None'):
       distribution_util.rotate_transpose(None, 1)
     for x in (np.ones(1), np.ones((2, 1)), np.ones((3, 2, 1))):
       for shift in np.arange(-5, 5):

@@ -38,7 +38,7 @@ from tensorflow_probability.python.internal.backend.numpy.gen import linear_oper
 from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator_util
 # from tensorflow.python.util.tf_export import tf_export
 
-__all__ = []
+__all__ = ["LinearOperatorInversion"]
 
 
 # @tf_export("linalg.LinearOperatorInversion")
@@ -193,9 +193,20 @@ class LinearOperatorInversion(linear_operator.LinearOperator):
           name=name)
 
   @property
-  def operator(self):
+  def operator(self) -> "LinearOperatorInversion":
     """The operator before inversion."""
     return self._operator
+
+  def _linop_inverse(self) -> linear_operator.LinearOperator:
+    return self.operator
+
+  def _linop_solve(
+      self,
+      left_operator: "LinearOperatorInversion",
+      right_operator: linear_operator.LinearOperator,
+  ) -> linear_operator.LinearOperator:
+    """Solve inverse of generic `LinearOperator`s."""
+    return left_operator.operator.matmul(right_operator)
 
   def _assert_non_singular(self):
     return self.operator.assert_non_singular()

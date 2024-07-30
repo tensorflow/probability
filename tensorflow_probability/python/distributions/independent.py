@@ -23,6 +23,7 @@ from tensorflow_probability.python.distributions import distribution as distribu
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import log_prob_ratio
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
@@ -85,7 +86,7 @@ class _Independent(distribution_lib.Distribution):
   ind = tfd.Independent(
       distribution=tfd.MultivariateNormalDiag(
           loc=[[-1., 1], [1, -1]],
-          scale_identity_multiplier=[1., 0.5]),
+          scale_diag=tf.tile([[1.], [0.5]], [1, 2]),
       reinterpreted_batch_ndims=1)
 
   # All batch dims have been 'absorbed' into event dims.
@@ -365,7 +366,7 @@ class Independent(
       else:
         distribution = kwargs.get('distribution')
 
-      if not isinstance(distribution, tf.__internal__.CompositeTensor):
+      if not auto_composite_tensor.is_composite_tensor(distribution):
         return _Independent(*args, **kwargs)
     return super(Independent, cls).__new__(cls)
 

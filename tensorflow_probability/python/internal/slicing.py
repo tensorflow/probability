@@ -58,7 +58,7 @@ def _sanitize_slices(slices, intended_shape, deficient_shape):
       if idx < 0:
         raise ValueError('Found multiple `...` in slices {}'.format(slices))
       num_remaining_non_newaxis_slices = sum(
-          [s is not tf.newaxis for s in slices[slices.index(Ellipsis) + 1:]])
+          s is not tf.newaxis for s in slices[slices.index(Ellipsis) + 1:])
       idx = -num_remaining_non_newaxis_slices
     elif slc is tf.newaxis:
       pass

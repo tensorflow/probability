@@ -45,12 +45,12 @@ class TrapzTest(test_util.TestCase):
     self.assertAllClose(integral, 5.0)
 
   def test_provide_multiple_axes_raises(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Only permitted to specify one axis'):
       integration.trapz(y=tf.ones((2, 3)), axis=[0, 1])
 
   def test_non_scalar_dx_raises(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Expected dx to be a scalar'):
       integration.trapz(y=tf.ones((2, 3)), dx=[0.1, 0.2])
 

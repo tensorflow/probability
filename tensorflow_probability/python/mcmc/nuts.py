@@ -997,16 +997,16 @@ def has_not_u_turn(state_diff,
       out = distribute_lib.psum(out, shard_axes)
     return out
   with tf.name_scope('has_not_u_turn'):
-    batch_dot_product_left = sum([
+    batch_dot_product_left = sum(
         reduce_sum(s_diff * m, m, axes)
         for s_diff, m, axes in zip(state_diff, momentum_left,
                                    shard_axis_names)
-    ])
-    batch_dot_product_right = sum([
+    )
+    batch_dot_product_right = sum(
         reduce_sum(s_diff * m, m, axes)
         for s_diff, m, axes in zip(state_diff, momentum_right,
                                    shard_axis_names)
-    ])
+    )
     return (batch_dot_product_left >= 0) & (batch_dot_product_right >= 0)
 
 

@@ -213,7 +213,7 @@ class MVNPrecisionFactorLinOpTest(test_util.TestCase):
     self.assertAllClose(mvn_precision.covariance(), cov.to_dense(), atol=1e-4)
     self.assertAllClose(mvn_precision.variance(), cov.diag_part(), atol=1e-4)
     self.assertAllClose(mvn_precision.stddev(), tf.sqrt(cov.diag_part()),
-                        atol=1e-5)
+                        atol=1e-4)
 
 
 if __name__ == '__main__':

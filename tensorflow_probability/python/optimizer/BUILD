@@ -18,6 +18,7 @@
 load("//tensorflow_probability/python:build_defs.bzl", "multi_substrate_py_library", "multi_substrate_py_test")
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -54,6 +55,7 @@ multi_substrate_py_library(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:tf_keras",
         "//tensorflow_probability/python/math:diag_jacobian",
     ],
 )
@@ -83,6 +85,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:tf_keras",
     ],
 )
 
@@ -184,6 +187,7 @@ multi_substrate_py_test(
     name = "nelder_mead_test",
     size = "medium",
     srcs = ["nelder_mead_test.py"],
+    shard_count = 3,
     deps = [
         ":nelder_mead",
         # numpy dep,
@@ -201,7 +205,8 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:categorical",
         "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 

@@ -192,6 +192,7 @@ class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
       if tf.executing_eagerly():
         tf.random.set_seed(seed)
       samples1 = dist.sample(n, seed)
+      seed = test_util.clone_seed(seed)
       if tf.executing_eagerly():
         tf.random.set_seed(seed)
       samples2 = dist.sample(n, seed)
@@ -448,6 +449,7 @@ class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
       if tf.executing_eagerly():
         tf.random.set_seed(seed)
       samples1 = dist.sample(n, seed)
+      seed = test_util.clone_seed(seed)
       if tf.executing_eagerly():
         tf.random.set_seed(seed)
       samples2 = dist.sample(n, seed)
@@ -650,6 +652,7 @@ class EmpiricalNdTest(test_util.VectorDistributionTestHelpers,
       if tf.executing_eagerly():
         tf.random.set_seed(seed)
       samples1 = dist.sample(n, seed)
+      seed = test_util.clone_seed(seed)
       if tf.executing_eagerly():
         tf.random.set_seed(seed)
       samples2 = dist.sample(n, seed)

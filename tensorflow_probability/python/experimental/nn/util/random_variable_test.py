@@ -72,7 +72,7 @@ class RandomVariableTest(test_util.TestCase):
     def run():
       tf.convert_to_tensor(x)
     run()
-    with self.assertRaisesRegexp(ValueError, r'different graph context'):
+    with self.assertRaisesRegex(ValueError, r'different graph context'):
       tf.convert_to_tensor(x)
 
   def test_nested_graphs(self):
@@ -88,7 +88,7 @@ class RandomVariableTest(test_util.TestCase):
       y = _inner()
       z = tf.convert_to_tensor(x, name='outer')
       return y, z
-    with self.assertRaisesRegexp(ValueError, r'different graph context'):
+    with self.assertRaisesRegex(ValueError, r'different graph context'):
       run()
 
 

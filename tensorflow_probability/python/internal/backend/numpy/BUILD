@@ -15,9 +15,13 @@
 # Description:
 #   Numpy backend.
 
+# Placeholder: py_library
+# Placeholder: py_test
+
 licenses(["notice"])
 
 package(
+    # default_applicable_licenses
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
@@ -31,6 +35,7 @@ py_library(
         ":bitwise",
         ":compat",
         ":composite_tensor",
+        ":composite_tensor_gradient",
         ":config",
         ":control_flow",
         ":data_structures",
@@ -42,7 +47,6 @@ py_library(
         ":linalg",
         ":misc",
         ":nest",
-        ":nested_structure_coder",
         ":nn",
         ":numpy_array",
         ":numpy_keras",
@@ -62,6 +66,7 @@ py_library(
         ":test_lib",
         ":tf_inspect",
         ":type_spec",
+        ":type_spec_registry",
         ":variable_utils",
         ":variables",
     ],
@@ -96,6 +101,11 @@ py_library(
 py_library(
     name = "composite_tensor",
     srcs = ["composite_tensor.py"],
+)
+
+py_library(
+    name = "composite_tensor_gradient",
+    srcs = ["composite_tensor_gradient.py"],
 )
 
 py_library(
@@ -219,12 +229,8 @@ py_library(
     srcs = ["nest.py"],
     deps = [
         # tree dep,
+        # wrapt dep,
     ],
-)
-
-py_library(
-    name = "nested_structure_coder",
-    srcs = ["nested_structure_coder.py"],
 )
 
 py_library(
@@ -313,8 +319,7 @@ py_test(
     tags = ["tfp_numpy"],
     deps = [
         ":tensor_array_ops",
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:test_util.numpy",
     ],
 )
 
@@ -369,7 +374,7 @@ genrule(
     srcs = [],
     outs = ["tensor_shape_gen.py"],
     cmd = "$(location //tensorflow_probability/python/internal/backend/meta:gen_tensor_shape) > $@",
-    exec_tools = ["//tensorflow_probability/python/internal/backend/meta:gen_tensor_shape"],
+    tools = ["//tensorflow_probability/python/internal/backend/meta:gen_tensor_shape"],
 )
 
 py_library(
@@ -385,12 +390,7 @@ py_library(
 py_library(
     name = "test_lib",
     srcs = ["test_lib.py"],
-    deps = [
-        ":nest",
-        # absl/logging dep,
-        # absl/testing:absltest dep,
-        # numpy dep,
-    ],
+    deps = [],
 )
 
 py_library(
@@ -407,6 +407,11 @@ py_library(
 py_library(
     name = "type_spec",
     srcs = ["type_spec.py"],
+)
+
+py_library(
+    name = "type_spec_registry",
+    srcs = ["type_spec_registry.py"],
 )
 
 py_library(
@@ -441,9 +446,10 @@ py_test(
     size = "small",
     srcs = ["numpy_test.py"],
     shard_count = 15,
-    tags = ["tfp_numpy"],
+    tags = ["tf1-broken"],
     deps = [
         ":numpy_testlib",
+        # tensorflow dep,
     ],
 )
 
@@ -473,7 +479,9 @@ py_test(
         "--test_mode=xla",
         # TODO(b/168718272): reduce_*([nan, nan], axis=0) (GPU)
         # histogram_fixed_width_bins fails with f32([0.]), [0.0, 0.0], 2
-        "--xla_disabled=math.reduce_min,math.reduce_max,histogram_fixed_width_bins",
+        ("--xla_disabled=math.cumulative_logsumexp,math.reduce_min,math.reduce_max,histogram_fixed_width_bins," +
+         # TODO(b/298426124): TF floomod GPU bug
+         "math.floormod"),
     ],
     main = "numpy_test.py",
     shard_count = 11,
@@ -529,12 +537,8 @@ py_library(
 )
 
 LINOP_FILES = [
-    "adjoint_registrations",
-    "cholesky_registrations",
-    "inverse_registrations",
     "linear_operator_addition",
     "linear_operator_adjoint",
-    "linear_operator_algebra",
     "linear_operator_block_diag",
     "linear_operator_block_lower_triangular",
     "linear_operator_circulant",
@@ -552,10 +556,8 @@ LINOP_FILES = [
     "linear_operator_toeplitz",
     "linear_operator_util",
     "linear_operator_zeros",
-    "matmul_registrations",
-    "registrations_util",
+    "property_hint_util",
     "slicing",
-    "solve_registrations",
 ]
 
 [genrule(
@@ -568,7 +570,7 @@ LINOP_FILES = [
         filename,
         ",".join(LINOP_FILES),
     ),
-    exec_tools = ["//tensorflow_probability/python/internal/backend/meta:gen_linear_operators"],
+    tools = ["//tensorflow_probability/python/internal/backend/meta:gen_linear_operators"],
 ) for filename in LINOP_FILES]
 
 # Rules helpful for generating new rewritten files.
@@ -582,7 +584,7 @@ LINOP_FILES = [
         filename,
         ",".join(LINOP_FILES),
     ),
-    exec_tools = ["//tensorflow_probability/python/internal/backend/meta:gen_linear_operators"],
+    tools = ["//tensorflow_probability/python/internal/backend/meta:gen_linear_operators"],
 ) for filename in LINOP_FILES]
 
 py_library(

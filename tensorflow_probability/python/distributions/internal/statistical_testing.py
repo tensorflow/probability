@@ -127,6 +127,7 @@ import itertools
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
 
@@ -1494,7 +1495,7 @@ def _random_unit_hypersphere(sample_shape, event_shape, dtype, seed):
   target_shape = tf.concat([sample_shape, event_shape], axis=0)
   return tf.math.l2_normalize(
       tf.random.normal(target_shape, seed=seed, dtype=dtype),
-      axis=-1 - tf.range(tf.size(event_shape)))
+      axis=-1 - ps.range(ps.size(event_shape)))
 
 
 def assert_multivariate_true_cdf_equal_on_projections_two_sample(

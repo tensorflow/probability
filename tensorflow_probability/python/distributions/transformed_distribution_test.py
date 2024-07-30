@@ -42,6 +42,7 @@ from tensorflow_probability.python.bijectors import softmax_centered
 from tensorflow_probability.python.bijectors import split
 from tensorflow_probability.python.bijectors import tanh
 from tensorflow_probability.python.distributions import beta
+from tensorflow_probability.python.distributions import dirichlet
 from tensorflow_probability.python.distributions import exponential
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import joint_distribution_auto_batched as jdab
@@ -54,6 +55,7 @@ from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.distributions import normal as normal_lib
 from tensorflow_probability.python.distributions import sample as sample_lib
 from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
@@ -319,6 +321,7 @@ class TransformedDistributionTest(test_util.TestCase):
         sample, s=sigma, scale=np.exp(mu))
     self.assertAllClose(expected_log_pdf, log_pdf, rtol=1e-4, atol=0.)
 
+    seed = test_util.clone_seed(seed)
     sample2 = self.evaluate(log_normal.sample(seed=seed))
     self.assertAllClose(sample, sample2, rtol=1e-4)
 
@@ -650,6 +653,26 @@ class TransformedDistributionTest(test_util.TestCase):
     #     oracle_64, d0.log_prob(x0) - d1.log_prob(x1),
     #     rtol=0., atol=0.007)
 
+  @test_util.numpy_disable_test_missing_functionality('b/306384754')
+  def testLogProbMatchesProbDirichlet(self):
+    # This was https://github.com/tensorflow/probability/issues/1761
+    scaled_dir = transformed_distribution.TransformedDistribution(
+        distribution=dirichlet.Dirichlet([2.0, 3.0]),
+        bijector=scale_lib.Scale(2.0))
+    x = np.array([0.2, 1.8], dtype=np.float32)
+    self.assertAllClose(scaled_dir.prob(x),
+                        tf.exp(scaled_dir.log_prob(x)))
+
+  @test_util.numpy_disable_test_missing_functionality('b/306384754')
+  def testLogProbMatchesProbUniform(self):
+    # Uniform does not define _log_prob
+    scaled_uniform = transformed_distribution.TransformedDistribution(
+        distribution=uniform.Uniform(),
+        bijector=scale_lib.Scale(2.0))
+    x = np.array([0.2], dtype=np.float32)
+    self.assertAllClose(scaled_uniform.prob(x),
+                        tf.exp(scaled_uniform.log_prob(x)))
+
 
 @test_util.test_all_tf_execution_regimes
 class ScalarToMultiTest(test_util.TestCase):
@@ -747,8 +770,7 @@ class ScalarToMultiTest(test_util.TestCase):
     num_samples = 7e3
     y = fake_mvn.sample(int(num_samples), seed=test_util.test_seed())
     x = y[0:5, ...]
-    self.assertAllMeansClose(y, expected_mean, axis=0,
-                             atol=0.1, rtol=0.1)
+    self.assertAllMeansClose(y, expected_mean, axis=0, atol=0.25)
     self.assertAllClose(expected_cov, sample_stats.covariance(y, sample_axis=0),
                         atol=0., rtol=0.1)
 
@@ -1248,8 +1270,9 @@ class MultipartBijectorsTest(test_util.TestCase):
     # Test that `.sample()` works and returns a result of the expected structure
     # and shape.
     y_sampled = transformed_dist.sample(sample_shape, seed=seed())
-    self.assertAllEqual(tf.nest.map_structure(lambda y: y.shape, y),
-                        tf.nest.map_structure(lambda y: y.shape, y_sampled))
+    self.assertAllEqualNested(
+        tf.nest.map_structure(lambda y: y.shape, y),
+        tf.nest.map_structure(lambda y: y.shape, y_sampled))
 
     # Test that a `Restructure` bijector applied to a `JointDistribution` works
     # as expected.

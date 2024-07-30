@@ -17,6 +17,7 @@
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.bijectors import composition
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -124,7 +125,7 @@ class JointMap(_JointMap, bijector_lib.AutoCompositeTensorBijector):
       else:
         bijectors = kwargs.get('bijectors')
       if bijectors is not None:
-        if not all(isinstance(b, tf.__internal__.CompositeTensor)
+        if not all(auto_composite_tensor.is_composite_tensor(b)
                    for b in tf.nest.flatten(bijectors)):
           return _JointMap(*args, **kwargs)
     return super(JointMap, cls).__new__(cls)
