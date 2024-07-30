@@ -51,6 +51,9 @@ def _validate_field_names(field_names):
     if name.startswith('_'):
       raise ValueError(
           'Field names cannot start with an underscore: {}'.format(name))
+    if name in dir(tuple):
+      raise ValueError(
+          'Field name {} is already a member of StructTuple'.format(name))
     if name in seen:
       raise ValueError('Encountered duplicate field name: {}'.format(name))
     seen.add(name)
