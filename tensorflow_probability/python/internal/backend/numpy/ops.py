@@ -286,6 +286,9 @@ def _default_convert_to_tensor_with_dtype(value, dtype,
     arr = np.array(value)
     if dtype is not None:
       # arr.astype(None) forces conversion to float64
+      if (np.issubdtype(arr.dtype, np.complexfloating) and
+          not np.issubdtype(dtype, np.complexfloating)):
+        arr = arr.real
       return arr.astype(dtype)
     return arr
   elif isinstance(value, complex):
