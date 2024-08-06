@@ -13,10 +13,12 @@
 # limitations under the License.
 # ============================================================================
 """Tests for Weibull distribution."""
+import math
+
 # Dependency imports
+
 import numpy as np
 from scipy import stats
-
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import gamma
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -274,12 +276,18 @@ class _WeibullTest(object):
 
     kl = kullback_leibler.kl_divergence(a, b)
     expected_kl = (
-        np.log(a_concentration / a_scale**a_concentration) -
-        np.log(b_concentration / b_scale**b_concentration) +
-        ((a_concentration - b_concentration) *
-         (np.log(a_scale) - np.euler_gamma / a_concentration)) +
-        ((a_scale / b_scale)**b_concentration *
-         np.exp(np.math.lgamma(b_concentration / a_concentration + 1.))) - 1.)
+        np.log(a_concentration / a_scale**a_concentration)
+        - np.log(b_concentration / b_scale**b_concentration)
+        + (
+            (a_concentration - b_concentration)
+            * (np.log(a_scale) - np.euler_gamma / a_concentration)
+        )
+        + (
+            (a_scale / b_scale) ** b_concentration
+            * np.exp(math.lgamma(b_concentration / a_concentration + 1.0))
+        )
+        - 1.0
+    )
 
     x = a.sample(int(1e5), seed=test_util.test_seed())
     kl_samples = a.log_prob(x) - b.log_prob(x)

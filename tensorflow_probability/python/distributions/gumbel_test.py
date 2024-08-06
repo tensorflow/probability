@@ -14,15 +14,16 @@
 # ============================================================================
 """Tests for Gumbel."""
 
+import math
+
 # Dependency imports
+
 import numpy as np
 from scipy import stats
-
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import gumbel
 from tensorflow_probability.python.distributions import kullback_leibler
-
 from tensorflow_probability.python.internal import test_util
 
 
@@ -258,12 +259,16 @@ class _GumbelTest(object):
     a = gumbel.Gumbel(loc=a_loc, scale=a_scale, validate_args=True)
     b = gumbel.Gumbel(loc=b_loc, scale=b_scale, validate_args=True)
 
-    true_kl = (np.log(b_scale) - np.log(a_scale)
-               + np.euler_gamma * (a_scale / b_scale - 1.)
-               + np.expm1((b_loc - a_loc) / b_scale
-                          + np.vectorize(np.math.lgamma)(a_scale / b_scale
-                                                         + 1.))
-               + (a_loc - b_loc) / b_scale)
+    true_kl = (
+        np.log(b_scale)
+        - np.log(a_scale)
+        + np.euler_gamma * (a_scale / b_scale - 1.0)
+        + np.expm1(
+            (b_loc - a_loc) / b_scale
+            + np.vectorize(math.lgamma)(a_scale / b_scale + 1.0)
+        )
+        + (a_loc - b_loc) / b_scale
+    )
 
     kl = kullback_leibler.kl_divergence(a, b)
 
