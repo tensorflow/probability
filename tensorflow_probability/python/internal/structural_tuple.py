@@ -142,7 +142,9 @@ def structtuple(field_names):
       """Return self as a plain tuple.  Used by copy and pickle."""
       return tuple(self)
 
-    def __getattr__(self, attr):
+    def __getattribute__(self, attr):
+      if attr.startswith('_'):
+        return super().__getattribute__(attr)
       attr_idx = self._field_name_to_index.get(attr)
       if attr_idx is None:
         raise AttributeError('StructTuple has no attribute {}'.format(attr))

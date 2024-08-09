@@ -100,6 +100,10 @@ class StructTupleTest(test_util.TestCase):
 
     self.assertEqual(3, nest_util.call_fn(foo, t(1, 2)))
 
+  def testTupleMethods(self):
+    t = structural_tuple.structtuple(['count', 'a', 'b'])
+    self.assertEqual(t(1, 2, 3).count, 1)
+
   def testMoreThan255Fields(self):
     num_fields = 1000
     t = structural_tuple.structtuple(
