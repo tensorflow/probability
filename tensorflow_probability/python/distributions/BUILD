@@ -2658,6 +2658,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "beta_test",
+    timeout = "moderate",
     srcs = ["beta_test.py"],
     jax_size = "medium",
     deps = [
