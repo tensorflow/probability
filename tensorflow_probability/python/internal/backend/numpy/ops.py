@@ -311,7 +311,7 @@ def _default_convert_to_tensor_with_dtype(value, dtype,
                                   or np.issubdtype(dtype, np.floating)):
       raise MixedTypesError()
     if dtype == np.int32 and _is_int64(value):
-      raise _Int64ToInt32Error(np.array(value, dtype=dtype))
+      raise _Int64ToInt32Error(np.array(value).astype(dtype))
     if dtype == np.bool_:
       # Can't downcast an int to a bool
       raise TypeConversionError(value, dtype)
