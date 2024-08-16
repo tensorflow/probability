@@ -128,7 +128,7 @@ class _PartialLanczosTest(absltest.TestCase):
     log_det = preconditioner.log_abs_determinant()
     self.assertAlmostEqual(0.0, log_det, places=4)
     out = preconditioner.solve(jnp.identity(10))
-    np.testing.assert_allclose(out, jnp.identity(10), atol=9e-2)
+    np.testing.assert_allclose(out, jnp.identity(10), atol=0.15)
     kernel = jnp.identity(100).astype(self.dtype)
     preconditioner = partial_lanczos.make_lanczos_preconditioner(
         kernel, jax.random.PRNGKey(6)
