@@ -17,6 +17,7 @@
 from absl import flags
 from absl.testing import parameterized
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import samplers
@@ -39,6 +40,16 @@ class RandomTest(test_util.TestCase):
     if JAX_MODE and FLAGS.test_tfp_jax_prng != 'default':
       from jax import config  # pylint: disable=g-import-not-at-top
       config.update('jax_default_prng_impl', FLAGS.test_tfp_jax_prng)
+
+  @test_util.substrate_disable_stateful_random_test
+  def test_old_salt(self):
+    if not tf1.control_flow_v2_enabled():
+      self.skipTest('TF2 only.')
+    with samplers.enable_old_salt(True):
+      seed = samplers.sanitize_seed(0, salt='nacl')
+      seed = samplers.sanitize_seed(seed, salt='kcl')
+      val = samplers.uniform([5], 0, 1000, dtype=tf.int32, seed=seed)
+      self.assertAllEqual([483, 61, 906, 125, 381], self.evaluate(val))
 
   def test_new_style_jax_keys(self):
     if not JAX_MODE:

@@ -14,6 +14,7 @@
 # ============================================================================
 """Random samplers."""
 
+import contextlib
 import hashlib
 import warnings
 
@@ -47,6 +48,18 @@ __all__ = [
 JAX_MODE = False
 
 SEED_DTYPE = np.uint32 if JAX_MODE else np.int32
+
+_old_salt = False
+
+
+@contextlib.contextmanager
+def enable_old_salt(enable):
+  global _old_salt
+  try:
+    _old_salt = enable
+    yield
+  finally:
+    _old_salt = False
 
 
 def zeros_seed():
@@ -140,9 +153,9 @@ def sanitize_seed(seed, salt=None, name=None):
     # discipline of splitting.
 
     if salt is not None:
-      salt = int(hashlib.sha512(str(salt).encode('utf-8')).hexdigest(), 16) % (
-          2**31 - 1
-      )
+      salt = int(hashlib.sha512(str(salt).encode('utf-8')).hexdigest(), 16)
+      if not _old_salt:
+        salt = salt % (2**31 - 1)
       seed = fold_in(seed, salt)
 
     if JAX_MODE:
