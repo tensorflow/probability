@@ -217,8 +217,9 @@ class PowerSpherical(distribution.AutoCompositeTensorDistribution):
     concentration1 = concentration + (event_size - 1.) / 2.
     concentration0 = (event_size - 1.) / 2.
 
-    return ((concentration1 + concentration0) * np.log(2.) +
-            concentration0 * np.log(np.pi) +
+    np_dtype = dtype_util.as_numpy_dtype(concentration.dtype)
+    return ((concentration1 + concentration0) * np.log(2.).astype(np_dtype) +
+            concentration0 * np.log(np.pi).astype(np_dtype) +
             special.log_gamma_difference(concentration0, concentration1))
 
   def _sample_control_dependencies(self, samples):
