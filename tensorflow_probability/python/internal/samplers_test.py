@@ -45,11 +45,11 @@ class RandomTest(test_util.TestCase):
   def test_old_salt(self):
     if not tf1.control_flow_v2_enabled():
       self.skipTest('TF2 only.')
-    with samplers.enable_old_salt(True):
-      seed = samplers.sanitize_seed(0, salt='nacl')
-      seed = samplers.sanitize_seed(seed, salt='kcl')
-      val = samplers.uniform([5], 0, 1000, dtype=tf.int32, seed=seed)
-      self.assertAllEqual([483, 61, 906, 125, 381], self.evaluate(val))
+    seed = samplers.sanitize_seed(0, salt='nacl')
+    seed = samplers.enable_old_salt_for_seed(seed, True)
+    seed = samplers.sanitize_seed(seed, salt='kcl')
+    val = samplers.uniform([5], 0, 1000, dtype=tf.int32, seed=seed)
+    self.assertAllEqual([483, 61, 906, 125, 381], self.evaluate(val))
 
   def test_new_style_jax_keys(self):
     if not JAX_MODE:
