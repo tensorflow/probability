@@ -476,19 +476,21 @@ class _ParticleFilterTest(test_util.TestCase):
     _, lps = self.evaluate(
         particle_filter.infer_trajectories(
             observation,
-            initial_state_prior=normal.Normal(loc=0., scale=1.),
+            initial_state_prior=normal.Normal(loc=self.dtype(0.), scale=1.),
             transition_fn=lambda _, x: normal.Normal(loc=x, scale=1.),
             observation_fn=lambda _, x: normal.Normal(loc=x, scale=1.),
-            initial_state_proposal=normal.Normal(loc=0., scale=5.),
+            initial_state_proposal=normal.Normal(loc=self.dtype(0.), scale=5.),
             proposal_fn=lambda _, x: normal.Normal(loc=x, scale=5.),
             num_particles=2048,
             seed=test_util.test_seed()))
 
     # Compare marginal likelihood against that
     # from the true (jointly normal) marginal distribution.
-    y1_marginal_dist = normal.Normal(loc=0., scale=np.sqrt(1. + 1.))
+    y1_marginal_dist = normal.Normal(loc=0.,
+                                     scale=np.sqrt(1. + 1.).astype(self.dtype))
     y2_conditional_dist = (
-        lambda y1: normal.Normal(loc=y1 / 2., scale=np.sqrt(5. / 2.)))
+        lambda y1: normal.Normal(
+            loc=y1 / self.dtype(2.), scale=np.sqrt(5. / 2.).astype(self.dtype)))
     true_lps = tf.stack(
         [y1_marginal_dist.log_prob(observation[0]),
          y2_conditional_dist(observation[0]).log_prob(observation[1])],

@@ -556,7 +556,7 @@ multi_substrate_py_test(
     size = "large",
     srcs = ["particle_filter_test.py"],
     numpy_tags = ["notap"],
-    shard_count = 3,
+    shard_count = 5,
     deps = [
         ":particle_filter",
         ":sequential_monte_carlo_kernel",
