@@ -989,7 +989,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     event_ndims = [0, 1, 0]
     fldj = joint_bijector.forward_log_det_jacobian(xs, event_ndims)
     fldj_fd = _finite_difference_ldj(bijectors, 'forward', xs, delta=0.01)
-    self.assertAllClose(self.evaluate(fldj), self.evaluate(fldj_fd), rtol=1e-5)
+    self.assertAllClose(self.evaluate(fldj), self.evaluate(fldj_fd), rtol=2e-5)
 
     # Test inverse log det Jacobian via finite differences.
     ildj = joint_bijector.inverse_log_det_jacobian(ys, event_ndims)

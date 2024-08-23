@@ -44,6 +44,7 @@ __all__ = [
 ]
 
 JAX_MODE = False
+NUMPY_MODE = False
 SKIP_DTYPE_CHECKS = False
 
 # Singleton object representing "no value", in cases where "None" is meaningful.
@@ -1914,11 +1915,12 @@ class Bijector(tf.Module, metaclass=abc.ABCMeta):
       maybe_dtype = ''
     if self.forward_min_event_ndims == self.inverse_min_event_ndims:
       maybe_min_ndims = ', min_event_ndims={}'.format(
-          self.forward_min_event_ndims)
+          _unwrap_event_ndims(self.forward_min_event_ndims))
     else:
       maybe_min_ndims = (
           ', forward_min_event_ndims={}, inverse_min_event_ndims={}'.format(
-              self.forward_min_event_ndims, self.inverse_min_event_ndims))
+              _unwrap_event_ndims(self.forward_min_event_ndims),
+              _unwrap_event_ndims(self.inverse_min_event_ndims)))
     maybe_min_ndims = maybe_min_ndims.replace('\'', '')
     return ('tfp.bijectors.{type_name}('
             '"{self_name}"'
@@ -1949,8 +1951,10 @@ class Bijector(tf.Module, metaclass=abc.ABCMeta):
                 type_name=type(self).__name__,
                 self_name=self.name or '<unknown>',
                 batch_shape=batch_shape_str,
-                forward_min_event_ndims=self.forward_min_event_ndims,
-                inverse_min_event_ndims=self.inverse_min_event_ndims,
+                forward_min_event_ndims=_unwrap_event_ndims(
+                    self.forward_min_event_ndims),
+                inverse_min_event_ndims=_unwrap_event_ndims(
+                    self.inverse_min_event_ndims),
                 dtype_x=_str_dtype(self.inverse_dtype()),
                 dtype_y=_str_dtype(self.forward_dtype())))
 
@@ -2026,7 +2030,7 @@ def check_valid_ndims(ndims, validate=True):
   assertions = []
 
   shape = ps.shape(ndims)
-  if not tf.is_tensor(shape):
+  if not tf.is_tensor(shape) or NUMPY_MODE or JAX_MODE:
     if shape.tolist():
       raise ValueError('Expected scalar, saw shape {}.'.format(shape))
   elif validate:
@@ -2390,3 +2394,7 @@ def _str_tensorshape(x):
   if tensorshape_util.rank(x) is None:
     return '?'
   return str(tensorshape_util.as_list(x)).replace('None', '?')
+
+
+def _unwrap_event_ndims(ndims):
+  return nest.map_structure(int, ndims)

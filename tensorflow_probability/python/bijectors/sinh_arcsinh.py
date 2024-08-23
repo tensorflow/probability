@@ -99,6 +99,7 @@ class SinhArcsinh(
           forward_min_event_ndims=0,
           validate_args=validate_args,
           parameters=parameters,
+          dtype=dtype,
           name=name)
 
   @classmethod
