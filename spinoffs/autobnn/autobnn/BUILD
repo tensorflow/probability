@@ -111,6 +111,7 @@ py_library(
 
 py_test(
     name = "estimators_test",
+    timeout = "long",
     srcs = ["estimators_test.py"],
     # TODO(b/322864412): enable this test in OSS.
     tags = ["no-oss-ci"],
