@@ -1,0 +1,23 @@
+# Copyright 2024 The TensorFlow Probability Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+jax >= 0.4.31
+jaxlib >=0.4.31
+matplotlib == 3.9
+ipywidgets == 8.1
+mediapy == 1.2
+fun_mc @ git+https://github.com/tensorflow/probability.git#egg=fun_mc&subdirectory=spinoffs/fun_mc
+plotly == 5.23
+pythreejs == 2.4
+tqdm == 4.66
+tfp-nightly==0.25.0.dev20240829
