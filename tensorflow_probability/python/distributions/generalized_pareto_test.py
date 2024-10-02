@@ -40,7 +40,8 @@ def generalized_paretos(draw, batch_shape=None):
   constraints = dict(
       loc=tfp_hps.identity_fn,
       scale=tfp_hps.softplus_plus_eps(),
-      concentration=lambda x: tf.math.tanh(x) * 0.24)  # <.25==safe for variance
+      # concentration < .25 ==> safe for variance
+      concentration=lambda x: tf.math.tanh(x) * 0.24 + 1e-6)
 
   params = draw(
       tfp_hps.broadcasting_params(
