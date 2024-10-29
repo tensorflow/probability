@@ -61,9 +61,9 @@ class DefaultModelTests(test_util.TestCase):
     self.assertIsInstance(model.components[0],
                           local_linear_trend.LocalLinearTrend)
     self.assertIsInstance(model.components[1], seasonal.Seasonal)
-    self.assertContainsSubsequence(model.components[1].name, 'HOUR_OF_DAY')
+    self.assertIn('HOUR_OF_DAY', model.components[1].name)
     self.assertIsInstance(model.components[2], seasonal.Seasonal)
-    self.assertContainsSubsequence(model.components[2].name, 'DAY_OF_WEEK')
+    self.assertIn('DAY_OF_WEEK', model.components[2].name)
 
   def test_explicit_base_component(self):
     series = self._build_test_series(shape=[48], freq=pd.DateOffset(hours=1))
