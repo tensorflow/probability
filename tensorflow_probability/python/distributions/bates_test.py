@@ -257,7 +257,7 @@ class BatesTest(test_util.TestCase):
     x = tf.linspace(low, high, nx)
     y = self.evaluate(d.prob(x))
     dx = self.evaluate(x[1] - x[0])
-    self.assertAllClose(scipy.integrate.simps(y=y, dx=dx), 1.,
+    self.assertAllClose(scipy.integrate.simpson(y=y, dx=dx), 1.,
                         atol=5e-05, rtol=5e-05)
 
   def testBatesPDFonNaNs(self):
