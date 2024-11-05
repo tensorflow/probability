@@ -102,6 +102,8 @@ class ScalarFunctionWithInferredInverseTests(test_util.TestCase):
     self.assertAllClose(ildj, ildj_true, atol=1e-4)
     self.assertAllClose(ildj_grad, ildj_grad_true, rtol=1e-4)
 
+  @test_util.disable_test_for_backend(
+      disable_jax=True, reason='Tracer leak from additional parameters.')
   @test_util.numpy_disable_gradient_test
   @parameterized.named_parameters(
       {

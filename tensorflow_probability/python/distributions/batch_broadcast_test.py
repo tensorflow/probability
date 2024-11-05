@@ -40,12 +40,23 @@ from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.random import random_ops
 
+_DIFFERENT_HYPOTHESIS_KWARGS = {}
+
+# This check is done on recent versions of hypothesis, but not all,
+# as of November 2024.
+if hasattr(hp.HealthCheck, 'differing_executors'):
+  _DIFFERENT_HYPOTHESIS_KWARGS['suppress_health_check'] = [
+      hp.HealthCheck.differing_executors
+  ]
+
 
 @test_util.test_all_tf_execution_regimes
 class _BatchBroadcastTest(object):
 
   @hp.given(hps.data())
-  @tfp_hps.tfp_hp_settings(default_max_examples=5)
+  @tfp_hps.tfp_hp_settings(
+      default_max_examples=5,
+      **_DIFFERENT_HYPOTHESIS_KWARGS)
   def test_shapes(self, data):
     batch_shape = data.draw(tfp_hps.shapes())
     bcast_arg, dist_batch_shp = data.draw(
@@ -63,7 +74,9 @@ class _BatchBroadcastTest(object):
                         dist.event_shape_tensor())
 
   @hp.given(hps.data())
-  @tfp_hps.tfp_hp_settings(default_max_examples=5)
+  @tfp_hps.tfp_hp_settings(
+      default_max_examples=5,
+      **_DIFFERENT_HYPOTHESIS_KWARGS)
   def test_sample(self, data):
     batch_shape = data.draw(tfp_hps.shapes())
     bcast_arg, dist_batch_shp = data.draw(
@@ -109,7 +122,9 @@ class _BatchBroadcastTest(object):
     self.assertAllClose(lp, dist.log_prob(sample2))
 
   @hp.given(hps.data())
-  @tfp_hps.tfp_hp_settings(default_max_examples=5)
+  @tfp_hps.tfp_hp_settings(
+      default_max_examples=5,
+      **_DIFFERENT_HYPOTHESIS_KWARGS)
   def test_log_prob(self, data):
     batch_shape = data.draw(tfp_hps.shapes())
     bcast_arg, dist_batch_shp = data.draw(
@@ -235,7 +250,9 @@ class _BatchBroadcastTest(object):
     self.evaluate(lp)
 
   @hp.given(hps.data())
-  @tfp_hps.tfp_hp_settings(default_max_examples=5)
+  @tfp_hps.tfp_hp_settings(
+      default_max_examples=5,
+      **_DIFFERENT_HYPOTHESIS_KWARGS)
   def test_default_bijector(self, data):
     batch_shape = data.draw(tfp_hps.shapes())
     bcast_arg, dist_batch_shp = data.draw(
