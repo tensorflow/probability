@@ -28,7 +28,6 @@ desired statistical significance, are hard-coded in this source file.
 
 import pprint
 
-# Dependency imports
 from absl import app
 from absl import flags
 

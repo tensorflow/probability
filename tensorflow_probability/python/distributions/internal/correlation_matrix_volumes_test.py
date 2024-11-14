@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for correlation_matrix_volumes_lib.py."""
 
-# Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
 
