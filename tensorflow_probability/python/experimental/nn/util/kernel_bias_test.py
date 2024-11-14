@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for kernel_bias."""
 
-# Dependency imports
-
 from tensorflow_probability.python.experimental.nn.util import kernel_bias
 from tensorflow_probability.python.internal import test_util
 

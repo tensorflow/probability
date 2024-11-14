@@ -16,7 +16,6 @@
 
 import collections
 
-# Dependency imports
 from absl.testing import parameterized
 
 import tensorflow.compat.v2 as tf

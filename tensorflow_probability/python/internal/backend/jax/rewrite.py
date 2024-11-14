@@ -14,8 +14,6 @@
 # ============================================================================
 """Rewrite script for NP->JAX."""
 
-# Dependency imports
-
 from absl import app
 from absl import flags
 

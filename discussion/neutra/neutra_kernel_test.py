@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests NeuTra."""
 
-# Dependency imports
 from absl.testing import parameterized
 
 import tensorflow.compat.v1 as tf

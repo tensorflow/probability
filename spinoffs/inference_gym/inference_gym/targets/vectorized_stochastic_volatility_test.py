@@ -14,8 +14,6 @@
 
 import functools
 
-# Dependency imports
-
 from absl import logging
 from absl.testing import parameterized
 import numpy as np

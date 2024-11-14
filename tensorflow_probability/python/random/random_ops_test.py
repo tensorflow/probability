@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for generating random samples."""
 
-# Dependency imports
 import numpy as np
 
 import tensorflow.compat.v1 as tf1

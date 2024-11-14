@@ -27,8 +27,6 @@ import collections
 import pprint
 import time
 
-# Dependency imports
-
 import tensorflow.compat.v2 as tf
 
 RUNTIME_EAGER = 'eager'
