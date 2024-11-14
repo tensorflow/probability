@@ -27,7 +27,6 @@ The architecture is LeNet-5 [1].
 import os
 import warnings
 
-# Dependency imports
 from absl import app
 from absl import flags
 import matplotlib

@@ -33,7 +33,6 @@ import functools
 import os
 import time
 
-# Dependency imports
 from absl import flags
 from matplotlib import cm
 from matplotlib import figure

@@ -37,7 +37,6 @@ To run with default arguments:
 import os
 import warnings
 
-# Dependency imports
 from absl import flags
 import matplotlib
 import numpy as np

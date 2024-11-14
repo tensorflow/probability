@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for GLM fitting with Proximal Hessian method."""
 
-# Dependency imports
-
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
