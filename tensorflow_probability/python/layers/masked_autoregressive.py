@@ -14,7 +14,6 @@
 # ============================================================================
 """Layers for normalizing flows and masked autoregressive density estimation."""
 
-# Dependency imports
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import masked_autoregressive as masked_autoregressive_lib

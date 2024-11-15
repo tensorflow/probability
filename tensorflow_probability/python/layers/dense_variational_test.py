@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for dense variational layers."""
 # pylint: disable=g-import-not-at-top
-# Dependency imports
 try:
   from keras.testing_infra import test_utils as keras_test_utils
 except ImportError:

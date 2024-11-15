@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for tensorflow_probability.layers Keras initializers."""
 
-# Dependency imports
 import numpy as np
 
 from tensorflow_probability.python.internal import test_util

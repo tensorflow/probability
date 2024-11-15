@@ -20,7 +20,6 @@ import functools
 import io
 import pickle
 
-# Dependency imports
 from cloudpickle import CloudPickler
 import numpy as np
 import six
