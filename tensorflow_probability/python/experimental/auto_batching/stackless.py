@@ -22,7 +22,6 @@ import contextlib
 import functools
 import heapq
 
-# Dependency imports
 from absl import logging
 import six
 from tensorflow_probability.python.experimental.auto_batching import instructions as inst

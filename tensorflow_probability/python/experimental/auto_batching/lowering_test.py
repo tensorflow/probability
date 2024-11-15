@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests of the FunctionCallOp lowering compilation pass."""
 
-# Dependency imports
-
 from tensorflow_probability.python.experimental.auto_batching import allocation_strategy
 from tensorflow_probability.python.experimental.auto_batching import lowering
 from tensorflow_probability.python.experimental.auto_batching import numpy_backend

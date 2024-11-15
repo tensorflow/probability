@@ -19,7 +19,6 @@ import functools
 import inspect
 import textwrap
 
-# Dependency imports
 from absl import logging
 import numpy as np
 import six

@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests of the instruction language (and definitional interpreter)."""
 
-# Dependency imports
 import numpy as np
 
 from tensorflow_probability.python.experimental.auto_batching import instructions

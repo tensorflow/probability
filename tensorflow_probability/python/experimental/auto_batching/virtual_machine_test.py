@@ -16,8 +16,6 @@
 
 import functools
 
-# Dependency imports
-
 from absl import flags
 
 import numpy as np

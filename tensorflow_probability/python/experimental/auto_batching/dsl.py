@@ -24,8 +24,6 @@ import collections
 import contextlib
 import inspect
 
-# Dependency imports
-
 from tensorflow_probability.python.experimental.auto_batching import instructions as inst
 
 __all__ = [

@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests of the instruction language (and definitional interpreter)."""
 
-# Dependency imports
-
 from tensorflow_probability.python.experimental.auto_batching import instructions
 from tensorflow_probability.python.experimental.auto_batching import test_programs
 from tensorflow_probability.python.internal import test_util as tfp_test_util

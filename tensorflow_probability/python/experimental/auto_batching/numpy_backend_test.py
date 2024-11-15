@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for implementations of batched variables."""
 
-# Dependency imports
 import hypothesis as hp
 from hypothesis import strategies as hps
 from hypothesis.extra import numpy as hpnp

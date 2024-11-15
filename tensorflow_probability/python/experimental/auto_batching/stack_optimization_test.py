@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Dependency imports
-
 from tensorflow_probability.python.experimental.auto_batching import stack_optimization as stack
 from tensorflow_probability.python.experimental.auto_batching import test_programs
 from tensorflow_probability.python.internal import test_util as tfp_test_util

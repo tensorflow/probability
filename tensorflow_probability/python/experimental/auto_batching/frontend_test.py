@@ -16,7 +16,6 @@
 
 import collections
 
-# Dependency imports
 from absl import logging
 import numpy as np
 

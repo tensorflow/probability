@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests of the FunctionCallOp lowering compilation pass."""
 
-# Dependency imports
-
 import tensorflow.compat.v1 as tf1
 
 from tensorflow_probability.python.experimental.auto_batching import allocation_strategy

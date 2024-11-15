@@ -20,7 +20,6 @@ Implements VM variable stack and registers backed by TF `Tensor`s.
 import collections
 import contextlib
 
-# Dependency imports
 import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf

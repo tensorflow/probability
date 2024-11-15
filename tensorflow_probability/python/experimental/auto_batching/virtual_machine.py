@@ -17,8 +17,6 @@
 import contextlib
 import functools
 
-# Dependency imports
-
 from absl import logging
 import six
 

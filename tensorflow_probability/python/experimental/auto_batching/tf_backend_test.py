@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for the TF implementations of auto-batched VM variables."""
 
-# Dependency imports
-
 import hypothesis as hp
 from hypothesis import strategies as hps
 from hypothesis.extra import numpy as hpnp

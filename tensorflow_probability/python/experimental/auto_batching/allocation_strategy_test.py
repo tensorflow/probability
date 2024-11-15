@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests of the allocation strategy optimization pass."""
 
-# Dependency imports
-
 from tensorflow_probability.python.experimental.auto_batching import allocation_strategy
 from tensorflow_probability.python.experimental.auto_batching import instructions as inst
 from tensorflow_probability.python.experimental.auto_batching import test_programs
