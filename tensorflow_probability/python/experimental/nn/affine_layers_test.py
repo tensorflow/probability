@@ -15,8 +15,6 @@
 """Tests for affine_layers.py."""
 
 import functools
-# Dependency imports
-
 from absl.testing import parameterized
 
 import numpy as np

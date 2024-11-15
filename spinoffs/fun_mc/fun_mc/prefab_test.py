@@ -17,8 +17,6 @@
 import functools
 import os
 
-# Dependency imports
-
 import jax as real_jax
 from jax import config as jax_config
 import numpy as np

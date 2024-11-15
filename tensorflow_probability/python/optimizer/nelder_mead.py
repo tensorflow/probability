@@ -23,7 +23,6 @@ and contraction) using the function values at each of the vertices.
 
 import collections
 
-# Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
 

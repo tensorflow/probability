@@ -25,7 +25,6 @@ suggests, is a limited-memory version of the BFGS algorithm.
 """
 import collections
 
-# Dependency imports
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util

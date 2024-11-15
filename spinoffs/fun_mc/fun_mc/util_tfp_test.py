@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for util_tfp."""
 
-# Dependency imports
-
 from absl.testing import parameterized
 from jax import config as jax_config
 import numpy as np

@@ -18,8 +18,6 @@ import collections
 import functools
 import os
 
-# Dependency imports
-
 from absl.testing import parameterized
 import jax as real_jax
 from jax import config as jax_config

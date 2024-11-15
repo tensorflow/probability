@@ -17,8 +17,6 @@
 import functools
 import os
 
-# Dependency imports
-
 from absl.testing import parameterized
 from jax import config as jax_config
 import tensorflow.compat.v2 as real_tf

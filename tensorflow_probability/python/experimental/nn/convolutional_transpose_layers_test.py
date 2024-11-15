@@ -15,7 +15,6 @@
 """Tests for convolutional_transpose_layers.py."""
 
 import functools
-# Dependency imports
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import sigmoid
