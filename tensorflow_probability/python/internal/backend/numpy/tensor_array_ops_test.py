@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for `internal.backend.numpy.TensorArray`."""
 
-# Dependency imports
-
 import numpy as np  # Rewritten by script to import jax.numpy
 
 from tensorflow_probability.python.internal.backend import numpy as nptf

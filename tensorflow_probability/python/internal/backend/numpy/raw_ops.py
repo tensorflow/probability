@@ -16,7 +16,6 @@
 
 import collections
 
-# Dependency imports
 import numpy as np
 import numpy as onp  # Disable JAX rewrite.  # pylint: disable=reimported
 

@@ -16,7 +16,6 @@
 
 import collections
 
-# Dependency imports
 import numpy as np
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils

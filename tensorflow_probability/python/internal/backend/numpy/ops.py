@@ -17,7 +17,6 @@
 import contextlib
 import functools
 
-# Dependency imports
 import numpy as np
 import numpy as onp  # Avoid JAX rewrite.  # pylint: disable=reimported
 import six

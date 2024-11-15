@@ -15,7 +15,6 @@
 """Numpy implementations of TensorFlow general top-level functions."""
 
 import functools
-# Dependency imports
 import numpy as np
 import numpy as onp  # pylint: disable=reimported
 
