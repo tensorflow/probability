@@ -14,7 +14,6 @@
 # ============================================================================
 """Testing the numerics testing utilities."""
 
-# Dependency imports
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import numerics_testing as nt
 from tensorflow_probability.python.internal import test_util

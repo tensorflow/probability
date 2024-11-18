@@ -16,7 +16,6 @@
 
 import functools
 
-# Dependency imports
 from absl import logging
 import numpy as np
 import tensorflow.compat.v2 as tf

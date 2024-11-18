@@ -18,8 +18,6 @@ import collections
 import hashlib
 import warnings
 
-# Dependency imports
-
 import numpy as np
 import six
 

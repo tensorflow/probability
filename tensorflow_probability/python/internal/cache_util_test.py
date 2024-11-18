@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for cache_util."""
 
-# Dependency imports
-
 from absl.testing import parameterized
 import tensorflow.compat.v2 as tf
 

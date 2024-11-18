@@ -20,7 +20,6 @@ import re
 import traceback
 import unittest
 
-# Dependency imports
 import hypothesis as hp
 from hypothesis.extra import numpy as hpnp
 import hypothesis.strategies as hps

@@ -16,7 +16,6 @@
 
 from collections import OrderedDict
 
-# Dependency imports
 from tensorflow_probability.python.internal import test_combinations
 from tensorflow_probability.python.internal import test_util
 

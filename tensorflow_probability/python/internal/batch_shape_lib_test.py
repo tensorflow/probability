@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for batch_shape."""
 
-# Dependency imports
-
 from absl import logging
 from absl.testing import parameterized
 import mock

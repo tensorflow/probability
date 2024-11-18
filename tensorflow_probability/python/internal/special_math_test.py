@@ -16,7 +16,6 @@
 
 import collections
 
-# Dependency imports
 import numpy as np
 from scipy import special as sp_special
 from scipy import stats as sp_stats

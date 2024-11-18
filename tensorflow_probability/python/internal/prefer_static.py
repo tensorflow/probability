@@ -14,7 +14,6 @@
 # ============================================================================
 """Operations that use static values when possible."""
 
-# Dependency imports
 import decorator
 import numpy as np
 
