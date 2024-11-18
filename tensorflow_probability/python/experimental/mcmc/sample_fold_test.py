@@ -17,7 +17,6 @@
 import collections
 import warnings
 
-# Dependency imports
 from absl.testing import parameterized
 import numpy as np
 

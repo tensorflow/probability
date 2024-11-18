@@ -16,8 +16,6 @@
 
 import collections
 import warnings
-# Dependency imports
-
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.experimental.mcmc import step
 from tensorflow_probability.python.experimental.mcmc import tracing_reducer

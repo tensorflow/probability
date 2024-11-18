@@ -15,7 +15,6 @@
 """Hamiltonian Monte Carlo, a gradient-based MCMC algorithm."""
 
 import collections
-# Dependency imports
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.mcmc import preconditioning_utils as pu

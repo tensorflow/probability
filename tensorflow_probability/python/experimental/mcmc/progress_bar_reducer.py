@@ -14,7 +14,6 @@
 # ============================================================================
 """`ProgressBarReducer` for showing progress bars."""
 
-# Dependency imports
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.mcmc import reducer as reducer_base

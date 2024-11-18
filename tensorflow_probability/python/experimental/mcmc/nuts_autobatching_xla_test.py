@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests of the No U-Turn Sampler."""
 
-# Dependency imports
 from absl import flags
 import numpy as np
 import tensorflow.compat.v1 as tf

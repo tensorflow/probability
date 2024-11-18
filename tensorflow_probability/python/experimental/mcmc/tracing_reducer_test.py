@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for TracingReducer."""
 
-# Dependency imports
-
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.experimental.mcmc import tracing_reducer
 from tensorflow_probability.python.experimental.mcmc.internal import test_fixtures

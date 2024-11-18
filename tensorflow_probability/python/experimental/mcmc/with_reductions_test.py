@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for tfp.experimental.mcmc.WithReductions TransitionKernel."""
 
-# Dependency imports
 from absl.testing import parameterized
 import numpy as np
 

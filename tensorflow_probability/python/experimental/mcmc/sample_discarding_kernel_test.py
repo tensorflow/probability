@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for SampleDiscardingKernel TransitionKernel (thinning and burn-in)."""
 
-# Dependency imports
 import numpy as np
 
 import tensorflow.compat.v2 as tf

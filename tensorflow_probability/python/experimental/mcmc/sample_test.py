@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for high(er) level drivers for streaming MCMC."""
 
-# Dependency imports
-
 from tensorflow_probability.python.experimental.mcmc import sample
 from tensorflow_probability.python.experimental.mcmc.internal import test_fixtures
 from tensorflow_probability.python.internal import samplers

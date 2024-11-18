@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for ProgressBarReducer."""
 
-# Dependency imports
-
 from tensorflow_probability.python.experimental.mcmc import progress_bar_reducer
 from tensorflow_probability.python.experimental.mcmc.internal import test_fixtures
 from tensorflow_probability.python.experimental.mcmc.sample_fold import sample_fold

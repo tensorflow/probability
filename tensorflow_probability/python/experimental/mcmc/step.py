@@ -15,8 +15,6 @@
 """Drivers for streaming reductions framework."""
 
 import warnings
-# Dependency imports
-
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import loop_util
 from tensorflow_probability.python.internal import prefer_static as ps
