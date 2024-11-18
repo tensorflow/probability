@@ -15,8 +15,6 @@
 """Tests for MultiTaskGaussianProcessRegressionModel."""
 
 from unittest import mock
-# Dependency imports
-
 from absl.testing import parameterized
 import numpy as np
 

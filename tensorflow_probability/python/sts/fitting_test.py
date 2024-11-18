@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for STS fitting methods."""
 
-# Dependency imports
 from absl.testing import parameterized
 
 import numpy as np

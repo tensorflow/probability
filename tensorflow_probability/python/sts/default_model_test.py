@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for automatically building StructuralTimeSeries models."""
 
-# Dependency imports
-
 import pandas as pd
 import tensorflow.compat.v2 as tf
 

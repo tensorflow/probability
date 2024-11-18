@@ -15,7 +15,6 @@
 """Methods for decomposing StructuralTimeSeries models."""
 import collections
 
-# Dependency imports
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental import util as tfe_util

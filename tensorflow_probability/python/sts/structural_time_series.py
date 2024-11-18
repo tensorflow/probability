@@ -16,7 +16,6 @@
 import collections
 import types
 
-# Dependency imports
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import joint_distribution_auto_batched

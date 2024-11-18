@@ -16,7 +16,6 @@
 
 import functools
 
-# Dependency imports
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import cholesky_util

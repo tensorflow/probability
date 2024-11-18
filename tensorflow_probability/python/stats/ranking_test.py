@@ -13,8 +13,6 @@
 # limitations under the License.
 """Tests for tensorflow_probability.python.stats.ranking_stats."""
 
-# Dependency imports
-
 from absl.testing import parameterized
 
 import numpy as np

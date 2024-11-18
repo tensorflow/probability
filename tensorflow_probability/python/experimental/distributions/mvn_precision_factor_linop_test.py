@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for tensorflow_probability.python.experimental.distributions.mvn_precision_factor_linop."""
 
-# Dependency imports
-
 import numpy as np
 import tensorflow.compat.v2 as tf
 

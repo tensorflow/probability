@@ -13,7 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """Methods for forecasting in StructuralTimeSeries models."""
-# Dependency imports
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import categorical

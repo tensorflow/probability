@@ -14,7 +14,6 @@
 # ============================================================================
 """The `IncrementLogProb` class."""
 
-# Dependency imports
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import identity as identity_bijector
