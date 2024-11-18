@@ -15,7 +15,6 @@
 """Markov chain Monte Carlo driver, `sample_chain_annealed_importance_chain`."""
 
 import collections
-# Dependency imports
 import numpy as np
 
 import tensorflow.compat.v2 as tf

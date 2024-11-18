@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for sample_halton_sequence_lib.py."""
 
-# Dependency imports
-
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import normal
