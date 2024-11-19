@@ -271,15 +271,13 @@ class TestWrapGeneratorAsStateless(test_util.TestCase):
   def test_rewrites_yield_to_return_in_docstring(self):
     wrapped = trainable_state_util.as_stateless_builder(
         generator_with_docstring)
-    self.assertContainsExactSubsequence(
-        generator_with_docstring.__doc__, 'Yields:')
+    self.assertIn('Yields:', generator_with_docstring.__doc__)
     self.assertNotIn('Yields:', wrapped.__doc__)
-    self.assertContainsExactSubsequence(
+    self.assertIn('Test generator with a docstring.', wrapped.__doc__)
+    self.assertIn(
+        trainable_state_util._STATELESS_RETURNS_DOCSTRING,
         wrapped.__doc__,
-        'Test generator with a docstring.')
-    self.assertContainsExactSubsequence(
-        wrapped.__doc__,
-        trainable_state_util._STATELESS_RETURNS_DOCSTRING)
+    )
 
   def test_fitting_example(self):
     if not JAX_MODE:
@@ -335,15 +333,13 @@ class TestWrapGeneratorAsStateful(test_util.TestCase):
   def test_rewrites_yield_to_return_in_docstring(self):
     wrapped = trainable_state_util.as_stateful_builder(
         generator_with_docstring)
-    self.assertContainsExactSubsequence(
-        generator_with_docstring.__doc__, 'Yields:')
+    self.assertIn('Yields:', generator_with_docstring.__doc__)
     self.assertNotIn('Yields:', wrapped.__doc__)
-    self.assertContainsExactSubsequence(
+    self.assertIn('Test generator with a docstring.', wrapped.__doc__)
+    self.assertIn(
+        trainable_state_util._STATEFUL_RETURNS_DOCSTRING,
         wrapped.__doc__,
-        'Test generator with a docstring.')
-    self.assertContainsExactSubsequence(
-        wrapped.__doc__,
-        trainable_state_util._STATEFUL_RETURNS_DOCSTRING)
+    )
 
   @test_util.jax_disable_variable_test
   def test_fitting_example(self):
