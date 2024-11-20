@@ -46,6 +46,8 @@ py_library(
     deps = [
         ":fun_mc_lib",
         ":prefab",
+        ":smc",
+        ":types",
         ":util_tfp",
     ],
 )
@@ -85,8 +87,10 @@ py_library(
     srcs = ["using_jax.py"],
     deps = [
         ":api",
+        # jax dep,
         "//fun_mc/backends:rewrite",
         "//fun_mc/dynamic/backend_jax:backend",
+        # tensorflow_probability/substrates:jax dep,
     ],
 )
 
@@ -96,6 +100,8 @@ py_library(
     srcs = ["using_tensorflow.py"],
     deps = [
         ":api",
+        # tensorflow dep,
+        # tensorflow_probability dep,
         "//fun_mc/backends:rewrite",
         "//fun_mc/dynamic/backend_tensorflow:backend",
     ],
@@ -146,6 +152,33 @@ py_test(
 
 # pytype
 py_library(
+    name = "prefab",
+    srcs = ["prefab.py"],
+    deps = [
+        ":backend",
+        ":fun_mc_lib",
+        ":malt",
+        ":sga_hmc",
+    ],
+)
+
+py_test(
+    name = "prefab_test",
+    srcs = ["prefab_test.py"],
+    shard_count = 2,
+    deps = [
+        ":fun_mc",
+        ":prefab",
+        ":test_util",
+        # jax dep,
+        # tensorflow dep,
+        # tensorflow_probability/python/internal:test_util dep,
+        # tensorflow/compiler/jit dep,
+    ],
+)
+
+# pytype
+py_library(
     name = "sga_hmc",
     srcs = ["sga_hmc.py"],
     deps = [
@@ -172,28 +205,43 @@ py_test(
 
 # pytype
 py_library(
-    name = "prefab",
-    srcs = ["prefab.py"],
+    name = "smc",
+    srcs = ["smc.py"],
     deps = [
         ":backend",
         ":fun_mc_lib",
-        ":malt",
-        ":sga_hmc",
+        ":types",
     ],
 )
 
-py_test(
-    name = "prefab_test",
-    srcs = ["prefab_test.py"],
-    shard_count = 2,
+pytype_strict_contrib_test(
+    name = "smc_test",
+    srcs = ["smc_test.py"],
+    shard_count = 4,
     deps = [
-        ":fun_mc",
-        ":prefab",
+        ":backend",
+        ":fun_mc_lib",
+        ":smc",
         ":test_util",
+        ":types",
+        # absl/testing:parameterized dep,
         # jax dep,
+        # jaxtyping dep,
+        # mock dep,
         # tensorflow dep,
         # tensorflow_probability/python/internal:test_util dep,
         # tensorflow/compiler/jit dep,
+    ],
+)
+
+# pytype
+py_library(
+    name = "types",
+    srcs = ["types.py"],
+    deps = [
+        ":backend",
+        # jaxtyping dep,
+        # typeguard dep,
     ],
 )
 

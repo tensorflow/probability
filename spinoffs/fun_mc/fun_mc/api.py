@@ -17,10 +17,14 @@
 
 from fun_mc import fun_mc_lib
 from fun_mc import prefab
+from fun_mc import smc
+from fun_mc import types
 from fun_mc import util_tfp
 from fun_mc.fun_mc_lib import *
+from fun_mc.smc import *
+from fun_mc.types import *
 
 __all__ = [
     'prefab',
     'util_tfp',
-] + fun_mc_lib.__all__
+] + fun_mc_lib.__all__ + smc.__all__ + types.__all__

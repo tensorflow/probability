@@ -21,12 +21,15 @@ from jax import lax
 from jax import random
 from jax import tree_util
 import jax.numpy as jnp
+import jaxtyping
 
 __all__ = [
+    'Array',
     'assert_same_shallow_tree',
     'block_until_ready',
     'convert_to_tensor',
     'diff',
+    'DType',
     'flatten_tree',
     'get_shallow_tree',
     'inverse_fn',
@@ -39,8 +42,10 @@ __all__ = [
     'random_categorical',
     'random_integer',
     'random_normal',
+    'random_permutation',
     'random_uniform',
     'repeat',
+    'Seed',
     'split_seed',
     'stack_dynamic_array',
     'trace',
@@ -48,6 +53,11 @@ __all__ = [
     'value_and_ldj',
     'write_to_dynamic_array',
 ]
+
+
+Array = jaxtyping.Array
+DType = jax.typing.DTypeLike
+Seed = jaxtyping.PRNGKeyArray
 
 
 def map_tree(fn, tree, *args):
@@ -102,8 +112,9 @@ def make_tensor_seed(seed):
   if hasattr(seed, 'dtype') and jax.dtypes.issubdtype(
       seed.dtype, jax.dtypes.prng_key
   ):
-    return seed
-  return jnp.asarray(seed, jnp.uint32)
+    return jnp.asarray(seed)
+  else:
+    return jnp.asarray(seed, jnp.uint32)
 
 
 def split_seed(seed, count):
@@ -114,7 +125,8 @@ def split_seed(seed, count):
 def random_uniform(shape, dtype, seed):
   """Generates a sample from uniform distribution over [0., 1)."""
   return random.uniform(
-      shape=tuple(shape), dtype=dtype, key=make_tensor_seed(seed))
+      shape=tuple(shape), dtype=dtype, key=make_tensor_seed(seed)
+  )
 
 
 def random_integer(shape, dtype, minval, maxval, seed):
@@ -124,13 +136,15 @@ def random_integer(shape, dtype, minval, maxval, seed):
       dtype=dtype,
       minval=minval,
       maxval=maxval,
-      key=make_tensor_seed(seed))
+      key=make_tensor_seed(seed),
+  )
 
 
 def random_normal(shape, dtype, seed):
   """Generates a sample from a standard normal distribution."""
   return random.normal(
-      shape=tuple(shape), dtype=dtype, key=make_tensor_seed(seed))
+      shape=tuple(shape), dtype=dtype, key=make_tensor_seed(seed)
+  )
 
 
 def _searchsorted(a, v):
@@ -158,7 +172,8 @@ def random_categorical(logits, num_samples, seed):
   cum_sum = jnp.cumsum(probs, axis=-1)
 
   eta = random.uniform(
-      make_tensor_seed(seed), (num_samples,) + cum_sum.shape[:-1])
+      make_tensor_seed(seed), (num_samples,) + cum_sum.shape[:-1]
+  )
   cum_sum = jnp.broadcast_to(cum_sum, (num_samples,) + cum_sum.shape)
 
   flat_cum_sum = cum_sum.reshape([-1, cum_sum.shape[-1]])
@@ -166,11 +181,17 @@ def random_categorical(logits, num_samples, seed):
   return jax.vmap(_searchsorted)(flat_cum_sum, flat_eta).reshape(eta.shape).T
 
 
+def random_permutation(value, seed):
+  """Randomly permutes the array."""
+  return random.permutation(seed, value)
+
+
 def trace(state, fn, num_steps, unroll, max_steps, **_):
   """Implementation of `trace` operator, without the calling convention."""
   # We need the shapes and dtypes of the outputs of `fn`.
   _, untraced_spec, traced_spec, stop_spec = jax.eval_shape(
-      fn, map_tree(lambda s: jax.ShapeDtypeStruct(s.shape, s.dtype), state))
+      fn, map_tree(lambda s: jax.ShapeDtypeStruct(s.shape, s.dtype), state)
+  )
   if isinstance(stop_spec, tuple):
     stop = ()
   else:
@@ -211,12 +232,16 @@ def trace(state, fn, num_steps, unroll, max_steps, **_):
         state, untraced, traced_element, stop = fn(state)
       else:
         traced_element = traced_init
-      map_tree_up_to(traced_spec, lambda l, e: l.append(e), traced_lists,
-                     traced_element)
+      map_tree_up_to(
+          traced_spec, lambda l, e: l.append(e), traced_lists, traced_element
+      )
     # Using asarray instead of stack to handle empty arrays correctly.
-    traced = map_tree_up_to(traced_spec,
-                            lambda l, s: jnp.asarray(l, dtype=s.dtype),
-                            traced_lists, traced_spec)
+    traced = map_tree_up_to(
+        traced_spec,
+        lambda l, s: jnp.asarray(l, dtype=s.dtype),
+        traced_lists,
+        traced_spec,
+    )
   elif use_scan:
 
     def wrapper(state_untraced, _):

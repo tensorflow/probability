@@ -22,6 +22,8 @@ version = "0.1.0"
 dependencies = [
     "immutabledict",
     "numpy>=1.13.3",
+    "jaxtyping",
+    "typeguard",
 ]
 requires-python = ">= 3.10"
 authors = [

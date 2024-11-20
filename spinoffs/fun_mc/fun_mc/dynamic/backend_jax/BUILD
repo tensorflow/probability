@@ -32,8 +32,7 @@ py_library(
     name = "util",
     srcs = ["util.py"],
     deps = [
-        # jax dep,
-        # jax:stax dep,
+        # jaxtyping dep,
     ],
 )
 
@@ -42,6 +41,5 @@ py_library(
     srcs = ["backend.py"],
     deps = [
         ":util",
-        # tensorflow_probability/substrates:jax dep,
     ],
 )

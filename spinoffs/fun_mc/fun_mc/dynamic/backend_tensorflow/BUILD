@@ -28,7 +28,6 @@ py_library(
     srcs = ["util.py"],
     deps = [
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -37,7 +36,5 @@ py_library(
     srcs = ["backend.py"],
     deps = [
         ":util",
-        # tensorflow dep,
-        # tensorflow_probability dep,
     ],
 )

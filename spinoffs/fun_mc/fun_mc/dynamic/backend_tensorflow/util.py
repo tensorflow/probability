@@ -19,15 +19,18 @@ import functools
 import numpy as np
 import six
 import tensorflow.compat.v2 as tf
+
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 tnp = tf.experimental.numpy
 
 __all__ = [
+    'Array',
     'assert_same_shallow_tree',
     'block_until_ready',
     'convert_to_tensor',
     'diff',
+    'DType',
     'flatten_tree',
     'get_shallow_tree',
     'inverse_fn',
@@ -40,14 +43,22 @@ __all__ = [
     'random_categorical',
     'random_integer',
     'random_normal',
+    'random_permutation',
     'random_uniform',
     'repeat',
+    'Seed',
     'split_seed',
     'stack_dynamic_array',
     'trace',
+    'value_and_grad',
     'value_and_ldj',
     'write_to_dynamic_array',
 ]
+
+
+Array = tf.Tensor
+DType = tf.DType
+Seed = tf.Tensor | int
 
 
 def map_tree(fn, tree, *args):
@@ -98,11 +109,9 @@ def make_tensor_seed(seed):
   """Converts a seed to a `Tensor` seed."""
   if _is_stateful_seed(seed):
     iinfo = np.iinfo(np.int32)
-    return tf.random.uniform([2],
-                             minval=iinfo.min,
-                             maxval=iinfo.max,
-                             dtype=tf.int32,
-                             name='seed')
+    return tf.random.uniform(
+        [2], minval=iinfo.min, maxval=iinfo.max, dtype=tf.int32, name='seed'
+    )
   else:
     return tf.convert_to_tensor(seed, dtype=tf.int32, name='seed')
 
@@ -139,10 +148,12 @@ def random_integer(shape, dtype, minval, maxval, seed):
   """Generates a sample from uniform distribution over [minval, maxval)."""
   if _is_stateful_seed(seed):
     return tf.random.uniform(
-        shape=shape, dtype=dtype, minval=minval, maxval=maxval, seed=seed)
+        shape=shape, dtype=dtype, minval=minval, maxval=maxval, seed=seed
+    )
   else:
     return tf.random.stateless_uniform(
-        shape=shape, dtype=dtype, minval=minval, maxval=maxval, seed=seed)
+        shape=shape, dtype=dtype, minval=minval, maxval=maxval, seed=seed
+    )
 
 
 def random_normal(shape, dtype, seed):
@@ -157,23 +168,36 @@ def random_categorical(logits, num_samples, seed):
   """Returns a sample from a categorical distribution. `logits` must be 2D."""
   if _is_stateful_seed(seed):
     return tf.random.categorical(
-        logits=logits, num_samples=num_samples, seed=seed)
+        logits=logits, num_samples=num_samples, seed=seed
+    )
   else:
     return tf.random.stateless_categorical(
-        logits=logits, num_samples=num_samples, seed=seed)
+        logits=logits, num_samples=num_samples, seed=seed
+    )
+
+
+def random_permutation(value, seed):
+  """Randomly permutes the array."""
+  if _is_stateful_seed(seed):
+    return tf.random.shuffle(value, seed)
+  else:
+    return tf.random.experimental.stateless_shuffle(value, seed)
 
 
 def _eval_shape(fn, input_spec):
   """Gets output `TensorSpec`s from `fn` given input `TensorSpec`."""
-  raw_compiled_fn = tf.function(
-      fn, autograph=False).get_concrete_function(input_spec)
+  raw_compiled_fn = tf.function(fn, autograph=False).get_concrete_function(
+      input_spec
+  )
 
   def compiled_fn(x):
     return raw_compiled_fn(*tf.nest.flatten(x))
 
-  output_spec = tf.nest.map_structure(tf.TensorSpec,
-                                      raw_compiled_fn.output_shapes,
-                                      raw_compiled_fn.output_dtypes)
+  output_spec = tf.nest.map_structure(
+      tf.TensorSpec,
+      raw_compiled_fn.output_shapes,
+      raw_compiled_fn.output_dtypes,
+  )
   return compiled_fn, output_spec
 
 
@@ -185,10 +209,10 @@ def trace(state, fn, num_steps, unroll, max_steps, parallel_iterations=10):
     state, first_untraced, first_traced, stop = fn(state)
     arrays = tf.nest.map_structure(
         lambda v: tf.TensorArray(  # pylint: disable=g-long-lambda
-            v.dtype,
-            size=num_outputs,
-            element_shape=v.shape).write(0, v),
-        first_traced)
+            v.dtype, size=num_outputs, element_shape=v.shape
+        ).write(0, v),
+        first_traced,
+    )
     start_idx = 1
   else:
     # We need the shapes and dtypes of the outputs of `fn` function to create
@@ -199,12 +223,13 @@ def trace(state, fn, num_steps, unroll, max_steps, parallel_iterations=10):
 
     arrays = tf.nest.map_structure(
         lambda spec: tf.TensorArray(  # pylint: disable=g-long-lambda
-            spec.dtype,
-            size=num_outputs,
-            element_shape=spec.shape),
-        traced_spec)
+            spec.dtype, size=num_outputs, element_shape=spec.shape
+        ),
+        traced_spec,
+    )
     first_untraced = tf.nest.map_structure(
-        lambda spec: tf.zeros(spec.shape, spec.dtype), untraced_spec)
+        lambda spec: tf.zeros(spec.shape, spec.dtype), untraced_spec
+    )
     start_idx = 0
     if isinstance(stop_spec, tuple):
       stop = ()
@@ -386,12 +411,13 @@ def named_call(f=None, name=None):
 def diff(x, prepend=None):
   """Like jnp.diff."""
   if prepend is not None:
-    x = tf.concat([tf.convert_to_tensor(prepend, dtype=x.dtype)[tf.newaxis], x],
-                  0)
+    x = tf.concat(
+        [tf.convert_to_tensor(prepend, dtype=x.dtype)[tf.newaxis], x], 0
+    )
   return x[1:] - x[:-1]
 
 
-def repeat(x, repeats, total_repeat_length=None):
+def repeat(x, repeats, total_repeat_length):
   """Like jnp.repeat."""
   res = tf.repeat(x, repeats)
   if total_repeat_length is not None:

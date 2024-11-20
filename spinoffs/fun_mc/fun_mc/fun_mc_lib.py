@@ -670,7 +670,7 @@ def call_transition_operator(
   new_args, extra = ret
   try:
     util.assert_same_shallow_tree(args, new_args)
-  except:
+  except Exception as e:
     args_s = _tree_repr(args)
     new_args_s = _tree_repr(new_args)
     raise TypeError(
@@ -681,7 +681,7 @@ def call_transition_operator(
             args_s=args_s,
             new_args_s=new_args_s,
         )
-    )
+    ) from e
   return new_args, extra
 
 
