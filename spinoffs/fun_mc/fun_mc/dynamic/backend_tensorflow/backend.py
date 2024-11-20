@@ -24,7 +24,13 @@ from fun_mc.dynamic.backend_tensorflow import util
 tnp = tf.experimental.numpy
 
 _lax = types.ModuleType('lax')
-_lax.cond = tf.cond
+
+
+def cond(pred, true_fn, false_fn, *args):
+  return tf.cond(pred, lambda: true_fn(*args), lambda: false_fn(*args))
+
+
+_lax.cond = cond
 _lax.stop_gradient = tf.stop_gradient
 
 _nn = types.ModuleType('nn')

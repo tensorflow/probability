@@ -226,7 +226,6 @@ pytype_strict_contrib_test(
         ":types",
         # absl/testing:parameterized dep,
         # jax dep,
-        # jaxtyping dep,
         # mock dep,
         # tensorflow dep,
         # tensorflow_probability/python/internal:test_util dep,

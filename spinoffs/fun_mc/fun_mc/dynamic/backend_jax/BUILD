@@ -33,6 +33,7 @@ py_library(
     srcs = ["util.py"],
     deps = [
         # jaxtyping dep,
+        # numpy dep,
     ],
 )
 

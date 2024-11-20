@@ -14,7 +14,9 @@
 # ============================================================================
 """FunMC utilities implemented via TensorFlow."""
 
+import dataclasses
 import functools
+from typing import TypeVar, dataclass_transform
 
 import numpy as np
 import six
@@ -29,10 +31,12 @@ __all__ = [
     'assert_same_shallow_tree',
     'block_until_ready',
     'convert_to_tensor',
+    'dataclass',
     'diff',
     'DType',
     'flatten_tree',
     'get_shallow_tree',
+    'get_static_value',
     'inverse_fn',
     'make_tensor_seed',
     'map_tree',
@@ -419,10 +423,23 @@ def diff(x, prepend=None):
 
 def repeat(x, repeats, total_repeat_length):
   """Like jnp.repeat."""
-  res = tf.repeat(x, repeats)
-  if total_repeat_length is not None:
-    res.set_shape([total_repeat_length] + [None] * (len(res.shape) - 1))
-  return res
+  # Implementation based on JAX, with some adjustments due to TF's stricted
+  # indexing validation.
+  exclusive_repeats = tf.concat([[0], repeats[:-1]], axis=0)
+  scatter_indices = tf.cumsum(exclusive_repeats)
+  scatter_indices = tf.where(
+      scatter_indices < total_repeat_length,
+      scatter_indices,
+      total_repeat_length,
+  )
+  block_split_indicators = tf.zeros([total_repeat_length + 1], tf.int32)
+  block_split_indicators = tf.tensor_scatter_nd_add(
+      block_split_indicators,
+      scatter_indices[..., tf.newaxis],
+      tf.ones_like(scatter_indices),
+  )
+  gather_indices = tf.cumsum(block_split_indicators[:-1]) - 1
+  return tf.gather(x, gather_indices)
 
 
 def new_dynamic_array(shape, dtype, size):
@@ -454,3 +471,44 @@ def convert_to_tensor(x):
   if isinstance(x, tf.TensorArray):
     return x
   return tf.convert_to_tensor(x)
+
+
+T = TypeVar('T')
+
+
+@dataclass_transform()
+def dataclass(cls: T) -> T:
+  """Create a tree-compatible dataclass."""
+  cls = dataclasses.dataclass(frozen=True)(cls)
+
+  def __tf_flatten__(self):  # pylint: disable=invalid-name
+    metadata = ()
+    fields = dataclasses.fields(self)
+    components = tuple(getattr(self, f.name) for f in fields)
+    return metadata, components
+
+  @classmethod
+  def __tf_unflatten__(cls, metadata, leaves):  # pylint: disable=invalid-name
+    del metadata
+    return cls(*leaves)
+
+  def __len__(self):  # pylint: disable=invalid-name
+    # This is to work around a bug in TF's tree-prefix matching.
+    return len(dataclasses.fields(self))
+
+  cls.__tf_flatten__ = __tf_flatten__
+  cls.__tf_unflatten__ = __tf_unflatten__
+  cls.__len__ = __len__
+
+  def replace(self, **updates):
+    """Returns a new object replacing the specified fields with new values."""
+    return dataclasses.replace(self, **updates)
+
+  cls.replace = replace
+
+  return cls
+
+
+def get_static_value(x):
+  """Returns the static value of x, or None if x is dynamic."""
+  return tf.get_static_value(x)

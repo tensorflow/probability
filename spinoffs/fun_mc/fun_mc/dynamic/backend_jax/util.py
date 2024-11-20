@@ -14,7 +14,9 @@
 # ============================================================================
 """FunMC utilities implemented via JAX."""
 
+import dataclasses
 import functools
+from typing import TypeVar, dataclass_transform
 
 import jax
 from jax import lax
@@ -22,16 +24,19 @@ from jax import random
 from jax import tree_util
 import jax.numpy as jnp
 import jaxtyping
+import numpy as np
 
 __all__ = [
     'Array',
     'assert_same_shallow_tree',
     'block_until_ready',
     'convert_to_tensor',
+    'dataclass',
     'diff',
     'DType',
     'flatten_tree',
     'get_shallow_tree',
+    'get_static_value',
     'inverse_fn',
     'make_tensor_seed',
     'map_tree',
@@ -406,7 +411,7 @@ def diff(x, prepend=None):
   return jnp.diff(x, prepend=prepend)
 
 
-def repeat(x, repeats, total_repeat_length=None):
+def repeat(x, repeats, total_repeat_length):
   """Like jnp.repeat."""
   return jnp.repeat(x, repeats, total_repeat_length=total_repeat_length)
 
@@ -436,3 +441,30 @@ def convert_to_tensor(x):
   if x is None:
     return x
   return jnp.asarray(x)
+
+
+T = TypeVar('T')
+
+
+@dataclass_transform()
+def dataclass(cls: T) -> T:
+  """Create a tree-compatible dataclass."""
+  cls = dataclasses.dataclass(frozen=True)(cls)
+  fields = [f.name for f in dataclasses.fields(cls)]
+  jax.tree_util.register_dataclass(cls, fields, [])
+
+  def replace(self, **updates):
+    """Returns a new object replacing the specified fields with new values."""
+    return dataclasses.replace(self, **updates)
+
+  cls.replace = replace
+
+  return cls
+
+
+def get_static_value(x):
+  """Returns the static value of x, or None if x is dynamic."""
+  try:
+    return np.array(x)
+  except TypeError:
+    return None
