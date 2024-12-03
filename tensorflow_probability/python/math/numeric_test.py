@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for tensorflow_probability.python.math.numeric."""
 
-# Dependency imports
 from absl.testing import parameterized
 import numpy as np
 

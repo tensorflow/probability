@@ -15,7 +15,6 @@
 """Tests for minimization utils."""
 
 import collections
-# Dependency imports
 import numpy as np
 
 import tensorflow.compat.v1 as tf1

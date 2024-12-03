@@ -14,7 +14,6 @@
 # ============================================================================
 """Implements bessel functions in TensorFlow."""
 
-# Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
