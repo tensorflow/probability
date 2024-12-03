@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for MultivariateNormalDiagPlusLowRankCovariance."""
 
-# Dependency imports
-
 import numpy as np
 from tensorflow_probability.python.distributions import mvn_diag_plus_low_rank_covariance as mvdplrc
 from tensorflow_probability.python.internal import test_util

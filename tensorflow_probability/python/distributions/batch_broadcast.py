@@ -14,7 +14,6 @@
 # ============================================================================
 """Batch broadcasting meta-distribuion."""
 
-# Dependency imports
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector as bijector_lib

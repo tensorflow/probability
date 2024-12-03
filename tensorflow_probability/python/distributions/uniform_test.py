@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for Uniform distribution."""
 
-# Dependency imports
-
 import numpy as np
 from scipy import stats as sp_stats
 import tensorflow.compat.v2 as tf

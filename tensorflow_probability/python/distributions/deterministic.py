@@ -16,7 +16,6 @@
 
 import abc
 
-# Dependency imports
 import six
 import tensorflow.compat.v2 as tf
 

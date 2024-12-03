@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for the Geometric distribution."""
 
-# Dependency imports
-
 import numpy as np
 from scipy import stats
 import tensorflow.compat.v1 as tf1

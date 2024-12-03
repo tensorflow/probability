@@ -14,8 +14,6 @@
 # ============================================================================
 """The exponentially modified Gaussian distribution class."""
 
-# Dependency imports
-
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector

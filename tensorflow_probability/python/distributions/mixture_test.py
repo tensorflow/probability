@@ -17,7 +17,6 @@
 import contextlib
 import warnings
 
-# Dependency imports
 import numpy as np
 from scipy import stats
 import tensorflow.compat.v1 as tf1

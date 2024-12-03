@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for the RelaxedBernoulli distribution."""
 
-# Dependency imports
-
 import numpy as np
 import scipy.special
 import tensorflow.compat.v1 as tf1

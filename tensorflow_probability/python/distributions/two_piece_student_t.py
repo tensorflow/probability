@@ -14,7 +14,6 @@
 # ============================================================================
 """The Two-Piece Student's t-distribution class."""
 
-# Dependency imports
 import numpy as np
 
 import tensorflow.compat.v2 as tf

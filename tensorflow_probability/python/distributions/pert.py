@@ -14,7 +14,6 @@
 # ============================================================================
 """The PERT distribution."""
 
-# Dependency imports
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import chain as chain_bijector

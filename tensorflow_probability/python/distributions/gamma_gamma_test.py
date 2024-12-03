@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Dependency imports
-
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import gamma_gamma

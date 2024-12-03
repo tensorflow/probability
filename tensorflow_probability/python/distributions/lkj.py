@@ -21,7 +21,6 @@ onion method,' Journal of Multivariate Analysis 100 (2009), pp
 1989-2001.
 """
 
-# Dependency imports
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf

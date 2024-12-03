@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for Generalized Pareto distribution."""
 
-# Dependency imports
 import hypothesis as hp
 import hypothesis.strategies as hps
 import numpy as np

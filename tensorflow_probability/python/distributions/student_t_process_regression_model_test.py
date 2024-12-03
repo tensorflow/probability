@@ -13,7 +13,6 @@
 # limitations under the License.
 # ============================================================================
 from unittest import mock
-# Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import gaussian_process_regression_model as gprm

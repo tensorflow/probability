@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for Moyal."""
 
-# Dependency imports
 import numpy as np
 from scipy import stats
 

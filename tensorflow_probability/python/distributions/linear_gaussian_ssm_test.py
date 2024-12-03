@@ -14,8 +14,6 @@
 # ============================================================================
 """Linear Gaussian State Space Model."""
 
-# Dependency imports
-
 from absl.testing import parameterized
 import numpy as np
 

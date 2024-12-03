@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for Two-Piece Student's t-distribution."""
 
-# Dependency imports
 from absl.testing import parameterized
 import numpy as np
 

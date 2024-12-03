@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for Wishart."""
 
-# Dependency imports
-
 import numpy as np
 from scipy import linalg
 import tensorflow.compat.v1 as tf1

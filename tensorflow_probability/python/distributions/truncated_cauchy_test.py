@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for TruncatedCauchy."""
 
-# Dependency imports
 from absl.testing import parameterized
 import numpy as np
 

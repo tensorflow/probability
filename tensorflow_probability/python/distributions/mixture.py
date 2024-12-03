@@ -16,7 +16,6 @@
 
 import warnings
 
-# Dependency imports
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import categorical

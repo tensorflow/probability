@@ -15,7 +15,6 @@
 """Tests for the ProbitBernoulli distribution."""
 
 
-# Dependency imports
 import numpy as np
 from scipy import special as sp_special
 

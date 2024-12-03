@@ -14,7 +14,6 @@
 # ============================================================================
 """The BetaBinomial distribution class."""
 
-# Dependency imports
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import binomial

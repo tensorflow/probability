@@ -17,8 +17,6 @@
 import functools
 import os
 
-# Dependency imports
-
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf

@@ -14,8 +14,6 @@
 # ============================================================================
 import math
 
-# Dependency imports
-
 import numpy as np
 from scipy import stats as sp_stats
 from scipy.special import gamma as sp_gamma

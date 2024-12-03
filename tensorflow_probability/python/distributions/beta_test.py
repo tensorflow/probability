@@ -13,7 +13,6 @@
 # limitations under the License.
 # ============================================================================
 
-# Dependency imports
 from absl.testing import parameterized
 import numpy as np
 from scipy import special as sp_special

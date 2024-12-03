@@ -14,7 +14,6 @@
 # ============================================================================
 """Johnson's SU distribution class."""
 
-# Dependency imports
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import invert as invert_bijector
 from tensorflow_probability.python.bijectors import scale as scale_bijector

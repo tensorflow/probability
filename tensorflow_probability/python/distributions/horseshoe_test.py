@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for Horseshoe Distribution."""
 
-# Dependency imports
 import numpy as np
 import scipy.stats
 import tensorflow.compat.v1 as tf1

@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for initializers."""
 
-# Dependency imports
 import numpy as np
 from scipy import special
 from scipy import stats

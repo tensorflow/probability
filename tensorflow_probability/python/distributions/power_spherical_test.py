@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for multivariate Power Spherical distribution."""
 
-# Dependency imports
 import numpy as np
 from scipy import special as sp_special
 

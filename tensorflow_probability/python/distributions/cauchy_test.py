@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for Cauchy."""
 
-# Dependency imports
 import numpy as np
 from scipy import stats as sp_stats
 

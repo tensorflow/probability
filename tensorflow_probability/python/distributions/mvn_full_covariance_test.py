@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for MultivariateNormalFullCovariance."""
 
-# Dependency imports
-
 import numpy as np
 from scipy import stats
 import tensorflow.compat.v2 as tf

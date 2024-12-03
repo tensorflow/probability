@@ -14,7 +14,6 @@
 # ============================================================================
 import unittest
 
-# Dependency imports
 from absl.testing import parameterized
 import hypothesis as hp
 from hypothesis import strategies as hps

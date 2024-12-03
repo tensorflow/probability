@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for LogLogistic."""
 
-# Dependency imports
-
 import numpy as np
 from scipy import stats
 

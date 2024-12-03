@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for Chi distribution."""
 
-# Dependency imports
 import numpy as np
 from scipy import special
 from scipy import stats

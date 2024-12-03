@@ -13,8 +13,6 @@
 # limitations under the License.
 # ============================================================================
 import collections
-# Dependency imports
-
 from absl import logging
 from absl.testing import parameterized
 

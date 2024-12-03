@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for the Bernoulli distribution."""
 
-# Dependency imports
-
 import numpy as np
 from scipy import special as sp_special
 import tensorflow.compat.v1 as tf1

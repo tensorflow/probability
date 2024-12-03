@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for multivariate von Mises-Fisher distribution."""
 
-# Dependency imports
 from absl.testing import parameterized
 import numpy as np
 from scipy import special as sp_special
