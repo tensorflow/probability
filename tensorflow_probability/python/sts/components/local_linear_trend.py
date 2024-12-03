@@ -13,7 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """Local Linear Trend model."""
-# Dependency imports
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import chain
