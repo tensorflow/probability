@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for TransformDiagonal bijector."""
 
-# Dependency imports
-
 from absl import logging
 import hypothesis as hp
 import hypothesis.strategies as hps

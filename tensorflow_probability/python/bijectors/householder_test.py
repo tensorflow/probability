@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for Bijector."""
 
-# Dependency imports
 from absl.testing import parameterized
 from tensorflow_probability.python.bijectors import householder
 from tensorflow_probability.python.internal import test_util

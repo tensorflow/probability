@@ -14,7 +14,6 @@
 # ============================================================================
 """ScaleMatvecDiag Tests."""
 
-# Dependency imports
 from absl.testing import parameterized
 import numpy as np
 from tensorflow_probability.python.bijectors import scale_matvec_diag

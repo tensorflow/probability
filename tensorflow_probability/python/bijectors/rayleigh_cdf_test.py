@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for Bijector."""
 
-# Dependency imports
-
 import numpy as np
 from scipy import stats as scipy_stats
 import tensorflow.compat.v2 as tf

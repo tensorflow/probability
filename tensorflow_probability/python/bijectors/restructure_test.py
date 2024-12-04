@@ -16,8 +16,6 @@
 
 import collections
 
-# Dependency imports
-
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import restructure
 from tensorflow_probability.python.distributions import joint_distribution_named

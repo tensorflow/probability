@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for FillScaleTriL bijector."""
 
-# Dependency imports
 import numpy as np
 from tensorflow_probability.python.bijectors import exp
 from tensorflow_probability.python.bijectors import fill_scale_tril

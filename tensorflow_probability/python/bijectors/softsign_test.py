@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for Bijector."""
 
-# Dependency imports
-
 import numpy as np
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.bijectors import softsign

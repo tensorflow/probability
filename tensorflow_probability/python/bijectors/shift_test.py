@@ -14,8 +14,6 @@
 # ============================================================================
 """Shift Tests."""
 
-# Dependency imports
-
 from absl.testing import parameterized
 from tensorflow_probability.python.bijectors import shift
 from tensorflow_probability.python.internal import test_util

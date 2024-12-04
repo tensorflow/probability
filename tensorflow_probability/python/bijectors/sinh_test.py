@@ -14,8 +14,6 @@
 # ============================================================================
 """Sinh Tests."""
 
-# Dependency imports
-
 from absl.testing import parameterized
 import numpy as np
 from tensorflow_probability.python.bijectors import bijector_test_util

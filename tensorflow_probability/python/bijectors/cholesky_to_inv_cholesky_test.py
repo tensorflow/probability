@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for CholeskyToInvCholesky bijector."""
 
-# Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import cholesky_to_inv_cholesky

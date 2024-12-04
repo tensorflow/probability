@@ -14,8 +14,6 @@
 # ============================================================================
 """SoftClip bijector."""
 
-# Dependency imports
-
 import tensorflow.compat.v2 as tf
 
 

@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for Power Bijector."""
 
-# Dependency imports
 from absl.testing import parameterized
 
 import numpy as np

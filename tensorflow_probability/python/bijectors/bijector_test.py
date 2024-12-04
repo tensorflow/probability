@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for Bijector."""
 
-# Dependency imports
 from absl.testing import parameterized
 import mock
 import numpy as np

@@ -15,7 +15,6 @@
 """Tests for tensorflow_probability.python.bijectors.glow."""
 
 import functools
-# Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector_test_util

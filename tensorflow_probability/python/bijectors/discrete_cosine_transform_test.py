@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for DCT Bijector."""
 
-# Dependency imports
-
 import numpy as np
 from scipy import fftpack
 import tensorflow.compat.v2 as tf

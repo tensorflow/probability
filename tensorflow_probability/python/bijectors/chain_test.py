@@ -14,7 +14,6 @@
 # ============================================================================
 """Chain Tests."""
 
-# Dependency imports
 import mock
 
 import numpy as np

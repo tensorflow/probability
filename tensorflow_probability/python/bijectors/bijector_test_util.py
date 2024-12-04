@@ -14,7 +14,6 @@
 # ============================================================================
 """Bijector unit-test utilities."""
 
-# Dependency imports
 from absl import logging
 import numpy as np
 

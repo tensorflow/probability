@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for the Blockwise bijector."""
 
-# Dependency imports
-
 from absl.testing import parameterized
 import mock
 import tensorflow.compat.v1 as tf1
