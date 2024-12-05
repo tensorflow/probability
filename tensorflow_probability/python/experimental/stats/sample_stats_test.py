@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for Sample Stats Ops."""
 
-# Dependency imports
-
 from absl.testing import parameterized
 
 import numpy as np

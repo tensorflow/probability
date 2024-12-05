@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for structured surrogate posteriors."""
 
-# Dependency imports
-
 from absl.testing import parameterized
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf

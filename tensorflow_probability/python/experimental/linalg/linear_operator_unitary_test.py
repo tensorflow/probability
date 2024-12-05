@@ -15,8 +15,6 @@
 """Tests for Unitary linop."""
 
 
-# Dependency imports
-
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.linalg import linear_operator_unitary

@@ -13,7 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """Structural Time Series utilities."""
-# Dependency imports
 import numpy as np
 
 import tensorflow.compat.v1 as tf1
