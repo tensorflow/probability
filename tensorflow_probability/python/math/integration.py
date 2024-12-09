@@ -69,7 +69,7 @@ def trapz(
       if dx is None:
         dx = 1.
       dx = tf.convert_to_tensor(dx, dtype=dtype, name='dx')
-      if ps.shape(dx):
+      if ps.shape(dx).size > 0:
         raise ValueError('Expected dx to be a scalar, got dx={}'.format(dx))
       elem_sum = tf.reduce_sum(y, axis=axis)
       elem_sum -= 0.5 * tf.reduce_sum(

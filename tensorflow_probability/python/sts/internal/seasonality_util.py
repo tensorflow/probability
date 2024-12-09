@@ -178,7 +178,7 @@ def build_fixed_effects(num_steps,
   else:
     design_matrix = ps.ones([num_steps, 1], dtype=dtype)
 
-  if covariates:
+  if covariates is not None:
     design_matrix = ps.concat(
         [design_matrix] +
         [tf.convert_to_tensor(x)[..., :num_steps, :] for x in covariates],
