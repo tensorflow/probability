@@ -137,7 +137,10 @@ class Loader(importlib.abc.SourceLoader):
 
   def get_filename(self, fullname):
     del fullname
-    return self._orig_filename
+    try:
+      return self._orig_loader.get_filename(self._orig_module_name)
+    except:  # pylint: disable=bare-except
+      return self._orig_filename
 
   def get_data(self, path):
     if DEBUG:
