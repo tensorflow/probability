@@ -61,7 +61,7 @@ find_good_tf_nightly_version_str() {
   VERSION=$1
   curl -s "https://pypi.org/pypi/${VERSION}/json" \
     | python -c "$PYTHON_PARSE_PACKAGE_JSON" \
-        --bad_dates 20220727 20220809 20220811 20220902 20230105
+        --bad_dates 20250103 20250105 20250107
 }
 
 install_tensorflow() {
@@ -96,7 +96,7 @@ install_test_only_packages() {
     bayeux-ml \
     chex \
     flax \
-    hypothesis \
+    hypothesis==6.80.0 \
     jax \
     jaxlib \
     jaxtyping \
