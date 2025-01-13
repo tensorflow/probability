@@ -249,11 +249,11 @@ class MultiTaskGaussianProcess(distribution.AutoCompositeTensorDistribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       input_dtype = dtype_util.common_dtype(
-          dict(
-              kernel=kernel,
-              index_points=index_points),
+          dict(index_points=index_points),
           dtype_hint=nest_util.broadcast_structure(
-              kernel.feature_ndims, tf.float32))
+              kernel.feature_ndims, tf.float32
+          ),
+      )
 
       # If the input dtype is non-nested float, we infer a single dtype for the
       # input and the float parameters, which is also the dtype of the MTGP's
