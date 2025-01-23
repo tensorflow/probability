@@ -278,6 +278,9 @@ multi_substrate_py_test(
     srcs = ["pnuts_test.py"],
     disabled_substrates = ["numpy"],
     shard_count = 10,
+    tags = [
+        "no-oss-ci",  # Prohibitively slow.
+    ],
     deps = [
         ":preconditioned_nuts",
         # absl/testing:parameterized dep,
