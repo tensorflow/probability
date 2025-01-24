@@ -15,6 +15,15 @@
 """pytest configuration."""
 
 from absl import app
+from absl import flags
+
+# TODO(siege): Find a better solution to duplicating this flag.
+flags.DEFINE_bool(
+    "use_tfds",
+    False,
+    "Whether to run tests that use TFDS.",
+    allow_override=True,
+)
 
 collect_ignore = [
     "setup.py",
@@ -26,7 +35,8 @@ def pytest_addoption(parser):
       "--absl-flag",
       action="append",
       help="flag to be passed to absl, e.g. `--absl-flag='--vary_seed'`",
-      default=[])
+      default=[],
+  )
 
 
 def pytest_collection_finish(session):
