@@ -17,7 +17,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fun_mc"
-description = "Functional MC: A functional API for creating new Markov Chains."
+description = "FunMC: A functional API for creating new Markov Chains."
+readme = "README.md"
 version = "0.1.0"
 dependencies = [
     "immutabledict",
