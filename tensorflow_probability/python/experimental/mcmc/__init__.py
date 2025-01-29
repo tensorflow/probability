@@ -70,6 +70,8 @@ from tensorflow_probability.python.experimental.mcmc.weighted_resampling import 
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_independent
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_stratified
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_systematic
+from tensorflow_probability.python.experimental.mcmc.windowed_sampling import default_hmc_trace_fn
+from tensorflow_probability.python.experimental.mcmc.windowed_sampling import default_nuts_trace_fn
 from tensorflow_probability.python.experimental.mcmc.windowed_sampling import windowed_adaptive_hmc
 from tensorflow_probability.python.experimental.mcmc.windowed_sampling import windowed_adaptive_nuts
 from tensorflow_probability.python.experimental.mcmc.with_reductions import WithReductions
@@ -135,6 +137,8 @@ __all__ = [
     'simple_heuristic_tuning',
     'snaper_criterion',
     'step_kernel',
+    'default_hmc_trace_fn',
+    'default_nuts_trace_fn',
     'windowed_adaptive_hmc',
-    'windowed_adaptive_nuts'
-    ]
+    'windowed_adaptive_nuts',
+]
