@@ -2039,62 +2039,6 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
     self.assertAllCloseNested(value, fn(x))
     self.assertAllCloseNested(expected_grad, grad)
 
-  def testSystematicResample(self):
-    probs = self._constant([0.0, 0.5, 0.2, 0.3, 0.0])
-    log_weights = jnp.log(probs)
-    particles = jnp.arange(probs.shape[0])
-
-    @jax.jit
-    def body(seed):
-      seed, resample_seed = util.split_seed(seed, 2)
-      (new_particles, new_log_weights), _ = fun_mc.systematic_resample(
-          particles, log_weights, resample_seed
-      )
-      return seed, (new_particles, new_log_weights)
-
-    _, (new_particles, new_log_weights) = fun_mc.trace(
-        self._make_seed(_test_seed()), body, 1000, trace_mask=(True, False)
-    )
-
-    new_particles_probs = jnp.mean(
-        jnp.array(new_particles[..., jnp.newaxis] == particles, jnp.float32),
-        (0, 1),
-    )
-
-    self.assertAllClose(new_particles_probs, probs, atol=0.05)
-    self.assertEqual(new_particles_probs[0], 0.0)
-    self.assertEqual(new_particles_probs[-1], 0.0)
-    self.assertAllClose(
-        new_log_weights,
-        jnp.full(probs.shape, tfp.math.reduce_logmeanexp(log_weights)),
-    )
-
-  def testSystematicResampleAncestors(self):
-    log_weights = self._constant([-float('inf'), 0.0])
-    particles = jnp.arange(log_weights.shape[0])
-    seed = self._make_seed(_test_seed())
-
-    (new_particles, new_log_weights), ancestors = fun_mc.systematic_resample(
-        particles, log_weights, seed=seed
-    )
-    self.assertAllEqual(new_particles, jnp.ones_like(particles))
-    self.assertAllEqual(new_log_weights, jnp.log(self._constant([0.5, 0.5])))
-    self.assertAllEqual(ancestors, jnp.ones_like(particles))
-
-    (new_particles, new_log_weights), ancestors = fun_mc.systematic_resample(
-        particles, log_weights, do_resample=True, seed=seed
-    )
-    self.assertAllEqual(new_particles, jnp.ones_like(particles))
-    self.assertAllEqual(new_log_weights, jnp.log(self._constant([0.5, 0.5])))
-    self.assertAllEqual(ancestors, jnp.ones_like(particles))
-
-    (new_particles, new_log_weights), ancestors = fun_mc.systematic_resample(
-        particles, log_weights, do_resample=False, seed=seed
-    )
-    self.assertAllEqual(new_particles, particles)
-    self.assertAllEqual(new_log_weights, log_weights)
-    self.assertAllEqual(ancestors, particles)
-
 
 @test_util.multi_backend_test(globals(), 'fun_mc_test')
 class FunMCTest32(FunMCTest):

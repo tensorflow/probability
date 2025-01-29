@@ -128,7 +128,6 @@ __all__ = [
     'SimpleDualAveragesState',
     'splitting_integrator_step',
     'State',
-    'systematic_resample',
     'trace',
     'transform_log_prob_fn',
     'TransitionOperator',
@@ -3464,60 +3463,6 @@ def clip_grads(
   return util.unflatten_tree(
       x, util.flatten_tree(grad_wrapper(*util.flatten_tree(x)))
   )
-
-
-@util.named_call
-def systematic_resample(
-    particles: State,
-    log_weights: FloatArray,
-    seed: Any,
-    do_resample: Optional[BooleanArray] = None,
-) -> tuple[tuple[State, FloatArray], IntArray]:
-  """Systematically resamples particles in proportion to their weights.
-
-  This uses the algorithm from [1].
-
-  Args:
-    particles: The particles.
-    log_weights: Un-normalized weights.
-    seed: PRNG seed.
-    do_resample: Whether to perform the resample. If None, resampling is
-      performed unconditionally.
-
-  Returns:
-    particles_and_weights: tuple of resampled particles and weights.
-    ancestor_idx: Indices from which the returned particles were sampled from.
-
-  #### References
-
-  [1] Maskell, S., Alun-Jones, B., & Macleod, M. (2006). A Single Instruction
-      Multiple Data Particle Filter. 2006 IEEE Nonlinear Statistical Signal
-      Processing Workshop. https://doi.org/10.1109/NSSPW.2006.4378818
-  """
-  log_weights = jnp.asarray(log_weights)
-  log_weights = jnp.where(
-      jnp.isnan(log_weights),
-      jnp.array(-float('inf'), log_weights.dtype),
-      log_weights,
-  )
-  probs = jax.nn.softmax(log_weights)
-  num_particles = probs.shape[0]
-
-  shift = util.random_uniform([], log_weights.dtype, seed)
-  pie = jnp.cumsum(probs) * num_particles + shift
-  repeats = jnp.array(util.diff(jnp.floor(pie), prepend=0), jnp.int32)
-  parent_idxs = util.repeat(
-      jnp.arange(num_particles), repeats, total_repeat_length=num_particles
-  )
-  if do_resample is not None:
-    parent_idxs = jnp.where(do_resample, parent_idxs, jnp.arange(num_particles))
-  new_particles = util.map_tree(lambda x: x[parent_idxs], particles)
-  new_log_weights = jnp.full(
-      log_weights.shape, tfp.math.reduce_logmeanexp(log_weights)
-  )
-  if do_resample is not None:
-    new_log_weights = jnp.where(do_resample, new_log_weights, log_weights)
-  return (new_particles, new_log_weights), parent_idxs
 
 
 class GeometricAnnealingPathExtra(NamedTuple):

@@ -48,6 +48,7 @@ __all__ = [
     'conditional_systematic_resampling',
     'effective_sample_size_predicate',
     'ParticleGatherFn',
+    'resample',
     'ResamplingPredicate',
     'SampleAncestorsFn',
     'sequential_monte_carlo_init',
@@ -78,6 +79,8 @@ def systematic_resampling(
 ) -> Int[Array, 'num_particles']:
   """Generate parent indices via systematic resampling.
 
+  This uses the algorithm from [1].
+
   Args:
     log_weights: Unnormalized log-scale weights.
     seed: PRNG seed.
@@ -87,13 +90,14 @@ def systematic_resampling(
   Returns:
     parent_idxs: parent indices such that the marginal probability that a
       randomly chosen element will be `i` is equal to `softmax(log_weights)[i]`.
+
+  #### References
+
+  [1] Maskell, S., Alun-Jones, B., & Macleod, M. (2006). A Single Instruction
+      Multiple Data Particle Filter. 2006 IEEE Nonlinear Statistical Signal
+      Processing Workshop. https://doi.org/10.1109/NSSPW.2006.4378818
   """
   shift_seed, permute_seed = util.split_seed(seed, 2)
-  log_weights = jnp.where(
-      jnp.isnan(log_weights),
-      jnp.array(-float('inf'), log_weights.dtype),
-      log_weights,
-  )
   probs = jax.nn.softmax(log_weights)
   # A common situation is all -inf log_weights that creats a NaN vector.
   probs = jnp.where(
@@ -146,11 +150,6 @@ def conditional_systematic_resampling(
       https://www.jstor.org/stable/43590414
   """
   mixture_seed, shift_seed, permute_seed = util.split_seed(seed, 3)
-  log_weights = jnp.where(
-      jnp.isnan(log_weights),
-      jnp.array(-float('inf'), log_weights.dtype),
-      log_weights,
-  )
   probs = jax.nn.softmax(log_weights)
   num_particles = log_weights.shape[0]
 
@@ -377,7 +376,7 @@ class ParticleGatherFn(Protocol[State]):
 
 
 @types.runtime_typed
-def _defalt_pytree_gather(
+def _default_pytree_gather(
     state: State,
     indices: Int[Array, 'num_particles'],
 ) -> State:
@@ -393,6 +392,75 @@ def _defalt_pytree_gather(
     new_state: Gathered state (with the same leading dimension).
   """
   return util.map_tree(lambda x: x[indices], state)
+
+
+@types.runtime_typed
+def resample(
+    state: State,
+    log_weights: Float[Array, 'num_particles'],
+    seed: Seed,
+    do_resample: BoolScalar = True,
+    sample_ancestors_fn: SampleAncestorsFn = systematic_resampling,
+    state_gather_fn: ParticleGatherFn[State] = _default_pytree_gather,
+) -> tuple[
+    tuple[State, Float[Array, 'num_particles']], Int[Array, 'num_particles']
+]:
+  """Possibly resamples state according to the log_weights.
+
+  The state should represent the same number of particles as implied by the
+  length of `log_weights`. If resampling occurs, the new log weights are
+  log-mean-exp of the incoming log weights. Otherwise, they are unchanged. By
+  default, this function performs systematic resampling.
+
+  Args:
+    state: The particles.
+    log_weights: Un-normalized log weights. NaN log weights are treated as -inf.
+    seed: Random seed.
+    do_resample: Whether to resample.
+    sample_ancestors_fn: Ancestor index sampling function.
+    state_gather_fn: State gather function.
+
+  Returns:
+    state_and_log_weights: tuple of the resampled state and log weights.
+    ancestor_idx: Indices that indicate which elements of the original state the
+      returned state particles were sampled from.
+  """
+
+  def do_resample_fn(
+      state,
+      log_weights,
+      seed,
+  ):
+    log_weights = jnp.where(
+        jnp.isnan(log_weights),
+        jnp.array(-float('inf'), log_weights.dtype),
+        log_weights,
+    )
+    ancestor_idxs = sample_ancestors_fn(log_weights, seed)
+    new_state = state_gather_fn(state, ancestor_idxs)
+    num_particles = log_weights.shape[0]
+    new_log_weights = jnp.full(
+        (num_particles,), tfp.math.reduce_logmeanexp(log_weights)
+    )
+    return (new_state, new_log_weights), ancestor_idxs
+
+  def dont_resample_fn(
+      state,
+      log_weights,
+      seed,
+  ):
+    del seed
+    num_particles = log_weights.shape[0]
+    return (state, log_weights), jnp.arange(num_particles)
+
+  return _smart_cond(
+      do_resample,
+      do_resample_fn,
+      dont_resample_fn,
+      state,
+      log_weights,
+      seed,
+  )
 
 
 @types.runtime_typed
@@ -430,7 +498,7 @@ def sequential_monte_carlo_step(
     seed: Seed,
     resampling_pred: ResamplingPredicate = effective_sample_size_predicate,
     sample_ancestors_fn: SampleAncestorsFn = systematic_resampling,
-    state_gather_fn: ParticleGatherFn[State] = _defalt_pytree_gather,
+    state_gather_fn: ParticleGatherFn[State] = _default_pytree_gather,
 ) -> tuple[
     SequentialMonteCarloState[State], SequentialMonteCarloExtra[State, Extra]
 ]:
@@ -461,43 +529,21 @@ def sequential_monte_carlo_step(
   """
   resample_seed, kernel_seed = util.split_seed(seed, 2)
 
-  def do_resample(
-      state,
-      log_weights,
-      seed,
-  ):
-    ancestor_idxs = sample_ancestors_fn(log_weights, seed)
-    new_state = state_gather_fn(state, ancestor_idxs)
-    num_particles = log_weights.shape[0]
-    new_log_weights = jnp.full(
-        (num_particles,), tfp.math.reduce_logmeanexp(log_weights)
-    )
-    return (new_state, ancestor_idxs, new_log_weights)
-
-  def dont_resample(
-      state,
-      log_weights,
-      seed,
-  ):
-    del seed
-    num_particles = log_weights.shape[0]
-    return state, jnp.arange(num_particles), log_weights
-
   # NOTE: We don't explicitly disable resampling at the first step. However, if
   # we initialize the log weights to zeros, either of
   # 1. resampling according to the effective sample size criterion and
   # 2. using systematic resampling effectively disables resampling at the first
   #    step.
   # First-step resampling can always be forced via the `resampling_pred`.
-  should_resample = resampling_pred(smc_state)
-  state_after_resampling, ancestor_idxs, log_weights_after_resampling = (
-      _smart_cond(
-          should_resample,
-          do_resample,
-          dont_resample,
-          smc_state.state,
-          smc_state.log_weights,
-          resample_seed,
+  do_resample = resampling_pred(smc_state)
+  (state_after_resampling, log_weights_after_resampling), ancestor_idxs = (
+      resample(
+          state=smc_state.state,
+          log_weights=smc_state.log_weights,
+          do_resample=do_resample,
+          seed=resample_seed,
+          sample_ancestors_fn=sample_ancestors_fn,
+          state_gather_fn=state_gather_fn,
       )
   )
 
@@ -516,7 +562,7 @@ def sequential_monte_carlo_step(
   smc_extra = SequentialMonteCarloExtra(
       incremental_log_weights=incremental_log_weights,
       kernel_extra=kernel_extra,
-      resampled=should_resample,
+      resampled=do_resample,
       ancestor_idxs=ancestor_idxs,
       state_after_resampling=state_after_resampling,
       log_weights_after_resampling=log_weights_after_resampling,
@@ -711,6 +757,7 @@ def annealed_importance_sampling_kernel(
   )
 
 
+@types.runtime_typed
 def _smart_cond(
     pred: BoolScalar,
     true_fn: Callable[..., T],

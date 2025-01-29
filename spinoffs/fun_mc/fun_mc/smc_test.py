@@ -272,6 +272,33 @@ class SMCTest(tfp_test_util.TestCase):
     )
     self.assertAllClose(rejection_freqs, conditional_freqs, atol=0.05)
 
+  def test_resample(self):
+    state = jnp.array([3, 2, 1, 0])
+    log_weights = jnp.array([-jnp.inf, float('NaN'), 1.0, 1.0], self._dtype)
+    seed = _test_seed()
+
+    (new_state, new_log_weights), ancestor_idxs = smc.resample(
+        state=state, log_weights=log_weights, seed=seed
+    )
+
+    self.assertAllTrue(new_state != 3)
+    self.assertAllTrue(new_state != 2)
+    self.assertAllTrue(~jnp.isnan(new_log_weights))
+    self.assertAllEqual(3 - new_state, ancestor_idxs)
+
+  def test_resample_but_dont(self):
+    state = jnp.array([3, 2, 1, 0])
+    log_weights = jnp.array([-jnp.inf, float('NaN'), 1.0, 1.0], self._dtype)
+    seed = _test_seed()
+
+    (new_state, new_log_weights), ancestor_idxs = smc.resample(
+        state=state, log_weights=log_weights, do_resample=False, seed=seed
+    )
+
+    self.assertAllEqual(new_state, state)
+    self.assertAllEqual(new_log_weights, log_weights)
+    self.assertAllEqual(ancestor_idxs, jnp.arange(state.shape[0]))
+
   def test_smc_runs_and_shapes_correct(self):
     num_particles = 3
     num_timesteps = 20
