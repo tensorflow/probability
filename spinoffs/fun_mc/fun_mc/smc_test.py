@@ -1184,6 +1184,73 @@ class SMCTest(tfp_test_util.TestCase):
     self.assertAllClose(gt_log_evidence, log_evidence, rtol=0.01)
     self.assertAllClose(gt_log_evidence, log_evidence, atol=0.2)
 
+  def test_annealed_importance_sampling(self):
+    def tlp_1(x):
+      return -0.5 * x**2, ()
+
+    def tlp_2(x):
+      return (-0.5 * (x - 2) ** 2) / 16.0, ()
+
+    @jax.jit
+    def kernel(smc_state, seed):
+      smc_seed, seed = util.split_seed(seed, 2)
+
+      def inner_kernel(state, step, tlp_fn, seed):
+        f = jnp.array(step, state.dtype) / num_steps
+        hmc_state = fun_mc.hamiltonian_monte_carlo_init(state, tlp_fn)
+        hmc_state, _ = fun_mc.hamiltonian_monte_carlo_step(
+            hmc_state,
+            tlp_fn,
+            step_size=f * 4.0 + (1.0 - f) * 1.0,
+            num_integrator_steps=1,
+            seed=seed,
+        )
+        return hmc_state.state, ()
+
+      smc_state, _ = smc.sequential_monte_carlo_step(
+          smc_state,
+          kernel=functools.partial(
+              smc.annealed_importance_sampling_kernel,
+              kernel=inner_kernel,
+              make_target_log_probability_fn=functools.partial(
+                  fun_mc.geometric_annealing_path,
+                  num_stages=num_steps,
+                  initial_target_log_prob_fn=tlp_1,
+                  final_target_log_prob_fn=tlp_2,
+              ),
+          ),
+          seed=smc_seed,
+      )
+
+      return (smc_state, seed), ()
+
+    num_steps = 1000
+    num_particles = 1000
+    init_seed, smc_seed = util.split_seed(_test_seed(), 2)
+    init_state = util.random_normal([num_particles], self._dtype, init_seed)
+
+    (smc_state, _), _ = fun_mc.trace(
+        (
+            smc.sequential_monte_carlo_init(
+                init_state,
+                weight_dtype=self._dtype,
+            ),
+            smc_seed,
+        ),
+        kernel,
+        num_steps,
+    )
+
+    weights = jnp.exp(smc_state.log_weights)
+    # 4 because tlp_2 has stddev of 4 while tlp_1 has stddev of 1.
+    self.assertAllClose(4.0, jnp.mean(weights), atol=0.1)
+
+    normed_weights = jax.nn.softmax(smc_state.log_weights)
+    mean = jnp.sum(normed_weights * smc_state.state)
+    variance = jnp.sum(normed_weights * (smc_state.state - mean) ** 2)
+    self.assertAllClose(2.0, mean, atol=0.3)
+    self.assertAllClose(16.0, variance, rtol=0.2)
+
 
 @test_util.multi_backend_test(globals(), 'smc_test')
 class SMCTest32(SMCTest):

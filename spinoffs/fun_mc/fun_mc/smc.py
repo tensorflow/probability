@@ -17,6 +17,7 @@
 from typing import Any, Callable, Generic, Protocol, TypeVar, runtime_checkable
 
 from fun_mc import backend
+from fun_mc import fun_mc_lib as fun_mc
 from fun_mc import types
 
 jax = backend.jax
@@ -34,11 +35,16 @@ DType = types.DType
 BoolScalar = types.BoolScalar
 IntScalar = types.IntScalar
 FloatScalar = types.FloatScalar
+PotentialFn = types.PotentialFn
+
 State = TypeVar('State')
 Extra = TypeVar('Extra')
+KernelExtra = TypeVar('KernelExtra')
 T = TypeVar('T')
 
 __all__ = [
+    'annealed_importance_sampling_kernel',
+    'AnnealedImportanceSamplingKernelExtra',
     'conditional_systematic_resampling',
     'effective_sample_size_predicate',
     'ParticleGatherFn',
@@ -516,6 +522,193 @@ def sequential_monte_carlo_step(
       log_weights_after_resampling=log_weights_after_resampling,
   )
   return smc_state, smc_extra
+
+
+@runtime_checkable
+class AnnealedImportanceSamplingMCMCKernel(Protocol[State, Extra, KernelExtra]):
+  """Function that decides whether to resample."""
+
+  def __call__(
+      self,
+      state: State,
+      step: IntScalar,
+      target_log_prob_fn: PotentialFn[Extra],
+      seed: Seed,
+  ) -> tuple[State, KernelExtra]:
+    """Return boolean indicating whether to resample.
+
+    Note that resampling happens before stepping the kernel.
+
+    Args:
+      state: State step `t`.
+      step: The timestep, `t`.
+      target_log_prob_fn: Target distribution corresponding to `t`.
+      seed: PRNG seed.
+
+    Returns:
+      new_state: New state, targeting `target_log_prob_fn`.
+      extra: Extra information from the kernel.
+    """
+
+
+@util.dataclass
+class AnnealedImportanceSamplingKernelExtra(Generic[KernelExtra, Extra]):
+  """Extra outputs from the AIS kernel.
+
+  Attributes:
+    kernel_extra: Extra outputs from the inner kernel.
+    next_state_extra: Extra output from the next step's target log prob
+      function.
+    cur_state_extra: Extra output from the current step's target log prob
+      function.
+  """
+
+  kernel_extra: KernelExtra
+  cur_state_extra: Extra
+  next_state_extra: Extra
+
+
+@types.runtime_typed
+def annealed_importance_sampling_kernel(
+    state: State,
+    step: IntScalar,
+    seed: Seed,
+    kernel: AnnealedImportanceSamplingMCMCKernel[State, Extra, KernelExtra],
+    make_target_log_probability_fn: Callable[[IntScalar], PotentialFn[Extra]],
+) -> tuple[
+    State,
+    tuple[
+        Float[Array, 'num_particles'],
+        AnnealedImportanceSamplingKernelExtra[KernelExtra, Extra],
+    ],
+]:
+  """SMC kernel that implements Annealed Importance Sampling.
+
+  Annealed Importance Sampling (AIS)[1] can be interpreted as a special case of
+  SMC with a particular choice of forward and reverse kernels:
+  ```none
+  r_t = k_t(x_{t + 1} | x_t) p_t(x_t) / p_t(x_{t + 1})
+  q_t = k_{t - 1}(x_t | x_{t - 1})
+  ```
+  where `k_t` is an MCMC kernel that has `p_t` invariant. This causes the
+  incremental weight equation to be particularly simple:
+  ```none
+  iw_t = p_t(x_t) / p_{t - 1}(x_t)
+  ```
+  Unfortunately, the reverse kernel is not optimal, so the annealing schedule
+  needs to be fine. The original formulation from [1] does not do resampling,
+  but enabling it will usually reduce the variance of the estimator.
+
+  Args:
+    state: The previous particle state, `x_{t - 1}^{1:K}`.
+    step: The previous timestep, `t - 1`.
+    seed: PRNG seed.
+    kernel: The inner MCMC kernel. It takes the current state, the timestep, the
+      target distribution and the seed and generates an approximate sample from
+      `p_t` where `t` is the passed-in timestep.
+    make_target_log_probability_fn: A function that, given a timestep, returns
+      the target distribution `p_t` where `t` is the passed-in timestep.
+
+  Returns:
+    state: The new particles, `x_t^{1:K}`.
+    extra: A 2-tuple of:
+      incremental_log_weights: The incremental log weight at timestep t,
+        `iw_t^{1:K}`.
+      kernel_extra: Extra information returned by the kernel.
+
+  #### Example
+
+  In this example we estimate the normalizing constant ratio between `tlp_1`
+  and `tlp_2`.
+
+  ```python
+  def tlp_1(x):
+    return -(x**2) / 2.0, ()
+
+  def tlp_2(x):
+    return -((x - 2) ** 2) / 2 / 16.0, ()
+
+  @jax.jit
+  def kernel(smc_state, seed):
+    smc_seed, seed = jax.random.split(seed, 2)
+
+    def inner_kernel(state, stage, tlp_fn, seed):
+      f = jnp.array(stage, state.dtype) / num_steps
+      hmc_state = fun_mc.hamiltonian_monte_carlo_init(state, tlp_fn)
+      hmc_state, _ = fun_mc.hamiltonian_monte_carlo_step(
+          hmc_state,
+          tlp_fn,
+          step_size=f * 4.0 + (1.0 - f) * 1.0,
+          num_integrator_steps=1,
+          seed=seed,
+      )
+      return hmc_state.state, ()
+
+    smc_state, _ = smc.sequential_monte_carlo_step(
+        smc_state,
+        kernel=functools.partial(
+            smc.annealed_importance_sampling_kernel,
+            kernel=inner_kernel,
+            make_target_log_probability_fn=functools.partial(
+                fun_mc.geometric_annealing_path,
+                num_stages=num_steps,
+                initial_target_log_prob_fn=tlp_1,
+                final_target_log_prob_fn=tlp_2,
+            ),
+        ),
+        seed=smc_seed,
+    )
+
+    return (smc_state, seed), ()
+
+  num_steps = 100
+  num_particles = 400
+  init_seed, seed = jax.random.split(jax.random.PRNGKey(0))
+  init_state = jax.random.normal(init_seed, [num_particles])
+
+  (smc_state, _), _ = fun_mc.trace(
+      (
+          smc.sequential_monte_carlo_init(
+              init_state,
+              weight_dtype=self._dtype,
+          ),
+          smc_seed,
+      ),
+      kernel,
+      num_steps,
+  )
+
+  weights = jnp.exp(smc_state.log_weights)
+  # Should be close to 4.
+  print(estimated z2/z1, weights.mean())
+  # Should be close to 2.
+  print(estimated mean, (jax.nn.softmax(smc_state.log_weights)
+                           * smc_state.state).sum())
+  ```
+
+  #### References
+
+  [1]: Neal, Radford M. (1998) Annealed Importance Sampling.
+       https://arxiv.org/abs/physics/9803008
+  """
+  new_state, kernel_extra = kernel(
+      state, step, make_target_log_probability_fn(step), seed
+  )
+  tlp_num, num_extra = fun_mc.call_potential_fn(
+      make_target_log_probability_fn(step + 1), new_state
+  )
+  tlp_denom, denom_extra = fun_mc.call_potential_fn(
+      make_target_log_probability_fn(step), new_state
+  )
+  extra = AnnealedImportanceSamplingKernelExtra(
+      kernel_extra=kernel_extra,
+      cur_state_extra=denom_extra,
+      next_state_extra=num_extra,
+  )
+  return new_state, (
+      tlp_num - tlp_denom,
+      extra,
+  )
 
 
 def _smart_cond(

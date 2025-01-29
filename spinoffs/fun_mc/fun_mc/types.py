@@ -14,7 +14,7 @@
 # ============================================================================
 """Various types used in FunMC."""
 
-from typing import Callable, TypeAlias, TypeVar
+from typing import Callable, Protocol, TypeAlias, TypeVar, runtime_checkable
 
 import jaxtyping
 from fun_mc import backend
@@ -29,6 +29,7 @@ __all__ = [
     'FloatScalar',
     'Int',
     'IntScalar',
+    'PotentialFn',
     'runtime_typed',
     'Seed',
 ]
@@ -42,8 +43,24 @@ Bool = jaxtyping.Bool
 BoolScalar: TypeAlias = bool | Bool[Array, '']
 IntScalar: TypeAlias = int | Int[Array, '']
 FloatScalar: TypeAlias = float | Float[Array, '']
-
 F = TypeVar('F', bound=Callable)
+_Extra = TypeVar('_Extra')
+
+
+@runtime_checkable
+class PotentialFn(Protocol[_Extra]):
+  """Maps state to an array of float.
+
+  If the state has leading dimension, the same dimension is present in the
+  returned values as well.
+  """
+
+  def __call__(
+      self,
+      *args,
+      **kwargs,
+  ) -> tuple[Float[Array, '...'], _Extra]:
+    """Potential function."""
 
 
 def runtime_typed(f: F) -> F:
