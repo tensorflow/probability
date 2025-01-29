@@ -238,7 +238,6 @@ multi_substrate_py_test(
     name = "regularization_test",
     size = "small",
     srcs = ["regularization_test.py"],
-    srcs_version = "PY2AND3",
     deps = [
         ":regularization",
         # numpy dep,

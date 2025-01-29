@@ -123,7 +123,6 @@ multi_substrate_py_library(
 multi_substrate_py_test(
     name = "linear_operator_row_block_test",
     srcs = ["linear_operator_row_block_test.py"],
-    python_version = "PY3",
     deps = [
         ":linear_operator_row_block",
         # numpy dep,
