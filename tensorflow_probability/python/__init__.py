@@ -90,7 +90,7 @@ def _validate_tf_environment(package):
             'please install the tf-keras or tf-keras-nightly package.\n'
             'This can be be done through installing the '
             'tensorflow-probability[tf] extra or directly installing tf-keras '
-            '(i.e. when using conda/mamba).\n\n') as err
+            '(i.e. when using conda/mamba).\n\n') from err
 
 
 # Declare these explicitly to appease pytype, which otherwise misses them,
