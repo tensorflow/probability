@@ -36,15 +36,16 @@ def _validate_tf_environment(package):
   """
   try:
     import tensorflow as tf
-  except (ImportError, ModuleNotFoundError):
-    # Print more informative error message, then reraise.
-    print('\n\nFailed to import TensorFlow. Please note that TensorFlow is not '
-          'installed by default when you install TensorFlow Probability. This '
-          'is so that users can decide whether to install the GPU-enabled '
+  except (ImportError, ModuleNotFoundError) as err:
+    # Raise same type of error, but with more informative error message.
+    # Using print will lead to a message above the stacktrace and can easily
+    # be overlooked. For Python 3.11+ may switch to "err.add_note(...)"
+    raise type(err)('\n\nFailed to import TensorFlow. Please note that TensorFlow '
+          'is not installed by default when you install TensorFlow Probability. '
+          'This is so that users can decide whether to install the GPU-enabled '
           'TensorFlow package. To use TensorFlow Probability, please install '
           'the most recent version of TensorFlow, by following instructions at '
-          'https://tensorflow.org/install.\n\n')
-    raise
+          'https://tensorflow.org/install.\n\n') from err
 
   import distutils.version
 
@@ -77,16 +78,19 @@ def _validate_tf_environment(package):
   if required_tensorflow_version[0] == '2':
     try:
       import tf_keras  # pylint: disable=unused-import
-    except (ImportError, ModuleNotFoundError):
-      # Print more informative error message, then reraise.
-      print('\n\nFailed to import TF-Keras. Please note that TF-Keras is not '
+    except (ImportError, ModuleNotFoundError) as err:
+      # Raise same type of error, but with more informative error message.
+      # Using print will lead to a message above the stacktrace and can easily
+      # be overlooked. For Python 3.11+ may switch to "err.add_note(...)"
+      raise type(err)('\n\nFailed to import TF-Keras. '
+            'Please note that TF-Keras is not '
             'installed by default when you install TensorFlow Probability. '
             'This is so that JAX-only users do not have to install TensorFlow '
             'or TF-Keras. To use TensorFlow Probability with TensorFlow, '
             'please install the tf-keras or tf-keras-nightly package.\n'
             'This can be be done through installing the '
-            'tensorflow-probability[tf] extra.\n\n')
-      raise
+            'tensorflow-probability[tf] extra or directly installing tf-keras '
+            '(i.e. when using conda/mamba).\n\n') as err
 
 
 # Declare these explicitly to appease pytype, which otherwise misses them,
