@@ -38,10 +38,12 @@ class LogisticRegressionTest(test_util.InferenceGymTestCase,
                              parameterized.TestCase):
 
   @parameterized.named_parameters(
-      ('NoTest', None),
-      ('WithTest', 5),
+      ('NoTestF32', None, tf.float32),
+      ('WithTestF32', 5, tf.float32),
+      ('NoTestF64', None, tf.float64),
+      ('WithTestF64', 5, tf.float64),
   )
-  def testBasic(self, num_test_points):
+  def testBasic(self, num_test_points, dtype):
     """Checks that you get finite values given unconstrained samples.
 
     We check `unnormalized_log_prob` as well as the values of the sample
@@ -49,17 +51,21 @@ class LogisticRegressionTest(test_util.InferenceGymTestCase,
 
     Args:
       num_test_points: Number of test points.
+      dtype: Dtype to use for floating point computations.
     """
     num_features = 5
     model = logistic_regression.LogisticRegression(
-        **_test_dataset(num_features, num_test_points))
+        **_test_dataset(num_features, num_test_points), dtype=dtype
+    )
     self.validate_log_prob_and_transforms(
         model,
         sample_transformation_shapes=dict(
             identity=[num_features + 1],
             test_nll=[],
             per_example_test_nll=[num_test_points],
-        ))
+        ),
+        dtype=dtype,
+    )
 
   @parameterized.named_parameters(
       ('NoTest', None),

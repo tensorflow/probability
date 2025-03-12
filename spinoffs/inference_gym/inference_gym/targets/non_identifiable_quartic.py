@@ -60,6 +60,7 @@ class NonIdentifiableQuarticMeasurementModel(bayesian_model.BayesianModel):
       self,
       ndims=2,
       noise_scale=0.1,
+      dtype=tf.float32,
       name='non_identifiable_quartic_measurement_model',
       pretty_name='Non-Identifiable Quartic Measurement Model',
   ):
@@ -69,6 +70,7 @@ class NonIdentifiableQuarticMeasurementModel(bayesian_model.BayesianModel):
       ndims: Python integer. Dimensionality of the distribution. Must be at
         least 2.
       noise_scale: Floating point Tensor. Scale of the observation noise.
+      dtype: Dtype to use for floating point quantities.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
 
@@ -86,12 +88,12 @@ class NonIdentifiableQuarticMeasurementModel(bayesian_model.BayesianModel):
                   fn=lambda params: params,
                   pretty_name='Identity',
                   ground_truth_mean=np.zeros(ndims),  # By symmetry.
+                  dtype=dtype,
               )
       }
 
-      self._prior_dist = tfd.Sample(tfd.Normal(0., 1.), ndims)
-      self._noise_scale = tf.convert_to_tensor(
-          noise_scale, dtype_hint=tf.float32)
+      self._prior_dist = tfd.Sample(tfd.Normal(tf.zeros([], dtype), 1.0), ndims)
+      self._noise_scale = tf.cast(noise_scale, dtype)
 
     super(NonIdentifiableQuarticMeasurementModel, self).__init__(
         default_event_space_bijector=tfb.Identity(),

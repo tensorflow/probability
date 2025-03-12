@@ -47,15 +47,18 @@ def _test_dataset(train_size, test_size=None, num_counties=3):
 class _RadonContextualEffectsTest(test_util.InferenceGymTestCase):
 
   @parameterized.named_parameters(
-      ('NoTest', None),
-      ('WithTest', 5),
+      ('NoTestF32', None, tf.float32),
+      ('WithTestF32', 5, tf.float32),
+      ('NoTestF64', None, tf.float64),
+      ('WithTestF64', 5, tf.float64),
   )
-  def testBasic(self, test_size):
+  def testBasic(self, test_size, dtype):
     """Checks that unconstrained parameters yield finite joint densities."""
     num_counties = 3
     train_size = 20
     model = radon_contextual_effects.RadonContextualEffects(
         prior_scale=self.prior_scale,
+        dtype=dtype,
         **_test_dataset(train_size, test_size, num_counties))
     self.validate_log_prob_and_transforms(
         model,
@@ -68,7 +71,8 @@ class _RadonContextualEffectsTest(test_util.InferenceGymTestCase):
                 'log_radon_scale': []
             },
             test_nll=[],
-            per_example_test_nll=[test_size]))
+            per_example_test_nll=[test_size]),
+        dtype=dtype)
 
   @parameterized.named_parameters(
       ('NoTest', None),

@@ -93,6 +93,7 @@ class PlasmaSpectroscopy(bayesian_model.BayesianModel):
       absolute_noise_scale=0.5,
       relative_noise_scale=0.05,
       use_bump_function=False,
+      dtype=tf.float32,
       name='plasma_spectroscopy',
       pretty_name='Plasma Spectroscopy',
   ):
@@ -127,6 +128,7 @@ class PlasmaSpectroscopy(bayesian_model.BayesianModel):
         observation noise.
       use_bump_function: Python `bool`. If True, use a bump function to smoothly
         decay the plasma blob to 0 at the edges.
+      dtype: Dtype to use for floating point quantities.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
 
@@ -144,25 +146,31 @@ class PlasmaSpectroscopy(bayesian_model.BayesianModel):
       self._wavelengths = wavelengths
       self._center_wavelength = center_wavelength
       self._num_shells = num_shells
-      self._outer_shell_radius = outer_shell_radius
-      self._sensor_span = sensor_span
+      self._outer_shell_radius = tf.cast(outer_shell_radius, dtype)
+      self._sensor_span = tf.cast(sensor_span, dtype)
       self._num_integration_points = num_integration_points
-      self._prior_diag_noise_variance = prior_diag_noise_variance
-      self._prior_length_scale = prior_length_scale
-      self._amplitude_scale = amplitude_scale
-      self._temperature_scale = temperature_scale
-      self._velocity_scale = velocity_scale
-      self._absolute_noise_scale = absolute_noise_scale
-      self._relative_noise_scale = relative_noise_scale
+      self._prior_diag_noise_variance = tf.cast(
+          prior_diag_noise_variance, dtype
+      )
+      self._prior_length_scale = tf.cast(prior_length_scale, dtype)
+      self._amplitude_scale = tf.cast(amplitude_scale, dtype)
+      self._temperature_scale = tf.cast(temperature_scale, dtype)
+      self._velocity_scale = tf.cast(velocity_scale, dtype)
+      self._absolute_noise_scale = tf.cast(absolute_noise_scale, dtype)
+      self._relative_noise_scale = tf.cast(relative_noise_scale, dtype)
       self._use_bump_function = use_bump_function
+      self._float_dtype = dtype
+
+      zero = tf.zeros([], dtype)
 
       @tfd.JointDistributionCoroutine
       def prior():
-        yield Root(tfd.Sample(tfd.Normal(0., 1.), num_shells, name='amplitude'))
+        yield Root(tfd.Sample(tfd.Normal(zero, 1.), num_shells, name='amplitude'))
         yield Root(
-            tfd.Sample(tfd.Normal(0., 1.), num_shells, name='temperature'))
-        yield Root(tfd.Sample(tfd.Normal(0., 1.), num_shells, name='velocity'))
-        yield Root(tfd.Normal(0., 1., name='shift'))
+            tfd.Sample(tfd.Normal(zero, 1.), num_shells, name='temperature'))
+        yield Root(
+            tfd.Sample(tfd.Normal(zero, 1.0), num_shells, name='velocity'))
+        yield Root(tfd.Normal(zero, 1., name='shift'))
 
       self._prior_dist = prior
 
@@ -179,7 +187,9 @@ class PlasmaSpectroscopy(bayesian_model.BayesianModel):
       def log_likelihood_fn(sample):
         """The log_likelihood function."""
         _, mean_measurement = self.forward_model(sample)
-        return observation_noise_fn(mean_measurement).log_prob(measurements)
+        return observation_noise_fn(mean_measurement).log_prob(
+            tf.cast(measurements, dtype)
+        )
 
       self._log_likelihood_fn = log_likelihood_fn
 
@@ -286,17 +296,24 @@ class PlasmaSpectroscopy(bayesian_model.BayesianModel):
       mean_measurement: Float `Tensor` with shape [num_wavelengths,
         num_sensors]. The measurement means.
     """
-    wavelengths = tf.convert_to_tensor(self.wavelengths, tf.float32)
-    center_wavelength = tf.convert_to_tensor(self.center_wavelength, tf.float32)
+    wavelengths = tf.cast(self.wavelengths, self._float_dtype)
+    center_wavelength = tf.cast(self.center_wavelength, self._float_dtype)
 
-    shell_radii = tf.linspace(0., self.outer_shell_radius, self.num_shells)
+    shell_radii = tf.linspace(
+        tf.zeros([], self._float_dtype),
+        self.outer_shell_radius,
+        self.num_shells,
+    )
 
     kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
         length_scale=self.prior_length_scale)
     prior_cov = kernel.matrix(shell_radii[..., tf.newaxis],
                               shell_radii[..., tf.newaxis])
-    prior_cov = (prior_cov + self.prior_diag_noise_variance * tf.eye(
-        int(prior_cov.shape[-1]))) / (1 + self.prior_diag_noise_variance)
+    prior_cov = (
+        prior_cov
+        + self.prior_diag_noise_variance
+        * tf.eye(int(prior_cov.shape[-1]), dtype=self._float_dtype)
+    ) / (1 + self.prior_diag_noise_variance)
     prior_scale = tf.linalg.cholesky(prior_cov)
 
     amplitude = tf.linalg.matvec(prior_scale, sample.amplitude)
@@ -323,8 +340,9 @@ class PlasmaSpectroscopy(bayesian_model.BayesianModel):
             / (2 * bandwidth**2))
 
     if self.use_bump_function:
+      one = tf.ones([], self._float_dtype)
       emissivity *= tfp.math.round_exponential_bump_function(
-          tf.linspace(-1., 1., self.num_shells))
+          tf.linspace(-one, one, self.num_shells))
 
     x = tf.linspace(-self.outer_shell_radius, self.outer_shell_radius,
                     self.num_integration_points)
@@ -382,9 +400,10 @@ class SyntheticPlasmaSpectroscopy(PlasmaSpectroscopy):
   challenging for typical gradient-based inference methods.
   """
 
-  def __init__(self):
+  def __init__(self, dtype=tf.float32):
     dataset = data.synthetic_plasma_spectroscopy()
     super().__init__(
+        dtype=dtype,
         name='synthetic_plasma_spectroscopy',
         pretty_name='Synthetic Plasma Spectroscopy',
         **dataset)
@@ -401,9 +420,10 @@ class SyntheticPlasmaSpectroscopyWithBump(PlasmaSpectroscopy):
   sensors used.
   """
 
-  def __init__(self):
+  def __init__(self, dtype=tf.float32):
     dataset = data.synthetic_plasma_spectroscopy_with_bump()
     super().__init__(
+        dtype=dtype,
         name='synthetic_plasma_spectroscopy_with_bump',
         pretty_name='Synthetic Plasma Spectroscopy With Bump',
         use_bump_function=True,

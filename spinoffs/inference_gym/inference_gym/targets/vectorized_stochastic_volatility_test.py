@@ -40,11 +40,14 @@ class VectorizedStochasticVolatilityTest(test_util.InferenceGymTestCase,
                                          parameterized.TestCase):
 
   @parameterized.named_parameters(
-      ('Centered', True, False),
-      ('Noncentered', False, False),
-      ('NoncenteredFFT', False, True),
+      ('CenteredF32', True, False, tf.float32),
+      ('NoncenteredF32', False, False, tf.float32),
+      ('NoncenteredFFTF32', False, True, tf.float32),
+      ('CenteredF64', True, False, tf.float64),
+      ('NoncenteredF64', False, False, tf.float64),
+      ('NoncenteredFFTF64', False, True, tf.float64),
   )
-  def testBasic(self, centered, use_fft):
+  def testBasic(self, centered, use_fft, dtype):
     """Checks that you get finite values given unconstrained samples.
 
     We check `log_prob` as well as the values of the expectations.
@@ -53,9 +56,13 @@ class VectorizedStochasticVolatilityTest(test_util.InferenceGymTestCase,
       centered: Whether or not to use the centered parameterization.
       use_fft: Whether or not to use FFT-based convolution to implement the
         centering transformation.
+      dtype: Dtype to use for floating point computations.
     """
     model = vectorized_stochastic_volatility.VectorizedStochasticVolatility(
-        centered_returns=_test_dataset(), centered=centered, use_fft=use_fft)
+        centered_returns=_test_dataset(),
+        centered=centered,
+        use_fft=use_fft,
+        dtype=dtype)
     self.validate_log_prob_and_transforms(
         model,
         sample_transformation_shapes=dict(
@@ -64,7 +71,8 @@ class VectorizedStochasticVolatilityTest(test_util.InferenceGymTestCase,
                 'mean_log_volatility': [],
                 'white_noise_shock_scale': [],
                 'log_volatility': [5]
-            }))
+            }),
+        dtype=dtype)
 
   def testDeferred(self):
     """Checks that the dataset is not prematurely materialized."""
@@ -192,7 +200,7 @@ class VectorizedStochasticVolatilityTest(test_util.InferenceGymTestCase,
 
   def testFFTConvCenter(self):
     np.random.seed(10003)
-    persistence = 0.95
+    persistence = np.array(0.95).astype(np.float32)
     noncentered = np.random.randn(100).astype(np.float32)
     centered = np.zeros_like(noncentered)
     centered[0] = noncentered[0] / np.sqrt(1 - persistence**2)

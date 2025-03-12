@@ -39,10 +39,12 @@ class _SparseLogisticRegressionTest(test_util.InferenceGymTestCase):
   positive_constraint_fn = None
 
   @parameterized.named_parameters(
-      ('NoTest', None),
-      ('WithTest', 5),
+      ('NoTestF32', None, tf.float32),
+      ('WithTestF32', 5, tf.float32),
+      ('NoTestF64', None, tf.float64),
+      ('WithTestF64', 5, tf.float64),
   )
-  def testBasic(self, num_test_points):
+  def testBasic(self, num_test_points, dtype):
     """Checks that you get finite values given unconstrained samples.
 
     We check `unnormalized_log_prob` as well as the values of the sample
@@ -50,10 +52,12 @@ class _SparseLogisticRegressionTest(test_util.InferenceGymTestCase):
 
     Args:
       num_test_points: Number of test points.
+      dtype: Dtype to use for floating point computations.
     """
     num_features = 5
     model = sparse_logistic_regression.SparseLogisticRegression(
         positive_constraint_fn=self.positive_constraint_fn,
+        dtype=dtype,
         **_test_dataset(num_features, num_test_points))
     self.validate_log_prob_and_transforms(
         model,
@@ -65,7 +69,9 @@ class _SparseLogisticRegressionTest(test_util.InferenceGymTestCase):
             },
             test_nll=[],
             per_example_test_nll=[num_test_points],
-        ))
+        ),
+        dtype=dtype,
+    )
 
   @parameterized.named_parameters(
       ('NoTest', None),

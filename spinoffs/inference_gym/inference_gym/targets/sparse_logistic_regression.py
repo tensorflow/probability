@@ -34,7 +34,9 @@ __all__ = [
 
 
 def _add_bias(features):
-  return tf.concat([features, tf.ones([ps.shape(features)[0], 1])], axis=-1)
+  return tf.concat(
+      [features, tf.ones([ps.shape(features)[0], 1], features.dtype)], axis=-1
+  )
 
 
 class SparseLogisticRegression(bayesian_model.BayesianModel):
@@ -60,6 +62,7 @@ class SparseLogisticRegression(bayesian_model.BayesianModel):
                test_features=None,
                test_labels=None,
                positive_constraint_fn='exp',
+               dtype=tf.float32,
                name='sparse_logistic_regression',
                pretty_name='Sparse Logistic Regression'):
     """Construct the sparse logistic regression model.
@@ -77,6 +80,7 @@ class SparseLogisticRegression(bayesian_model.BayesianModel):
         are not computed.
       positive_constraint_fn: Python `str`. Which squashing function to use to
         enforce positivity of scales. Can be either `exp` or `softplus`.
+      dtype: Dtype to use for floating point quantities.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
 
@@ -87,11 +91,14 @@ class SparseLogisticRegression(bayesian_model.BayesianModel):
     with tf.name_scope(name):
       num_features = int(train_features.shape[1] + 1)
 
+      zero = tf.zeros([], dtype)
+      half = tf.constant(0.5, dtype)
+
       self._prior_dist = tfd.JointDistributionNamed(
           dict(
-              unscaled_weights=tfd.Sample(tfd.Normal(0., 1.), num_features),
-              local_scales=tfd.Sample(tfd.Gamma(0.5, 0.5), num_features),
-              global_scale=tfd.Gamma(0.5, 0.5),
+              unscaled_weights=tfd.Sample(tfd.Normal(zero, 1.), num_features),
+              local_scales=tfd.Sample(tfd.Gamma(half, half), num_features),
+              global_scale=tfd.Gamma(half, half),
           ))
 
       def log_likelihood_fn(unscaled_weights,
@@ -101,7 +108,7 @@ class SparseLogisticRegression(bayesian_model.BayesianModel):
                             labels,
                             reduce_sum=True):
         """The log_likelihood function."""
-        features = tf.convert_to_tensor(features, tf.float32)
+        features = tf.cast(features, dtype)
         features = _add_bias(features)
         labels = tf.convert_to_tensor(labels)
 
@@ -139,6 +146,7 @@ class SparseLogisticRegression(bayesian_model.BayesianModel):
             model.Model.SampleTransformation(
                 fn=lambda params: test_log_likelihood_fn(**params),
                 pretty_name='Test NLL',
+                dtype=dtype,
             ))
         sample_transformations['per_example_test_nll'] = (
             model.Model.SampleTransformation(
@@ -146,6 +154,7 @@ class SparseLogisticRegression(bayesian_model.BayesianModel):
                     reduce_sum=False,
                     **params),
                 pretty_name='Per-example Test NLL',
+                dtype=dtype,
             ))
 
     if positive_constraint_fn == 'exp':
@@ -188,11 +197,12 @@ class GermanCreditNumericSparseLogisticRegression(SparseLogisticRegression):
 
   GROUND_TRUTH_MODULE = german_credit_numeric_sparse_logistic_regression
 
-  def __init__(self, positive_constraint_fn='exp'):
+  def __init__(self, dtype=tf.float32, positive_constraint_fn='exp'):
     dataset = data.german_credit_numeric()
     del dataset['test_features']
     del dataset['test_labels']
     super(GermanCreditNumericSparseLogisticRegression, self).__init__(
+        dtype=dtype,
         name='german_credit_numeric_sparse_logistic_regression',
         pretty_name='German Credit Numeric Sparse Logistic Regression',
         positive_constraint_fn=positive_constraint_fn,

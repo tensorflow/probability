@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_util
 
 flags.DEFINE_bool('use_tfds', False, 'Whether to run tests that use TFDS.',
@@ -279,6 +280,7 @@ class InferenceGymTestCase(test_util.TestCase):
       self,
       model,
       sample_transformation_shapes,
+      dtype=tf.float32,
       check_ground_truth_mean=False,
       check_ground_truth_mean_standard_error=False,
       check_ground_truth_standard_deviation=False,
@@ -295,6 +297,7 @@ class InferenceGymTestCase(test_util.TestCase):
     Args:
       model: The model to validate.
       sample_transformation_shapes: Shapes of the transformation outputs.
+      dtype: The expected dtype of floating point quantities.
       check_ground_truth_mean: Whether to check the shape of the ground truth
         mean.
       check_ground_truth_mean_standard_error: Whether to check the shape of the
@@ -331,9 +334,16 @@ class InferenceGymTestCase(test_util.TestCase):
 
     self.assertAllFinite(log_prob)
     self.assertEqual((batch_size,), log_prob.shape)
+    self.assertEqual(dtype, log_prob.dtype)
+
+    def _assert_dtype_part(part):
+      if dtype_util.is_floating(part):
+        self.assertEqual(dtype, part)
+
+    self.assertAllAssertsNested(_assert_dtype_part, model.dtype)
 
     for name, sample_transformation in model.sample_transformations.items():
-      transformed_points = self.evaluate(sample_transformation(test_points))
+      transformed_points = sample_transformation(test_points)
 
       def _assertions_part(expected_shape, expected_dtype, transformed_part):
         self.assertAllFinite(transformed_part)
@@ -341,6 +351,8 @@ class InferenceGymTestCase(test_util.TestCase):
             (batch_size,) + tuple(expected_shape),
             tuple(list(transformed_part.shape)))
         self.assertEqual(expected_dtype, transformed_part.dtype)
+        if dtype_util.is_floating(transformed_part.dtype):
+          self.assertEqual(dtype, transformed_part.dtype)
 
       self.assertAllAssertsNested(
           _assertions_part,

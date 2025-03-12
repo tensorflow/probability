@@ -55,6 +55,7 @@ class NealsFunnel(model.Model):
   def __init__(
       self,
       ndims=10,
+      dtype=tf.float32,
       name='neals_funnel',
       pretty_name='Neal\'s Funnel',
   ):
@@ -63,6 +64,7 @@ class NealsFunnel(model.Model):
     Args:
       ndims: Python integer. Dimensionality of the distribution. Must be at
         least 2.
+      dtype: Dtype to use for floating point quantities.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
 
@@ -79,16 +81,18 @@ class NealsFunnel(model.Model):
         batch_shape = ps.shape(x)[:-1]
         scale = tf.concat(
             [
-                tf.ones(ps.concat([batch_shape, [1]], axis=0)),
-                tf.exp(x[..., :1] / 2) *
-                tf.ones(ps.concat([batch_shape, [ndims - 1]], axis=0)),
+                tf.ones(ps.concat([batch_shape, [1]], axis=0), dtype),
+                tf.exp(x[..., :1] / 2)
+                * tf.ones(
+                    ps.concat([batch_shape, [ndims - 1]], axis=0), dtype
+                ),
             ],
             axis=-1,
         )
         return tfb.Scale(scale)
 
       mg = tfd.MultivariateNormalDiag(
-          loc=tf.zeros(ndims), scale_diag=[3.] + [1.] * (ndims - 1))
+          loc=tf.zeros(ndims, dtype), scale_diag=[3.] + [1.] * (ndims - 1))
       funnel = tfd.TransformedDistribution(
           mg, bijector=tfb.MaskedAutoregressiveFlow(bijector_fn=bijector_fn))
 
@@ -104,11 +108,12 @@ class NealsFunnel(model.Model):
                   # formulas. For the mean, the formulas yield zero.
                   ground_truth_mean=np.zeros(ndims),
                   # For the standard deviation, all means are zero and standard
-                  # deivations of the normals are 1, so the formula reduces to
+                  # deviations of the normals are 1, so the formula reduces to
                   # `sqrt((sigma_log_normal + mean_log_normal**2))` which
                   # reduces to `exp((sigma_log_normal)**2)`.
                   ground_truth_standard_deviation=np.array(
                       [3.] + [np.exp((3. / 2)**2)] * (ndims - 1)),
+                  dtype=dtype,
               )
       }
 

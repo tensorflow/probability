@@ -15,6 +15,8 @@
 """Tests for inference_gym.targets.lorenz_system."""
 
 import functools
+
+from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
@@ -55,11 +57,15 @@ _test_dataset = functools.partial(_make_dataset, _full_observed_data)
 @test_util.multi_backend_test(globals(), 'targets.lorenz_system_test')
 class LorenzSystemTest(test_util.InferenceGymTestCase):
 
-  def testLorenzSystem(self):
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testLorenzSystem(self, dtype):
     """Checks that unconstrained parameters yield finite joint densities."""
-    model = lorenz_system.LorenzSystem(**_test_dataset(), use_markov_chain=True)
+    model = lorenz_system.LorenzSystem(
+        **_test_dataset(), use_markov_chain=True, dtype=dtype)
     self.validate_log_prob_and_transforms(
-        model, sample_transformation_shapes=dict(identity=[30, 3]))
+        model,
+        sample_transformation_shapes=dict(identity=[30, 3]),
+        dtype=dtype)
 
   def testDeferred(self):
     """Checks that the dataset is not prematurely materialized."""
@@ -71,15 +77,18 @@ class LorenzSystemTest(test_util.InferenceGymTestCase):
                              observation_index=dataset.pop('observation_index'))
     self.validate_deferred_materialization(func, **dataset)
 
-  def testConvectionLorenzBridge(self):
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testConvectionLorenzBridge(self, dtype):
     """Checks that unconstrained parameters yield finite joint densities."""
-    model = lorenz_system.ConvectionLorenzBridge(use_markov_chain=True)
+    model = lorenz_system.ConvectionLorenzBridge(
+        use_markov_chain=True, dtype=dtype)
     self.validate_log_prob_and_transforms(
         model,
         sample_transformation_shapes=dict(identity=[30, 3]),
         check_ground_truth_mean_standard_error=True,
         check_ground_truth_mean=True,
-        check_ground_truth_standard_deviation=True)
+        check_ground_truth_standard_deviation=True,
+        dtype=dtype)
 
   @test_util.numpy_disable_gradient_test
   def testConvectionLorenzBridgeHMC(self):
@@ -110,18 +119,21 @@ class LorenzSystemTest(test_util.InferenceGymTestCase):
 @test_util.multi_backend_test(globals(), 'targets.lorenz_system_test')
 class LorenzSystemUnknownScalesTest(test_util.InferenceGymTestCase):
 
-  def testLorenzSystemUnknownScales(self):
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testLorenzSystemUnknownScales(self, dtype):
     """Checks that unconstrained parameters yield finite joint densities."""
     dataset = _test_dataset()
     del dataset['innovation_scale']
     del dataset['observation_scale']
     model = lorenz_system.LorenzSystemUnknownScales(use_markov_chain=True,
+                                                    dtype=dtype,
                                                     **dataset)
     self.validate_log_prob_and_transforms(
         model, sample_transformation_shapes=dict(
             identity={'innovation_scale': [],
                       'observation_scale': [],
-                      'latents': [30, 3]}))
+                      'latents': [30, 3]}),
+        dtype=dtype)
 
   def testDeferred(self):
     """Checks that the dataset is not prematurely materialized."""
@@ -134,10 +146,11 @@ class LorenzSystemUnknownScalesTest(test_util.InferenceGymTestCase):
         observation_index=dataset.pop('observation_index'))
     self.validate_deferred_materialization(func, **dataset)
 
-  def testConvectionLorenzBridge(self):
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testConvectionLorenzBridge(self, dtype):
     """Checks that unconstrained parameters yield finite joint densities."""
     model = lorenz_system.ConvectionLorenzBridgeUnknownScales(
-        use_markov_chain=True)
+        use_markov_chain=True, dtype=dtype)
     self.validate_log_prob_and_transforms(
         model,
         sample_transformation_shapes=dict(
@@ -146,7 +159,8 @@ class LorenzSystemUnknownScalesTest(test_util.InferenceGymTestCase):
                       'latents': [30, 3]}),
         check_ground_truth_mean_standard_error=True,
         check_ground_truth_mean=True,
-        check_ground_truth_standard_deviation=True)
+        check_ground_truth_standard_deviation=True,
+        dtype=dtype)
 
   @test_util.numpy_disable_gradient_test
   def testConvectionLorenzBridgeHMC(self):

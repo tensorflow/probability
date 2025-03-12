@@ -17,7 +17,6 @@ import functools
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.internal import dtype_util
 
 from inference_gym.internal import data
 from inference_gym.targets import bayesian_model
@@ -75,24 +74,26 @@ def make_radon_prior(num_counties, dtype, prior_scale):
 
 
 def make_radon_observation_dist(params, log_uranium, floor, county,
-                                floor_by_county):
+                                floor_by_county, dtype):
   """Likelihood of observed data under the contextual effects radon model."""
-  floor = tf.cast(floor, dtype=log_uranium.dtype)
+  floor = tf.cast(floor, dtype)
   return tfd.Normal(
       loc=affine(
-          log_uranium,
+          tf.cast(log_uranium, dtype),
           params['weight'][..., :1],
           affine(floor, params['weight'][..., 1:2])
-          + affine(floor_by_county, params['weight'][..., 2:])
+          + affine(tf.cast(floor_by_county, dtype), params['weight'][..., 2:])
           + tf.gather(params['county_effect'], county, axis=-1)),
       scale=params['log_radon_scale'][..., tf.newaxis])
 
 
 def radon_log_likelihood_fn(
     params, log_uranium, floor, county, floor_by_county, log_radon,
-    reduce_sum=True):
-  log_likelihood = make_radon_observation_dist(
-      params, log_uranium, floor, county, floor_by_county).log_prob(log_radon)
+    dtype, reduce_sum=True):
+  dist = make_radon_observation_dist(
+      params, log_uranium, floor, county, floor_by_county, dtype
+  )
+  log_likelihood = dist.log_prob(tf.cast(log_radon, dtype))
   if reduce_sum:
     return tf.reduce_sum(log_likelihood, [-1])
   return log_likelihood
@@ -126,9 +127,9 @@ class RadonContextualEffects(bayesian_model.BayesianModel):
 
   for k in range(num_houses):
     log_radon[k] ~ Normal(
-        loc=log_uranium * weight[1]           # effect of soil uranium
-            + floor * weight[2]               # effect of floor
-            + floor_by_county * weight[3]     # effect of mean floor by county
+        loc=log_uranium[k] * weight[1]        # effect of soil uranium
+            + floor[k] * weight[2]            # effect of floor
+            + floor_by_county[k] * weight[3]  # effect of mean floor by county
             + county_effect[county[k]],       # effect of county
         scale=log_radon_scale)
   ```
@@ -171,6 +172,7 @@ class RadonContextualEffects(bayesian_model.BayesianModel):
                test_floor_by_county=None,
                test_log_radon=None,
                prior_scale='uniform',
+               dtype=tf.float32,
                name='radon_contextual_effects',
                pretty_name='Radon Contextual Effects'):
     """Construct the hierarchical radon model with contextual effects.
@@ -214,6 +216,7 @@ class RadonContextualEffects(bayesian_model.BayesianModel):
         `Uniform` distribution as in the original Stan model. A `halfnormal`
         value constructs the prior distribution's `county_effect_scale` and
         `log_radon_scale` with a `HalfNormal` distribution.
+      dtype: Dtype to use for floating point quantities.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
 
@@ -232,7 +235,7 @@ class RadonContextualEffects(bayesian_model.BayesianModel):
             '`test_floor_by_county`={}, `test_log_radon`={}`'.format(
                 *test_data))
 
-      dtype = train_log_radon.dtype
+      self._float_dtype = dtype
       self._prior_dist = make_radon_prior(
           num_counties, dtype=dtype, prior_scale=prior_scale)
       self._train_log_likelihood_fn = functools.partial(
@@ -241,7 +244,8 @@ class RadonContextualEffects(bayesian_model.BayesianModel):
           floor=train_floor,
           county=train_county,
           floor_by_county=train_floor_by_county,
-          log_radon=train_log_radon)
+          log_radon=train_log_radon,
+          dtype=dtype)
 
       sample_transformations = {
           'identity':
@@ -259,17 +263,20 @@ class RadonContextualEffects(bayesian_model.BayesianModel):
             floor=test_floor,
             county=test_county,
             floor_by_county=test_floor_by_county,
-            log_radon=test_log_radon)
+            log_radon=test_log_radon,
+            dtype=dtype)
 
         sample_transformations['test_nll'] = (
             model.Model.SampleTransformation(
                 fn=test_log_likelihood_fn,
                 pretty_name='Test NLL',
+                dtype=dtype,
             ))
         sample_transformations['per_example_test_nll'] = (
             model.Model.SampleTransformation(
                 fn=functools.partial(test_log_likelihood_fn, reduce_sum=False),
                 pretty_name='Per-example Test NLL',
+                dtype=dtype,
             ))
 
       self._train_log_uranium = train_log_uranium
@@ -326,12 +333,12 @@ class RadonContextualEffects(bayesian_model.BayesianModel):
     prior_samples = self._prior_distribution().sample(seed=seed)
     dist = make_radon_observation_dist(
         prior_samples, self._train_log_uranium, self._train_floor,
-        self._train_county, self._train_floor_by_county)
+        self._train_county, self._train_floor_by_county, self._float_dtype)
     dataset['train_log_radon'] = dist.sample(seed=seed)
     if self._have_test:
       test_dist = make_radon_observation_dist(
           prior_samples, self._test_log_uranium, self._test_floor,
-          self._test_county, self._test_floor_by_county)
+          self._test_county, self._test_floor_by_county, self._float_dtype)
       dataset['test_log_radon'] = test_dist.sample(seed=seed)
     return dataset
 
@@ -358,9 +365,8 @@ class RadonContextualEffectsIndiana(RadonContextualEffects):
     for key in list(dataset.keys()):
       if key.startswith('test_'):
         del dataset[key]
-      elif dtype_util.is_floating(dataset[key].dtype):
-        dataset[key] = tf.cast(dataset[key], dtype)
     super(RadonContextualEffectsIndiana, self).__init__(
+        dtype=dtype,
         name='radon_contextual_effects_indiana',
         pretty_name='Radon Contextual Effects Indiana',
         **dataset)
@@ -389,8 +395,6 @@ class RadonContextualEffectsHalfNormalIndiana(RadonContextualEffects):
     for key in list(dataset.keys()):
       if key.startswith('test_'):
         del dataset[key]
-      elif dtype_util.is_floating(dataset[key].dtype):
-        dataset[key] = tf.cast(dataset[key], dtype)
     super(RadonContextualEffectsHalfNormalIndiana, self).__init__(
         name='radon_contextual_effects_halfnormal_indiana',
         pretty_name='Radon Contextual Effects HalfNormal Indiana',
@@ -418,9 +422,8 @@ class RadonContextualEffectsMinnesota(RadonContextualEffects):
     for key in list(dataset.keys()):
       if key.startswith('test_'):
         del dataset[key]
-      elif dtype_util.is_floating(dataset[key].dtype):
-        dataset[key] = tf.cast(dataset[key], dtype)
     super(RadonContextualEffectsMinnesota, self).__init__(
+        dtype=dtype,
         name='radon_contextual_effects_minnesota',
         pretty_name='Radon Contextual Effects Minnesota',
         **dataset)
@@ -447,9 +450,8 @@ class RadonContextualEffectsHalfNormalMinnesota(RadonContextualEffects):
     for key in list(dataset.keys()):
       if key.startswith('test_'):
         del dataset[key]
-      elif dtype_util.is_floating(dataset[key].dtype):
-        dataset[key] = tf.cast(dataset[key], dtype)
     super(RadonContextualEffectsHalfNormalMinnesota, self).__init__(
+        dtype=dtype,
         name='radon_contextual_effects_halfnormal_minnesota',
         pretty_name='Radon Contextual Effects HalfNormal Minnesota',
         prior_scale='halfnormal',

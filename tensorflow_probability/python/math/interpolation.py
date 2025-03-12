@@ -125,7 +125,7 @@ def _interp_regular_1d_grid_impl(x,
     # the y_ref values are the same).
     idx_below = tf.floor(x_idx)
     idx_above = tf.minimum(idx_below + 1, ny - 1)
-    idx_below = tf.maximum(idx_above - 1, 0)
+    idx_below = tf.maximum(idx_above - 1, tf.zeros_like(idx_above))
 
     # These are the values of y_ref corresponding to above/below indices.
     idx_below_int32 = tf.cast(idx_below, dtype=tf.int32)
@@ -175,7 +175,7 @@ def _interp_regular_1d_grid_impl(x,
       else:
         y = tf.where(
             (x_idx_unclipped < 0) | (x_idx_unclipped > ny - 1),
-            fill_value, y)
+            tf.convert_to_tensor(fill_value, y.dtype), y)
     else:
       # Fill values below x_ref_min <==> x_idx_unclipped < 0.
       if fill_value_below == 'constant_extension':
@@ -218,7 +218,8 @@ def _interp_regular_1d_grid_impl(x,
         y = tf.where(x_idx_unclipped > ny - 1,
                      y_n1 + x_factor * (y_n1 - y_n2), y)
       else:
-        y = tf.where(x_idx_unclipped > ny - 1, fill_value_above, y)
+        y = tf.where(x_idx_unclipped > ny - 1,
+                     tf.convert_to_tensor(fill_value_above, y.dtype), y)
 
     return y
 

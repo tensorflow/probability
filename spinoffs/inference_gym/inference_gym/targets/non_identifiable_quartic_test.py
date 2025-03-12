@@ -14,6 +14,9 @@
 # ============================================================================
 """Tests for inference_gym.targets.non_identifiable_quartic."""
 
+from absl.testing import parameterized
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from inference_gym.internal import test_util
 from inference_gym.targets import non_identifiable_quartic
@@ -24,18 +27,23 @@ from inference_gym.targets import non_identifiable_quartic
 class NonIdentifiableQuarticMeasurementModelTest(test_util.InferenceGymTestCase
                                                 ):
 
-  def testBasic(self):
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testBasic(self, dtype):
     """Checks that you get finite values given unconstrained samples.
 
     We check `unnormalized_log_prob` as well as the values of the sample
     transformations.
+
+    Args:
+      dtype: Dtype to use for floating point computations.
     """
     model = non_identifiable_quartic.NonIdentifiableQuarticMeasurementModel(
-        ndims=3)
+        ndims=3, dtype=dtype)
     self.validate_log_prob_and_transforms(
         model,
         sample_transformation_shapes=dict(identity=[3]),
         check_ground_truth_mean=True,
+        dtype=dtype,
     )
 
 

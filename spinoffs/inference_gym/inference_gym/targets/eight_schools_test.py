@@ -14,6 +14,9 @@
 # ============================================================================
 """Tests for inference_gym.targets.eight_schools."""
 
+from absl.testing import parameterized
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from inference_gym.internal import test_util
 from inference_gym.targets import eight_schools
@@ -22,9 +25,10 @@ from inference_gym.targets import eight_schools
 @test_util.multi_backend_test(globals(), 'targets.eight_schools_test')
 class EightSchoolsTest(test_util.InferenceGymTestCase):
 
-  def testEightSchools(self):
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testEightSchools(self, dtype):
     """Checks that unconstrained parameters yield finite joint densities."""
-    model = eight_schools.EightSchools()
+    model = eight_schools.EightSchools(dtype=dtype)
     self.validate_log_prob_and_transforms(
         model,
         sample_transformation_shapes=dict(identity={
@@ -34,7 +38,8 @@ class EightSchoolsTest(test_util.InferenceGymTestCase):
         }),
         check_ground_truth_mean_standard_error=True,
         check_ground_truth_mean=True,
-        check_ground_truth_standard_deviation=True)
+        check_ground_truth_standard_deviation=True,
+        dtype=dtype)
 
   @test_util.numpy_disable_gradient_test
   def testEightSchoolsHMC(self):

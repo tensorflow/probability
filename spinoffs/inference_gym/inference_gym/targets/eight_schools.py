@@ -75,34 +75,50 @@ class EightSchools(bayesian_model.BayesianModel):
 
   GROUND_TRUTH_MODULE = eight_schools
 
-  def __init__(self, name='eight_schools', pretty_name='Eight Schools'):
+  def __init__(
+      self,
+      dtype=tf.float32,
+      name='eight_schools',
+      pretty_name='Eight Schools',
+  ):
     """Construct the Eight Schools model.
 
     Args:
+      dtype: Dtype to use for floating point quantities.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
     """
     with tf.name_scope(name):
 
       treatment_effects = tf.constant(
-          [28, 8, -3, 7, -1, 1, 18, 12], dtype=tf.float32)
+          [28, 8, -3, 7, -1, 1, 18, 12], dtype=dtype)
       treatment_stddevs = tf.constant(
-          [15, 10, 16, 11, 9, 11, 10, 18], dtype=tf.float32)
+          [15, 10, 16, 11, 9, 11, 10, 18], dtype=dtype)
       num_schools = ps.shape(treatment_effects)[-1]
 
       self._prior_dist = tfd.JointDistributionNamed({
-          'avg_effect': tfd.Normal(loc=0., scale=10., name='avg_effect'),
-          'log_stddev': tfd.Normal(loc=5., scale=1., name='log_stddev'),
+          'avg_effect': tfd.Normal(
+              loc=tf.constant(0.0, dtype), scale=10.0, name='avg_effect'
+          ),
+          'log_stddev': tfd.Normal(
+              loc=tf.constant(5.0, dtype), scale=1.0, name='log_stddev'
+          ),
           # Deliberately specify the more challenging 'centered' form of the
           # model (the non-centered form, where all RVs are iid standard normal
           # in the prior, provides an easier inference problem).
           'school_effects': lambda log_stddev, avg_effect: (  # pylint: disable=g-long-lambda
               tfd.Independent(
-                  tfd.Normal(loc=avg_effect[..., None] * tf.ones(num_schools),
-                             scale=tf.exp(
-                                 log_stddev[..., None]) * tf.ones(num_schools),
-                             name='school_effects'),
-                  reinterpreted_batch_ndims=1))})
+                  tfd.Normal(
+                      loc=avg_effect[..., None]
+                      * tf.ones(num_schools, dtype),
+                      scale=tf.exp(log_stddev[..., None])
+                      * tf.ones(num_schools, dtype),
+                      name='school_effects',
+                  ),
+                  reinterpreted_batch_ndims=1,
+              )
+          ),
+      })
 
       self._log_likelihood_fn = (
           lambda values: tfd.Independent(  # pylint: disable=g-long-lambda

@@ -75,6 +75,7 @@ class ItemResponseTheory(bayesian_model.BayesianModel):
       test_student_ids=None,
       test_question_ids=None,
       test_correct=None,
+      dtype=tf.float32,
       name='item_response_theory',
       pretty_name='Item-Response Theory',
   ):
@@ -98,6 +99,7 @@ class ItemResponseTheory(bayesian_model.BayesianModel):
         student in the testing set answered the question correctly, either 0 or
         1. Can be `None`, in which case test-related sample transformations are
         not computed.
+      dtype: Dtype to use for floating point quantities.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
 
@@ -143,15 +145,16 @@ class ItemResponseTheory(bayesian_model.BayesianModel):
           train_correct,
       )
 
+      one = tf.ones([], dtype)
       self._prior_dist = tfd.JointDistributionNamed(
           dict(
-              mean_student_ability=tfd.Normal(0.75, 1.),
+              mean_student_ability=tfd.Normal(0.75, one),
               centered_student_ability=tfd.Sample(
-                  tfd.Normal(0., 1.),
+                  tfd.Normal(0., one),
                   self._num_students,
               ),
               question_difficulty=tfd.Sample(
-                  tfd.Normal(0., 1.),
+                  tfd.Normal(0., one),
                   self._num_questions,
               ),
           ))
@@ -183,14 +186,12 @@ class ItemResponseTheory(bayesian_model.BayesianModel):
           y_mask=train_y_mask,
       )
 
-      dtype = self._prior_dist.dtype
-
       sample_transformations = {
           'identity':
               model.Model.SampleTransformation(
                   fn=lambda params: params,
                   pretty_name='Identity',
-                  dtype=dtype,
+                  dtype=self._prior_dist.dtype,
               )
       }
       if self._have_test:
@@ -216,6 +217,7 @@ class ItemResponseTheory(bayesian_model.BayesianModel):
             model.Model.SampleTransformation(
                 fn=lambda params: test_log_likelihood_fn(**params),
                 pretty_name='Test NLL',
+                dtype=dtype,
             ))
 
         def _per_example_test_nll(params):
@@ -228,6 +230,7 @@ class ItemResponseTheory(bayesian_model.BayesianModel):
             model.Model.SampleTransformation(
                 fn=_per_example_test_nll,
                 pretty_name='Per-example Test NLL',
+                dtype=dtype,
             ))
 
     self._train_student_ids = train_student_ids
@@ -239,7 +242,7 @@ class ItemResponseTheory(bayesian_model.BayesianModel):
         default_event_space_bijector=tf.nest.map_structure(
             lambda _: tfb.Identity(), self._prior_dist.dtype),
         event_shape=self._prior_dist.event_shape,
-        dtype=dtype,
+        dtype=self._prior_dist.dtype,
         name=name,
         pretty_name=pretty_name,
         sample_transformations=sample_transformations,

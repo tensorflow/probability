@@ -191,9 +191,10 @@ class SyntheticLogGaussianCoxProcess(LogGaussianCoxProcess):
 
   GROUND_TRUTH_MODULE = synthetic_log_gaussian_cox_process
 
-  def __init__(self):
+  def __init__(self, dtype=tf.float64):
     dataset = data.synthetic_log_gaussian_cox_process()
     super(SyntheticLogGaussianCoxProcess, self).__init__(
+        dtype=dtype,
         name='synthetic_log_gaussian_cox_process',
         pretty_name='Synthetic Log-Gaussian Cox Process',
         **dataset)

@@ -18,8 +18,6 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import tensor_util
 
 from inference_gym.internal import data
 from inference_gym.targets import bayesian_model
@@ -57,11 +55,12 @@ def lorenz_system_as_explicit_steps(num_timesteps,
                                     step_size,
                                     dtype):
   """Generative process for the Lorenz System model."""
-  innovation_scale = tensor_util.convert_nonref_to_tensor(
+  innovation_scale = tf.cast(
       innovation_scale, name='innovation_scale', dtype=dtype)
-  step_size = tensor_util.convert_nonref_to_tensor(
+  step_size = tf.cast(
       step_size, name='step_size', dtype=dtype)
-  loc = yield Root(tfd.Sample(tfd.Normal(0., 1.), sample_shape=3))
+  loc = yield Root(tfd.Sample(tfd.Normal(tf.zeros([], dtype), 1.),
+                              sample_shape=3))
   for _ in range(num_timesteps - 1):
     loc = yield lorenz_transition_fn(
         _, loc, innovation_scale=innovation_scale, step_size=step_size)
@@ -70,16 +69,20 @@ def lorenz_system_as_explicit_steps(num_timesteps,
 def lorenz_system_as_markov_chain(num_timesteps, innovation_scale, step_size,
                                   dtype=tf.float32):
   """Represents a Lorenz system as a single MarkovChain distribution."""
-  innovation_scale = tensor_util.convert_nonref_to_tensor(
+  innovation_scale = tf.cast(
       innovation_scale, name='innovation_scale', dtype=dtype)
-  step_size = tensor_util.convert_nonref_to_tensor(
+  step_size = tf.cast(
       step_size, name='step_size', dtype=dtype)
   return tfd.MarkovChain(
-      initial_state_prior=tfd.Sample(tfd.Normal(0., 1.), sample_shape=3),
-      transition_fn=functools.partial(lorenz_transition_fn,
-                                      innovation_scale=innovation_scale,
-                                      step_size=step_size),
-      num_steps=num_timesteps)
+      initial_state_prior=tfd.Sample(
+          tfd.Normal(tf.zeros([], dtype), 1.0), sample_shape=3),
+      transition_fn=functools.partial(
+          lorenz_transition_fn,
+          innovation_scale=innovation_scale,
+          step_size=step_size,
+      ),
+      num_steps=num_timesteps,
+  )
 
 
 def lorenz_system_unknown_scales_prior_fn(num_timesteps,
@@ -87,8 +90,10 @@ def lorenz_system_unknown_scales_prior_fn(num_timesteps,
                                           use_markov_chain=False,
                                           dtype=tf.float32):
   """Generative process for the Lorenz System model with unknown scales."""
-  innovation_scale = yield Root(tfd.LogNormal(-1., 1., name='innovation_scale'))
-  _ = yield Root(tfd.LogNormal(-1., 1., name='observation_scale'))
+  one = tf.ones([], dtype)
+  innovation_scale = yield Root(tfd.LogNormal(-1., one, name='innovation_scale')
+                               )
+  _ = yield Root(tfd.LogNormal(-1., one, name='observation_scale'))
   if use_markov_chain:
     yield lorenz_system_as_markov_chain(num_timesteps,
                                         innovation_scale=innovation_scale,
@@ -110,9 +115,9 @@ def lorenz_system_log_likelihood_fn(params, observed_values, observation_scale,
   if observation_scale is None:  # Scales are random variables.
     (_, observation_scale) = params[:2]
     params = params[2] if use_markov_chain else params[2:]
-  observed_values = tensor_util.convert_nonref_to_tensor(
+  observed_values = tf.cast(
       observed_values, name='observation_values', dtype=dtype)
-  observation_scale = tensor_util.convert_nonref_to_tensor(
+  observation_scale = tf.cast(
       observation_scale, name='observation_scale', dtype=dtype)
   num_observations = tf.compat.dimension_value(observed_values.shape[0])
   observation_indices = list(np.arange(num_observations)[observation_mask])
@@ -158,6 +163,7 @@ class LorenzSystem(bayesian_model.BayesianModel):
                observation_index,
                step_size,
                use_markov_chain=False,
+               dtype=tf.float32,
                name='lorenz_system',
                pretty_name='Lorenz System'):
     """Constructs a Lorenz System model.
@@ -176,13 +182,11 @@ class LorenzSystem(bayesian_model.BayesianModel):
         `MarkovChain` distribution in place of separate random variables for
         each time step. The default of `False` is for backwards compatibility;
         setting this to `True` should significantly improve performance.
+      dtype: Dtype to use for floating point quantities.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
     """
     with tf.name_scope(name):
-      dtype = dtype_util.common_dtype(
-          [observed_values, innovation_scale, observation_scale, step_size],
-          dtype_hint=tf.float32)
       if not isinstance(observation_index, int):
         raise NotImplementedError('Observing multiple time series is not yet'
                                   ' supported.')
@@ -221,6 +225,7 @@ class LorenzSystem(bayesian_model.BayesianModel):
               model.Model.SampleTransformation(
                   fn=_ext_identity,
                   pretty_name='Identity',
+                  dtype=dtype,
               )
       }
 
@@ -261,6 +266,7 @@ class ConvectionLorenzBridge(LorenzSystem):
 
   def __init__(self,
                use_markov_chain=False,
+               dtype=tf.float32,
                name='convection_lorenz_bridge',
                pretty_name='Ambrogioni Lorenz System'):
     dataset = data.convection_lorenz_bridge()
@@ -268,6 +274,7 @@ class ConvectionLorenzBridge(LorenzSystem):
         name=name,
         pretty_name=pretty_name,
         use_markov_chain=use_markov_chain,
+        dtype=dtype,
         **dataset)
 
 
@@ -310,6 +317,7 @@ class LorenzSystemUnknownScales(bayesian_model.BayesianModel):
                observation_index,
                step_size,
                use_markov_chain=False,
+               dtype=tf.float32,
                name='lorenz_system',
                pretty_name='Lorenz System'):
     """Constructs a Lorenz System model.
@@ -325,13 +333,11 @@ class LorenzSystemUnknownScales(bayesian_model.BayesianModel):
         `MarkovChain` distribution in place of separate random variables for
         each time step. The default of `False` is for backwards compatibility;
         setting this to `True` should significantly improve performance.
+      dtype: Dtype to use for floating point quantities.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
     """
     with tf.name_scope(name):
-      dtype = dtype_util.common_dtype(
-          [observed_values, step_size],
-          dtype_hint=tf.float32)
       if not isinstance(observation_index, int):
         raise NotImplementedError('Observing multiple time series is not yet'
                                   ' supported.')
@@ -366,9 +372,9 @@ class LorenzSystemUnknownScales(bayesian_model.BayesianModel):
               model.Model.SampleTransformation(
                   fn=_ext_identity,
                   pretty_name='Identity',
-                  dtype={'innovation_scale': tf.float32,
-                         'observation_scale': tf.float32,
-                         'latents': tf.float32}
+                  dtype={'innovation_scale': dtype,
+                         'observation_scale': dtype,
+                         'latents': dtype}
               )
       }
 
@@ -414,6 +420,7 @@ class ConvectionLorenzBridgeUnknownScales(LorenzSystemUnknownScales):
 
   def __init__(self,
                use_markov_chain=False,
+               dtype=tf.float32,
                name='convection_lorenz_bridge_unknown_scales',
                pretty_name='Ambrogioni Lorenz System'):
     dataset = data.convection_lorenz_bridge()
@@ -423,4 +430,5 @@ class ConvectionLorenzBridgeUnknownScales(LorenzSystemUnknownScales):
         name=name,
         pretty_name=pretty_name,
         use_markov_chain=use_markov_chain,
+        dtype=dtype,
         **dataset)

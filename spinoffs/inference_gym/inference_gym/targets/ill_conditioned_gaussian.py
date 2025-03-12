@@ -44,6 +44,7 @@ class IllConditionedGaussian(model.Model):
       gamma_shape_parameter=0.5,
       max_eigvalue=None,
       seed=10,
+      dtype=tf.float32,
       name='ill_conditioned_gaussian',
       pretty_name='Ill-Conditioned Gaussian',
   ):
@@ -58,6 +59,7 @@ class IllConditionedGaussian(model.Model):
         that the maximum is this value.
       seed: Seed to use when generating the eigenvalues and the random
         orthogonal matrix.
+      dtype: Dtype to use for floating point quantities.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
     """
@@ -73,9 +75,9 @@ class IllConditionedGaussian(model.Model):
     covariance = (q * eigenvalues).dot(q.T)
 
     gaussian = tfd.MultivariateNormalTriL(
-        loc=tf.zeros(ndims),
+        loc=tf.zeros(ndims, dtype),
         scale_tril=tf.linalg.cholesky(
-            tf.convert_to_tensor(covariance, dtype=tf.float32)))
+            tf.convert_to_tensor(covariance, dtype=dtype)))
     self._eigenvalues = eigenvalues
 
     sample_transformations = {
@@ -85,6 +87,7 @@ class IllConditionedGaussian(model.Model):
                 pretty_name='Identity',
                 ground_truth_mean=np.zeros(ndims),
                 ground_truth_standard_deviation=np.sqrt(np.diag(covariance)),
+                dtype=dtype,
             )
     }
 

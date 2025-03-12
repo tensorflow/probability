@@ -85,17 +85,15 @@ def _fft_conv_center(noncentered, persistence_of_volatility):
   Returns:
     centered: The centered time series.
   """
-  noncentered = tf.convert_to_tensor(noncentered)
-  persistence_of_volatility = tf.convert_to_tensor(persistence_of_volatility)
   persistence_of_volatility = persistence_of_volatility[..., tf.newaxis]
   last_dim = int(tuple(noncentered.shape)[-1])
 
   kernel = tf.concat([
       tf.ones_like(persistence_of_volatility), persistence_of_volatility**
-      tf.range(1, last_dim, dtype=tf.float32)
+      tf.range(1, last_dim, dtype=persistence_of_volatility.dtype)
   ], -1)
   centered_at_0 = tf.concat([
-      noncentered[..., :1] / tf.sqrt(1 - persistence_of_volatility**2),
+      noncentered[..., :1] / tf.sqrt(1. - persistence_of_volatility**2),
       noncentered[..., 1:]
   ], -1)
   return _fft_conv(centered_at_0, kernel)[..., :last_dim]
@@ -152,6 +150,7 @@ class VectorizedStochasticVolatility(bayesian_model.BayesianModel):
       centered_returns,
       centered=False,
       use_fft=True,
+      dtype=tf.float32,
       name='vectorized_stochastic_volatility',
       pretty_name='Stochastic Volatility',
   ):
@@ -172,6 +171,7 @@ class VectorizedStochasticVolatility(bayesian_model.BayesianModel):
         parameterization. Turning this off may use fewer FLOPs, and may result
         in slightly better numerics, but is dramatically slower because it uses
         scan instead of vectorized ops.
+      dtype: Dtype to use for floating point quantities.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
 
@@ -192,6 +192,8 @@ class VectorizedStochasticVolatility(bayesian_model.BayesianModel):
 
       root = tfd.JointDistributionCoroutine.Root
 
+      zero = tf.zeros([], dtype)
+
       def log_volatility_centered_fn(white_noise_shock_scale,
                                      persistence_of_volatility):
         """Centered parameterization of log_volatility random variable."""
@@ -199,7 +201,7 @@ class VectorizedStochasticVolatility(bayesian_model.BayesianModel):
         def bijector_fn(std_log_volatility):
           """Bijector function to set up the autoregressive dependence."""
           shift = tf.concat([
-              tf.zeros(std_log_volatility.shape[:-1])[..., tf.newaxis],
+              tf.zeros(std_log_volatility.shape[:-1], dtype)[..., tf.newaxis],
               persistence_of_volatility[..., tf.newaxis] *
               std_log_volatility[..., :-1]
           ], -1)
@@ -212,7 +214,7 @@ class VectorizedStochasticVolatility(bayesian_model.BayesianModel):
                   ps.concat([
                       ps.shape(white_noise_shock_scale),
                       ps.shape(std_log_volatility)[-1:] - 1
-                  ], 0)))
+                  ], 0), dtype))
 
           scale = tf.concat([scale0[..., tf.newaxis], scale_rest], -1)
 
@@ -223,7 +225,7 @@ class VectorizedStochasticVolatility(bayesian_model.BayesianModel):
         # Interesting syntax oddity, 'return yield' is a syntax error.
         return (yield root(
             tfd.TransformedDistribution(
-                tfd.Sample(tfd.Normal(0., 1.), num_timesteps),
+                tfd.Sample(tfd.Normal(zero, 1.), num_timesteps),
                 b,
                 name='log_volatility',
             )))
@@ -235,7 +237,7 @@ class VectorizedStochasticVolatility(bayesian_model.BayesianModel):
         # but is slower (catastrophically so if FFT is not used).
         std_log_volatility = yield root(
             tfd.Sample(
-                tfd.Normal(0., 1.),
+                tfd.Normal(zero, 1.),
                 num_timesteps,
                 name='std_log_volatility',
             ))
@@ -274,13 +276,19 @@ class VectorizedStochasticVolatility(bayesian_model.BayesianModel):
         """Model definition."""
         persistence_of_volatility = yield root(
             tfd.TransformedDistribution(
-                tfd.Beta(concentration1=20., concentration0=1.5),
-                tfb.Shift(-1.)(tfb.Scale(2.)),
-                name='persistence_of_volatility'))
+                tfd.Beta(
+                    concentration1=tf.constant(20.0, dtype), concentration0=1.5
+                ),
+                tfb.Shift(tf.constant(-1.0, dtype))(
+                    tfb.Scale(tf.constant(2.0, dtype))
+                ),
+                name='persistence_of_volatility',
+            )
+        )
         mean_log_volatility = yield root(
-            tfd.Cauchy(loc=0., scale=5., name='mean_log_volatility'))
+            tfd.Cauchy(loc=zero, scale=5., name='mean_log_volatility'))
         white_noise_shock_scale = yield root(
-            tfd.HalfCauchy(loc=0., scale=2., name='white_noise_shock_scale'))
+            tfd.HalfCauchy(loc=zero, scale=2., name='white_noise_shock_scale'))
 
         if centered:
           log_volatility = yield from log_volatility_centered_fn(
@@ -298,8 +306,7 @@ class VectorizedStochasticVolatility(bayesian_model.BayesianModel):
         observation_scales = _drive_coroutine(prior_fn(), value)
         observation_dist = tfd.Independent(
             tfd.Normal(0., observation_scales), 1)
-        res = observation_dist.log_prob(centered_returns)
-        return res
+        return observation_dist.log_prob(tf.cast(centered_returns, dtype))
 
       self._log_likelihood_fn = log_likelihood_fn
 
@@ -326,10 +333,10 @@ class VectorizedStochasticVolatility(bayesian_model.BayesianModel):
                   fn=_ext_identity,
                   pretty_name='Identity',
                   dtype=collections.OrderedDict(
-                      persistence_of_volatility=tf.float32,
-                      mean_log_volatility=tf.float32,
-                      white_noise_shock_scale=tf.float32,
-                      log_volatility=tf.float32))
+                      persistence_of_volatility=dtype,
+                      mean_log_volatility=dtype,
+                      white_noise_shock_scale=dtype,
+                      log_volatility=dtype))
       }
 
     if centered:
@@ -339,7 +346,9 @@ class VectorizedStochasticVolatility(bayesian_model.BayesianModel):
 
     super(VectorizedStochasticVolatility, self).__init__(
         default_event_space_bijector=type(self._prior_dist.dtype)(
-            persistence_of_volatility=tfb.Sigmoid(-1., 1.),
+            persistence_of_volatility=tfb.Sigmoid(
+                tf.constant(-1.0, dtype), 1.0
+            ),
             mean_log_volatility=tfb.Identity(),
             white_noise_shock_scale=tfb.Softplus(),
             **log_volatility_bijector,
@@ -401,9 +410,11 @@ class VectorizedStochasticVolatilityLogSP500(VectorizedStochasticVolatility):
       self,
       centered=False,
       use_fft=True,
+      dtype=tf.float32,
   ):
     dataset = data.sp500_log_returns()
     super(VectorizedStochasticVolatilityLogSP500, self).__init__(
+        dtype=dtype,
         name='vectorized_stochastic_volatility_log_sp500',
         pretty_name='Stochastic volatility model of S&P500 log returns.',
         **dataset)
@@ -419,9 +430,11 @@ class VectorizedStochasticVolatilityLogSP500Small(VectorizedStochasticVolatility
       self,
       centered=False,
       use_fft=True,
+      dtype=tf.float32,
   ):
     dataset = data.sp500_log_returns(num_points=100)
     super(VectorizedStochasticVolatilityLogSP500Small, self).__init__(
+        dtype=dtype,
         name='vectorized_stochasticic_volatility_log_sp500_small',
         pretty_name=(
             'Smaller stochastic volatility model of S&P500 log returns.'),

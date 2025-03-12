@@ -34,7 +34,9 @@ __all__ = [
 
 
 def _add_bias(features):
-  return tf.concat([features, tf.ones([ps.shape(features)[0], 1])], axis=-1)
+  return tf.concat(
+      [features, tf.ones([ps.shape(features)[0], 1], features.dtype)], axis=-1
+  )
 
 
 class LogisticRegression(bayesian_model.BayesianModel):
@@ -56,6 +58,7 @@ class LogisticRegression(bayesian_model.BayesianModel):
       train_labels,
       test_features=None,
       test_labels=None,
+      dtype=tf.float32,
       name='logistic_regression',
       pretty_name='Logistic Regression',
   ):
@@ -72,6 +75,7 @@ class LogisticRegression(bayesian_model.BayesianModel):
       test_labels: Integer `Tensor` with shape `[num_test_points]`. Testing
         labels. Can be `None`, in which case test-related sample transformations
         are not computed.
+      dtype: Dtype to use for floating point quantities.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
 
@@ -81,11 +85,13 @@ class LogisticRegression(bayesian_model.BayesianModel):
     """
     with tf.name_scope(name):
       num_features = int(train_features.shape[1] + 1)
-      self._prior_dist = tfd.Sample(tfd.Normal(0., 1.), num_features)
+      self._prior_dist = tfd.Sample(
+          tfd.Normal(tf.zeros([], dtype), 1.0), num_features
+      )
 
       def log_likelihood_fn(weights, features, labels, reduce_sum=True):
         """The log_likelihood function."""
-        features = tf.convert_to_tensor(features, tf.float32)
+        features = tf.cast(features, dtype)
         features = _add_bias(features)
         labels = tf.convert_to_tensor(labels)
 
@@ -104,6 +110,7 @@ class LogisticRegression(bayesian_model.BayesianModel):
               model.Model.SampleTransformation(
                   fn=lambda params: params,
                   pretty_name='Identity',
+                  dtype=dtype,
               )
       }
       if (test_features is not None) != (test_labels is not None):
@@ -119,11 +126,13 @@ class LogisticRegression(bayesian_model.BayesianModel):
             model.Model.SampleTransformation(
                 fn=test_log_likelihood_fn,
                 pretty_name='Test NLL',
+                dtype=dtype,
             ))
         sample_transformations['per_example_test_nll'] = (
             model.Model.SampleTransformation(
                 fn=functools.partial(test_log_likelihood_fn, reduce_sum=False),
                 pretty_name='Per-example Test NLL',
+                dtype=dtype,
             ))
 
     super(LogisticRegression, self).__init__(

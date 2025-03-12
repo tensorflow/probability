@@ -14,6 +14,7 @@
 # ============================================================================
 """Tests for inference_gym.targets.log_gaussian_cox_process."""
 
+from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
@@ -36,13 +37,19 @@ def _test_dataset():
                               'targets.log_gaussian_cox_process_test')
 class LogGaussianCoxProcessTest(test_util.InferenceGymTestCase):
 
-  def testBasic(self):
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testBasic(self, dtype):
     """Checks that you get finite values given unconstrained samples.
 
     We check `unnormalized_log_prob` as well as the values of the sample
     transformations.
+
+    Args:
+      dtype: Dtype to use for floating point computations.
     """
-    model = log_gaussian_cox_process.LogGaussianCoxProcess(**_test_dataset())
+    model = log_gaussian_cox_process.LogGaussianCoxProcess(
+        **_test_dataset(), dtype=dtype
+    )
     self.validate_log_prob_and_transforms(
         model,
         sample_transformation_shapes=dict(
@@ -50,15 +57,20 @@ class LogGaussianCoxProcessTest(test_util.InferenceGymTestCase):
                 'amplitude': [],
                 'length_scale': [],
                 'log_intensity': [10],
-            },))
+            },),
+        dtype=dtype)
 
-  def testCreateDataset(self):
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testCreateDataset(self, dtype):
     """Checks that creating a dataset works."""
     # Technically this is private functionality, but we don't have it tested
     # elsewhere.
-    model = log_gaussian_cox_process.LogGaussianCoxProcess(**_test_dataset())
+    model = log_gaussian_cox_process.LogGaussianCoxProcess(
+        **_test_dataset(), dtype=dtype
+    )
     model2 = log_gaussian_cox_process.LogGaussianCoxProcess(
-        **model._sample_dataset(tfp_test_util.test_seed()))
+        **model._sample_dataset(tfp_test_util.test_seed()), dtype=dtype
+    )
     self.validate_log_prob_and_transforms(
         model2,
         sample_transformation_shapes=dict(
@@ -66,15 +78,22 @@ class LogGaussianCoxProcessTest(test_util.InferenceGymTestCase):
                 'amplitude': [],
                 'length_scale': [],
                 'log_intensity': [10],
-            },))
+            },),
+        dtype=dtype
+    )
 
-  def testSyntheticLogGaussianCoxProcess(self):
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testSyntheticLogGaussianCoxProcess(self, dtype):
     """Checks that you get finite values given unconstrained samples.
 
     We check `unnormalized_log_prob` as well as the values of the sample
     transformations.
+
+    Args:
+      dtype: Dtype to use for floating point computations.
     """
-    model = log_gaussian_cox_process.SyntheticLogGaussianCoxProcess()
+    model = log_gaussian_cox_process.SyntheticLogGaussianCoxProcess(
+        dtype=dtype)
     self.validate_log_prob_and_transforms(
         model,
         sample_transformation_shapes=dict(
@@ -86,6 +105,7 @@ class LogGaussianCoxProcessTest(test_util.InferenceGymTestCase):
         check_ground_truth_mean_standard_error=True,
         check_ground_truth_mean=True,
         check_ground_truth_standard_deviation=True,
+        dtype=dtype,
     )
 
   @test_util.numpy_disable_gradient_test

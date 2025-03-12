@@ -61,16 +61,18 @@ class Banana(model.Model):
       self,
       ndims=2,
       curvature=0.03,
+      dtype=tf.float32,
       name='banana',
       pretty_name='Banana',
   ):
-    """Construct the banana model.
+    """Initialize the banana model.
 
     Args:
       ndims: Python integer. Dimensionality of the distribution. Must be at
         least 2.
       curvature: Python float. Controls the strength of the curvature of
         the distribution.
+      dtype: Dtype to use for floating point quantities.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
 
@@ -87,16 +89,20 @@ class Banana(model.Model):
         batch_shape = ps.shape(x)[:-1]
         shift = tf.concat(
             [
-                tf.zeros(ps.concat([batch_shape, [1]], axis=0)),
+                tf.zeros(ps.concat([batch_shape, [1]], axis=0), dtype),
                 curvature * (tf.square(x[..., :1]) - 100),
-                tf.zeros(ps.concat([batch_shape, [ndims - 2]], axis=0)),
+                tf.zeros(
+                    ps.concat([batch_shape, [ndims - 2]], axis=0), dtype
+                ),
             ],
             axis=-1,
         )
         return tfb.Shift(shift)
 
       mg = tfd.MultivariateNormalDiag(
-          loc=tf.zeros(ndims), scale_diag=[10.] + [1.] * (ndims - 1))
+          loc=tf.zeros(ndims, dtype),
+          scale_diag=[10.0] + [1.0] * (ndims - 1),
+      )
       banana = tfd.TransformedDistribution(
           mg, bijector=tfb.MaskedAutoregressiveFlow(bijector_fn=bijector_fn))
 
@@ -115,6 +121,7 @@ class Banana(model.Model):
                   ground_truth_standard_deviation=np.array(
                       [10.] + [np.sqrt(1. + 2 * curvature**2 * 10.**4)] +
                       [1.] * (ndims - 2)),
+                  dtype=banana.dtype,
               )
       }
 

@@ -63,6 +63,7 @@ py_library(
     srcs = ["banana.py"],
     deps = [
         ":model",
+        # absl/testing:parameterized dep,
         # numpy dep,
     ],
 )
@@ -73,6 +74,7 @@ py_test(
     srcs = ["banana_test.py"],
     deps = [
         ":banana",
+        # absl/testing:parameterized dep,
         # tensorflow dep,
         # tensorflow_probability/python/internal:test_util dep,
         "//inference_gym/internal:test_util",
@@ -146,6 +148,7 @@ py_test(
     srcs = ["eight_schools_test.py"],
     deps = [
         ":eight_schools",
+        # absl/testing:parameterized dep,
         # tensorflow dep,
         # tensorflow_probability/python/internal:test_util dep,
         "//inference_gym/internal:test_util",
@@ -167,6 +170,7 @@ py_test(
     srcs = ["ill_conditioned_gaussian_test.py"],
     deps = [
         ":ill_conditioned_gaussian",
+        # absl/testing:parameterized dep,
         # tensorflow dep,
         # tensorflow_probability/python/internal:test_util dep,
         "//inference_gym/internal:test_util",
@@ -220,6 +224,7 @@ py_test(
     shard_count = 3,
     deps = [
         ":log_gaussian_cox_process",
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         # tensorflow_probability/python/internal:test_util dep,
@@ -275,6 +280,7 @@ py_test(
     shard_count = 3,
     deps = [
         ":lorenz_system",
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         # tensorflow_probability/python/internal:test_util dep,
@@ -319,6 +325,7 @@ py_test(
     srcs = ["neals_funnel_test.py"],
     deps = [
         ":neals_funnel",
+        # absl/testing:parameterized dep,
         # tensorflow dep,
         # tensorflow_probability/python/internal:test_util dep,
         "//inference_gym/internal:test_util",
@@ -340,6 +347,7 @@ py_test(
     srcs = ["non_identifiable_quartic_test.py"],
     deps = [
         ":non_identifiable_quartic",
+        # absl/testing:parameterized dep,
         # tensorflow dep,
         # tensorflow_probability/python/internal:test_util dep,
         "//inference_gym/internal:test_util",

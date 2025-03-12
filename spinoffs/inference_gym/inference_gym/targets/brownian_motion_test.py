@@ -15,6 +15,8 @@
 """Tests for inference_gym.targets.brownian_motion."""
 
 import functools
+
+from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
@@ -45,26 +47,41 @@ def _test_dataset():
 @test_util.multi_backend_test(globals(), 'targets.brownian_motion_test')
 class BrownianMotionTest(test_util.InferenceGymTestCase):
 
-  def testBrownianMotion(self):
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testBrownianMotion(self, dtype):
     """Checks that unconstrained parameters yield finite joint densities."""
-    model = brownian_motion.BrownianMotion(**_test_dataset())
+    model = brownian_motion.BrownianMotion(
+        **_test_dataset(), dtype=dtype
+    )
     self.validate_log_prob_and_transforms(
-        model, sample_transformation_shapes=dict(identity=[30]))
+        model,
+        sample_transformation_shapes=dict(identity=[30]),
+        dtype=dtype)
 
-  def testBrownianMotionMissingMiddleObservations(self):
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testBrownianMotionMissingMiddleObservations(self, dtype):
     """Checks that unconstrained parameters yield finite joint densities."""
-    model = brownian_motion.BrownianMotionMissingMiddleObservations()
+    model = brownian_motion.BrownianMotionMissingMiddleObservations(
+        dtype=dtype
+    )
     self.validate_log_prob_and_transforms(
         model,
         sample_transformation_shapes=dict(identity=[30]),
         check_ground_truth_mean_standard_error=True,
         check_ground_truth_mean=True,
-        check_ground_truth_standard_deviation=True)
+        check_ground_truth_standard_deviation=True,
+        dtype=dtype)
 
-  def testBrownianMotionUnknownScalesMissingMiddleObservations(self):
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testBrownianMotionUnknownScalesMissingMiddleObservations(
+      self, dtype
+  ):
     """Checks that unconstrained parameters yield finite joint densities."""
     model = (
-        brownian_motion.BrownianMotionUnknownScalesMissingMiddleObservations())
+        brownian_motion.BrownianMotionUnknownScalesMissingMiddleObservations(
+            dtype=dtype
+        )
+    )
     self.validate_log_prob_and_transforms(
         model,
         sample_transformation_shapes=dict(
@@ -73,7 +90,8 @@ class BrownianMotionTest(test_util.InferenceGymTestCase):
                       'locs': [30]}),
         check_ground_truth_mean_standard_error=True,
         check_ground_truth_mean=True,
-        check_ground_truth_standard_deviation=True)
+        check_ground_truth_standard_deviation=True,
+        dtype=dtype)
 
   def testDeferred(self):
     """Checks that the dataset is not prematurely materialized."""

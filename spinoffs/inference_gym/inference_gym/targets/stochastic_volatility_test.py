@@ -14,6 +14,7 @@
 # ============================================================================
 """Tests for inference_gym.targets.stochastic_volatility."""
 
+from absl.testing import parameterized
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import test_util as tfp_test_util
@@ -25,10 +26,12 @@ from inference_gym.targets import stochastic_volatility
 @test_util.multi_backend_test(globals(), 'targets.stochastic_volatility_test')
 class StochasticVolatilityTest(test_util.InferenceGymTestCase):
 
-  def testBasic(self):
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testBasic(self, dtype):
     """Checks that unconstrained parameters yield finite joint densities."""
     model = stochastic_volatility.StochasticVolatility(
-        centered_returns=tf.convert_to_tensor([5., -2.1, 8., 4., 1.1]))
+        centered_returns=tf.convert_to_tensor([5., -2.1, 8., 4., 1.1]),
+        dtype=dtype)
     self.validate_log_prob_and_transforms(
         model,
         sample_transformation_shapes=dict(
@@ -37,7 +40,8 @@ class StochasticVolatilityTest(test_util.InferenceGymTestCase):
                 'mean_log_volatility': [],
                 'white_noise_shock_scale': [],
                 'log_volatility': [5]
-            }))
+            }),
+        dtype=dtype)
 
   def testDeferred(self):
     """Checks that the dataset is not prematurely materialized."""
@@ -80,13 +84,14 @@ class StochasticVolatilityTest(test_util.InferenceGymTestCase):
         check_ground_truth_mean=True,
         check_ground_truth_standard_deviation=True)
 
-  def testMarkovChainLogprobMatchesOriginal(self):
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testMarkovChainLogprobMatchesOriginal(self, dtype):
     # Use a very short dataset since the non-markov-chain model is slow.
     dataset = data.sp500_returns(num_points=10)
     model = stochastic_volatility.StochasticVolatility(
-        use_markov_chain=False, **dataset)
+        use_markov_chain=False, dtype=dtype, **dataset)
     markov_chain_model = stochastic_volatility.StochasticVolatility(
-        use_markov_chain=True, **dataset)
+        use_markov_chain=True, dtype=dtype, **dataset)
 
     xs = self.evaluate(model.prior_distribution().sample(
         10, seed=tfp_test_util.test_seed()))
