@@ -210,9 +210,9 @@ py_test(
     deps = [
         ":mbcg",
         ":partial_lanczos",
-        # absl/testing:absltest dep,
         # jax dep,
         # numpy dep,
+        "//tensorflow_probability/python/internal:test_util.jax",
         "//tensorflow_probability/substrates:jax",
     ],
 )

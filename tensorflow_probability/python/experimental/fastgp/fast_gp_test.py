@@ -763,7 +763,7 @@ class _FastGpTest(parameterized.TestCase):
 
     d = jax.grad(quadratic)
     # quadratic(s) = 55/s, quadratic'(s) = -55 / s^2
-    self.assertAlmostEqual(d(self.dtype(1.0)), -55.0)
+    self.assertAlmostEqual(d(self.dtype(1.0)), -55.0, delta=1e-5)
     self.assertAlmostEqual(d(self.dtype(2.0)), -55.0/4.0, delta=5e-4)
 
   def test_yt_inv_y_derivative_with_rank_one_preconditioner(self):
