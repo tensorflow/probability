@@ -158,7 +158,7 @@ def _scale_from_precomputed(precomputed_cholesky, kernel):
     for param in params['kronecker_orths']:
       if 'identity' in param:
         ops.append(tf.linalg.LinearOperatorIdentity(
-            param['identity'], dtype=params['diag'].dtype))
+            kernel.num_tasks, dtype=params['diag'].dtype))
       elif 'unitary' in param:
         ops.append(
             linear_operator_unitary.LinearOperatorUnitary(param['unitary'])
@@ -187,7 +187,7 @@ def _precomputed_from_scale(observation_scale):
   if isinstance(observation_scale, tf.linalg.LinearOperatorComposition):
     kronecker_op, diag_op = observation_scale.operators
     kronecker_orths = [
-        {'identity': k.domain_dimension_tensor()}
+        {'identity': None}
         if isinstance(k, tf.linalg.LinearOperatorIdentity)
         else {'unitary': k.matrix} for k in kronecker_op.operators]
     return {'separable': {'kronecker_orths': kronecker_orths,
