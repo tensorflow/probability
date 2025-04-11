@@ -19,6 +19,8 @@ import pytest
 from discussion.pathfinder import pathfinder
 import tensorflow_probability.substrates.jax as tfp
 
+jax.config.update("jax_threefry_partitionable", False)
+
 tfd = tfp.distributions
 
 

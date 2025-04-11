@@ -22,6 +22,8 @@ from autobnn import bnn_tree
 from autobnn import kernels
 from absl.testing import absltest
 
+jax.config.update('jax_threefry_partitionable', False)
+
 
 class TreeTest(parameterized.TestCase):
 

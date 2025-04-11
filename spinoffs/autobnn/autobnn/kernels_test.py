@@ -24,6 +24,8 @@ from tensorflow_probability.substrates.jax.distributions import lognormal as log
 
 from absl.testing import absltest
 
+jax.config.update('jax_threefry_partitionable', False)
+
 
 KERNELS = [
     kernels.IdentityBNN,

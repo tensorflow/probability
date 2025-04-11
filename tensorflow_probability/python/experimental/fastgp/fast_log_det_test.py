@@ -25,6 +25,8 @@ from tensorflow_probability.python.experimental.fastgp import preconditioners
 from tensorflow_probability.substrates import jax as tfp
 from tensorflow_probability.substrates.jax.internal import test_util
 
+jax.config.update('jax_threefry_partitionable', False)
+
 # pylint: disable=invalid-name
 
 
