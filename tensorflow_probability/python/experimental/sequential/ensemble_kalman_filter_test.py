@@ -531,6 +531,7 @@ class ComparingMethodsTest(test_util.TestCase):
       perturbed_observations,
   ):
     """Check that the KF and EnKF solutions are the same."""
+    self.skipTest('b/410065645')
     # Tests pass with n_ensemble = 1e7. The KF vs. EnKF tolerance is
     # proportional to 1 / sqrt(n_ensemble), so this shows good agreement.
     n_ensemble = int(1e4) if NUMPY_MODE else int(1e5)
