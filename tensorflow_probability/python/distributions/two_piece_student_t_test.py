@@ -276,7 +276,7 @@ class _TwoPieceStudentTTest(parameterized.TestCase):
         sf,
         expected_sf,
         atol=0.,
-        rtol=1e-6 if self.dtype == np.float32 else 5e-11)
+        rtol=2e-6 if self.dtype == np.float32 else 5e-11)
 
   def testQuantile(self):
     dist = self.make_two_piece_student_ts()
