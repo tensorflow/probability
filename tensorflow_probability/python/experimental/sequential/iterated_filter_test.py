@@ -48,17 +48,16 @@ class IteratedFilterTest(test_util.TestCase):
         lambda _, state, **kwargs: normal.Normal(loc=state, scale=1.0))
 
     # Generate a batch of synthetic observations from the model.
+    seeds = test_util.test_seed_stream('iterated_filter_test')
     num_timesteps = 100
     true_scales = self.evaluate(
-        parameter_prior.sample(seed=test_util.test_seed()))
+        parameter_prior.sample(seed=seeds()))
     trajectories = tf.math.cumsum(
         tf.random.normal(
-            [num_timesteps] + batch_shape, seed=test_util.test_seed()) *
-        true_scales,
+            [num_timesteps] + batch_shape, seed=seeds()) * true_scales,
         axis=0)
     observations = self.evaluate(
-        parameterized_observation_fn(0, trajectories).sample(
-            seed=test_util.test_seed()))
+        parameterized_observation_fn(0, trajectories).sample(seed=seeds()))
 
     # Estimate the batch of scale parameters.
     iterated_filter = iterated_filter_lib.IteratedFilter(
@@ -75,7 +74,7 @@ class IteratedFilterTest(test_util.TestCase):
             initial_perturbation_scale=1.0,
             cooling_schedule=(iterated_filter_lib.geometric_cooling_schedule(
                 0.001, k=20)),
-            seed=test_util.test_seed()))
+            seed=seeds()))
     final_scales = tf.nest.map_structure(lambda x: x[-1], estimated_scales)
     # Note that this inference isn't super precise with the current tuning.
     # Varying the seed, the max absolute error across the batch is typically
