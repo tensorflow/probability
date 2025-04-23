@@ -45,8 +45,7 @@ class Dirichlet(model.Model):
 
   def __init__(
       self,
-      ndims=100,
-      concentration_vector=np.ones(100),
+      concentration_vector=tf.ones(100)+100,
       dtype=tf.float32,
       name='dirichlet',
       pretty_name='Dirichlet',
@@ -54,7 +53,6 @@ class Dirichlet(model.Model):
     """Construct the Dirichlet.
 
     Args:
-      ndims: Python `int`. Dimensionality of the Dirichlet (in unconstrained space, so e.g. a Beta distribution is a 2-dimensional Dirichlet).
       dtype: Dtype to use for floating point quantities.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
@@ -81,9 +79,11 @@ class Dirichlet(model.Model):
 
     self._dirichlet = dirichlet
 
-    # a different bijector might perform better for this model, but since the goal is to provide a challenge for the sampler, this is a reasonable choice
+    self.bij = tfb.IteratedSigmoidCentered(validate_args=False,name='iterated_sigmoid'  )
+
     super(Dirichlet, self).__init__(
-        default_event_space_bijector=tfb.IteratedSigmoidCentered(validate_args=False,name='iterated_sigmoid'),
+        # default_event_space_bijector=tfb.Identity(),
+        default_event_space_bijector=self.bij,
         event_shape=dirichlet.event_shape,
         dtype=dirichlet.dtype,
         name=name,
@@ -113,4 +113,14 @@ class Dirichlet(model.Model):
     Returns:
       samples: a `Tensor` with prepended dimensions `sample_shape`.
     """
-    return self._dirichlet.sample(sample_shape, seed=seed, name=name)
+    return self.bij.inverse(self._dirichlet.sample(sample_shape, seed=seed, name=name))
+  
+if __name__ == '__main__':
+  # Debug test for Dirichlet model
+    import tensorflow_probability.python.internal.test_util as tfp_test_util
+    dims = 3
+    model = Dirichlet(
+        concentration_vector=tf.ones(dims),
+    )
+    # set seed to 1
+    print(model.sample(seed=1))
