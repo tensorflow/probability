@@ -1,4 +1,4 @@
-# Copyright 2020 The TensorFlow Probability Authors.
+# Copyright 2025 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,13 +39,12 @@ class Dirichlet(model.Model):
 
   
 
-  Note that this function produces reproducible targets, i.e. the constructor
-  `seed` argument always needs to be non-`None`.
+  This function produces a Dirichlet distribution. Low concentration parameters (much below 1) produce a distribution that is typically difficult to sample from.
   """
 
   def __init__(
       self,
-      concentration_vector=tf.ones(100)+100,
+      concentration_vector=np.ones(100)*0.1,
       dtype=tf.float32,
       name='dirichlet',
       pretty_name='Dirichlet',
@@ -53,17 +52,14 @@ class Dirichlet(model.Model):
     """Construct the Dirichlet.
 
     Args:
+      concentration_vector: The concentration parameters of the Dirichlet distribution.
       dtype: Dtype to use for floating point quantities.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
     """
     
     dirichlet = tfp.distributions.Dirichlet(
-        concentration_vector,
-        validate_args=False,
-        allow_nan_stats=True,
-        force_probs_to_zero_outside_support=False,
-        name='Dirichlet'
+        concentration=concentration_vector,
     )
         
     sample_transformations = {
@@ -79,11 +75,9 @@ class Dirichlet(model.Model):
 
     self._dirichlet = dirichlet
 
-    self.bij = tfb.IteratedSigmoidCentered(validate_args=False,name='iterated_sigmoid'  )
 
     super(Dirichlet, self).__init__(
-        # default_event_space_bijector=tfb.Identity(),
-        default_event_space_bijector=self.bij,
+        default_event_space_bijector=tfb.IteratedSigmoidCentered(validate_args=False,name='iterated_sigmoid'),
         event_shape=dirichlet.event_shape,
         dtype=dirichlet.dtype,
         name=name,
@@ -113,4 +107,4 @@ class Dirichlet(model.Model):
     Returns:
       samples: a `Tensor` with prepended dimensions `sample_shape`.
     """
-    return self.bij.inverse(self._dirichlet.sample(sample_shape, seed=seed, name=name))
+    return self._dirichlet.sample(sample_shape, seed=seed, name=name)
