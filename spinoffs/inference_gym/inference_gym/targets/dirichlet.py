@@ -114,13 +114,3 @@ class Dirichlet(model.Model):
       samples: a `Tensor` with prepended dimensions `sample_shape`.
     """
     return self.bij.inverse(self._dirichlet.sample(sample_shape, seed=seed, name=name))
-  
-if __name__ == '__main__':
-  # Debug test for Dirichlet model
-    import tensorflow_probability.python.internal.test_util as tfp_test_util
-    dims = 3
-    model = Dirichlet(
-        concentration_vector=tf.ones(dims),
-    )
-    # set seed to 1
-    print(model.sample(seed=1))
