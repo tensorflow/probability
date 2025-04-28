@@ -223,17 +223,22 @@ def run_hmc_on_model(
     seed = test_util.test_seed(sampler_type='stateless')
   current_state = tf.nest.map_structure(
       lambda b, e: b(  # pylint: disable=g-long-lambda
-          tf.zeros([num_chains] + list(e), dtype=dtype)),
+          tf.zeros([num_chains] + list(b.inverse_event_shape(e)), dtype=dtype)),
+      model.default_event_space_bijector,
+      model.event_shape)
+  step_size = tf.nest.map_structure(
+      lambda b, e: tf.fill(b.inverse_event_shape(e), step_size),
       model.default_event_space_bijector,
       model.event_shape)
 
   # tfp.mcmc only works well with lists.
   current_state = tf.nest.flatten(current_state)
+  step_size = tf.nest.flatten(step_size)
 
   hmc = tfp.mcmc.HamiltonianMonteCarlo(
       target_log_prob_fn=target_log_prob_fn,
       num_leapfrog_steps=num_leapfrog_steps,
-      step_size=[tf.fill(s.shape, step_size) for s in current_state])
+      step_size=step_size)
   hmc = tfp.mcmc.TransformedTransitionKernel(
       hmc, tf.nest.flatten(model.default_event_space_bijector))
   hmc = tfp.mcmc.DualAveragingStepSizeAdaptation(

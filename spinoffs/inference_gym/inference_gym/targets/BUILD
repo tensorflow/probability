@@ -38,6 +38,7 @@ py_library(
         ":banana",
         ":bayesian_model",
         ":brownian_motion",
+        ":dirichlet",
         ":eight_schools",
         ":ill_conditioned_gaussian",
         ":item_response_theory",
@@ -124,6 +125,29 @@ py_test(
     shard_count = 3,
     deps = [
         ":brownian_motion",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        # tensorflow_probability/python/internal:test_util dep,
+        "//inference_gym/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "dirichlet",
+    srcs = ["dirichlet.py"],
+    deps = [
+        ":model",
+        # tensorflow_probability dep,
+    ],
+)
+
+# py_strict
+py_test(
+    name = "dirichlet_test",
+    srcs = ["dirichlet_test.py"],
+    deps = [
+        ":dirichlet",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
