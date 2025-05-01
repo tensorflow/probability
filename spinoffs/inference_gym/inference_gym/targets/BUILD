@@ -138,7 +138,7 @@ py_library(
     srcs = ["dirichlet.py"],
     deps = [
         ":model",
-        # tensorflow_probability dep,
+        "//tensorflow_probability:numpy",
     ],
 )
 

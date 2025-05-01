@@ -23,6 +23,7 @@ with util.silence_nonrewritten_import_errors():
   from inference_gym.targets.brownian_motion import BrownianMotionMissingMiddleObservations
   from inference_gym.targets.brownian_motion import BrownianMotionUnknownScales
   from inference_gym.targets.brownian_motion import BrownianMotionUnknownScalesMissingMiddleObservations
+  from inference_gym.targets.dirichlet import Dirichlet
   from inference_gym.targets.eight_schools import EightSchools
   from inference_gym.targets.ill_conditioned_gaussian import IllConditionedGaussian
   from inference_gym.targets.item_response_theory import ItemResponseTheory
@@ -69,6 +70,7 @@ __all__ = [
     'BrownianMotionUnknownScalesMissingMiddleObservations',
     'ConvectionLorenzBridge',
     'ConvectionLorenzBridgeUnknownScales',
+    'Dirichlet',
     'EightSchools',
     'GermanCreditNumericLogisticRegression',
     'GermanCreditNumericProbitRegression',
