@@ -17,7 +17,6 @@ import functools
 
 from absl.testing import parameterized
 import numpy as np
-from scipy import misc as sp_misc
 from scipy import special as sp_special
 from scipy import stats as sp_stats
 
@@ -945,8 +944,12 @@ class GammaSamplingTest(test_util.TestCase):
     def expected_grad(s, c, r):
       u = sp_special.gammainc(c, s * r)
       delta = 1e-4
-      return sp_misc.derivative(
-          lambda x: sp_special.gammaincinv(x, u), c, dx=delta * c) / r
+      def _finite_diff(f, x, dx):
+        return (f(x + dx) - f(x - dx)) / 2 / dx
+
+      return _finite_diff(
+          f=lambda x: sp_special.gammaincinv(x, u), x=c, dx=delta * c,
+      ) / r
 
     self.assertAllClose(
         concentration_grad,
