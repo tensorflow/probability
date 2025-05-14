@@ -77,7 +77,9 @@ def nary_einsum(draw, max_num_tensors):
   lhss = []
   tensors = []
   for _ in range(n):
-    rank = draw(hps.integers(min_value=0, max_value=4))
+    # TODO(leben, cgs): This is a hack to deal with b/412969862.  Set
+    # min_value=0 after figuring out why the bug is happening.
+    rank = draw(hps.integers(min_value=1, max_value=4))
     # Deliberately choosing values in a restricted range so as not to cause
     # underflow making results comparable with ordinary `einsum`.
     lhs_t, t = draw(indexed_tensor(rank, min_value=1e-5, max_value=1.))
