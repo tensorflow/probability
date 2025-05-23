@@ -22,6 +22,14 @@ from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import gradient
 
 
+JAX_MODE = False
+
+if JAX_MODE:
+  import jax  # pylint: disable=g-import-not-at-top
+  # TODO(b/415014385): Remove this config once the bug is fixed.
+  jax.config.update('jax_use_direct_linearize', False)
+
+
 def _value_and_grads(f, x, has_aux=False):
   val, grad = gradient.value_and_gradient(f, x, has_aux=has_aux)
   _, grad_of_grad = gradient.value_and_gradient(
