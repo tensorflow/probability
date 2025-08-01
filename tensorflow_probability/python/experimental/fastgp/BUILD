@@ -176,7 +176,7 @@ py_library(
     srcs = ["linalg.py"],
     deps = [
         ":partial_lanczos",
-        # jax:experimental_sparse dep,
+        # jax/experimental:sparse dep,
         "//tensorflow_probability/python/internal/backend/jax",
     ],
 )
