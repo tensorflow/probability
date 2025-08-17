@@ -47,6 +47,13 @@ def _validate_tf_environment(package):
     raise
 
   import distutils.version
+  import packaging.version
+
+  def _loose_version(version: str):
+    try:
+      return packaging.version.Version(version)
+    except packaging.version.InvalidVersion:
+      return distutils.version.LooseVersion(version)
 
   #
   # Update this whenever we need to depend on a newer TensorFlow release.
@@ -54,8 +61,9 @@ def _validate_tf_environment(package):
   required_tensorflow_version = '2.18'
 #   required_tensorflow_version = '1.15'  # Needed internally -- DisableOnExport
 
-  if (distutils.version.LooseVersion(tf.__version__) <
-      distutils.version.LooseVersion(required_tensorflow_version)):
+  if _loose_version(tf.__version__) < _loose_version(
+      required_tensorflow_version
+  ):
     raise ImportError(
         'This version of TensorFlow Probability requires TensorFlow '
         'version >= {required}; Detected an installation of version {present}. '

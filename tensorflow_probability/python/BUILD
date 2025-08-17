@@ -35,6 +35,7 @@ py_library(
     deps = [
         ":version",
         # distutils dep,
+        # packaging dep,
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/debugging",
         "//tensorflow_probability/python/distributions",
