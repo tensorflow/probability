@@ -14,6 +14,8 @@
 # ============================================================================
 """Build defs for TF/NumPy/JAX-variadic libraries & tests."""
 
+# load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
+# load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 # Placeholder: load PyCcLinkParamsInfo
 # Placeholder: load PyInfo
 # Placeholder: load native py_library
