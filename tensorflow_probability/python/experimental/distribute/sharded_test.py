@@ -31,6 +31,9 @@ from tensorflow_probability.python.math import gradient
 
 JAX_MODE = False
 
+if JAX_MODE:
+  import jax  # pylint: disable=g-bad-import-order,g-import-not-at-top
+
 
 @test_util.test_all_tf_execution_regimes
 class ShardTest(test_lib.DistributedTest):
@@ -64,9 +67,13 @@ class ShardTest(test_lib.DistributedTest):
           shard_axis_name=[self.axis_name, other_axis_name]).sample(seed=key)
 
     def outer_run(key, x):
+      kwargs = {}
+      if JAX_MODE:
+        kwargs['variant'] = jax.vmap
       return self.strategy_run(run, (key, x),
                                axis_name=other_axis_name,
-                               in_axes=(None, 0))
+                               in_axes=(None, 0),
+                               **kwargs)
     # Pass a dummy ones([2, 2]) to create the right axis sizes
     sample = self.strategy_run(outer_run, (self.key, tf.ones([2, 2])),
                                in_axes=(None, 0))
@@ -200,7 +207,11 @@ class ShardTest(test_lib.DistributedTest):
     x = tf.ones([2, 2])
 
     def outer_run(x):
-      return self.strategy_run(lp_grad, (x,), axis_name=other_axis_name)
+      kwargs = {}
+      if JAX_MODE:
+        kwargs['variant'] = jax.vmap
+      return self.strategy_run(
+          lp_grad, (x,), axis_name=other_axis_name, **kwargs)
     lp1, g1, lp2, g2 = self.strategy_run(outer_run, (x,))
     true_lp1, true_g1, true_lp2, true_g2 = true_lp_grad(x)
 

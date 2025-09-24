@@ -24,7 +24,7 @@ NUMPY_MODE = False
 NUM_DEVICES = 4
 
 if JAX_MODE:
-  import jax  # pylint: disable=g-import-not-at-top
+  import jax  # pylint: disable=g-bad-import-order,g-import-not-at-top
 
 
 class DistributedTest(test_util.TestCase):
@@ -81,15 +81,19 @@ class DistributedTest(test_util.TestCase):
     else:
       return None
 
-  def strategy_run(self, f, args=(), in_axes=0, axis_name=None):
+  def strategy_run(
+      self, f, args=(), variant=None, in_axes=0, axis_name=None
+  ):
     if JAX_MODE:
+      if variant is None:
+        variant = jax.pmap
       axis_name = axis_name or self.axis_name
       if in_axes is None:
-        return jax.pmap(
+        return variant(
             lambda _, args: f(*args),
             in_axes=(0, None),
             axis_name=axis_name)(tf.ones(NUM_DEVICES), args)
-      return jax.pmap(f, axis_name=axis_name, in_axes=in_axes)(*args)
+      return variant(f, axis_name=axis_name, in_axes=in_axes)(*args)
     return self.strategy().run(tf.function(f, autograph=False), args)
 
   def shard_values(self, values, axis=0):

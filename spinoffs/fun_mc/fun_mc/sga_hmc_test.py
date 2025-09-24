@@ -280,7 +280,7 @@ class SGAHMCTest(tfp_test_util.TestCase):
       @functools.partial(jax.pmap, axis_name='chain')
       def run_chain(previous_state, accept_prob):
         @functools.partial(
-            jax.pmap, axis_name='local', in_axes=(in_axes, in_axes)
+            jax.vmap, axis_name='local', in_axes=(in_axes, in_axes)
         )
         def run_state(previous_state, state_mean):
           value, _, grad = fun_mc.call_potential_fn_with_grads(

@@ -33,7 +33,8 @@ TF_MODE = not (JAX_MODE or NUMPY_MODE)
 
 
 if JAX_MODE:
-  from jax import random  # pylint: disable=g-import-not-at-top
+  import jax  # pylint: disable=g-bad-import-order,g-import-not-at-top
+  from jax import random  # pylint: disable=g-bad-import-order,g-import-not-at-top
 
 
 def _allow_all_gather(fn):
@@ -733,10 +734,16 @@ class LogProbPartsTest(test_lib.DistributedTest):
     data2 = 3 * tf.ones(2)
 
     def outer_run(x, data1):
+      kwargs = {}
+      if JAX_MODE:
+        kwargs['variant'] = jax.vmap
       return self.strategy_run(
-          run, (x, data1, data2),
+          run,
+          (x, data1, data2),
           in_axes=(None, None, 0),
-          axis_name=other_axis_name)
+          axis_name=other_axis_name,
+          **kwargs,
+      )
 
     out_values, out_grads = self.strategy_run(
         outer_run, (x, data1), in_axes=(None, 0), axis_name=self.axis_name)
@@ -781,8 +788,16 @@ class LogProbPartsTest(test_lib.DistributedTest):
     data = 2 * tf.ones([2, 2])
 
     def outer_run(x, data):
+      kwargs = {}
+      if JAX_MODE:
+        kwargs['variant'] = jax.vmap
       return self.strategy_run(
-          run, (x, data), in_axes=(None, 0), axis_name=other_axis_name)
+          run,
+          (x, data),
+          in_axes=(None, 0),
+          axis_name=other_axis_name,
+          **kwargs,
+      )
 
     out_values, out_grads = self.strategy_run(
         outer_run, (x, data), in_axes=(None, 0))
@@ -832,8 +847,16 @@ class LogProbPartsTest(test_lib.DistributedTest):
     z = normal.Normal(0., 1.).sample(seed=z_seed, sample_shape=[2, 2])
 
     def outer_run(x, y, z):
+      kwargs = {}
+      if JAX_MODE:
+        kwargs['variant'] = jax.vmap
       return self.strategy_run(
-          run, (x, y, z), in_axes=(None, 0, 0), axis_name=other_axis_name)
+          run,
+          (x, y, z),
+          in_axes=(None, 0, 0),
+          axis_name=other_axis_name,
+          **kwargs,
+      )
 
     out_values, out_grads = self.strategy_run(
         outer_run, (x, y, z), in_axes=(0, None, 0))
