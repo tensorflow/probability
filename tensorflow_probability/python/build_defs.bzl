@@ -216,6 +216,7 @@ def multi_substrate_py_library(
     remove_deps = [
         "//third_party/py/tensorflow",
         "//third_party/py/tensorflow:tensorflow",
+        "//third_party/py/tensorflow:tensorflow_no_contrib",
         "//tensorflow_probability/python/internal:tf_keras",
     ]
 
@@ -342,6 +343,7 @@ def multi_substrate_py_test(
     remove_deps = [
         "//third_party/py/tensorflow",
         "//third_party/py/tensorflow:tensorflow",
+        "//third_party/py/tensorflow:tensorflow_no_contrib",
         "//tensorflow_probability/python/internal:tf_keras",
     ]
 

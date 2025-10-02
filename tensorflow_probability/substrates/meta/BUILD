@@ -32,6 +32,7 @@ py_test(
     srcs = ["numpy_integration_test.py"],
     tags = ["tfp_numpy"],
     deps = [
+        # absl/testing:absltest dep,
         "//tensorflow_probability/substrates:numpy",
     ],
 )
@@ -41,6 +42,7 @@ py_test(
     srcs = ["jax_integration_test.py"],
     tags = ["tfp_jax"],
     deps = [
+        # absl/testing:absltest dep,
         # jax dep,
         "//tensorflow_probability/substrates:jax",
     ],
