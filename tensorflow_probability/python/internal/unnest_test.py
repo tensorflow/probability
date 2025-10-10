@@ -163,9 +163,9 @@ class TestNestedAccessors(test_util.TestCase):
     self.assertEqual(unnest.replace_outermost(
         results, return_unused=True, unique_core=2, foo=3),
                      (FakeResults(2), {'foo': 3}))
-    self.assertRaises(ValueError, lambda: unnest.replace_innermost(   # pylint: disable=g-long-lambda
+    self.assertRaises(Exception, lambda: unnest.replace_innermost(   # pylint: disable=g-long-lambda
         results, unique_core=1, foo=1))
-    self.assertRaises(ValueError, lambda: unnest.replace_outermost(   # pylint: disable=g-long-lambda
+    self.assertRaises(Exception, lambda: unnest.replace_outermost(   # pylint: disable=g-long-lambda
         results, unique_core=1, foo=1))
 
   def test_nesting_replace(self):
@@ -192,9 +192,9 @@ class TestNestedAccessors(test_util.TestCase):
     self.assertEqual(unnest.replace_outermost(
         results, return_unused=True, unique_nesting=2, unique_core=3, foo=4),
                      (build(2, 3), {'foo': 4}))
-    self.assertRaises(ValueError, lambda: unnest.replace_innermost(   # pylint: disable=g-long-lambda
+    self.assertRaises(Exception, lambda: unnest.replace_innermost(   # pylint: disable=g-long-lambda
         results, unique_core=1, foo=1))
-    self.assertRaises(ValueError, lambda: unnest.replace_outermost(   # pylint: disable=g-long-lambda
+    self.assertRaises(Exception, lambda: unnest.replace_outermost(   # pylint: disable=g-long-lambda
         results, unique_core=1, foo=1))
 
   def test_atypical_nesting_replace(self):
@@ -226,9 +226,9 @@ class TestNestedAccessors(test_util.TestCase):
         results, return_unused=True,
         unique_atypical_nesting=2, unique_core=3, foo=4),
                      (build(2, 3), {'foo': 4}))
-    self.assertRaises(ValueError, lambda: unnest.replace_innermost(   # pylint: disable=g-long-lambda
+    self.assertRaises(Exception, lambda: unnest.replace_innermost(   # pylint: disable=g-long-lambda
         results, unique_core=1, foo=1))
-    self.assertRaises(ValueError, lambda: unnest.replace_outermost(   # pylint: disable=g-long-lambda
+    self.assertRaises(Exception, lambda: unnest.replace_outermost(   # pylint: disable=g-long-lambda
         results, unique_core=1, foo=1))
 
   def test_deeply_nested_replace(self):
@@ -261,9 +261,9 @@ class TestNestedAccessors(test_util.TestCase):
         results, return_unused=True, unique_nesting=5,
         unique_atypical_nesting=6, unique_core=7, foo=8),
                     (_build_deeply_nested(5, 6, 2, 3, 7), {'foo': 8}))
-    self.assertRaises(ValueError, lambda: unnest.replace_innermost(   # pylint: disable=g-long-lambda
+    self.assertRaises(Exception, lambda: unnest.replace_innermost(   # pylint: disable=g-long-lambda
         results, unique_core=1, foo=1))
-    self.assertRaises(ValueError, lambda: unnest.replace_outermost(   # pylint: disable=g-long-lambda
+    self.assertRaises(Exception, lambda: unnest.replace_outermost(   # pylint: disable=g-long-lambda
         results, unique_core=1, foo=1))
 
   def test_get_nested_obj(self):

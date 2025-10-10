@@ -1281,6 +1281,7 @@ def parent_frame_arguments():
 
   # Remove the *varargs, and flatten the **kwargs. Both are
   # nested lists.
+  local_vars = dict(local_vars)
   local_vars.pop(variable_arg_name, {})
   keyword_args = local_vars.pop(keyword_arg_name, {})
 
