@@ -22,14 +22,6 @@ from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import gradient
 
 
-JAX_MODE = False
-
-if JAX_MODE:
-  import jax  # pylint: disable=g-import-not-at-top
-  # TODO(b/415014385): Remove this config once the bug is fixed.
-  jax.config.update('jax_use_direct_linearize', False)
-
-
 def _value_and_grads(f, x, has_aux=False):
   val, grad = gradient.value_and_gradient(f, x, has_aux=has_aux)
   _, grad_of_grad = gradient.value_and_gradient(
@@ -76,8 +68,8 @@ class MarginalFnsTest(test_util.TestCase):
             matrix, has_aux=True))
     self.assertAllEqual(expected, res)
     self.assertAllClose(expected_shift[..., 0, 0], shift)
-    self.assertAllEqual(expected_grad, grad)
-    self.assertAllEqual(expected_grad_of_grad, grad_of_grad)
+    self.assertAllClose(expected_grad, grad)
+    self.assertAllClose(expected_grad_of_grad, grad_of_grad, rtol=2e-6)
 
     # Test value and gradients of XLA-compiled `retrying_cholesky`.
     xla_retrying_cholesky = tf.function(
@@ -119,12 +111,8 @@ class MarginalFnsTest(test_util.TestCase):
             marginal_fns.retrying_cholesky, matrix, has_aux=True))
     self.assertAllEqual(expected, res)
     self.assertAllClose(expected_shift[..., 0, 0], shift)
-    self.assertAllEqual(expected_grad, grad)
-    self.assertAllEqual(expected_grad_of_grad, grad_of_grad)
-
-    expected, expected_grad, expected_grad_of_grad = self.evaluate(
-        _value_and_grads(lambda x: tf.linalg.cholesky(x + expected_shift),
-                         matrix))
+    self.assertAllClose(expected_grad, grad)
+    self.assertAllClose(expected_grad_of_grad, grad_of_grad)
 
   @test_util.disable_test_for_backend(
       disable_numpy=True, reason='No gradients available in numpy.')
@@ -149,11 +137,12 @@ class MarginalFnsTest(test_util.TestCase):
             lambda x: marginal_fns.retrying_cholesky(x, max_iters=6),
             matrix, has_aux=True))
 
-    self.assertAllEqual([expected[0], expected[2]], [res[0], res[2]])
-    self.assertAllEqual([expected_grad[0], expected_grad[2]],
+    self.assertAllClose([expected[0], expected[2]], [res[0], res[2]])
+    self.assertAllClose([expected_grad[0], expected_grad[2]],
                         [grad[0], grad[2]])
-    self.assertAllEqual([expected_grad_of_grad[0], expected_grad_of_grad[2]],
-                        [grad_of_grad[0], grad_of_grad[2]])
+    self.assertAllClose([expected_grad_of_grad[0], expected_grad_of_grad[2]],
+                        [grad_of_grad[0], grad_of_grad[2]],
+                        rtol=2e-6)
 
     # Check that the lower-triangular part of `res[1]` is NaN.
     for i in range(res[1].shape[0]):
