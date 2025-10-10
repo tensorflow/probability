@@ -203,6 +203,8 @@ def _bincount(arr, weights=None, minlength=None, maxlength=None,  # pylint: disa
   """Counts number of occurences of each value in `arr`."""
   # TODO(https://github.com/google/jax/issues/5719): Use np.bincount directly?
   if not JAX_MODE:
+    if minlength is None:
+      minlength = 0
     return np.bincount(arr, weights, minlength).astype(utils.numpy_dtype(dtype))
 
   dtype = utils.numpy_dtype(dtype)
