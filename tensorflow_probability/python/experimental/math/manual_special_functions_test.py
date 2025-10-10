@@ -339,11 +339,11 @@ class ManualSpecialFunctionsTest(test_util.TestCase):
       log1p_calls += 1
       self.assertEqual(log1p_calls, log1p.call_count)
 
-      tf.math.reduce_logsumexp(0.)
+      tf.math.reduce_logsumexp([0.])
       logsumexp_calls += 1
       self.assertEqual(logsumexp_calls, logsumexp.call_count)
 
-      tf.reduce_logsumexp(0.)
+      tf.reduce_logsumexp([0.])
       logsumexp_calls += 1
       self.assertEqual(logsumexp_calls, logsumexp.call_count)
 

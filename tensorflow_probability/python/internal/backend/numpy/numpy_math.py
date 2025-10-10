@@ -416,6 +416,8 @@ def _reduce_logsumexp(input_tensor, axis=None, keepdims=False, name=None):  # py
           or np.issubdtype(dtype, np.complexfloating)):
     # Match TF error
     raise TypeError('Input must be either real or complex')
+  if not input_tensor.shape:
+    return input_tensor
   if input_tensor.size == 0:
     # On empty arrays, mimic TF in returning `-inf` instead of failing, and
     # preserve error message if `axis` arg is incompatible with an empty array.
