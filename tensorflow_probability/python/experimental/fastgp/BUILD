@@ -22,7 +22,6 @@ licenses(["notice"])
 package(
     # default_applicable_licenses
     default_visibility = [
-        "//research/probability:__subpackages__",
         "//tensorflow_probability:__subpackages__",
         # vizier:__subpackages__ dep,
     ],
