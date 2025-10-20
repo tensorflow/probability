@@ -18,10 +18,7 @@
 
 package(
     # default_applicable_licenses
-    default_visibility = [
-        "//tensorflow_probability:__subpackages__",
-        "//inference_gym:__subpackages__",
-    ],
+    default_visibility = ["//inference_gym:__subpackages__"],
 )
 
 licenses(["notice"])
