@@ -72,6 +72,7 @@ py_test(
         # absl/testing:absltest dep,
         # jax dep,
         # numpy dep,
+        # scipy dep,
     ],
 )
 
