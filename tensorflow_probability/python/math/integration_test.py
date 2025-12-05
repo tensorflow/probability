@@ -169,7 +169,7 @@ class TrapzTest(test_util.TestCase):
       x = data.draw(
           tfp_hps.constrained_tensors(tfp_hps.identity_fn, shp, dtype))
       dx = None
-    np_soln = np.trapz(
+    np_soln = np.trapezoid(
         self.evaluate(y),
         x=self.evaluate(x) if x is not None else None,  # cannot evaluate(None)
         dx=dx or 1.0,  # numpy default is 1.0

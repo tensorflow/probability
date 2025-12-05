@@ -275,7 +275,7 @@ class ImportanceResampleTest(test_util.TestCase):
     xs = np.linspace(0, 1.6, 100)
     aucs = []
     for s in samplers.split_seed(seed, n=30):
-      aucs.append(np.trapz(
+      aucs.append(np.trapezoid(
           self.evaluate(dist.prob(xs, seed=s, sample_size=100)), xs))
 
     self.assertAllClose(aucs, np.ones_like(aucs), atol=.05)
