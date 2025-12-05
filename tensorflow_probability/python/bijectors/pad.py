@@ -140,7 +140,7 @@ class Pad(bijector.AutoCompositeTensorBijector):
       self._constant_values = tensor_util.convert_nonref_to_tensor(
           constant_values, dtype_hint=tf.float32, name='constant_values')
       min_event_ndims_ = int(-np.min(np.pad(
-          np.reshape(axis_, newshape=[-1]),
+          np.reshape(axis_, [-1]),
           mode='constant', pad_width=[[0, 1]])))
       super(Pad, self).__init__(
           forward_min_event_ndims=min_event_ndims_,

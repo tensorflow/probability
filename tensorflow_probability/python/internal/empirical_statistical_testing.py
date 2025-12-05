@@ -217,7 +217,7 @@ def _bootstrap_means(samples, mean_size, fuel):
   if num_bootstraps * mean_size <= len(samples):
     # Inputs are huge relative to fuel; fake a bootstrap by just slicing
     # the input array
-    return np.mean(np.reshape(samples, newshape=(-1, mean_size)), axis=-1)
+    return np.mean(np.reshape(samples, (-1, mean_size)), axis=-1)
   # Compute this in batches to never materialize an over-large
   # intermediate array.
   n_batches = 10
