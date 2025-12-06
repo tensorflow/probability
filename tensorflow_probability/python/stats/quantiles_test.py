@@ -440,7 +440,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
     x = [1., 5., 3., 2., 4.]
     for q in [0, 10, 25, 49.9, 50, 50.01, 90, 95, 100]:
       expected_percentile = np.percentile(
-          x, q=q, interpolation=self._interpolation, axis=0)
+          x, q=q, method=self._interpolation, axis=0)
       pct = quantiles.percentile(
           x, q=q, interpolation=self._interpolation, axis=[0])
       self.assertAllEqual((), pct.shape)
@@ -450,7 +450,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
     x = [1., 5., 3., 2., 4.]
     q = np.array([0, 10, 25, 49.9, 50, 50.01, 90, 95, 100])
     expected_percentile = np.percentile(
-        x, q=q, interpolation=self._interpolation, axis=0)
+        x, q=q, method=self._interpolation, axis=0)
     pct = quantiles.percentile(
         x, q=q, interpolation=self._interpolation, axis=[0])
     self.assertAllEqual(q.shape, pct.shape)
@@ -460,7 +460,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
     x = [1., 5., 3., 2., 4., 5.]
     for q in [0, 10, 25, 49.9, 50, 50.01, 90, 95, 100]:
       expected_percentile = np.percentile(
-          x, q=q, interpolation=self._interpolation)
+          x, q=q, method=self._interpolation)
       pct = quantiles.percentile(x, q=q, interpolation=self._interpolation)
       self.assertAllEqual((), pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
@@ -469,7 +469,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
     x = np.array([[-1., 50., -3.5, 2., -1], [0., 0., 3., 2., 4.]]).T
     for q in [0, 10, 25, 49.9, 50, 50.01, 90, 95, 100]:
       expected_percentile = np.percentile(
-          x, q=q, interpolation=self._interpolation, axis=0)
+          x, q=q, method=self._interpolation, axis=0)
       # Get dim 1 with negative and positive indices.
       pct_neg_index = quantiles.percentile(
           x, q=q, interpolation=self._interpolation, axis=[0])
@@ -485,7 +485,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
     x = np.array([1., 2., 4., 50.])
     q = 10
     expected_percentile = np.percentile(
-        x, q=q, interpolation=self._interpolation, axis=0)
+        x, q=q, method=self._interpolation, axis=0)
     pct = quantiles.percentile(
         x, q=q, interpolation=self._interpolation, axis=[0])
     self.assertAllClose(expected_percentile, self.evaluate(pct))
@@ -494,7 +494,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
     x = np.array([[1., 2., 4., 50.], [1., 2., -4., 5.]]).T
     for q in [0, 10, 25, 49.9, 50, 50.01, 90, 95, 100]:
       expected_percentile = np.percentile(
-          x, q=q, interpolation=self._interpolation, axis=0)
+          x, q=q, method=self._interpolation, axis=0)
       pct = quantiles.percentile(
           x, q=q, interpolation=self._interpolation, axis=[0])
       self.assertAllEqual((2,), pct.shape)
@@ -504,7 +504,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
     x = np.array([[1., 2., 4., 50.], [1., 2., -4., 5.]]).T
     for q in [0, 10, 25, 49.9, 50, 50.01, 90, 95, 100]:
       expected_percentile = np.percentile(
-          x, q=q, interpolation=self._interpolation, keepdims=True, axis=0)
+          x, q=q, method=self._interpolation, keepdims=True, axis=0)
       pct = quantiles.percentile(
           x, q=q, interpolation=self._interpolation, keepdims=True, axis=[0])
       self.assertAllEqual((1, 2), pct.shape)
@@ -514,7 +514,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
     x = np.random.rand(2, 3, 4, 5)
     for axis in [None, 0, 1, -2, (0,), (-1,), (-1, 1), (3, 1), (-3, 0)]:
       expected_percentile = np.percentile(
-          x, q=0.77, interpolation=self._interpolation, axis=axis)
+          x, q=0.77, method=self._interpolation, axis=axis)
       pct = quantiles.percentile(
           x, q=0.77, interpolation=self._interpolation, axis=axis)
       self.assertAllEqual(expected_percentile.shape, pct.shape)
@@ -525,7 +525,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
     q = [0.25, 0.75]
     for axis in [None, 0, (-1, 1)]:
       expected_percentile = np.percentile(
-          x, q=q, interpolation=self._interpolation, axis=axis)
+          x, q=q, method=self._interpolation, axis=axis)
       pct = quantiles.percentile(
           x, q=q, interpolation=self._interpolation, axis=axis)
       self.assertAllEqual(expected_percentile.shape, pct.shape)
@@ -536,7 +536,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
     q = [0.25, 0.75]
     for axis in [None, 0, (-1, 1)]:
       expected_percentile = np.percentile(
-          x, q=q, interpolation=self._interpolation, axis=axis, keepdims=True)
+          x, q=q, method=self._interpolation, axis=axis, keepdims=True)
       pct = quantiles.percentile(
           x, q=q, interpolation=self._interpolation, axis=axis, keepdims=True)
       self.assertAllEqual(expected_percentile.shape, pct.shape)
@@ -548,7 +548,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
       expected_percentile = np.percentile(
           x,
           q=0.77,
-          interpolation=self._interpolation,
+          method=self._interpolation,
           axis=axis,
           keepdims=True)
       pct = quantiles.percentile(
@@ -565,7 +565,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
     x_ph = tf1.placeholder_with_default(x, shape=[None, None, None, None])
     for axis in [None, 0, 1, -2, (0,), (-1,), (-1, 1), (3, 1), (-3, 0)]:
       expected_percentile = np.percentile(
-          x, q=0.77, interpolation=self._interpolation, axis=axis)
+          x, q=0.77, method=self._interpolation, axis=axis)
       pct = quantiles.percentile(
           x_ph, q=0.77, interpolation=self._interpolation, axis=axis)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
@@ -577,7 +577,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
       expected_percentile = np.percentile(
           x,
           q=0.77,
-          interpolation=self._interpolation,
+          method=self._interpolation,
           axis=axis,
           keepdims=True)
       pct = quantiles.percentile(
@@ -595,7 +595,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
     x = [1, 5, 3, 2, 4]
     for q in [0, 10, 25, 49.9, 50, 50.01, 90, 95, 100]:
       expected_percentile = np.percentile(
-          x, q=q, interpolation=self._interpolation)
+          x, q=q, method=self._interpolation)
       pct = quantiles.percentile(x, q=q, interpolation=self._interpolation)
       self.assertEqual(tf.int32, pct.dtype)
       self.assertAllEqual((), pct.shape)
@@ -610,13 +610,13 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
       # Test each percentile individually
       for q in qs:
         expected_percentile = np.percentile(
-            xs, q=q, interpolation=self._interpolation)
+            xs, q=q, method=self._interpolation)
         self.assertTrue(np.isnan(expected_percentile))
         pct = quantiles.percentile(xs, q=q, interpolation=self._interpolation)
         self.assertTrue(self.evaluate(tf.math.is_nan(pct)))
       # Test vector percentile as well
       expected_percentiles = np.percentile(
-          xs, q=qs, interpolation=self._interpolation)
+          xs, q=qs, method=self._interpolation)
       pcts = quantiles.percentile(xs, q=qs, interpolation=self._interpolation)
       self.assertAllEqual(expected_percentiles, pcts)
 
@@ -793,7 +793,7 @@ class PercentileTestWithNearestInterpolation(test_util.TestCase):
     x = [1., 5., 3., 2., 4.]
     for q in [0, 10.1, 25.1, 49.9, 50.1, 50.01, 89, 100]:
       expected_percentile = np.percentile(
-          x, q=q, interpolation=self._interpolation)
+          x, q=q, method=self._interpolation)
       pct = quantiles.percentile(x, q=q, interpolation=self._interpolation)
       self.assertAllEqual((), pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
@@ -802,7 +802,7 @@ class PercentileTestWithNearestInterpolation(test_util.TestCase):
     x = [1., 5., 3., 2., 4., 5.]
     for q in [0, 10.1, 25.1, 49.9, 50.1, 50.01, 89, 100]:
       expected_percentile = np.percentile(
-          x, q=q, interpolation=self._interpolation)
+          x, q=q, method=self._interpolation)
       pct = quantiles.percentile(x, q=q, interpolation=self._interpolation)
       self.assertAllEqual((), pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
@@ -811,7 +811,7 @@ class PercentileTestWithNearestInterpolation(test_util.TestCase):
     x = [[10.0, 7.0, 4.0], [3.0, 2.0, 1.0]]
     for q in [0, 10.1, 25.1, 49.9, 50.0, 50.1, 50.01, 89, 100]:
       expected_percentile = np.percentile(
-          x, q=q, interpolation=self._interpolation)
+          x, q=q, method=self._interpolation)
       pct = quantiles.percentile(x, q=q, interpolation=self._interpolation)
       self.assertAllEqual((), pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
