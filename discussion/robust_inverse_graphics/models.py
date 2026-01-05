@@ -116,6 +116,21 @@ class Example:
   scene_id: Any | None = None
   scene_embedding: Any | None = None
 
+  # Directly comparing members of the type `jax.Array` can throw an error:
+  # "The truth value of an array with more than one element is ambiguous."
+  # So we bring back an explicit implementation of __eq__ like it was prior to
+  # Python 3.13 in order work around this possibility.
+  def __eq__(self, other):
+    if self is other:
+      return True
+    if other.__class__ is self.__class__:
+      return tuple(
+          getattr(self, field.name) for field in dataclasses.fields(self)
+      ) == tuple(
+          getattr(other, field.name) for field in dataclasses.fields(other)
+      )
+    return NotImplemented
+
   def fields_with_view_axis(self) -> tree_util.DataclassView['Example']:
     """Returns a view with only fields that typically have the view axis."""
     return tree_util.DataclassView(self, _fields_with_view_axis_selector)
