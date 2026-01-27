@@ -62,6 +62,7 @@ py_library(
 py_library(
     name = "banana",
     srcs = ["banana.py"],
+    strict_deps = False,
     deps = [
         ":model",
         # absl/testing:parameterized dep,
@@ -85,6 +86,7 @@ py_test(
 py_library(
     name = "bayesian_model",
     srcs = ["bayesian_model.py"],
+    strict_deps = False,
     deps = [
         ":model",
         "//inference_gym/internal:ground_truth_encoding",
@@ -108,6 +110,7 @@ py_test(
 py_library(
     name = "brownian_motion",
     srcs = ["brownian_motion.py"],
+    strict_deps = False,
     deps = [
         ":bayesian_model",
         ":model",
@@ -136,6 +139,7 @@ py_test(
 py_library(
     name = "dirichlet",
     srcs = ["dirichlet.py"],
+    strict_deps = False,
     deps = [
         ":model",
         "//tensorflow_probability:numpy",
@@ -159,6 +163,7 @@ py_test(
 py_library(
     name = "eight_schools",
     srcs = ["eight_schools.py"],
+    strict_deps = False,
     deps = [
         ":model",
         # numpy dep,
@@ -182,6 +187,7 @@ py_test(
 py_library(
     name = "ill_conditioned_gaussian",
     srcs = ["ill_conditioned_gaussian.py"],
+    strict_deps = False,
     deps = [
         ":model",
         # numpy dep,
@@ -204,6 +210,7 @@ py_test(
 py_library(
     name = "item_response_theory",
     srcs = ["item_response_theory.py"],
+    strict_deps = False,
     deps = [
         ":bayesian_model",
         ":model",
@@ -231,6 +238,7 @@ py_test(
 py_library(
     name = "log_gaussian_cox_process",
     srcs = ["log_gaussian_cox_process.py"],
+    strict_deps = False,
     deps = [
         ":bayesian_model",
         ":model",
@@ -259,6 +267,7 @@ py_test(
 py_library(
     name = "logistic_regression",
     srcs = ["logistic_regression.py"],
+    strict_deps = False,
     deps = [
         ":bayesian_model",
         ":model",
@@ -286,6 +295,7 @@ py_test(
 py_library(
     name = "lorenz_system",
     srcs = ["lorenz_system.py"],
+    strict_deps = False,
     deps = [
         ":bayesian_model",
         ":model",
@@ -315,6 +325,7 @@ py_test(
 py_library(
     name = "model",
     srcs = ["model.py"],
+    strict_deps = False,
     deps = [
         "//inference_gym/internal:ground_truth_encoding",
     ],
@@ -337,6 +348,7 @@ py_test(
 py_library(
     name = "neals_funnel",
     srcs = ["neals_funnel.py"],
+    strict_deps = False,
     deps = [
         ":model",
         # numpy dep,
@@ -359,6 +371,7 @@ py_test(
 py_library(
     name = "non_identifiable_quartic",
     srcs = ["non_identifiable_quartic.py"],
+    strict_deps = False,
     deps = [
         ":bayesian_model",
         ":model",
@@ -381,6 +394,7 @@ py_test(
 py_library(
     name = "plasma_spectroscopy",
     srcs = ["plasma_spectroscopy.py"],
+    strict_deps = False,
     deps = [
         ":bayesian_model",
         ":model",
@@ -406,6 +420,7 @@ py_test(
 py_library(
     name = "probit_regression",
     srcs = ["probit_regression.py"],
+    strict_deps = False,
     deps = [
         ":bayesian_model",
         ":model",
@@ -433,6 +448,7 @@ py_test(
 py_library(
     name = "radon_contextual_effects",
     srcs = ["radon_contextual_effects.py"],
+    strict_deps = False,
     deps = [
         ":bayesian_model",
         ":model",
@@ -463,6 +479,7 @@ py_test(
 py_library(
     name = "sparse_logistic_regression",
     srcs = ["sparse_logistic_regression.py"],
+    strict_deps = False,
     deps = [
         ":bayesian_model",
         ":model",
@@ -490,6 +507,7 @@ py_test(
 py_library(
     name = "stochastic_volatility",
     srcs = ["stochastic_volatility.py"],
+    strict_deps = False,
     deps = [
         ":bayesian_model",
         ":model",
@@ -518,6 +536,7 @@ py_test(
 py_library(
     name = "vector_model",
     srcs = ["vector_model.py"],
+    strict_deps = False,
     deps = [
         ":model",
     ],
@@ -541,6 +560,7 @@ py_test(
 py_library(
     name = "vectorized_stochastic_volatility",
     srcs = ["vectorized_stochastic_volatility.py"],
+    strict_deps = False,
     deps = [
         ":bayesian_model",
         ":model",

@@ -42,6 +42,7 @@ py_library(
 py_library(
     name = "using_numpy",
     srcs = ["using_numpy.py"],
+    strict_deps = False,
     visibility = ["//visibility:public"],
     deps = [
         ":backend_numpy",
@@ -54,6 +55,7 @@ py_library(
 py_library(
     name = "using_jax",
     srcs = ["using_jax.py"],
+    strict_deps = False,
     visibility = ["//visibility:public"],
     deps = [
         ":backend_jax",
@@ -67,6 +69,7 @@ py_library(
 py_library(
     name = "using_tensorflow",
     srcs = ["using_tensorflow.py"],
+    strict_deps = False,
     visibility = ["//visibility:public"],
     deps = [
         ":backend_tensorflow",

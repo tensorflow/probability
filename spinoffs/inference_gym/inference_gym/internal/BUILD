@@ -61,6 +61,7 @@ py_test(
 py_library(
     name = "data",
     srcs = ["data.py"],
+    strict_deps = False,
     deps = [
         # numpy dep,
         "//inference_gym/internal/datasets",
