@@ -28,6 +28,7 @@ package(
 py_library(
     name = "convolution_util",
     srcs = ["convolution_util.py"],
+    strict_deps = False,
     deps = [
         ":utils",
         # tensorflow dep,
@@ -56,6 +57,7 @@ py_test(
 py_library(
     name = "kernel_bias",
     srcs = ["kernel_bias.py"],
+    strict_deps = False,
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:chain",
@@ -89,6 +91,7 @@ py_test(
 py_library(
     name = "util",
     srcs = ["__init__.py"],
+    strict_deps = False,
     deps = [
         ":convolution_util",
         ":kernel_bias",
@@ -101,6 +104,7 @@ py_library(
 py_library(
     name = "random_variable",
     srcs = ["random_variable.py"],
+    strict_deps = False,
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:distribution",
@@ -127,6 +131,7 @@ py_test(
 py_library(
     name = "utils",
     srcs = ["utils.py"],
+    strict_deps = False,
     deps = [
         # numpy dep,
         # tensorflow dep,

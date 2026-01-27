@@ -28,6 +28,7 @@ licenses(["notice"])
 py_library(
     name = "debugging",
     srcs = ["__init__.py"],
+    strict_deps = False,
     deps = [
         "//tensorflow_probability/python/debugging/benchmarking",
     ],

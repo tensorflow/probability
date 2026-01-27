@@ -86,6 +86,7 @@ py_library(
     srcs = [
         "correlation_matrix_volumes_lib.py",
     ],
+    strict_deps = False,
     deps = [
         ":init",
         # numpy dep,

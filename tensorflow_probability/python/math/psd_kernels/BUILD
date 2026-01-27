@@ -466,6 +466,7 @@ py_library(
     name = "hypothesis_testlib",
     testonly = True,
     srcs = ["hypothesis_testlib.py"],
+    strict_deps = False,
     deps = [
         ":psd_kernels",
         # hypothesis dep,

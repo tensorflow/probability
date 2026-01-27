@@ -51,6 +51,7 @@ multi_substrate_py_library(
 py_library(
     name = "deferred_module",
     srcs = ["deferred_module.py"],
+    strict_deps = False,
     deps = [
         ":special_methods",
         # numpy dep,
@@ -110,6 +111,7 @@ multi_substrate_py_test(
 py_library(
     name = "special_methods",
     srcs = ["special_methods.py"],
+    strict_deps = False,
     deps = [
         # tensorflow dep,
     ],
@@ -158,6 +160,7 @@ multi_substrate_py_test(
 py_library(
     name = "composite_tensor",
     srcs = ["composite_tensor.py"],
+    strict_deps = False,
     deps = [
     ],
 )

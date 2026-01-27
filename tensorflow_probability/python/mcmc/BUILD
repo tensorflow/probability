@@ -615,6 +615,7 @@ multi_substrate_py_test(
 py_library(
     name = "eight_schools_hmc",
     srcs = ["eight_schools_hmc.py"],
+    strict_deps = False,
     deps = [
         ":hmc",
         ":sample",

@@ -76,6 +76,7 @@ multi_substrate_py_test(
 py_library(
     name = "proximal_hessian",
     srcs = ["proximal_hessian.py"],
+    strict_deps = False,
     deps = [
         ":fisher_scoring",
         # numpy dep,

@@ -447,6 +447,7 @@ py_library(
     srcs = [
         "sparse.py",
     ],
+    strict_deps = False,
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
