@@ -88,7 +88,7 @@ multi_substrate_py_test(
 py_library(
     name = "mutual_information",
     srcs = ["mutual_information.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # numpy dep,
         # tensorflow dep,

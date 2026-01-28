@@ -32,7 +32,7 @@ py_library(
     srcs = [
         "__init__.py",
     ],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     # :substrates needs to be visible to the external :pip_pkg target.
     visibility = ["//visibility:public"],  # EnableOnExport
     deps = [
@@ -47,7 +47,7 @@ py_library(
 py_library(
     name = "jax",
     srcs = ["jax/__init__.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     tags = ["alt_dep=//tensorflow_probability:jax"],
     deps = [
         # jax dep,
@@ -76,7 +76,7 @@ py_library(
 py_library(
     name = "numpy",
     srcs = ["numpy/__init__.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     tags = ["alt_dep=//tensorflow_probability:numpy"],
     deps = [
 #         "//tensorflow_probability/google:google.numpy",  # DisableOnExport

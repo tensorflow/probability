@@ -447,7 +447,7 @@ py_library(
     srcs = [
         "sparse.py",
     ],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",

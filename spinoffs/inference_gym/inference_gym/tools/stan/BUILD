@@ -30,7 +30,7 @@ licenses(["notice"])
 py_library(
     name = "brownian_motion",
     srcs = ["brownian_motion.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":stan_model",
         ":util",
@@ -41,7 +41,7 @@ py_library(
 py_library(
     name = "eight_schools",
     srcs = ["eight_schools.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":stan_model",
         ":util",
@@ -52,7 +52,7 @@ py_library(
 py_library(
     name = "item_response_theory",
     srcs = ["item_response_theory.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":stan_model",
         ":util",
@@ -62,7 +62,7 @@ py_library(
 py_library(
     name = "log_gaussian_cox_process",
     srcs = ["log_gaussian_cox_process.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":stan_model",
         ":util",
@@ -72,7 +72,7 @@ py_library(
 py_library(
     name = "logistic_regression",
     srcs = ["logistic_regression.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":stan_model",
         ":util",
@@ -82,7 +82,7 @@ py_library(
 py_library(
     name = "lorenz_system",
     srcs = ["lorenz_system.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":stan_model",
         ":util",
@@ -93,7 +93,7 @@ py_library(
 py_library(
     name = "radon_contextual_effects",
     srcs = ["radon_contextual_effects.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":stan_model",
         ":util",
@@ -103,7 +103,7 @@ py_library(
 py_library(
     name = "radon_contextual_effects_halfnormal",
     srcs = ["radon_contextual_effects_halfnormal.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":stan_model",
         ":util",
@@ -113,13 +113,13 @@ py_library(
 py_library(
     name = "stan_model",
     srcs = ["stan_model.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
 )
 
 py_library(
     name = "stochastic_volatility",
     srcs = ["stochastic_volatility.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":stan_model",
         ":util",
@@ -129,7 +129,7 @@ py_library(
 py_library(
     name = "probit_regression",
     srcs = ["probit_regression.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":stan_model",
         ":util",
@@ -139,7 +139,7 @@ py_library(
 py_library(
     name = "sparse_logistic_regression",
     srcs = ["sparse_logistic_regression.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":stan_model",
         ":util",
@@ -149,7 +149,7 @@ py_library(
 py_library(
     name = "targets",
     srcs = ["targets.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":brownian_motion",
         ":eight_schools",
@@ -168,5 +168,5 @@ py_library(
 py_library(
     name = "util",
     srcs = ["util.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
 )

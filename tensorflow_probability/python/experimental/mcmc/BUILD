@@ -132,7 +132,7 @@ multi_substrate_py_test(
 py_library(
     name = "kernel_builder",
     srcs = ["kernel_builder.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":kernel_outputs",
         ":preconditioned_hmc",
@@ -174,7 +174,7 @@ py_test(
 py_library(
     name = "kernel_outputs",
     srcs = ["kernel_outputs.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":tracing_reducer",
         "//tensorflow_probability/python/internal:unnest",
@@ -376,7 +376,7 @@ multi_substrate_py_test(
 py_library(
     name = "progress_bar_reducer",
     srcs = ["progress_bar_reducer.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":reducer",
         # tensorflow dep,
@@ -429,7 +429,7 @@ multi_substrate_py_test(
 py_library(
     name = "nuts_autobatching",
     srcs = ["nuts_autobatching.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -445,7 +445,7 @@ py_library(
     name = "nuts_autobatching_testlib",
     testonly = 1,
     srcs = ["nuts_autobatching_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":nuts_autobatching",
         # absl/testing:parameterized dep,
@@ -593,7 +593,7 @@ multi_substrate_py_test(
 py_library(
     name = "particle_filter_augmentation",
     srcs = ["particle_filter_augmentation.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # numpy dep,
         # tensorflow dep,

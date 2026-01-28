@@ -87,7 +87,7 @@ multi_substrate_py_test(
 py_library(
     name = "linear_operator_psd_kernel",
     srcs = ["linear_operator_psd_kernel.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -159,7 +159,7 @@ multi_substrate_py_test(
 py_library(
     name = "no_pivot_ldl",
     srcs = ["no_pivot_ldl.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # tensorflow dep,
     ],

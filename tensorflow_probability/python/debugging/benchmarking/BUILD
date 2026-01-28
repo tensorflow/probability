@@ -28,7 +28,7 @@ licenses(["notice"])
 py_library(
     name = "benchmarking",
     srcs = ["__init__.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":benchmark_tf_function",
     ],
@@ -37,7 +37,7 @@ py_library(
 py_library(
     name = "benchmark_tf_function",
     srcs = ["benchmark_tf_function.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # tensorflow dep,
     ],

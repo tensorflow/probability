@@ -30,7 +30,7 @@ licenses(["notice"])
 py_library(
     name = "layers",
     srcs = ["__init__.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":conv_variational",
         ":dense_variational",
@@ -48,7 +48,7 @@ py_library(
     srcs = [
         "conv_variational.py",
     ],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":util",
         # tensorflow dep,
@@ -86,7 +86,7 @@ py_library(
     srcs = [
         "dense_variational.py",
     ],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":util",
         # tensorflow dep,
@@ -122,7 +122,7 @@ py_library(
     srcs = [
         "dense_variational_v2.py",
     ],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:kullback_leibler",
@@ -152,7 +152,7 @@ py_test(
 py_library(
     name = "distribution_layer",
     srcs = ["distribution_layer.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # cloudpickle dep,
         # tensorflow dep,
@@ -215,7 +215,7 @@ py_library(
     srcs = [
         "initializers.py",
     ],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tf_keras",
@@ -236,7 +236,7 @@ py_test(
 py_library(
     name = "masked_autoregressive",
     srcs = ["masked_autoregressive.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:masked_autoregressive",
@@ -266,7 +266,7 @@ py_library(
     srcs = [
         "util.py",
     ],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -283,7 +283,7 @@ py_library(
     srcs = [
         "variable_input.py",
     ],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tf_keras",
@@ -310,7 +310,7 @@ py_library(
     srcs = [
         "weight_norm.py",
     ],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tf_keras",

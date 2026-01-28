@@ -27,7 +27,7 @@ package(
 py_library(
     name = "autobnn.jax",
     srcs = ["__init__.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":bnn",
         ":bnn_tree",
@@ -45,7 +45,7 @@ py_library(
 py_library(
     name = "bnn",
     srcs = ["bnn.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":likelihoods",
         # flax:core dep,
@@ -72,7 +72,7 @@ py_test(
 py_library(
     name = "bnn_tree",
     srcs = ["bnn_tree.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":bnn",
         ":kernels",
@@ -102,7 +102,7 @@ py_test(
 py_library(
     name = "estimators",
     srcs = ["estimators.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":bnn",
         ":likelihoods",
@@ -130,7 +130,7 @@ py_test(
 py_library(
     name = "kernels",
     srcs = ["kernels.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":bnn",
         # flax dep,
@@ -160,7 +160,7 @@ py_test(
 py_library(
     name = "likelihoods",
     srcs = ["likelihoods.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # flax:core dep,
         # jax dep,
@@ -190,7 +190,7 @@ py_test(
 py_library(
     name = "models",
     srcs = ["models.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":bnn",
         ":bnn_tree",
@@ -219,7 +219,7 @@ py_test(
 py_library(
     name = "operators",
     srcs = ["operators.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":bnn",
         ":likelihoods",
@@ -258,7 +258,7 @@ py_test(
 py_library(
     name = "training_util",
     srcs = ["training_util.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":bnn",
         ":util",
@@ -292,7 +292,7 @@ py_test(
 py_library(
     name = "util",
     srcs = ["util.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":bnn",
         # jax dep,

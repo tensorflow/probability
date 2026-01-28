@@ -30,7 +30,7 @@ package(
 py_library(
     name = "nn",
     srcs = ["__init__.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":affine_layers",
         ":convolutional_layers",
@@ -48,7 +48,7 @@ py_library(
 py_library(
     name = "affine_layers",
     srcs = ["affine_layers.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":layers",
         ":variational_base",
@@ -84,7 +84,7 @@ py_test(
 py_library(
     name = "convolutional_layers",
     srcs = ["convolutional_layers.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":layers",
         ":variational_base",
@@ -118,7 +118,7 @@ py_test(
 py_library(
     name = "convolutional_layers_v2",
     srcs = ["convolutional_layers_v2.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":layers",
         ":variational_base",
@@ -153,7 +153,7 @@ py_test(
 py_library(
     name = "convolutional_transpose_layers",
     srcs = ["convolutional_transpose_layers.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":layers",
         ":variational_base",
@@ -185,7 +185,7 @@ py_test(
 py_library(
     name = "layers",
     srcs = ["layers.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/experimental/nn/util:utils",
@@ -209,7 +209,7 @@ py_test(
 py_library(
     name = "variational_base",
     srcs = ["variational_base.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":layers",
         # tensorflow dep,

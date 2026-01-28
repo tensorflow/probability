@@ -30,7 +30,7 @@ package(
 py_library(
     name = "numpy",
     srcs = ["__init__.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":__internal__",
         ":bitwise",
@@ -76,7 +76,7 @@ py_library(
 py_library(
     name = "__internal__",
     srcs = ["__internal__.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":composite_tensor",
     ],
@@ -85,7 +85,7 @@ py_library(
 py_library(
     name = "bitwise",
     srcs = ["bitwise.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         # numpy dep,
@@ -95,7 +95,7 @@ py_library(
 py_library(
     name = "compat",
     srcs = ["compat.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":v1",
         ":v2",
@@ -105,25 +105,25 @@ py_library(
 py_library(
     name = "composite_tensor",
     srcs = ["composite_tensor.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
 )
 
 py_library(
     name = "composite_tensor_gradient",
     srcs = ["composite_tensor_gradient.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
 )
 
 py_library(
     name = "config",
     srcs = ["config.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
 )
 
 py_library(
     name = "control_flow",
     srcs = ["control_flow.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         ":dtype",
@@ -135,14 +135,14 @@ py_library(
 py_library(
     name = "data_structures",
     srcs = ["data_structures.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [],
 )
 
 py_library(
     name = "debugging",
     srcs = ["debugging.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         ":dtype",
@@ -155,14 +155,14 @@ py_library(
 py_library(
     name = "deprecation",
     srcs = ["deprecation.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [],
 )
 
 py_library(
     name = "dtype",
     srcs = ["dtype.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         # numpy dep,
@@ -172,7 +172,7 @@ py_library(
 py_library(
     name = "errors",
     srcs = ["errors.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
     ],
 )
@@ -180,7 +180,7 @@ py_library(
 py_library(
     name = "functional_ops",
     srcs = ["functional_ops.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         # numpy dep,
@@ -190,7 +190,7 @@ py_library(
 py_library(
     name = "initializers",
     srcs = ["initializers.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         # numpy dep,
@@ -200,7 +200,7 @@ py_library(
 py_library(
     name = "numpy_keras",
     srcs = ["numpy_keras.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         ":keras_layers",
@@ -211,7 +211,7 @@ py_library(
 py_library(
     name = "keras_layers",
     srcs = ["keras_layers.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         # numpy dep,
@@ -224,7 +224,7 @@ py_library(
         "linalg.py",
         "linalg_impl.py",
     ],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         ":static_rewrites",
@@ -236,7 +236,7 @@ py_library(
 py_library(
     name = "misc",
     srcs = ["misc.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         # numpy dep,
@@ -246,7 +246,7 @@ py_library(
 py_library(
     name = "nest",
     srcs = ["nest.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # tree dep,
         # wrapt dep,
@@ -256,7 +256,7 @@ py_library(
 py_library(
     name = "nn",
     srcs = ["nn.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         ":numpy_array",
@@ -269,7 +269,7 @@ py_library(
 py_library(
     name = "numpy_array",
     srcs = ["numpy_array.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         ":ops",
@@ -280,7 +280,7 @@ py_library(
 py_library(
     name = "numpy_logging",
     srcs = ["numpy_logging.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         # numpy dep,
@@ -290,7 +290,7 @@ py_library(
 py_library(
     name = "numpy_math",
     srcs = ["numpy_math.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         # numpy dep,
@@ -301,7 +301,7 @@ py_library(
 py_library(
     name = "numpy_signal",
     srcs = ["numpy_signal.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         # numpy dep,
@@ -311,7 +311,7 @@ py_library(
 py_library(
     name = "ops",
     srcs = ["ops.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         # numpy dep,
@@ -323,7 +323,7 @@ py_library(
 py_library(
     name = "private",
     srcs = ["private.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         # numpy dep,
@@ -333,7 +333,7 @@ py_library(
 py_library(
     name = "tensor_array_ops",
     srcs = ["tensor_array_ops.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         # numpy dep,
@@ -354,7 +354,7 @@ py_test(
 py_library(
     name = "random_generators",
     srcs = ["random_generators.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         ":numpy_array",
@@ -367,7 +367,7 @@ py_library(
 py_library(
     name = "raw_ops",
     srcs = ["raw_ops.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         ":numpy_array",
@@ -380,13 +380,13 @@ py_library(
 py_library(
     name = "resource_variable_ops",
     srcs = ["resource_variable_ops.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
 )
 
 py_library(
     name = "sets_lib",
     srcs = ["sets_lib.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         # numpy dep,
@@ -396,7 +396,7 @@ py_library(
 py_library(
     name = "sparse_lib",
     srcs = ["sparse_lib.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
     ],
@@ -414,7 +414,7 @@ py_library(
     name = "tensor_shape_gen",
     testonly = 1,
     srcs = ["tensor_shape_gen.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # absl/logging dep,
         # six dep,
@@ -424,45 +424,45 @@ py_library(
 py_library(
     name = "test_lib",
     srcs = ["test_lib.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [],
 )
 
 py_library(
     name = "tf_inspect",
     srcs = ["tf_inspect.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [],
 )
 
 py_library(
     name = "tensor_spec",
     srcs = ["tensor_spec.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
 )
 
 py_library(
     name = "type_spec",
     srcs = ["type_spec.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
 )
 
 py_library(
     name = "type_spec_registry",
     srcs = ["type_spec_registry.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
 )
 
 py_library(
     name = "variable_utils",
     srcs = ["variable_utils.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
 )
 
 py_library(
     name = "variables",
     srcs = ["variables.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":ops",
     ],
@@ -471,7 +471,7 @@ py_library(
 py_library(
     name = "numpy_testlib",
     testonly = 1,
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":numpy",
         # absl/testing:parameterized dep,
@@ -549,7 +549,7 @@ test_suite(
 py_library(
     name = "v1",
     srcs = ["v1.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         ":initializers",
@@ -562,7 +562,7 @@ py_library(
 py_library(
     name = "v2",
     srcs = ["v2.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         ":nest",
@@ -574,7 +574,7 @@ py_library(
 py_library(
     name = "_utils",
     srcs = ["_utils.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":nest",
         # wrapt dep,
@@ -636,14 +636,14 @@ py_library(
     name = "generated_files",
     testonly = 1,
     srcs = ["gen_new/{}.py".format(filename) for filename in LINOP_FILES],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
 )
 
 py_library(
     name = "linear_operator_gen",
     testonly = 1,
     srcs = [":{}_gen.py".format(filename) for filename in LINOP_FILES],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         # numpy dep,
@@ -675,7 +675,7 @@ py_test(
 py_library(
     name = "static_rewrites",
     srcs = glob(["gen/*.py"]),
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":_utils",
         # numpy dep,

@@ -29,7 +29,7 @@ licenses(["notice"])
 py_library(
     name = "models",
     srcs = ["__init__.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":bayesian_resnet",
         ":bayesian_vgg",
@@ -39,7 +39,7 @@ py_library(
 py_library(
     name = "bayesian_resnet",
     srcs = ["bayesian_resnet.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
@@ -49,7 +49,7 @@ py_library(
 py_library(
     name = "bayesian_vgg",
     srcs = ["bayesian_vgg.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",

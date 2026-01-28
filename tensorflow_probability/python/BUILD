@@ -31,7 +31,7 @@ package(
 py_library(
     name = "python",
     srcs = ["__init__.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     visibility = ["//tensorflow_probability:__pkg__"],
     deps = [
         ":version",
@@ -61,5 +61,5 @@ py_library(
 py_library(
     name = "version",
     srcs = ["version.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
 )

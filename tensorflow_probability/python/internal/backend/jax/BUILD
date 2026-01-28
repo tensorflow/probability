@@ -127,7 +127,7 @@ GEN_FILENAMES = [
 py_library(
     name = "jax",
     srcs = [":{}.py".format(f) for f in FILENAMES + GEN_FILENAMES if "_test" not in f],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [],  # The JAX dependency is a weak dependency, opt-in by user.
 )
 
@@ -135,7 +135,7 @@ py_library(
     name = "jax_testlib",
     testonly = 1,
     srcs = [":{}.py".format(f) for f in FILENAMES + GEN_FILENAMES if "_test" in f],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":jax",
     ],

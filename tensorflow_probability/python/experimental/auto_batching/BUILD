@@ -30,7 +30,7 @@ licenses(["notice"])
 py_library(
     name = "auto_batching",
     srcs = ["__init__.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":allocation_strategy",
         ":dsl",
@@ -50,7 +50,7 @@ py_library(
 py_library(
     name = "instructions",
     srcs = ["instructions.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # numpy dep,
         # tensorflow dep,  # For pywrap_tensorflow.IsNamedtuple
@@ -62,7 +62,7 @@ py_library(
     srcs = [
         "numpy_backend.py",
     ],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":instructions",
         # numpy dep,
@@ -74,7 +74,7 @@ py_library(
     srcs = [
         "tf_backend.py",
     ],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":instructions",
         ":xla",
@@ -87,7 +87,7 @@ py_library(
     srcs = [
         "type_inference.py",
     ],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":instructions",
         # absl/logging dep,
@@ -99,7 +99,7 @@ py_library(
     srcs = [
         "virtual_machine.py",
     ],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":instructions",
     ],
@@ -110,7 +110,7 @@ py_library(
     srcs = [
         "liveness.py",
     ],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":instructions",
     ],
@@ -121,7 +121,7 @@ py_library(
     srcs = [
         "lowering.py",
     ],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":instructions",
         ":liveness",
@@ -133,7 +133,7 @@ py_library(
     srcs = [
         "stack_optimization.py",
     ],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":instructions",
     ],
@@ -144,7 +144,7 @@ py_library(
     srcs = [
         "allocation_strategy.py",
     ],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":instructions",
         ":liveness",
@@ -156,7 +156,7 @@ py_library(
     srcs = [
         "stackless.py",
     ],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":instructions",
     ],
@@ -167,7 +167,7 @@ py_library(
     srcs = [
         "dsl.py",
     ],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":instructions",
     ],
@@ -179,7 +179,7 @@ py_library(
         "frontend.py",
         "gast_util.py",
     ],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":allocation_strategy",
         ":dsl",
@@ -200,7 +200,7 @@ py_library(
     srcs = [
         "backend_test_lib.py",
     ],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # tensorflow dep,
     ],
@@ -209,7 +209,7 @@ py_library(
 py_library(
     name = "test_programs",
     srcs = ["test_programs.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":instructions",
         # numpy dep,
@@ -219,7 +219,7 @@ py_library(
 py_library(
     name = "xla",
     srcs = ["xla.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # tensorflow dep,
     ],

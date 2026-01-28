@@ -61,7 +61,7 @@ py_test(
 py_library(
     name = "data",
     srcs = ["data.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # numpy dep,
         "//inference_gym/internal/datasets",

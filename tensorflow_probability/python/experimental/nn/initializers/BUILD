@@ -26,7 +26,7 @@ package(
 py_library(
     name = "initializers",
     srcs = ["__init__.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":initializers_lib",
         "//tensorflow_probability/python/internal:all_util",
@@ -36,7 +36,7 @@ py_library(
 py_library(
     name = "initializers_lib",
     srcs = ["initializers.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",

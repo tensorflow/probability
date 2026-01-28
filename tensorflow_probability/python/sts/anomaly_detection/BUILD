@@ -30,7 +30,7 @@ package(
 py_library(
     name = "anomaly_detection",
     srcs = ["__init__.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":anomaly_detection_lib",
     ],
@@ -39,7 +39,7 @@ py_library(
 py_library(
     name = "anomaly_detection_lib",
     srcs = ["anomaly_detection_lib.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # numpy dep,
         # tensorflow dep,

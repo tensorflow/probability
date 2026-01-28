@@ -464,7 +464,7 @@ multi_substrate_py_library(
 py_library(
     name = "glow",
     srcs = ["glow.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":bijector",
         ":blockwise",

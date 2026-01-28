@@ -86,7 +86,7 @@ py_library(
     srcs = [
         "correlation_matrix_volumes_lib.py",
     ],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":init",
         # numpy dep,

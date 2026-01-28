@@ -30,7 +30,7 @@ package(
 py_library(
     name = "internal",
     srcs = ["__init__.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":distribution_tensor_coercible",
         ":tensor_tuple",
@@ -40,7 +40,7 @@ py_library(
 py_library(
     name = "distribution_tensor_coercible",
     srcs = ["distribution_tensor_coercible.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:distribution",
@@ -73,7 +73,7 @@ py_test(
 py_library(
     name = "tensor_tuple",
     srcs = ["tensor_tuple.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # tensorflow dep,
     ],

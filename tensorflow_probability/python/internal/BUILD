@@ -46,7 +46,7 @@ multi_substrate_py_library(
 py_library(
     name = "all_util",
     srcs = ["all_util.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [],
 )
 
@@ -278,7 +278,7 @@ py_library(
     srcs = [
         "docstring_util.py",
     ],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
     ],
 )
@@ -409,7 +409,7 @@ multi_substrate_py_test(
 py_library(
     name = "lazy_loader",
     srcs = ["lazy_loader.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
 )
 
 multi_substrate_py_library(
@@ -530,7 +530,7 @@ py_test(
 py_library(
     name = "reparameterization",
     srcs = ["reparameterization.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
 )
 
 multi_substrate_py_library(
@@ -933,7 +933,7 @@ exports_files(
 py_library(
     name = "tf_keras",
     srcs = ["tf_keras.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # tensorflow dep,
     ],

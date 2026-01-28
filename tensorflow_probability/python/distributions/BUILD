@@ -4871,7 +4871,7 @@ py_test(
 py_library(
     name = "jax_transformation_testlib",
     testonly = 1,
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":hypothesis_testlib.jax",
         # absl/testing:parameterized dep,

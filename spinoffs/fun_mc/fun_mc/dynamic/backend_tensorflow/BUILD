@@ -26,7 +26,7 @@ package(
 py_library(
     name = "util",
     srcs = ["util.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # numpy dep,
     ],
@@ -35,7 +35,7 @@ py_library(
 py_library(
     name = "backend",
     srcs = ["backend.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":util",
     ],

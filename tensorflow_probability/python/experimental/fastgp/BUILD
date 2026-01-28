@@ -30,7 +30,7 @@ package(
 py_library(
     name = "fastgp.jax",
     srcs = ["__init__.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":fast_gp",
         ":fast_gprm",
@@ -50,20 +50,20 @@ py_library(
 # tfp/python/experimental:experimental.
 py_library(
     name = "fastgp",
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [],
 )
 
 py_library(
     name = "fastgp.numpy",
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [],
 )
 
 py_library(
     name = "mbcg",
     srcs = ["mbcg.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
     ],
 )
@@ -83,7 +83,7 @@ py_test(
 py_library(
     name = "fast_gp",
     srcs = ["fast_gp.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":fast_log_det",
         ":mbcg",
@@ -118,7 +118,7 @@ py_test(
 py_library(
     name = "fast_mtgp",
     srcs = ["fast_mtgp.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":fast_gp",
         ":fast_log_det",
@@ -152,7 +152,7 @@ py_test(
 py_library(
     name = "fast_gprm",
     srcs = ["fast_gprm.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":fast_gp",
         ":preconditioners",
@@ -181,7 +181,7 @@ py_test(
 py_library(
     name = "linalg",
     srcs = ["linalg.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":partial_lanczos",
         # jax/experimental:sparse dep,
@@ -205,7 +205,7 @@ py_test(
 py_library(
     name = "partial_lanczos",
     srcs = ["partial_lanczos.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":mbcg",
         # scipy dep,
@@ -229,7 +229,7 @@ py_test(
 py_library(
     name = "fast_log_det",
     srcs = ["fast_log_det.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":mbcg",
         ":partial_lanczos",
@@ -258,7 +258,7 @@ py_test(
 py_library(
     name = "linear_operator_sum",
     srcs = ["linear_operator_sum.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
     ],
 )
@@ -266,7 +266,7 @@ py_library(
 py_library(
     name = "preconditioners",
     srcs = ["preconditioners.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":linalg",
         ":linear_operator_sum",
@@ -291,7 +291,7 @@ py_test(
 py_library(
     name = "schur_complement",
     srcs = ["schur_complement.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":preconditioners",
         "//tensorflow_probability/python/bijectors:softplus.jax",
