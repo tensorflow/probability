@@ -75,6 +75,7 @@ VMAP_LOGPROB_BLOCKLIST = (
 PMAP_SAMPLE_BLOCKLIST = (
     'Bates',
     'BatchReshape',  # http://b/163171224
+    'IncrementLogProb',  # pmap_shmap_merge sharding conflict
     'MixtureSameFamily',  # Too slow: http://b/170871051
     'NegativeBinomial',  # Too slow: http://b/170871051
     'ZeroInflatedNegativeBinomial',  # Too slow: http://b/170871051
