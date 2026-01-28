@@ -25,6 +25,7 @@ package(default_applicable_licenses = ["//tensorflow_probability:license"])
 py_library(
     name = "neutra",
     srcs = ["__init__.py"],
+    strict_deps = False,
     deps = [
         ":neutra_kernel",
     ],
@@ -33,6 +34,7 @@ py_library(
 py_library(
     name = "neutra_kernel",
     srcs = ["neutra_kernel.py"],
+    strict_deps = False,
     deps = [
         # numpy dep,
         # tensorflow dep,

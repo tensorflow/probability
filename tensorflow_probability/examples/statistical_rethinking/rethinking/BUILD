@@ -30,12 +30,14 @@ licenses(["notice"])
 py_library(
     name = "rethinking",
     srcs = ["__init__.py"],
+    strict_deps = False,
     deps = [":quap"],
 )
 
 py_library(
     name = "quap",
     srcs = ["quap.py"],
+    strict_deps = False,
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",

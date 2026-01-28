@@ -39,6 +39,7 @@ py_binary(
 py_library(
     name = "bayesian_neural_network_lib",
     srcs = ["bayesian_neural_network.py"],
+    strict_deps = False,
     deps = [
         # absl/flags dep,
         # matplotlib dep,
@@ -77,6 +78,7 @@ py_binary(
 py_library(
     name = "disentangled_vae_lib",
     srcs = ["disentangled_vae.py"],
+    strict_deps = False,
     deps = [
         ":sprites_dataset",
         # absl:app dep,
@@ -139,6 +141,7 @@ py_binary(
 py_library(
     name = "logistic_regression_lib",
     srcs = ["logistic_regression.py"],
+    strict_deps = False,
     deps = [
         # absl/flags dep,
         # matplotlib dep,
@@ -168,6 +171,7 @@ py_test(
 py_library(
     name = "sprites_dataset",
     srcs = ["sprites_dataset.py"],
+    strict_deps = False,
     deps = [
         # absl/flags dep,
         # six dep,
@@ -186,6 +190,7 @@ py_binary(
 py_library(
     name = "vq_vae_lib",
     srcs = ["vq_vae.py"],
+    strict_deps = False,
     deps = [
         # absl/flags dep,
         # matplotlib dep,
@@ -227,6 +232,7 @@ py_binary(
 py_library(
     name = "cifar10_bnn_lib",
     srcs = ["cifar10_bnn.py"],
+    strict_deps = False,
     deps = [
         # absl/flags dep,
         # matplotlib dep,
