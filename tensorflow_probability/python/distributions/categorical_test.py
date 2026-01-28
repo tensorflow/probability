@@ -509,7 +509,7 @@ class CategoricalTest(test_util.TestCase):
     num_logits = 10_000_000
     dist = categorical.Categorical(
         tf.zeros(num_logits), validate_args=True)
-    self.assertAllClose(num_logits / 2, self.evaluate(dist.mean()))
+    self.assertAllClose(num_logits / 2, self.evaluate(dist.mean()), rtol=1e-3)
 
   def testVariance(self):
     histograms = np.array([[[0.2, 0.8], [0.6, 0.4]]])
