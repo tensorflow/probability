@@ -27,6 +27,7 @@ licenses(["notice"])
 py_binary(
     name = "get_ground_truth",
     srcs = ["get_ground_truth.py"],
+    strict_deps = False,
     deps = [
         # tensorflow_probability dep,
         "//inference_gym/internal:ground_truth_encoding",

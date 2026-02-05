@@ -102,6 +102,7 @@ py_binary(
     name = "correlation_matrix_volumes",
 #     testonly = 1,  # DisableOnExport
     srcs = ["correlation_matrix_volumes.py"],
+    strict_deps = False,
     deps = [
         ":correlation_matrix_volumes_lib",
         ":init",

@@ -31,6 +31,7 @@ licenses(["notice"])
 py_binary(
     name = "bayesian_neural_network",
     srcs = ["bayesian_neural_network.py"],
+    strict_deps = False,
     deps = [
         ":bayesian_neural_network_lib",
     ],
@@ -70,6 +71,7 @@ py_test(
 py_binary(
     name = "disentangled_vae",
     srcs = ["disentangled_vae.py"],
+    strict_deps = False,
     deps = [
         ":disentangled_vae_lib",
     ],
@@ -133,6 +135,7 @@ py_test(
 py_binary(
     name = "logistic_regression",
     srcs = ["logistic_regression.py"],
+    strict_deps = False,
     deps = [
         ":logistic_regression_lib",
     ],
@@ -182,6 +185,7 @@ py_library(
 py_binary(
     name = "vq_vae",
     srcs = ["vq_vae.py"],
+    strict_deps = False,
     deps = [
         ":vq_vae_lib",
     ],
@@ -224,6 +228,7 @@ py_test(
 py_binary(
     name = "cifar10_bnn",
     srcs = ["cifar10_bnn.py"],
+    strict_deps = False,
     deps = [
         ":cifar10_bnn_lib",
     ],

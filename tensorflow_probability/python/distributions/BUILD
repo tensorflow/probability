@@ -4969,6 +4969,7 @@ py_binary(
     name = "untestable_distributions",
     testonly = 1,
     srcs = ["untestable_distributions.py"],
+    strict_deps = False,
     deps = [
         # absl:app dep,
         # absl/logging dep,

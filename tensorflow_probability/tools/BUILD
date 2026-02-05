@@ -21,6 +21,7 @@ licenses(["notice"])
 py_binary(
     name = "build_docs",
     srcs = ["build_docs.py"],
+    strict_deps = False,
     deps = [
         # jax dep,
         # tensorflow_docs/api_generator:generate_lib dep,

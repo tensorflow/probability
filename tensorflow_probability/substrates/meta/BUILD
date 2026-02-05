@@ -51,6 +51,7 @@ py_test(
 py_binary(
     name = "rewrite",
     srcs = ["rewrite.py"],
+    strict_deps = False,
     deps = [
         # absl:app dep,
     ],
