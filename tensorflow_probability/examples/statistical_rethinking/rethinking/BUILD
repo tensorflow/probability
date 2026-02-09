@@ -48,6 +48,7 @@ py_test(
     name = "quap_test",
     size = "large",
     srcs = ["quap_test.py"],
+    strict_deps = False,
     deps = [
         ":rethinking",
         # tensorflow dep,

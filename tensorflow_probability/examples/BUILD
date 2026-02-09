@@ -62,6 +62,7 @@ py_test(
         "--num_monte_carlo=4",
     ],
     main = "bayesian_neural_network.py",
+    strict_deps = False,
     tags = ["not_run:arm"],
     deps = [
         ":bayesian_neural_network_lib",
@@ -108,6 +109,7 @@ py_test(
         "--enable_debug_logging",
     ],
     main = "disentangled_vae.py",
+    strict_deps = False,
     deps = [
         ":disentangled_vae_lib",
     ],
@@ -119,6 +121,7 @@ py_test(
     srcs = ["disentangled_vae_test.py"],
     main = "disentangled_vae_test.py",
     shard_count = 2,
+    strict_deps = False,
     tags = [
         "no-oss-ci",
         "tf2-broken",
@@ -165,6 +168,7 @@ py_test(
         "--batch_size=8",
     ],
     main = "logistic_regression.py",
+    strict_deps = False,
     tags = ["tf2-kokoro-broken"],
     deps = [
         ":logistic_regression_lib",
@@ -214,6 +218,7 @@ py_test(
         "--base_depth=2",
     ],
     main = "vq_vae.py",
+    strict_deps = False,
     tags = [
         "tf2-kokoro-broken",
         # TODO(b/147689726) Re-enable this test after contrib references are
@@ -258,6 +263,7 @@ py_test(
         "--batch_size=5",
     ],
     main = "cifar10_bnn.py",
+    strict_deps = False,
     tags = [
         "tf2-broken",
         "tf2-kokoro-broken",

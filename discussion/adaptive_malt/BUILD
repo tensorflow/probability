@@ -45,6 +45,7 @@ py_library(
 py_test(
     name = "adaptive_malt_test",
     srcs = ["adaptive_malt_test.py"],
+    strict_deps = False,
     deps = [
         ":adaptive_malt",
         # absl/testing:absltest dep,
