@@ -112,6 +112,7 @@ py_test(
     size = "large",
     srcs = ["fun_mc_test.py"],
     shard_count = 8,
+    strict_deps = False,
     deps = [
         ":fun_mc",
         ":prefab",
@@ -139,6 +140,7 @@ py_test(
     name = "malt_test",
     srcs = ["malt_test.py"],
     shard_count = 2,
+    strict_deps = False,
     deps = [
         ":fun_mc",
         ":malt",
@@ -166,6 +168,7 @@ py_test(
     name = "prefab_test",
     srcs = ["prefab_test.py"],
     shard_count = 2,
+    strict_deps = False,
     deps = [
         ":fun_mc",
         ":prefab",
@@ -192,6 +195,7 @@ py_test(
     name = "sga_hmc_test",
     srcs = ["sga_hmc_test.py"],
     shard_count = 2,
+    strict_deps = False,
     deps = [
         ":fun_mc",
         ":sga_hmc",
@@ -258,6 +262,7 @@ py_test(
     name = "util_tfp_test",
     srcs = ["util_tfp_test.py"],
     shard_count = 2,
+    strict_deps = False,
     deps = [
         ":fun_mc",
         ":test_util",

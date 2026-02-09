@@ -58,6 +58,7 @@ py_library(
 py_test(
     name = "bnn_test",
     srcs = ["bnn_test.py"],
+    strict_deps = False,
     deps = [
         ":bnn",
         # absl/testing:absltest dep,
@@ -88,6 +89,7 @@ py_test(
     timeout = "long",
     srcs = ["bnn_tree_test.py"],
     shard_count = 3,
+    strict_deps = False,
     deps = [
         ":bnn_tree",
         ":kernels",
@@ -117,6 +119,7 @@ py_test(
     name = "estimators_test",
     timeout = "long",
     srcs = ["estimators_test.py"],
+    strict_deps = False,
     # TODO(b/322864412): enable this test in OSS.
     tags = ["no-oss-ci"],
     deps = [
@@ -146,6 +149,7 @@ py_library(
 py_test(
     name = "kernels_test",
     srcs = ["kernels_test.py"],
+    strict_deps = False,
     deps = [
         ":kernels",
         ":util",
@@ -179,6 +183,7 @@ py_library(
 py_test(
     name = "likelihoods_test",
     srcs = ["likelihoods_test.py"],
+    strict_deps = False,
     deps = [
         ":likelihoods",
         # absl/testing:absltest dep,
@@ -206,6 +211,7 @@ py_test(
     timeout = "long",
     srcs = ["models_test.py"],
     shard_count = 3,
+    strict_deps = False,
     deps = [
         ":likelihoods",
         ":models",
@@ -239,6 +245,7 @@ py_library(
 py_test(
     name = "operators_test",
     srcs = ["operators_test.py"],
+    strict_deps = False,
     # TODO(b/322864412): enable this test in OSS.
     tags = ["no-oss-ci"],
     deps = [
@@ -274,6 +281,7 @@ py_library(
 py_test(
     name = "training_util_test",
     srcs = ["training_util_test.py"],
+    strict_deps = False,
     # TODO(b/322864412): enable this test in OSS.
     tags = ["no-oss-ci"],
     deps = [
@@ -305,6 +313,7 @@ py_library(
 py_test(
     name = "util_test",
     srcs = ["util_test.py"],
+    strict_deps = False,
     deps = [
         ":kernels",
         ":util",

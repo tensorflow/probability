@@ -335,6 +335,7 @@ py_library(
 py_test(
     name = "model_test",
     srcs = ["model_test.py"],
+    strict_deps = False,
     deps = [
         ":targets",
         # numpy dep,
@@ -578,6 +579,7 @@ py_test(
     size = "large",
     srcs = ["vectorized_stochastic_volatility_test.py"],
     shard_count = 3,
+    strict_deps = False,
     deps = [
         ":stochastic_volatility",
         ":vectorized_stochastic_volatility",

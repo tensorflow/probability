@@ -103,6 +103,7 @@ py_test(
     size = "small",
     srcs = ["mutual_information_test.py"],
     shard_count = 5,
+    strict_deps = False,
     deps = [
         ":mutual_information",
         # numpy dep,
