@@ -116,6 +116,7 @@ py_test(
     size = "small",
     srcs = ["correlation_matrix_volumes_test.py"],
     shard_count = 4,
+    strict_deps = False,
     tags = [
         "no_pip",
         "optonly",

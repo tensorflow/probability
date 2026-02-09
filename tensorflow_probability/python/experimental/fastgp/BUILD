@@ -72,6 +72,7 @@ py_library(
 py_test(
     name = "mbcg_test",
     srcs = ["mbcg_test.py"],
+    strict_deps = False,
     deps = [
         ":mbcg",
         # absl/testing:absltest dep,
@@ -106,6 +107,7 @@ py_test(
     name = "fast_gp_test",
     srcs = ["fast_gp_test.py"],
     shard_count = 3,
+    strict_deps = False,
     deps = [
         ":fast_gp",
         # absl/testing:absltest dep,
@@ -141,6 +143,7 @@ py_test(
     name = "fast_mtgp_test",
     srcs = ["fast_mtgp_test.py"],
     shard_count = 3,
+    strict_deps = False,
     deps = [
         ":fast_mtgp",
         # absl/testing:absltest dep,
@@ -169,6 +172,7 @@ py_library(
 py_test(
     name = "fast_gprm_test",
     srcs = ["fast_gprm_test.py"],
+    strict_deps = False,
     deps = [
         ":fast_gprm",
         # absl/testing:absltest dep,
@@ -194,6 +198,7 @@ py_test(
     name = "linalg_test",
     srcs = ["linalg_test.py"],
     shard_count = 3,
+    strict_deps = False,
     deps = [
         ":linalg",
         # absl/testing:absltest dep,
@@ -217,6 +222,7 @@ py_library(
 py_test(
     name = "partial_lanczos_test",
     srcs = ["partial_lanczos_test.py"],
+    strict_deps = False,
     deps = [
         ":mbcg",
         ":partial_lanczos",
@@ -244,6 +250,7 @@ py_test(
     name = "fast_log_det_test",
     srcs = ["fast_log_det_test.py"],
     shard_count = 3,
+    strict_deps = False,
     deps = [
         ":fast_log_det",
         ":preconditioners",
@@ -280,6 +287,7 @@ py_test(
     name = "preconditioners_test",
     srcs = ["preconditioners_test.py"],
     shard_count = 3,
+    strict_deps = False,
     deps = [
         ":preconditioners",
         # absl/testing:absltest dep,
@@ -305,6 +313,7 @@ py_library(
 py_test(
     name = "schur_complement_test",
     srcs = ["schur_complement_test.py"],
+    strict_deps = False,
     deps = [
         ":schur_complement",
         # absl/testing:absltest dep,

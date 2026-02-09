@@ -58,6 +58,7 @@ py_test(
     name = "trainable_linear_operators_test",
     size = "small",
     srcs = ["trainable_linear_operators_test.py"],
+    strict_deps = False,
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

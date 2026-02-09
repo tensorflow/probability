@@ -458,6 +458,7 @@ py_test(
     name = "sparse_test",
     size = "small",
     srcs = ["sparse_test.py"],
+    strict_deps = False,
     deps = [
         ":sparse",
         # numpy dep,

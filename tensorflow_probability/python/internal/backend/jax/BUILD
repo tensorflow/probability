@@ -145,6 +145,7 @@ py_test(
     name = "tensor_array_ops_test",
     srcs = ["tensor_array_ops_test.py"],
     main = "tensor_array_ops_test.py",
+    strict_deps = False,
     tags = ["tfp_jax"],
     deps = [
         ":jax",
@@ -161,6 +162,7 @@ py_test(
     srcs = ["numpy_test.py"],
     main = "numpy_test.py",
     shard_count = 8,
+    strict_deps = False,
     tags = ["tf1-broken"],  # This is broken in TF1 due to backwards incompatibilities with convolutions.
     deps = [
         ":jax",

@@ -481,6 +481,7 @@ py_test(
     size = "medium",
     srcs = ["psd_kernel_properties_test.py"],
     shard_count = 20,
+    strict_deps = False,
     tags = ["hypothesis"],
     deps = [
         # absl/logging dep,

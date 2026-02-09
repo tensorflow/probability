@@ -55,6 +55,7 @@ py_test(
     name = "distribution_tensor_coercible_test",
     size = "small",
     srcs = ["distribution_tensor_coercible_test.py"],
+    strict_deps = False,
     deps = [
         ":distribution_tensor_coercible",
         # absl/testing:parameterized dep,
@@ -83,6 +84,7 @@ py_test(
     name = "tensor_tuple_test",
     size = "small",
     srcs = ["tensor_tuple_test.py"],
+    strict_deps = False,
     deps = [
         ":tensor_tuple",
         # tensorflow dep,

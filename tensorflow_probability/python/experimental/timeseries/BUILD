@@ -46,6 +46,7 @@ py_library(
 py_test(
     name = "metrics_test",
     srcs = ["metrics_test.py"],
+    strict_deps = False,
     deps = [
         ":metrics",
         # absl/testing:absltest dep,

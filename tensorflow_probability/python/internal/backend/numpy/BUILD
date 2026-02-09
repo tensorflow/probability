@@ -344,6 +344,7 @@ py_test(
     name = "tensor_array_ops_test",
     size = "small",
     srcs = ["tensor_array_ops_test.py"],
+    strict_deps = False,
     tags = ["tfp_numpy"],
     deps = [
         ":tensor_array_ops",
@@ -488,6 +489,7 @@ py_test(
     size = "small",
     srcs = ["numpy_test.py"],
     shard_count = 15,
+    strict_deps = False,
     tags = ["tf1-broken"],
     deps = [
         ":numpy_testlib",
@@ -502,6 +504,7 @@ py_test(
     args = ["--test_mode=xla"],
     main = "numpy_test.py",
     shard_count = 15,
+    strict_deps = False,
     tags = [
         "hypothesis",
         "no-oss-ci",
@@ -527,6 +530,7 @@ py_test(
     ],
     main = "numpy_test.py",
     shard_count = 11,
+    strict_deps = False,
     tags = [
         "no-oss-ci",
         "requires-gpu-nvidia",
@@ -658,6 +662,7 @@ py_test(
         "--modules_to_check",
         ",".join(LINOP_FILES + ["tensor_shape"]),
     ],
+    strict_deps = False,
     tags = [
         "no-oss-ci",
         "notap",

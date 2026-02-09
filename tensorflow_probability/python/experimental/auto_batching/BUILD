@@ -232,6 +232,7 @@ py_test(
     args = ["--test_device=cpu"],
     main = "virtual_machine_test.py",
     shard_count = 10,
+    strict_deps = False,
     tags = [
         "nozapfhahn",
     ],
@@ -252,6 +253,7 @@ py_test(
     args = ["--test_device=gpu"],
     main = "virtual_machine_test.py",
     shard_count = 10,
+    strict_deps = False,
     tags = [
         "nozapfhahn",
         "requires-gpu-nvidia",
@@ -270,6 +272,7 @@ py_test(
     name = "instructions_test",
     size = "small",
     srcs = ["instructions_test.py"],
+    strict_deps = False,
     deps = [
         ":instructions",
         ":test_programs",
@@ -282,6 +285,7 @@ py_test(
     name = "numpy_backend_test",
     size = "small",
     srcs = ["numpy_backend_test.py"],
+    strict_deps = False,
     deps = [
         ":backend_test_lib",
         ":instructions",
@@ -297,6 +301,7 @@ py_test(
     name = "tf_backend_test",
     size = "large",
     srcs = ["tf_backend_test.py"],
+    strict_deps = False,
     deps = [
         ":backend_test_lib",
         ":instructions",
@@ -313,6 +318,7 @@ py_test(
     name = "lowering_test",
     size = "small",
     srcs = ["lowering_test.py"],
+    strict_deps = False,
     deps = [
         ":allocation_strategy",
         ":lowering",
@@ -328,6 +334,7 @@ py_test(
     name = "allocation_strategy_test",
     size = "small",
     srcs = ["allocation_strategy_test.py"],
+    strict_deps = False,
     deps = [
         ":allocation_strategy",
         ":instructions",
@@ -341,6 +348,7 @@ py_test(
     name = "stackless_test",
     size = "small",
     srcs = ["stackless_test.py"],
+    strict_deps = False,
     deps = [
         ":allocation_strategy",
         ":numpy_backend",
@@ -355,6 +363,7 @@ py_test(
     name = "stack_optimization_test",
     size = "small",
     srcs = ["stack_optimization_test.py"],
+    strict_deps = False,
     deps = [
         ":stack_optimization",
         ":test_programs",
@@ -367,6 +376,7 @@ py_test(
     size = "small",
     srcs = ["type_inference_test.py"],
     shard_count = 4,
+    strict_deps = False,
     deps = [
         ":allocation_strategy",
         ":lowering",
@@ -386,6 +396,7 @@ py_test(
     name = "dsl_test",
     size = "small",
     srcs = ["dsl_test.py"],
+    strict_deps = False,
     deps = [
         ":allocation_strategy",
         ":dsl",
@@ -405,6 +416,7 @@ py_test(
     size = "small",
     srcs = ["frontend_test.py"],
     shard_count = 4,
+    strict_deps = False,
     deps = [
         ":frontend",
         ":instructions",

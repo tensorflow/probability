@@ -51,6 +51,7 @@ py_test(
     size = "enormous",
     srcs = ["window_tune_nuts_sampling_test.py"],
     shard_count = 1,
+    strict_deps = False,
     tags = [
         "nozapfhahn",
     ],
@@ -70,6 +71,7 @@ py_test(
     srcs = ["window_tune_nuts_sampling_test.py"],
     main = "window_tune_nuts_sampling_test.py",
     shard_count = 1,
+    strict_deps = False,
     tags = [
         "notap",
         "nozapfhahn",

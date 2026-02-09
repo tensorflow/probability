@@ -92,6 +92,7 @@ py_test(
     size = "medium",
     srcs = ["proximal_hessian_test.py"],
     shard_count = 4,
+    strict_deps = False,
     deps = [
         ":family",
         ":proximal_hessian",

@@ -43,6 +43,7 @@ py_test(
     size = "medium",
     srcs = ["convolution_util_test.py"],
     shard_count = 4,
+    strict_deps = False,
     deps = [
         ":convolution_util",
         # absl/testing:parameterized dep,
@@ -80,6 +81,7 @@ py_test(
     size = "small",
     srcs = ["kernel_bias_test.py"],
     shard_count = 4,
+    strict_deps = False,
     deps = [
         ":kernel_bias",
         # tensorflow dep,
@@ -116,6 +118,7 @@ py_test(
     name = "random_variable_test",
     size = "medium",
     srcs = ["random_variable_test.py"],
+    strict_deps = False,
     deps = [
         ":random_variable",
         # tensorflow dep,

@@ -153,6 +153,7 @@ py_test(
     args = ["--test_device=cpu"],
     main = "xla_test.py",
     shard_count = 1,
+    strict_deps = False,
     tags = [
         "nozapfhahn",
     ],
@@ -172,6 +173,7 @@ py_test(
     args = ["--test_device=gpu"],
     main = "xla_test.py",
     shard_count = 1,
+    strict_deps = False,
     tags = [
         "nozapfhahn",
         "requires-gpu-nvidia",

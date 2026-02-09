@@ -157,6 +157,7 @@ py_test(
     name = "kernel_builder_test",
     size = "small",
     srcs = ["kernel_builder_test.py"],
+    strict_deps = False,
     deps = [
         ":kernel_builder",
         ":sample_discarding_kernel",
@@ -186,6 +187,7 @@ py_test(
     name = "kernel_outputs_test",
     size = "small",
     srcs = ["kernel_outputs_test.py"],
+    strict_deps = False,
     deps = [
         ":kernel_builder",
         # tensorflow dep,
@@ -388,6 +390,7 @@ py_test(
     name = "progress_bar_reducer_test",
     size = "small",
     srcs = ["progress_bar_reducer_test.py"],
+    strict_deps = False,
     deps = [
         ":progress_bar_reducer",
         ":sample_fold",
@@ -473,6 +476,7 @@ py_test(
     size = "medium",
     srcs = ["nuts_autobatching_test.py"],
     shard_count = 7,
+    strict_deps = False,
     tags = ["nozapfhahn"],
     deps = [
         ":nuts_autobatching_testlib",
@@ -485,6 +489,7 @@ py_test(
     srcs = ["nuts_autobatching_test.py"],
     main = "nuts_autobatching_test.py",
     shard_count = 7,
+    strict_deps = False,
     tags = [
         "notap",
         "nozapfhahn",
@@ -503,6 +508,7 @@ py_test(
     args = ["--test_device=cpu"],
     main = "nuts_autobatching_xla_test.py",
     shard_count = 1,
+    strict_deps = False,
     tags = [
         "nozapfhahn",
     ],
@@ -526,6 +532,7 @@ py_test(
     args = ["--test_device=gpu"],
     main = "nuts_autobatching_xla_test.py",
     shard_count = 1,
+    strict_deps = False,
     tags = [
         "nozapfhahn",
         "requires-gpu-nvidia",
@@ -608,6 +615,7 @@ py_test(
     name = "particle_filter_augmentation_test",
     size = "medium",
     srcs = ["particle_filter_augmentation_test.py"],
+    strict_deps = False,
     deps = [
         ":particle_filter",
         ":particle_filter_augmentation",
