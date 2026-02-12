@@ -31,7 +31,7 @@ licenses(["notice"])
 py_binary(
     name = "bayesian_neural_network",
     srcs = ["bayesian_neural_network.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":bayesian_neural_network_lib",
     ],
@@ -62,7 +62,7 @@ py_test(
         "--num_monte_carlo=4",
     ],
     main = "bayesian_neural_network.py",
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     tags = ["not_run:arm"],
     deps = [
         ":bayesian_neural_network_lib",
@@ -72,7 +72,7 @@ py_test(
 py_binary(
     name = "disentangled_vae",
     srcs = ["disentangled_vae.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":disentangled_vae_lib",
     ],
@@ -109,7 +109,7 @@ py_test(
         "--enable_debug_logging",
     ],
     main = "disentangled_vae.py",
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":disentangled_vae_lib",
     ],
@@ -121,7 +121,7 @@ py_test(
     srcs = ["disentangled_vae_test.py"],
     main = "disentangled_vae_test.py",
     shard_count = 2,
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     tags = [
         "no-oss-ci",
         "tf2-broken",
@@ -138,7 +138,7 @@ py_test(
 py_binary(
     name = "logistic_regression",
     srcs = ["logistic_regression.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":logistic_regression_lib",
     ],
@@ -168,7 +168,7 @@ py_test(
         "--batch_size=8",
     ],
     main = "logistic_regression.py",
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     tags = ["tf2-kokoro-broken"],
     deps = [
         ":logistic_regression_lib",
@@ -189,7 +189,7 @@ py_library(
 py_binary(
     name = "vq_vae",
     srcs = ["vq_vae.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":vq_vae_lib",
     ],
@@ -218,7 +218,7 @@ py_test(
         "--base_depth=2",
     ],
     main = "vq_vae.py",
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     tags = [
         "tf2-kokoro-broken",
         # TODO(b/147689726) Re-enable this test after contrib references are
@@ -233,7 +233,7 @@ py_test(
 py_binary(
     name = "cifar10_bnn",
     srcs = ["cifar10_bnn.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":cifar10_bnn_lib",
     ],
@@ -263,7 +263,7 @@ py_test(
         "--batch_size=5",
     ],
     main = "cifar10_bnn.py",
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     tags = [
         "tf2-broken",
         "tf2-kokoro-broken",

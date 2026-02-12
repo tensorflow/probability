@@ -144,7 +144,7 @@ py_test(
     size = "large",
     srcs = ["bijector_properties_test.py"],
     shard_count = 35,
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     tags = ["hypothesis"],
     deps = [
         ":bijectors",
@@ -1200,7 +1200,7 @@ py_test(
     name = "glow_test",
     size = "medium",
     srcs = ["glow_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":bijector",
         ":bijector_test_util",

@@ -103,7 +103,7 @@ py_test(
     size = "small",
     srcs = ["mutual_information_test.py"],
     shard_count = 5,
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":mutual_information",
         # numpy dep,

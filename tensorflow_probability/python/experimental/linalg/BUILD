@@ -101,7 +101,7 @@ py_test(
     name = "linear_operator_psd_kernel_test",
     size = "small",
     srcs = ["linear_operator_psd_kernel_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -169,7 +169,7 @@ py_library(
 py_test(
     name = "no_pivot_ldl_test",
     srcs = ["no_pivot_ldl_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # numpy dep,
         # tensorflow dep,

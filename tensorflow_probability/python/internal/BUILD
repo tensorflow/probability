@@ -265,7 +265,7 @@ py_test(
     name = "cache_util_test",
     size = "small",
     srcs = ["cache_util_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":cache_util",
         # numpy dep,
@@ -288,7 +288,7 @@ py_test(
     name = "docstring_util_test",
     size = "small",
     srcs = ["docstring_util_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":docstring_util",
         # numpy dep,
@@ -337,7 +337,7 @@ py_test(
     name = "distribution_util_test",
     size = "small",
     srcs = ["distribution_util_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":distribution_util",
         ":tensorshape_util",
@@ -376,7 +376,7 @@ py_test(
     name = "implementation_selection_test_gpu",
     srcs = ["implementation_selection_test.py"],
     main = "implementation_selection_test.py",
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     tags = ["requires-gpu-nvidia"],
     deps = [
         ":implementation_selection",
@@ -617,7 +617,7 @@ py_test(
     name = "tensor_util_test",
     size = "small",
     srcs = ["tensor_util_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":tensor_util",
         # numpy dep,
@@ -714,7 +714,7 @@ py_test(
     size = "small",
     srcs = ["hypothesis_testlib_test.py"],
     shard_count = 5,
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":hypothesis_testlib",
         # absl/testing:parameterized dep,

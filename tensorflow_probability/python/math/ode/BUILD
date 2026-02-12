@@ -153,7 +153,7 @@ py_test(
     args = ["--test_device=cpu"],
     main = "xla_test.py",
     shard_count = 1,
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     tags = [
         "nozapfhahn",
     ],
@@ -173,7 +173,7 @@ py_test(
     args = ["--test_device=gpu"],
     main = "xla_test.py",
     shard_count = 1,
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     tags = [
         "nozapfhahn",
         "requires-gpu-nvidia",

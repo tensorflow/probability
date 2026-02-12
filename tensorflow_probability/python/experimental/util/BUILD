@@ -64,7 +64,7 @@ py_test(
     name = "deferred_module_test",
     size = "small",
     srcs = ["deferred_module_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":deferred_module",
         # tensorflow:tensorflow_no_contrib dep,

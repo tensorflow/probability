@@ -58,7 +58,7 @@ py_test(
     name = "trainable_linear_operators_test",
     size = "small",
     srcs = ["trainable_linear_operators_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

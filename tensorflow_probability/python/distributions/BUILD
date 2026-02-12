@@ -2728,7 +2728,7 @@ py_test(
     srcs = ["binomial_test.py"],
     main = "binomial_test.py",
     shard_count = 3,
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     tags = ["requires-gpu-nvidia"],
     deps = [
         # numpy dep,
@@ -3105,7 +3105,7 @@ py_test(
     srcs = ["gamma_test.py"],
     main = "gamma_test.py",
     shard_count = 2,
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     tags = ["requires-gpu-nvidia"],
     deps = [
         ":gamma",
@@ -4253,7 +4253,7 @@ py_test(
     size = "medium",
     srcs = ["poisson_test.py"],
     main = "poisson_test.py",
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     tags = ["requires-gpu-nvidia"],
     deps = [
         ":poisson",
@@ -4828,7 +4828,7 @@ py_test(
     size = "large",
     srcs = ["distribution_properties_test.py"],
     shard_count = 50,
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     tags = ["hypothesis"],
     deps = [
         ":distributions",
@@ -4857,7 +4857,7 @@ py_test(
     size = "large",
     srcs = ["numerical_properties_test.py"],
     shard_count = 50,
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     tags = ["hypothesis"],
     deps = [
         ":hypothesis_testlib",
@@ -4899,7 +4899,7 @@ py_test(
     size = "large",
     srcs = ["jax_transformation_test.py"],
     shard_count = 40,
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     tags = [
         "hypothesis",
         "notap",
@@ -4916,7 +4916,7 @@ py_test(
     args = ["--execute_only"],
     main = "jax_transformation_test.py",
     shard_count = 50,
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     tags = [
         "hypothesis",
         "no-oss-ci",
@@ -4932,7 +4932,7 @@ py_test(
     size = "large",
     srcs = ["platform_compatibility_test.py"],
     shard_count = 50,
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     tags = [
         "hypothesis",
     ],
@@ -4956,7 +4956,7 @@ py_test(
     size = "large",
     srcs = ["stochastic_process_properties_test.py"],
     shard_count = 10,
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     tags = ["hypothesis"],
     deps = [
         ":gaussian_process",
@@ -4978,7 +4978,7 @@ py_binary(
     name = "untestable_distributions",
     testonly = 1,
     srcs = ["untestable_distributions.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # absl:app dep,
         # absl/logging dep,

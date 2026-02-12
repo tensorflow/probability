@@ -102,7 +102,7 @@ py_binary(
     name = "correlation_matrix_volumes",
 #     testonly = 1,  # DisableOnExport
     srcs = ["correlation_matrix_volumes.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":correlation_matrix_volumes_lib",
         ":init",
@@ -116,7 +116,7 @@ py_test(
     size = "small",
     srcs = ["correlation_matrix_volumes_test.py"],
     shard_count = 4,
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     tags = [
         "no_pip",
         "optonly",

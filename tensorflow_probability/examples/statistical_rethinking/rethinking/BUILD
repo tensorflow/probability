@@ -48,7 +48,7 @@ py_test(
     name = "quap_test",
     size = "large",
     srcs = ["quap_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":rethinking",
         # tensorflow dep,

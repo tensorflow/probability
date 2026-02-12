@@ -65,7 +65,7 @@ py_test(
     size = "large",
     srcs = ["anomaly_detection_test.py"],
     shard_count = 3,
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":anomaly_detection",
         # absl/testing:parameterized dep,

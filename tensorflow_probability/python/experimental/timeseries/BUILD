@@ -46,7 +46,7 @@ py_library(
 py_test(
     name = "metrics_test",
     srcs = ["metrics_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":metrics",
         # absl/testing:absltest dep,

@@ -67,7 +67,7 @@ py_test(
     size = "medium",
     srcs = ["conv_variational_test.py"],
     shard_count = 2,
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":conv_variational",
         ":util",
@@ -105,7 +105,7 @@ py_test(
     name = "dense_variational_test",
     size = "medium",
     srcs = ["dense_variational_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":dense_variational",
         ":util",
@@ -137,7 +137,7 @@ py_test(
     name = "dense_variational_v2_test",
     size = "small",
     srcs = ["dense_variational_v2_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":dense_variational_v2",
         ":distribution_layer",
@@ -184,7 +184,7 @@ py_test(
     size = "medium",
     srcs = ["distribution_layer_test.py"],
     shard_count = 5,
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":distribution_layer",
         ":variable_input",
@@ -230,7 +230,7 @@ py_test(
     name = "initializers_test",
     size = "small",
     srcs = ["initializers_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":initializers",
         "//tensorflow_probability/python/internal:test_util",
@@ -254,7 +254,7 @@ py_test(
     name = "masked_autoregressive_test",
     size = "small",
     srcs = ["masked_autoregressive_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":distribution_layer",
         ":masked_autoregressive",
@@ -300,7 +300,7 @@ py_test(
     name = "variable_input_test",
     size = "small",
     srcs = ["variable_input_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":distribution_layer",
         ":variable_input",
@@ -328,7 +328,7 @@ py_test(
     name = "weight_norm_test",
     size = "medium",
     srcs = ["weight_norm_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

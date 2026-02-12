@@ -458,7 +458,7 @@ py_test(
     name = "sparse_test",
     size = "small",
     srcs = ["sparse_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":sparse",
         # numpy dep,

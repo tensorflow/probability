@@ -257,7 +257,7 @@ py_test(
     srcs = ["nuts_test.py"],
     main = "nuts_test.py",
     shard_count = 7,
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     tags = [
         "notap",
         "nozapfhahn",
@@ -632,7 +632,7 @@ py_test(
     name = "eight_schools_hmc_eager_test",
     size = "medium",  # Might run > 1 minute.
     srcs = ["eight_schools_hmc_eager_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     tags = ["no-oss-ci"],
     deps = [
         ":eight_schools_hmc",
@@ -646,7 +646,7 @@ py_test(
     name = "eight_schools_hmc_graph_test",
     size = "medium",  # Might run > 1 minute.
     srcs = ["eight_schools_hmc_graph_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     tags = ["no-oss-ci"],
     deps = [
         ":eight_schools_hmc",

@@ -65,7 +65,7 @@ py_test(
     name = "affine_layers_test",
     size = "medium",
     srcs = ["affine_layers_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":nn",
         # absl/testing:parameterized dep,
@@ -102,7 +102,7 @@ py_test(
     name = "convolutional_layers_test",
     size = "medium",
     srcs = ["convolutional_layers_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":nn",
         # numpy dep,
@@ -137,7 +137,7 @@ py_test(
     size = "medium",
     srcs = ["convolutional_layers_v2_test.py"],
     shard_count = 2,
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":nn",
         # absl/testing:parameterized dep,
@@ -173,7 +173,7 @@ py_test(
     name = "convolutional_transpose_layers_test",
     size = "medium",
     srcs = ["convolutional_transpose_layers_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":nn",
         # tensorflow dep,
@@ -201,7 +201,7 @@ py_test(
     name = "layers_test",
     size = "small",
     srcs = ["layers_test.py"],
-    strict_deps = False,
+#     strict_deps = False,  # DisableOnExport
     deps = [
         ":nn",
         # tensorflow dep,
