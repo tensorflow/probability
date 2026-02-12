@@ -23,11 +23,11 @@ jobs:
         python-version: [3.12]
     steps:
       - name: Checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v6
         with:
           fetch-depth: 20
       - name: Setup Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
       - name: Lints
@@ -45,11 +45,11 @@ jobs:
       NUM_SHARDS: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v6
         with:
           fetch-depth: 1
       - name: Setup Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
       - name: Tests
@@ -57,7 +57,7 @@ jobs:
           ./testing/run_github_tests.sh
       - name: Upload test logs
         if: failure()
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v6
         with:
             name: testlogs-${{ matrix.shard }}
             path: bazel-testlogs
