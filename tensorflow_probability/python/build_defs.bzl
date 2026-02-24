@@ -207,6 +207,7 @@ def multi_substrate_py_library(
         fail("Must use PY3 for srcs_version", srcs_version)
 
     native.py_library(
+#         strict_deps = False,  # DisableOnExport
         name = name,
         srcs = srcs,
         deps = deps,
@@ -238,6 +239,7 @@ def multi_substrate_py_library(
             tools = [REWRITER_TARGET],
         )
     native.py_library(
+#         strict_deps = False,  # DisableOnExport
         name = "{}.numpy.raw".format(name),
         srcs = _substrate_srcs(srcs, "numpy"),
         deps = _substrate_deps(trimmed_deps, "numpy"),
@@ -270,6 +272,7 @@ def multi_substrate_py_library(
             tools = [REWRITER_TARGET],
         )
     native.py_library(
+#         strict_deps = False,  # DisableOnExport
         name = "{}.jax.raw".format(name),
         srcs = jax_srcs,
         deps = _substrate_deps(trimmed_deps, "jax"),
@@ -351,6 +354,7 @@ def multi_substrate_py_test(
 
     if "tf" not in disabled_substrates:
         native.py_test(
+#             strict_deps = False,  # DisableOnExport
             name = "{}.tf".format(name),
             size = size,
             srcs = srcs,
@@ -376,6 +380,7 @@ def multi_substrate_py_test(
                 tools = [REWRITER_TARGET],
             )
         native.py_test(
+#             strict_deps = False,  # DisableOnExport
             name = "{}.numpy".format(name),
             size = numpy_size or size,
             srcs = numpy_srcs,
@@ -403,6 +408,7 @@ def multi_substrate_py_test(
         jax_deps = _substrate_deps(trimmed_deps, "jax") + jax_extra_deps
         # [internal] Add JAX build dep
         native.py_test(
+#             strict_deps = False,  # DisableOnExport
             name = "{}.jax".format(name),
             size = jax_size or size,
             srcs = jax_srcs,
