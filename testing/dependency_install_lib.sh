@@ -23,7 +23,6 @@ import re
 import sys
 import json
 import argparse
-import pkg_resources
 import sysconfig
 
 
@@ -54,7 +53,12 @@ for release, release_info in package_data['releases'].items():
              for wheel_info in release_info):
     continue
   releases.append(release)
-print(sorted(releases, key=pkg_resources.parse_version)[-1])
+# setuptools no longer has pkg_resources.parse_version and the python version
+# we test on lacks packaging.version.parse, so we do it ourselves.
+def version_string_to_sortable_tuple(s):
+  maj, min, patch, tag = s.split('.')
+  return (int(maj), int(min), int(patch), tag)
+print(sorted(releases, key=version_string_to_sortable_tuple)[-1])
 "
 
 find_good_tf_nightly_version_str() {
