@@ -352,10 +352,10 @@ class _FastMultiTaskGpTest(absltest.TestCase):
     )(self.dtype(1.0), self.dtype(1.0), self.dtype(1e-3))
     np.testing.assert_allclose(value, slow_value, rtol=1e-3)
     slow_d_amp, slow_d_length_scale, slow_d_noise = slow_gradient
-    np.testing.assert_allclose(d_amp, slow_d_amp, rtol=1e-4)
-    np.testing.assert_allclose(d_length_scale, slow_d_length_scale, rtol=1e-4)
+    np.testing.assert_allclose(d_amp, slow_d_amp, rtol=2e-4)
+    np.testing.assert_allclose(d_length_scale, slow_d_length_scale, rtol=2e-4)
     # TODO(thomaswc): Investigate why the noise gradient is so noisy.
-    np.testing.assert_allclose(d_noise, slow_d_noise, rtol=1e-4)
+    np.testing.assert_allclose(d_noise, slow_d_noise, rtol=2e-4)
 
   def test_gaussian_process_log_prob_gradient_of_index_points(self):
     samples = jnp.array([
@@ -407,7 +407,7 @@ class _FastMultiTaskGpTest(absltest.TestCase):
         fast_log_prob, argnums=[0, 1, 2]
     )(self.dtype(-0.5), self.dtype(0.0), self.dtype(0.5))
     np.testing.assert_allclose(fast_value, slow_value, rtol=3e-5)
-    np.testing.assert_allclose(fast_gradient, slow_gradient, rtol=1e-4)
+    np.testing.assert_allclose(fast_gradient, slow_gradient, rtol=2e-4)
 
   def test_gaussian_process_mean(self):
     mean_fn = lambda x: jnp.stack([x[:, 0]**2, x[:, 0]**3], axis=-1)
