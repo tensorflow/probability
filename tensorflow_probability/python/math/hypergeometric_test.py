@@ -197,6 +197,38 @@ class Hyp2F1Test(test_util.TestCase):
     c = self.GenParam(20., 50., dtype, seed_stream())
     self.VerifyHyp2F1(dtype, rtol, a, b, c, z_lower=-1., z_upper=1.)
 
+  @parameterized.named_parameters(
+      ("float32", np.float32, 2e-3),
+      ("float64", np.float64, 1e-7))
+  def testHyp2F1DegenerateCMinusAMinusB(self, dtype, rtol):
+    # Regression test for https://github.com/tensorflow/probability/issues/2001
+    # When c - a - b is exactly an integer, the z-near-1 connection formula
+    # has a removable singularity: lgamma(d) has a pole for d <= 0, and
+    # lgamma(-d) has a pole for d >= 0, so one of the two always fires,
+    # producing nan even though 2F1 itself is finite there. Cover a spread
+    # of m = c - a - b (positive, negative, and the m = 0 boundary).
+    H = dtype(1.)
+    a = dtype(1.)
+    b = dtype(0.5 - H)
+    c = dtype(H + 1.5)  # c - a - b == 2. exactly
+    z = dtype(0.9901961)
+    hyp2f1 = self.evaluate(hypergeometric.hyp2f1_small_argument(a, b, c, z))
+    self.assertAllClose(hyp2f1, 0.753603006025111, rtol=rtol)
+
+    for a_val, b_val, c_val, z_val in [
+        (0.5, 0.5, 1.0, 0.99),    # m == 0 (boundary between the two poles)
+        (3.0, 2.0, 6.0, 0.999),   # m == 1
+        (2.3, 1.5, 6.8, 0.95),    # m == 3
+        (2.0, 1.0, 2.0, 0.95),    # m == -1 (c - a - b < 0)
+        (4.5, 1.7, 3.2, 0.92),    # m == -3
+    ]:
+      a_t, b_t, c_t, z_t = (dtype(a_val), dtype(b_val), dtype(c_val),
+                            dtype(z_val))
+      hyp2f1 = self.evaluate(
+          hypergeometric.hyp2f1_small_argument(a_t, b_t, c_t, z_t))
+      expected = scipy_special.hyp2f1(a_val, b_val, c_val, z_val)
+      self.assertAllClose(hyp2f1, expected, rtol=rtol)
+
   @test_util.numpy_disable_gradient_test
   @test_util.jax_disable_test_missing_functionality(
       "Gradients not supported in JAX.")
