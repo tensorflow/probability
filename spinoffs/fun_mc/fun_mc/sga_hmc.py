@@ -481,7 +481,7 @@ def default_trajectory_length_sample(
   """
   del seed
   mean_trajectory_length = jnp.exp(
-      fun_mc.clip_grads(
+      fun_mc.clip_grads(  # pyrefly: ignore[bad-argument-type]
           trajectory_length_params.log_mean_trajectory_length, 1.0
       )
   )
@@ -711,7 +711,7 @@ def stochastic_gradient_ascent_hmc_step(
         accept_prob,
         # + step_size because we're effectively doing floor(traj / step_size)
         # when computing the number of leapfrog steps.
-        trajectory_length + scalar_step_size,
+        trajectory_length + scalar_step_size,  # pyrefly: ignore[unsupported-operation]
     )
 
     return -criterion, (

@@ -333,7 +333,7 @@ def vdm_sample(
         denoise_fn=denoise_fn,
         seed=sample_seed,
         denoise_output=denoise_output,
-        t_start=t_start,
+        t_start=t_start,  # pyrefly: ignore[bad-argument-type]
     )
     if trace_z_s:
       trace = {"z_s": z_s}
@@ -341,7 +341,7 @@ def vdm_sample(
       trace = {}
     return (z_s, step - 1, seed), trace
 
-  (z_0, _, _), trace = fun_mc.trace((z_t, num_steps, seed), body, num_steps)
+  (z_0, _, _), trace = fun_mc.trace((z_t, num_steps, seed), body, num_steps)  # pyrefly: ignore[missing-attribute]
 
   return z_0, VDMSampleExtra(z_s=trace.get("z_s"))
 

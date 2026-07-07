@@ -27,9 +27,9 @@ class SavingTest(test_util.TestCase):
       y = y + 2.0
       return (x, y), (x, y)
 
-    state, _ = fun_mc.trace(
-        state=fun_mc.interruptible_trace_init((0.0, 0.0), fn=fun, num_steps=5),
-        fn=functools.partial(fun_mc.interruptible_trace_step, fn=fun),
+    state, _ = fun_mc.trace(  # pyrefly: ignore[missing-attribute]
+        state=fun_mc.interruptible_trace_init((0.0, 0.0), fn=fun, num_steps=5),  # pyrefly: ignore[missing-attribute]
+        fn=functools.partial(fun_mc.interruptible_trace_step, fn=fun),  # pyrefly: ignore[missing-attribute]
         num_steps=4,
     )
 

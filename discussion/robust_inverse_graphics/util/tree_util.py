@@ -58,7 +58,7 @@ class DataclassView(Generic[T]):
   def tree_flatten(self) -> tuple[list[Any], 'DataclassView[T]']:
     selected_fields = [
         getattr(self.value, f.name)
-        for f in dataclasses.fields(self.value)
+        for f in dataclasses.fields(self.value)  # pyrefly: ignore[bad-argument-type]
         if self.field_selector_fn(f.name)
     ]
 
@@ -70,12 +70,12 @@ class DataclassView(Generic[T]):
   ) -> 'DataclassView[T]':
     selected_field_names = [
         f.name
-        for f in dataclasses.fields(aux_data.value)
+        for f in dataclasses.fields(aux_data.value)  # pyrefly: ignore[bad-argument-type]
         if aux_data.field_selector_fn(f.name)
     ]
     selected_fields = dict(zip(selected_field_names, children))
     return cls(
-        aux_data.value.replace(**selected_fields), aux_data.field_selector_fn
+        aux_data.value.replace(**selected_fields), aux_data.field_selector_fn  # pyrefly: ignore[missing-attribute]
     )
 
 

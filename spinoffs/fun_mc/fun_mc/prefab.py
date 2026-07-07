@@ -70,7 +70,7 @@ def _polynomial_decay(
   decay_steps_f = jnp.array(decay_steps, step_size.dtype)
   step_mult = (1.0 - step_f / decay_steps_f) ** power
   step_mult = jnp.where(
-      step >= decay_steps, jnp.zeros_like(step_mult), step_mult
+      step >= decay_steps, jnp.zeros_like(step_mult), step_mult  # pyrefly: ignore[unsupported-operation]
   )
   return step_mult * (step_size - final_step_size) + final_step_size
 
@@ -83,7 +83,7 @@ class StepSizeAdaptationState(NamedTuple):
   rms_state: fun_mc.RunningMeanState
 
   def opt_step_size(self):
-    return jnp.exp(self.opt_state.state)
+    return jnp.exp(self.opt_state.state)  # pyrefly: ignore[bad-argument-type]
 
   @property
   def rms_step_size(self):
@@ -258,7 +258,7 @@ class AdaptiveHamiltonianMonteCarloExtra(NamedTuple):
     tuple, with the first element thereof containing the state in the original
     space.
     """
-    return self.hmc_state.state_extra[0]
+    return self.hmc_state.state_extra[0]  # pyrefly: ignore[bad-index]
 
   @property
   def is_accepted(self) -> fun_mc.BooleanArray:
@@ -656,7 +656,7 @@ def interactive_trace(
       but with leaves replaced with stacked and unstacked values according to
       the `trace_mask`.
   """
-  num_steps = int(num_steps)
+  num_steps = int(num_steps)  # pyrefly: ignore[bad-assignment]
 
   if progress_bar_fn is None:
     pbar = None
@@ -937,7 +937,7 @@ def persistent_hamiltonian_monte_carlo_step(
       def _sample_part(old_momentum, seed, named_axis):
         seed = backend.distribute_lib.fold_in_axis_index(seed, named_axis)
         return jnp.sqrt(
-            1 - jnp.square(noise_fraction)
+            1 - jnp.square(noise_fraction)  # pyrefly: ignore[bad-argument-type]
         ) * old_momentum + noise_fraction * util.random_normal(
             old_momentum.shape, old_momentum.dtype, seed
         )
@@ -947,7 +947,7 @@ def persistent_hamiltonian_monte_carlo_step(
       )
       return new_momentum
 
-    momentum_sample_fn = _momentum_sample_fn
+    momentum_sample_fn = _momentum_sample_fn  # pyrefly: ignore[bad-assignment]
 
   if integrator_fn is None:
     step_size = util.map_tree(jnp.asarray, step_size)
@@ -989,7 +989,7 @@ def persistent_hamiltonian_monte_carlo_step(
     integrator_fn = _integrator_fn
 
   seed, sample_seed = util.split_seed(seed, 2)
-  momentum = momentum_sample_fn(momentum, sample_seed)
+  momentum = momentum_sample_fn(momentum, sample_seed)  # pyrefly: ignore[not-callable]
 
   initial_integrator_state = fun_mc.IntegratorState(
       target_log_prob=target_log_prob,
@@ -1055,7 +1055,7 @@ def persistent_hamiltonian_monte_carlo_step(
 
   return phmc_state, PersistentHamiltonianMonteCarloExtra(
       is_accepted=is_accepted,
-      proposed_phmc_state=proposed_state,
+      proposed_phmc_state=proposed_state,  # pyrefly: ignore[bad-argument-type]
       log_accept_ratio=-energy_change,
       integrator_state=integrator_state,
       integrator_extra=integrator_extra,

@@ -65,4 +65,4 @@ class PotentialFn(Protocol[_Extra]):
 
 def runtime_typed(f: F) -> F:
   """Adds runtime type checking."""
-  return jaxtyping.jaxtyped(f, typechecker=typeguard.typechecked)
+  return jaxtyping.jaxtyped(f, typechecker=typeguard.typechecked)  # pyrefly: ignore[bad-return]

@@ -251,7 +251,7 @@ class Finder(importlib.abc.MetaPathFinder):
     # Helps with pdb integration.
     spec.has_location = True
     # We don't cache these rewritten modules.
-    spec.cached = False
+    spec.cached = False  # pyrefly: ignore[bad-assignment]
     if DEBUG:
       print()
     return spec

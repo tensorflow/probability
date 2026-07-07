@@ -157,6 +157,6 @@ def get_experiment(
 
   def wrapped_args_to_hparams(**job_args):
     return ', '.join(
-        f'{k}: {v}' for k, v in args_to_hparams(**job_args).items())
+        f'{k}: {v}' for k, v in args_to_hparams(**job_args).items())  # pyrefly: ignore[not-callable]
 
   return wrapped_args_to_hparams, all_job_args

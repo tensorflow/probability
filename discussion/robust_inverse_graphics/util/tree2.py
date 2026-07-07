@@ -404,7 +404,7 @@ class Registry:
     else:
       tag = tags[0]
 
-    encode_fn = self._tag_to_serializer[tag].encode_fn
+    encode_fn = self._tag_to_serializer[tag].encode_fn  # pyrefly: ignore[bad-index]
     return encode_fn(tree, ctx, functools.partial(self._encode_tree, ctx=ctx))
 
   def save_tree(self,
@@ -451,7 +451,7 @@ class Registry:
 
       f.write(b'\n')
 
-      ctx.save_blocks(f)
+      ctx.save_blocks(f)  # pyrefly: ignore[bad-argument-type]
     finally:
       if need_close:
         f.close()
@@ -522,7 +522,7 @@ class Registry:
         block_format = block_parts[1]
 
       if block_format is not None:
-        ctx.load_blocks(f, block_format)
+        ctx.load_blocks(f, block_format)  # pyrefly: ignore[bad-argument-type]
 
     finally:
       if need_close:
@@ -588,9 +588,9 @@ class Registry:
 
     def reg_fn(tree_type: Type[Tree]) -> Type[Tree]:
       return self.register_type(
-          tag, tree_type,
+          tag, tree_type,  # pyrefly: ignore[bad-argument-type]
           functools.partial(
-              _encode_sequence, tag=_get_first_tag(tag), fallback=fallback),
+              _encode_sequence, tag=_get_first_tag(tag), fallback=fallback),  # pyrefly: ignore[bad-argument-type]
           functools.partial(_decode_sequence, tree_type=tree_type))
 
     return reg_fn
@@ -614,9 +614,9 @@ class Registry:
 
     def reg_fn(tree_type: Type[Tree]) -> Type[Tree]:
       return self.register_type(
-          tag, tree_type,
+          tag, tree_type,  # pyrefly: ignore[bad-argument-type]
           functools.partial(
-              _encode_mapping, tag=_get_first_tag(tag), fallback=fallback),
+              _encode_mapping, tag=_get_first_tag(tag), fallback=fallback),  # pyrefly: ignore[bad-argument-type]
           functools.partial(_decode_mapping, tree_type=tree_type))
 
     return reg_fn
@@ -640,9 +640,9 @@ class Registry:
 
     def reg_fn(tree_type: Type[Tree]) -> Type[Tree]:
       return self.register_type(
-          tag, tree_type,
+          tag, tree_type,  # pyrefly: ignore[bad-argument-type]
           functools.partial(
-              _encode_namedtuple, tag=_get_first_tag(tag), fallback=fallback),
+              _encode_namedtuple, tag=_get_first_tag(tag), fallback=fallback),  # pyrefly: ignore[bad-argument-type]
           functools.partial(_decode_namedtuple, tree_type=tree_type))
 
     return reg_fn
@@ -666,9 +666,9 @@ class Registry:
 
     def reg_fn(tree_type: Type[Tree]) -> Type[Tree]:
       return self.register_type(
-          tag, tree_type,
+          tag, tree_type,  # pyrefly: ignore[bad-argument-type]
           functools.partial(
-              _encode_dataclass, tag=_get_first_tag(tag), fallback=fallback),
+              _encode_dataclass, tag=_get_first_tag(tag), fallback=fallback),  # pyrefly: ignore[bad-argument-type]
           functools.partial(_decode_dataclass, tree_type=tree_type))
 
     return reg_fn
@@ -688,8 +688,8 @@ class Registry:
 
     def reg_fn(tree_type: Type[Tree]) -> Type[Tree]:
       return self.register_type(
-          tag, tree_type,
-          functools.partial(_encode_enum, tag=_get_first_tag(tag)),
+          tag, tree_type,  # pyrefly: ignore[bad-argument-type]
+          functools.partial(_encode_enum, tag=_get_first_tag(tag)),  # pyrefly: ignore[bad-argument-type]
           functools.partial(_decode_enum, tree_type=tree_type))
 
     return reg_fn
@@ -792,9 +792,9 @@ class Registry:
         del ctx
         encoded = {}
         encoded[_TREE2_TYPE_TAG] = tfp_struct_tuple
-        encoded['val'] = {k: encode_fn(v) for k, v in tree._asdict().items()}
+        encoded['val'] = {k: encode_fn(v) for k, v in tree._asdict().items()}  # pyrefly: ignore[missing-attribute]
         encoded['fallback_type'] = UNKNOWN_NAMEDTUPLE
-        return encoded
+        return encoded  # pyrefly: ignore[bad-return]
 
       def decode_tfp_struct_tuple(encoded: Any, ctx: Context) -> Any:
         del ctx
@@ -811,20 +811,20 @@ class Registry:
     def encode_array_fn(tree: Tree, ctx: Context,
                         encode_fn: InnerEncodeFn) -> EncodedTree:
       del encode_fn
-      tree = np.asarray(tree)
+      tree = np.asarray(tree)  # pyrefly: ignore[bad-assignment]
 
       encoded = {}
       encoded[_TREE2_TYPE_TAG] = ARRAY
-      encoded['dtype'] = np.dtype(tree.dtype).name
-      encoded['shape'] = list(tree.shape)
-      if np.size(tree) < 64:
-        encoded['val'] = tree.tolist()
+      encoded['dtype'] = np.dtype(tree.dtype).name  # pyrefly: ignore[missing-attribute]
+      encoded['shape'] = list(tree.shape)  # pyrefly: ignore[missing-attribute]
+      if np.size(tree) < 64:  # pyrefly: ignore[bad-argument-type]
+        encoded['val'] = tree.tolist()  # pyrefly: ignore[missing-attribute]
       else:
-        encoded['head'] = tree.flatten()[:10].tolist()
-        encoded['tail'] = tree.flatten()[-10:].tolist()
-        encoded['block'] = ctx.add_array(tree)
+        encoded['head'] = tree.flatten()[:10].tolist()  # pyrefly: ignore[missing-attribute]
+        encoded['tail'] = tree.flatten()[-10:].tolist()  # pyrefly: ignore[missing-attribute]
+        encoded['block'] = ctx.add_array(tree)  # pyrefly: ignore[bad-argument-type]
 
-      return encoded
+      return encoded  # pyrefly: ignore[bad-return]
 
     def decode_array_fn(encoded: Any, ctx: Context) -> Any:
       val = encoded.get('val')
@@ -840,14 +840,14 @@ class Registry:
     def encode_scalar_fn(tree: Tree, ctx: Context,
                          encode_fn: InnerEncodeFn) -> EncodedTree:
       del ctx, encode_fn
-      tree = np.asarray(tree)
+      tree = np.asarray(tree)  # pyrefly: ignore[bad-assignment]
 
       encoded = {}
       encoded[_TREE2_TYPE_TAG] = SCALAR
-      encoded['dtype'] = np.dtype(tree.dtype).name
-      encoded['val'] = tree.tolist()
+      encoded['dtype'] = np.dtype(tree.dtype).name  # pyrefly: ignore[missing-attribute]
+      encoded['val'] = tree.tolist()  # pyrefly: ignore[missing-attribute]
 
-      return encoded
+      return encoded  # pyrefly: ignore[bad-return]
 
     def decode_scalar_fn(encoded: Any, ctx: Context) -> Any:
       del ctx
@@ -879,17 +879,17 @@ def _encode_sequence(tree: Type[Tree],
   encoded = {}
   encoded[_TREE2_TYPE_TAG] = tag
   if type(tree) is list:  # pylint: disable=unidiomatic-typecheck
-    return [encode_fn(v) for v in tree]
+    return [encode_fn(v) for v in tree]  # pyrefly: ignore[bad-return]
   else:
-    encoded['val'] = [encode_fn(v) for v in tree]
+    encoded['val'] = [encode_fn(v) for v in tree]  # pyrefly: ignore[not-iterable]
     if fallback is not None:
       encoded['fallback_type'] = fallback
-  return encoded
+  return encoded  # pyrefly: ignore[bad-return]
 
 
 def _decode_sequence(encoded: Any, ctx: Context, tree_type: Type[Tree]) -> Tree:
   del ctx
-  return tree_type(encoded['val'])
+  return tree_type(encoded['val'])  # pyrefly: ignore[bad-argument-count]
 
 
 def _detect_unknown_sequence(tree: Any, ctx: Context) -> Optional[str]:
@@ -927,22 +927,22 @@ def _encode_mapping(tree: Type[Tree],
   encoded[_TREE2_TYPE_TAG] = tag
   # Fast path: all-string keys and no special tags inside the mapping lets us
   # use a more efficient encoding.
-  if all(isinstance(x, str) for x in tree) and _TREE2_TYPE_TAG not in tree:
+  if all(isinstance(x, str) for x in tree) and _TREE2_TYPE_TAG not in tree:  # pyrefly: ignore[not-iterable]
     if type(tree) is dict:  # pylint: disable=unidiomatic-typecheck
-      return {k: encode_fn(v) for k, v in tree.items()}
+      return {k: encode_fn(v) for k, v in tree.items()}  # pyrefly: ignore[bad-return]
     else:
-      tree = {k: encode_fn(v) for k, v in tree.items()}
+      tree = {k: encode_fn(v) for k, v in tree.items()}  # pyrefly: ignore[bad-assignment, missing-attribute]
   else:
-    tree = [[encode_fn(k), encode_fn(v)] for k, v in tree.items()]
+    tree = [[encode_fn(k), encode_fn(v)] for k, v in tree.items()]  # pyrefly: ignore[bad-assignment, missing-attribute]
   encoded['val'] = tree
   if fallback is not None:
     encoded['fallback_type'] = fallback
-  return encoded
+  return encoded  # pyrefly: ignore[bad-return]
 
 
 def _decode_mapping(encoded: Any, ctx: Context, tree_type: Type[Tree]) -> Tree:
   del ctx
-  return tree_type(encoded['val'])
+  return tree_type(encoded['val'])  # pyrefly: ignore[bad-argument-count]
 
 
 def _detect_unknown_mapping(tree: Any, ctx: Context) -> Optional[str]:
@@ -979,17 +979,17 @@ def _encode_namedtuple(
   del ctx
   encoded = {}
   encoded[_TREE2_TYPE_TAG] = tag
-  encoded['val'] = {k: encode_fn(v) for k, v in tree._asdict().items()}
+  encoded['val'] = {k: encode_fn(v) for k, v in tree._asdict().items()}  # pyrefly: ignore[missing-attribute]
   if fallback is not None:
     encoded['fallback_type'] = fallback
-  return encoded
+  return encoded  # pyrefly: ignore[bad-return]
 
 
 def _decode_namedtuple(encoded: Any, ctx: Context,
                        tree_type: Type[Tree]) -> Tree:
   """Decodes a namedtuple."""
   del ctx
-  fields = set(tree_type._fields)
+  fields = set(tree_type._fields)  # pyrefly: ignore[missing-attribute]
   sanitized_val = {}
   for k, v in encoded['val'].items():
     if k in fields:
@@ -1018,7 +1018,7 @@ def _decode_unknown_namedtuple(encoded: Any, ctx: Context) -> Any:
   del ctx
   warnings.warn(f'Decoding unknown namedtuple type: {encoded[_TREE2_TYPE_TAG]}')
 
-  tree_type = collections.namedtuple(encoded[_TREE2_TYPE_TAG],
+  tree_type = collections.namedtuple(encoded[_TREE2_TYPE_TAG],  # pyrefly: ignore[bad-class-definition]
                                      list(encoded['val'].keys()))
   return tree_type(**encoded['val'])
 
@@ -1039,18 +1039,18 @@ def _encode_dataclass(
   encoded = {}
   encoded[_TREE2_TYPE_TAG] = tag
   encoded['val'] = {
-      f.name: encode_fn(getattr(tree, f.name)) for f in dataclasses.fields(tree)
+      f.name: encode_fn(getattr(tree, f.name)) for f in dataclasses.fields(tree)  # pyrefly: ignore[bad-argument-type]
   }
   if fallback is not None:
     encoded['fallback_type'] = fallback
-  return encoded
+  return encoded  # pyrefly: ignore[bad-return]
 
 
 def _decode_dataclass(encoded: Any, ctx: Context,
                       tree_type: Type[Tree]) -> Tree:
   """Decodes a dataclass."""
   del ctx
-  fields = set(f.name for f in dataclasses.fields(tree_type))
+  fields = set(f.name for f in dataclasses.fields(tree_type))  # pyrefly: ignore[bad-argument-type]
   sanitized_val = {}
   for k, v in encoded['val'].items():
     if k in fields:
@@ -1095,10 +1095,10 @@ def _encode_enum(tree: Type[Tree], ctx: Context, encode_fn: InnerEncodeFn,
   del ctx, encode_fn
   encoded = {}
   encoded[_TREE2_TYPE_TAG] = tag
-  encoded['val'] = tree.name
-  return encoded
+  encoded['val'] = tree.name  # pyrefly: ignore[missing-attribute]
+  return encoded  # pyrefly: ignore[bad-return]
 
 
 def _decode_enum(encoded: Any, ctx: Context, tree_type: Type[Tree]) -> Tree:
   del ctx
-  return tree_type[encoded['val']]
+  return tree_type[encoded['val']]  # pyrefly: ignore[unsupported-operation]

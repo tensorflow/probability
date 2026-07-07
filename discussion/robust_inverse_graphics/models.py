@@ -429,7 +429,7 @@ def make_nerf_model(
                 covariance=jnp.ones((3, 3)),
                 viewdir=jnp.ones(3),
             ),
-            **kwargs,
+            **kwargs,  # pyrefly: ignore[bad-argument-type]
         ),
         (),
     )
@@ -470,12 +470,12 @@ def make_nerf_model(
       one_ll, ll_extra = rgb_log_likelihood_fn(
           extra_l.rgb,
           rgb,
-          obs_scale,
+          obs_scale,  # pyrefly: ignore[bad-argument-type]
       )
       ll += one_ll
     # Grab the ll_extra from the last level, as that corresponds to the final
     # reconstruction.
-    rgb_mse = ll_extra.rgb_loss
+    rgb_mse = ll_extra.rgb_loss  # pyrefly: ignore[unbound-name]
     if not return_render_extra:
       extra = None
     return ll * ll_factor, LikelihoodExtra(
@@ -804,7 +804,7 @@ def make_probnerf_model(
       one_ll, ll_extra = rgb_log_likelihood_fn(
           extra_l.rgb,
           subsampled_rgb,
-          mipnerf_obs_scale,
+          mipnerf_obs_scale,  # pyrefly: ignore[bad-argument-type]
       )
       ll += one_ll
     # Grab the ll_extra from the last level, as that corresponds to the
@@ -813,7 +813,7 @@ def make_probnerf_model(
     total_num_rays = functools.reduce(
         operator.mul, inputs.example.rgb.shape[:-1]
     )
-    rgb_mse = ll_extra.rgb_loss
+    rgb_mse = ll_extra.rgb_loss  # pyrefly: ignore[unbound-name]
     return ll * total_num_rays / num_rays, LikelihoodExtra(
         psnr=None, rgb_mse=rgb_mse
     )
@@ -876,7 +876,7 @@ def make_probnerf_guide(
     )
 
   def guide_sample_fn(params, example, seed):
-    latents, (_, _), log_prob_stop_grad_params = guide.apply(
+    latents, (_, _), log_prob_stop_grad_params = guide.apply(  # pyrefly: ignore[bad-unpacking]
         params, example.rgb, example.camera_world_matrix, seed
     )
     return latents, GuideSampleExtra(

@@ -55,7 +55,7 @@ def experiment(output_dir: str,
       whole_grid_index = [grid_index, j]
       res = adaptive_malt.run_grid_element(  # pytype: disable=missing-parameter
           mean_trajectory_length=mean_trajectory_length,
-          seed=np.random.RandomState(list(whole_grid_index)).randint(1 << 32))
+          seed=np.random.RandomState(list(whole_grid_index)).randint(1 << 32))  # pyrefly: ignore[bad-argument-type]
       utils.save_h5py(
           os.path.join(output_dir,
                        f'{whole_grid_index[0]}.{whole_grid_index[1]}.h5'), res)
@@ -65,7 +65,7 @@ def experiment(output_dir: str,
       whole_grid_index = [i, grid_index]
       res = adaptive_malt.run_grid_element(  # pytype: disable=missing-parameter
           damping=damping,
-          seed=np.random.RandomState(list(whole_grid_index)).randint(1 << 32))
+          seed=np.random.RandomState(list(whole_grid_index)).randint(1 << 32))  # pyrefly: ignore[bad-argument-type]
       utils.save_h5py(
           os.path.join(output_dir,
                        f'{whole_grid_index[0]}.{whole_grid_index[1]}.h5'), res)

@@ -61,12 +61,12 @@ def _test_seed() -> Seed:
 
 @types.runtime_typed
 def basic_kernel(
-    state: Float[Array, 'num_particles'],
+    state: Float[Array, 'num_particles'],  # pyrefly: ignore[unknown-name]
     step: IntScalar,
     seed: Seed,
 ) -> tuple[
-    Float[Array, 'num_particles'],
-    tuple[Float[Array, 'num_particles'], tuple[()]],
+    Float[Array, 'num_particles'],  # pyrefly: ignore[unknown-name]
+    tuple[Float[Array, 'num_particles'], tuple[()]],  # pyrefly: ignore[unknown-name]
 ]:
   del step
   random_weights = util.random_uniform(state.shape, state.dtype, seed)
@@ -76,12 +76,12 @@ def basic_kernel(
 
 @types.runtime_typed
 def ess_kernel(
-    state: Float[Array, 'num_particles'],
+    state: Float[Array, 'num_particles'],  # pyrefly: ignore[unknown-name]
     step: IntScalar,
     seed: Seed,
 ) -> tuple[
-    Float[Array, 'num_particles'],
-    tuple[Float[Array, 'num_particles'], tuple[()]],
+    Float[Array, 'num_particles'],  # pyrefly: ignore[unknown-name]
+    tuple[Float[Array, 'num_particles'], tuple[()]],  # pyrefly: ignore[unknown-name]
 ]:
   """Make the ESS low only for first 3 timesteps."""
   del seed
@@ -98,12 +98,12 @@ def ess_kernel(
 
 @types.runtime_typed
 def kernel_log_weights_eq_two(
-    state: Float[Array, 'num_particles'],
+    state: Float[Array, 'num_particles'],  # pyrefly: ignore[unknown-name]
     step: IntScalar,
     seed: Seed,
 ) -> tuple[
-    Float[Array, 'num_particles'],
-    tuple[Float[Array, 'num_particles'], tuple[()]],
+    Float[Array, 'num_particles'],  # pyrefly: ignore[unknown-name]
+    tuple[Float[Array, 'num_particles'], tuple[()]],  # pyrefly: ignore[unknown-name]
 ]:
   """Always returns log weight equals 2."""
   del seed, step
@@ -114,12 +114,12 @@ def kernel_log_weights_eq_two(
 
 @types.runtime_typed
 def kernel_log_weights_eq_step(
-    state: Float[Array, 'num_particles'],
+    state: Float[Array, 'num_particles'],  # pyrefly: ignore[unknown-name]
     step: IntScalar,
     seed: Seed,
 ) -> tuple[
-    Float[Array, 'num_particles'],
-    tuple[Float[Array, 'num_particles'], tuple[()]],
+    Float[Array, 'num_particles'],  # pyrefly: ignore[unknown-name]
+    tuple[Float[Array, 'num_particles'], tuple[()]],  # pyrefly: ignore[unknown-name]
 ]:
   """Log weight equals timestep."""
   del seed
@@ -130,13 +130,13 @@ def kernel_log_weights_eq_step(
 
 @types.runtime_typed
 def kernel_extra_is_finished(
-    state: Float[Array, 'num_particles'],
+    state: Float[Array, 'num_particles'],  # pyrefly: ignore[unknown-name]
     step: IntScalar,
     seed: Seed,
     num_timesteps: int,
 ) -> tuple[
-    Float[Array, 'num_particles'],
-    tuple[Float[Array, 'num_particles'], BoolScalar],
+    Float[Array, 'num_particles'],  # pyrefly: ignore[unknown-name]
+    tuple[Float[Array, 'num_particles'], BoolScalar],  # pyrefly: ignore[unknown-name]
 ]:
   """Returns an extra `is_finished` value based on `num_timesteps`."""
   del seed
@@ -148,12 +148,12 @@ def kernel_extra_is_finished(
 
 @types.runtime_typed
 def kernel_log_weights_eq_neg_inf_if_state_lt_zero(
-    state: Float[Array, 'num_particles'],
+    state: Float[Array, 'num_particles'],  # pyrefly: ignore[unknown-name]
     step: IntScalar,
     seed: Seed,
 ) -> tuple[
-    Float[Array, 'num_particles'],
-    tuple[Float[Array, 'num_particles'], tuple[()]],
+    Float[Array, 'num_particles'],  # pyrefly: ignore[unknown-name]
+    tuple[Float[Array, 'num_particles'], tuple[()]],  # pyrefly: ignore[unknown-name]
 ]:
   """Decrements the state and returns -inf weight when it dips below zero."""
   del seed, step
@@ -351,7 +351,7 @@ class SMCTest(tfp_test_util.TestCase):
           smc_state,
           kernel=basic_kernel,
           seed=step_seed,
-          resampling_pred=lambda _: resample,
+          resampling_pred=lambda _: resample,  # pyrefly: ignore[bad-argument-type]
       )
       return (smc_state, seed), extra.resampled
 

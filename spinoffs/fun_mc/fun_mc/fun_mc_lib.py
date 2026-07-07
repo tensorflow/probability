@@ -522,7 +522,7 @@ def recover_state_from_args(
   """Attempts to recover the state that was transmitted via *args, **kwargs."""
   orig_args = args
   if isinstance(state_structure, collections.abc.Mapping):
-    state = type(state_structure)()
+    state = type(state_structure)()  # pyrefly: ignore[bad-instantiation]
     # Mappings can be ordered and not ordered, and this information is lost when
     # passed via **kwargs. We iterate using the reference structure order so we
     # can reconstruct it. For unordered mappings the order doesn't matter. We
@@ -531,7 +531,7 @@ def recover_state_from_args(
     for k in state_structure.keys():
       # This emulates the positional argument passing.
       if args:
-        state[k] = args[0]
+        state[k] = args[0]  # pyrefly: ignore[unsupported-operation]
         args = args[1:]
       else:
         if k not in kwargs:
@@ -541,7 +541,7 @@ def recover_state_from_args(
                   'state_structure=\n{}'
               ).format(k, orig_args, kwargs, _tree_repr(state_structure))
           )
-        state[k] = kwargs[k]
+        state[k] = kwargs[k]  # pyrefly: ignore[unsupported-operation]
     return state
   elif isinstance(
       state_structure, collections.abc.Sequence
@@ -556,7 +556,7 @@ def recover_state_from_args(
               _tree_repr(state_structure)
           )
       )
-    return type(state_structure)(args)
+    return type(state_structure)(args)  # pyrefly: ignore[bad-argument-count, bad-instantiation]
   elif args:
     return args[0]
   elif kwargs:
@@ -608,7 +608,7 @@ def call_potential_fn(
             fn=fn, args=args, ret=ret, args_s=args_s, ret_s=ret_s
         )
     )
-  return ret
+  return ret  # pyrefly: ignore[bad-return]
 
 
 def call_transition_operator(
@@ -721,7 +721,7 @@ def call_transport_map(
             fn=fn, args=args, ret=ret, args_s=args_s, ret_s=ret_s
         )
     )
-  return ret
+  return ret  # pyrefly: ignore[bad-return]
 
 
 def call_transport_map_with_ldj(
@@ -863,7 +863,7 @@ def reparameterize_potential_fn(
     potential, extra = call_potential_fn(potential_fn, state)
 
     if track_volume:
-      potential += ldj
+      potential += ldj  # pyrefly: ignore[unbound-name, unsupported-operation]
 
     return potential, [state, extra, map_extra]
 
@@ -1060,11 +1060,11 @@ def splitting_integrator_step(
   return (
       IntegratorStepState(state, state_grads, momentum),
       IntegratorStepExtras(
-          target_log_prob,
-          state_extra,
-          kinetic_energy,
-          kinetic_energy_extra,
-          momentum_grads,
+          target_log_prob,  # pyrefly: ignore[unbound-name]
+          state_extra,  # pyrefly: ignore[unbound-name]
+          kinetic_energy,  # pyrefly: ignore[unbound-name]
+          kinetic_energy_extra,  # pyrefly: ignore[unbound-name]
+          momentum_grads,  # pyrefly: ignore[bad-argument-type]
       ),
   )
 
@@ -2040,7 +2040,7 @@ def hamiltonian_monte_carlo_step(
   hmc_state = typing.cast(HamiltonianMonteCarloState, hmc_state)
   return hmc_state, HamiltonianMonteCarloExtra(
       is_accepted=mh_extra.is_accepted,
-      proposed_hmc_state=proposed_state,
+      proposed_hmc_state=proposed_state,  # pyrefly: ignore[bad-argument-type]
       log_accept_ratio=-energy_change,
       integrator_state=integrator_state,
       integrator_extra=integrator_extra,
@@ -2540,7 +2540,7 @@ def random_walk_metropolis_step(
     rwm_extra: RandomWalkMetropolisExtra
   """
   seed, sample_seed = util.split_seed(seed, 2)
-  proposed_state, (proposal_extra, log_proposed_bias) = proposal_fn(
+  proposed_state, (proposal_extra, log_proposed_bias) = proposal_fn(  # pyrefly: ignore[not-iterable]
       rwm_state.state, sample_seed
   )
 
@@ -2550,7 +2550,7 @@ def random_walk_metropolis_step(
 
   # TODO(siege): Is it really a "log accept ratio" if we need to clamp it to 0?
   log_accept_ratio = (
-      proposed_target_log_prob - rwm_state.target_log_prob - log_proposed_bias
+      proposed_target_log_prob - rwm_state.target_log_prob - log_proposed_bias  # pyrefly: ignore[unsupported-operation]
   )
 
   proposed_rwm_state = RandomWalkMetropolisState(
@@ -3106,7 +3106,7 @@ def running_approximate_auto_covariance_init(
       return [max_lags + 1] + list(shape)
     else:
       return jnp.concatenate(
-          [[max_lags + 1], jnp.asarray(shape, jnp.int32)], axis=0
+          [[max_lags + 1], jnp.asarray(shape, jnp.int32)], axis=0  # pyrefly: ignore[bad-argument-type]
       )
 
   return RunningApproximateAutoCovarianceState(

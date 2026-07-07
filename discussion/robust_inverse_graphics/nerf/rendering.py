@@ -142,7 +142,7 @@ def ray_trace_mip_radiance_field(
     far: float,
     jitter: str = 'correlated',
     ray_shape: str = 'cone',
-    background_color: jnp.ndarray = np.ones(3, np.float32),
+    background_color: jnp.ndarray = np.ones(3, np.float32),  # pyrefly: ignore[bad-function-definition]
     weight_bias: float = 0.01,
     epsilon: float = 1e-10,
     ray_warp_fn: str | Callable[[jax.Array], jax.Array] | None = None,
@@ -220,10 +220,10 @@ def ray_trace_mip_radiance_field(
         sample_seed = None
         single_jitter = False
       case 'correlated':
-        sample_seed, seed = jax.random.split(seed)
+        sample_seed, seed = jax.random.split(seed)  # pyrefly: ignore[bad-argument-type]
         single_jitter = True
       case 'stratified':
-        sample_seed, seed = jax.random.split(seed)
+        sample_seed, seed = jax.random.split(seed)  # pyrefly: ignore[bad-argument-type]
         single_jitter = False
       case _:
         raise ValueError(f'Unknown jitter type: {jitter}')

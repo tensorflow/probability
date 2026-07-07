@@ -65,18 +65,18 @@ class SampleAncestorsFn(Protocol):
 
   def __call__(
       self,
-      log_weights: Float[Array, 'num_particles'],
+      log_weights: Float[Array, 'num_particles'],  # pyrefly: ignore[unknown-name]
       seed: Seed,
-  ) -> Int[Array, 'num_particles']:
+  ) -> Int[Array, 'num_particles']:  # pyrefly: ignore[unknown-name]
     """Generate a set of ancestor indices from particle weights."""
 
 
 @types.runtime_typed
 def systematic_resampling(
-    log_weights: Float[Array, 'num_particles'],
+    log_weights: Float[Array, 'num_particles'],  # pyrefly: ignore[unknown-name]
     seed: Seed,
     permute: bool = False,
-) -> Int[Array, 'num_particles']:
+) -> Int[Array, 'num_particles']:  # pyrefly: ignore[unknown-name]
   """Generate parent indices via systematic resampling.
 
   This uses the algorithm from [1].
@@ -118,9 +118,9 @@ def systematic_resampling(
 
 @types.runtime_typed
 def conditional_systematic_resampling(
-    log_weights: Float[Array, 'num_particles'],
+    log_weights: Float[Array, 'num_particles'],  # pyrefly: ignore[unknown-name]
     seed: Seed,
-) -> Int[Array, 'num_particles']:
+) -> Int[Array, 'num_particles']:  # pyrefly: ignore[unknown-name]
   """Apply conditional systematic resampling to `softmax(log_weights)`.
 
   Equivalent to (but typically much more efficient than) the following
@@ -190,7 +190,7 @@ class SequentialMonteCarloState(Generic[State]):
   """
 
   state: State
-  log_weights: Float[Array, 'num_particles']
+  log_weights: Float[Array, 'num_particles']  # pyrefly: ignore[unknown-name]
   step: IntScalar
 
   def log_normalizing_constant(self) -> FloatScalar:
@@ -218,12 +218,12 @@ class SequentialMonteCarloExtra(Generic[State, Extra]):
       before running the SMC kernel.
   """
 
-  incremental_log_weights: Float[Array, 'num_particles']
+  incremental_log_weights: Float[Array, 'num_particles']  # pyrefly: ignore[unknown-name]
   kernel_extra: Extra
   resampled: BoolScalar
-  ancestor_idxs: Int[Array, 'num_particles']
+  ancestor_idxs: Int[Array, 'num_particles']  # pyrefly: ignore[unknown-name]
   state_after_resampling: State
-  log_weights_after_resampling: Float[Array, 'num_particles']
+  log_weights_after_resampling: Float[Array, 'num_particles']  # pyrefly: ignore[unknown-name]
 
 
 @runtime_checkable
@@ -237,7 +237,7 @@ class SequentialMonteCarloKernel(Protocol[State, Extra]):
       seed: Seed,
   ) -> tuple[
       State,
-      tuple[Float[Array, 'num_particles'], Extra],
+      tuple[Float[Array, 'num_particles'], Extra],  # pyrefly: ignore[unknown-name]
   ]:
     """Perform an SMC kernel step.
 
@@ -370,7 +370,7 @@ class ParticleGatherFn(Protocol[State]):
   def __call__(
       self,
       state: State,
-      indices: Int[Array, 'num_particles'],
+      indices: Int[Array, 'num_particles'],  # pyrefly: ignore[unknown-name]
   ) -> State:
     """Gather states at the given indices."""
 
@@ -378,7 +378,7 @@ class ParticleGatherFn(Protocol[State]):
 @types.runtime_typed
 def _default_pytree_gather(
     state: State,
-    indices: Int[Array, 'num_particles'],
+    indices: Int[Array, 'num_particles'],  # pyrefly: ignore[unknown-name]
 ) -> State:
   """Indexes into states using the default gather.
 
@@ -397,13 +397,13 @@ def _default_pytree_gather(
 @types.runtime_typed
 def resample(
     state: State,
-    log_weights: Float[Array, 'num_particles'],
+    log_weights: Float[Array, 'num_particles'],  # pyrefly: ignore[unknown-name]
     seed: Seed,
     do_resample: BoolScalar = True,
     sample_ancestors_fn: SampleAncestorsFn = systematic_resampling,
     state_gather_fn: ParticleGatherFn[State] = _default_pytree_gather,
 ) -> tuple[
-    tuple[State, Float[Array, 'num_particles']], Int[Array, 'num_particles']
+    tuple[State, Float[Array, 'num_particles']], Int[Array, 'num_particles']  # pyrefly: ignore[unknown-name]
 ]:
   """Possibly resamples state according to the log_weights.
 
@@ -624,7 +624,7 @@ def annealed_importance_sampling_kernel(
 ) -> tuple[
     State,
     tuple[
-        Float[Array, 'num_particles'],
+        Float[Array, 'num_particles'],  # pyrefly: ignore[unknown-name]
         AnnealedImportanceSamplingKernelExtra[KernelExtra, Extra],
     ],
 ]:
@@ -741,10 +741,10 @@ def annealed_importance_sampling_kernel(
       state, step, make_target_log_probability_fn(step), seed
   )
   tlp_num, num_extra = fun_mc.call_potential_fn(
-      make_target_log_probability_fn(step + 1), new_state
+      make_target_log_probability_fn(step + 1), new_state  # pyrefly: ignore[bad-argument-type]
   )
   tlp_denom, denom_extra = fun_mc.call_potential_fn(
-      make_target_log_probability_fn(step), new_state
+      make_target_log_probability_fn(step), new_state  # pyrefly: ignore[bad-argument-type]
   )
   extra = AnnealedImportanceSamplingKernelExtra(
       kernel_extra=kernel_extra,

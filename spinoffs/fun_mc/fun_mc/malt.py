@@ -90,10 +90,10 @@ def _default_energy_change_fn(
 ) -> Tuple[fun_mc.FloatArray, Tuple[Any, Any]]:
   """Default energy change function."""
   old_kinetic_energy, old_kinetic_energy_extra = fun_mc.call_potential_fn(
-      kinetic_energy_fn, old_int_state.momentum
+      kinetic_energy_fn, old_int_state.momentum  # pyrefly: ignore[bad-argument-type]
   )
   new_kinetic_energy, new_kinetic_energy_extra = fun_mc.call_potential_fn(
-      kinetic_energy_fn, new_int_state.momentum
+      kinetic_energy_fn, new_int_state.momentum  # pyrefly: ignore[bad-argument-type]
   )
 
   old_energy = -old_int_state.target_log_prob + old_kinetic_energy
@@ -300,7 +300,7 @@ def metropolis_adjusted_langevin_trajectories_step(
       momentum_refresh_fn = lambda m, seed: _gaussian_momentum_refresh_fn(  # pylint: disable=g-long-lambda
           m,
           seed=seed,
-          step_size=step_size / 2.0,
+          step_size=step_size / 2.0,  # pyrefly: ignore[unsupported-operation]
           damping=damping,
           named_axis=named_axis,
       )
@@ -322,7 +322,7 @@ def metropolis_adjusted_langevin_trajectories_step(
 
   mh_seed, sample_seed, integrator_seed = util.split_seed(seed, 3)
   if momentum is None:
-    momentum = momentum_sample_fn(sample_seed)
+    momentum = momentum_sample_fn(sample_seed)  # pyrefly: ignore[not-callable]
 
   initial_integrator_state = fun_mc.IntegratorState(
       state=malt_state.state,
@@ -353,7 +353,7 @@ def metropolis_adjusted_langevin_trajectories_step(
 
   return malt_state, MetropolisAdjustedLangevinTrajectoriesExtra(
       is_accepted=mh_extra.is_accepted,
-      proposed_malt_state=proposed_state,
+      proposed_malt_state=proposed_state,  # pyrefly: ignore[bad-argument-type]
       log_accept_ratio=-integrator_extra.energy_change,
       integrator_state=integrator_state,
       integrator_extra=integrator_extra,

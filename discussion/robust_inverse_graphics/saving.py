@@ -35,10 +35,10 @@ __all__ = [
 ]
 
 _registry = tree2.Registry(allow_unknown_types=True)
-_registry.auto_register_type('_TraceMaskHolder')(fun_mc_lib._TraceMaskHolder)  # pylint: disable=protected-access
-_registry.auto_register_type('AdamState')(fun_mc.AdamState)
+_registry.auto_register_type('_TraceMaskHolder')(fun_mc_lib._TraceMaskHolder)  # pylint: disable=protected-access  # pyrefly: ignore[unbound-name]
+_registry.auto_register_type('AdamState')(fun_mc.AdamState)  # pyrefly: ignore[missing-attribute]
 _registry.auto_register_type('InterruptibleTraceState')(
-    fun_mc.InterruptibleTraceState
+    fun_mc.InterruptibleTraceState  # pyrefly: ignore[missing-attribute]
 )
 
 

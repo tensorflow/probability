@@ -101,8 +101,8 @@ def bijector_to_transform_fn(
       ),
   )
 
-  forward_transform_fn.inverse = inverse_transform_fn
-  inverse_transform_fn.inverse = forward_transform_fn
+  forward_transform_fn.inverse = inverse_transform_fn  # pyrefly: ignore[missing-attribute]
+  inverse_transform_fn.inverse = forward_transform_fn  # pyrefly: ignore[missing-attribute]
 
   return forward_transform_fn
 
