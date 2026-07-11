@@ -215,6 +215,14 @@ class Hyp2F1Test(test_util.TestCase):
     hyp2f1 = self.evaluate(hypergeometric.hyp2f1_small_argument(a, b, c, z))
     self.assertAllClose(hyp2f1, 0.753603006025111, rtol=rtol)
 
+    # Same degenerate (a, b, c) with a different z: the exact repro from
+    # https://github.com/tensorflow/probability/issues/1861, which is the
+    # same underlying bug as #2001 above.
+    z_1861 = dtype(0.9)
+    hyp2f1_1861 = self.evaluate(
+        hypergeometric.hyp2f1_small_argument(a, b, c, z_1861))
+    self.assertAllClose(hyp2f1_1861, 0.7836799547024426, rtol=rtol)
+
     for a_val, b_val, c_val, z_val in [
         (0.5, 0.5, 1.0, 0.99),    # m == 0 (boundary between the two poles)
         (3.0, 2.0, 6.0, 0.999),   # m == 1
