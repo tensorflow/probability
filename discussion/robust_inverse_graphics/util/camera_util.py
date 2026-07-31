@@ -57,7 +57,7 @@ def look_at_quat(
   rotation_matrix2 = np.stack([right, up, front])
 
   return tuple(
-      pyquaternion.Quaternion(matrix=(rotation_matrix1.T @ rotation_matrix2),
+      pyquaternion.Quaternion(matrix=(rotation_matrix1.T @ rotation_matrix2),  # pyrefly: ignore[bad-argument-type]
                               atol=quaternion_atol,
                               rtol=quaternion_rtol))
 
@@ -65,8 +65,8 @@ def look_at_quat(
 def random_sphere(rng: Optional[np.random.RandomState] = None) -> np.ndarray:
   """Generates points uniformly on a sphere."""
   if rng is None:
-    rng = np.random
-  z = rng.randn(3)
+    rng = np.random  # pyrefly: ignore[bad-assignment]
+  z = rng.randn(3)  # pyrefly: ignore[missing-attribute]
   z /= (np.linalg.norm(z) + 1e-20)
   return z
 

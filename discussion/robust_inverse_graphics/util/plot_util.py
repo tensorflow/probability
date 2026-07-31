@@ -43,14 +43,14 @@ def _exp_mean(vals: jax.Array, window_size: float) -> jax.Array:
 
   def kernel(rm_state, i):
     v = vals[i]
-    cand_rm_state, _ = fun_mc.running_mean_step(
+    cand_rm_state, _ = fun_mc.running_mean_step(  # pyrefly: ignore[missing-attribute]
         rm_state, v, window_size=window_size
     )
-    rm_state = fun_mc.choose(jnp.isfinite(v), cand_rm_state, rm_state)
+    rm_state = fun_mc.choose(jnp.isfinite(v), cand_rm_state, rm_state)  # pyrefly: ignore[missing-attribute]
     return (rm_state, i + 1), rm_state.mean
 
-  _, exp_mean = fun_mc.trace(
-      (fun_mc.running_mean_init(vals.shape[1:], jnp.float32), 0),
+  _, exp_mean = fun_mc.trace(  # pyrefly: ignore[missing-attribute]
+      (fun_mc.running_mean_init(vals.shape[1:], jnp.float32), 0),  # pyrefly: ignore[missing-attribute]
       kernel,
       vals.shape[0],
   )
@@ -117,10 +117,10 @@ class HistBoxesHandler:
     handlebox.add_artist(patch)
     handlebox.add_artist(
         matplotlib.collections.PathCollection(
-            orig_handle.scatter.get_paths(),
+            orig_handle.scatter.get_paths(),  # pyrefly: ignore[missing-attribute]
             offsets=(x0 + width / 2, y0 + height / 2),
-            fc=orig_handle.scatter.get_fc(),
-            ec=orig_handle.scatter.get_ec(),
+            fc=orig_handle.scatter.get_fc(),  # pyrefly: ignore[missing-attribute]
+            ec=orig_handle.scatter.get_ec(),  # pyrefly: ignore[missing-attribute]
             sizes=5 * np.array([min(width, height)]),
         )
     )
@@ -137,7 +137,7 @@ def polkagram_vert(
     x: float | np.generic = 0.0,
     bins: int = 20,
     width: float = 1.0,
-    rng: np.random.RandomState = np.random,
+    rng: np.random.RandomState = np.random,  # pyrefly: ignore[bad-function-definition]
     draw_boxes: bool = True,
     box_ec: str = 'none',
     box_fc: str = 'lightgray',
@@ -236,7 +236,7 @@ def polkagram_vert(
             patches,
             facecolor=box_fc,
             edgecolor=box_ec,
-            label=label,
+            label=label,  # pyrefly: ignore[unbound-name]
             zorder=scatter.zorder - 1,
             scatter=scatter,
         )
@@ -251,7 +251,7 @@ def polkagram_horiz(
     y: float | np.generic = 0.0,
     bins: int = 20,
     height: float = 1.0,
-    rng: np.random.RandomState = np.random,
+    rng: np.random.RandomState = np.random,  # pyrefly: ignore[bad-function-definition]
     draw_boxes: bool = True,
     box_ec: str = 'none',
     box_fc: str = 'lightgray',
@@ -350,7 +350,7 @@ def polkagram_horiz(
             patches,
             facecolor=box_fc,
             edgecolor=box_ec,
-            label=label,
+            label=label,  # pyrefly: ignore[unbound-name]
             zorder=scatter.zorder - 1,
             scatter=scatter,
         )
