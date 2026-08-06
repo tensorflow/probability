@@ -46,7 +46,7 @@ install_bazel() {
   # Add Bazel distribution URI as a package source
   echo "deb [arch=amd64] http://storage.googleapis.com/bazel-apt stable jdk1.8" \
     | sudo tee /etc/apt/sources.list.d/bazel.list
-  curl https://bazel.build/bazel-release.pub.gpg | sudo apt-key add -
+  curl https://releases.bazel.build/bazel-release.pub.gpg | sudo apt-key add -
 
   # Update apt and install bazel (use -qq to minimize log cruft)
   sudo apt-get update
