@@ -21,6 +21,7 @@ from tensorflow_probability.python.distributions import inflated
 from tensorflow_probability.python.distributions import lognormal
 from tensorflow_probability.python.distributions import negative_binomial
 from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import poisson
 from tensorflow_probability.python.experimental.util import trainable
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import gradient
@@ -88,6 +89,36 @@ class DistributionsTest(test_util.TestCase):
     zinb = inflated.ZeroInflatedNegativeBinomial(
         inflated_loc_probs=0.2, probs=0.5, total_count=10.0)
     self.assertEqual('ZeroInflatedNegativeBinomial', zinb.name)
+
+  def test_zero_inflated_poisson(self):
+    zip_ = inflated.ZeroInflatedPoisson(
+        inflated_loc_probs=0.3, rate=5.0)
+    self.assertEqual('ZeroInflatedPoisson', zip_.name)
+    samples = zip_.sample(sample_shape=100, seed=test_util.test_seed())
+    self.assertEqual((100,), samples.shape)
+    lprob = zip_.log_prob(0.0)
+    self.assertAllFinite(lprob)
+    lprob = zip_.log_prob(3.0)
+    self.assertAllFinite(lprob)
+
+  def test_zero_inflated_poisson_logits(self):
+    zip_ = inflated.ZeroInflatedPoisson(
+        inflated_loc_logits=0.5, rate=3.0)
+    self.assertEqual('ZeroInflatedPoisson', zip_.name)
+    samples = zip_.sample(seed=test_util.test_seed())
+    self.assertAllFinite(samples)
+
+  def test_zero_inflated_poisson_batched(self):
+    poisson_dist = poisson.Poisson(
+        rate=np.array([1.0, 2.0, 3.0, 4.0, 5.0], dtype=np.float32))
+    zip_ = inflated.ZeroInflatedPoisson(
+        poisson_dist,
+        inflated_loc_probs=np.array([0.1, 0.2, 0.3, 0.4, 0.5],
+                                    dtype=np.float32))
+    lprob = zip_.log_prob([0, 1, 2, 3, 4])
+    self.assertEqual((5,), lprob.shape)
+    samples = zip_.sample(seed=test_util.test_seed())
+    self.assertEqual((5,), samples.shape)
 
   def test_zinb_is_trainable(self):
     init_fn, apply_fn = trainable.make_trainable_stateless(

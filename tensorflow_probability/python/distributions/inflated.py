@@ -25,6 +25,7 @@ from tensorflow_probability.python.distributions import deterministic
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import mixture
 from tensorflow_probability.python.distributions import negative_binomial
+from tensorflow_probability.python.distributions import poisson
 from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
@@ -33,7 +34,8 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
-__all__ = ['Inflated', 'inflated_factory', 'ZeroInflatedNegativeBinomial']
+__all__ = ['Inflated', 'inflated_factory', 'ZeroInflatedNegativeBinomial',
+           'ZeroInflatedPoisson']
 
 
 def _safe_value_for_distribution(dist):
@@ -348,3 +350,8 @@ ZeroInflatedNegativeBinomial = inflated_factory(
     negative_binomial.NegativeBinomial,
     0.0,
     require_integer_total_count=False)
+
+ZeroInflatedPoisson = inflated_factory(
+    'ZeroInflatedPoisson',
+    poisson.Poisson,
+    0.0)
