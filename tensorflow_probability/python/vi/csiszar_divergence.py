@@ -357,15 +357,47 @@ def jensen_shannon(logu, self_normalized=False, name=None):
   In a sense, this divergence is the "reverse" of the Arithmetic-Geometric
   f-Divergence.
 
-  This Csiszar-function induces a symmetric f-Divergence, i.e.,
+  This Csiszar-function induces a symmetric f-Divergence [1], i.e.,
   `D_f[p, q] = D_f[q, p]`.
 
   Warning: this function makes non-log-space calculations and may therefore be
   numerically unstable for `|logu| >> 0`.
 
-  For more information, see:
-    Lin, J. "Divergence measures based on the Shannon entropy." IEEE Trans.
-    Inf. Th., 37, 145-151, 1991.
+  #### Mathematical Details and Numerical Stability
+
+  When `self_normalized = True`, the Csiszar generator is:
+
+  ```none
+  f(u) = u log(u) - (1 + u) log((1 + u) / 2)
+  ```
+
+  Near `u = 1` (`log(u) = 0`), naive and softplus-based evaluations suffer
+  from catastrophic subtractive cancellation. Computing this directly drops all
+  of float64's 53 bits of precision, resulting in 100% relative error and
+  frequently returning mathematically impossible negative values for what is
+  strictly a non-negative divergence.
+
+  For `|log(u)| < 1`, we avert this by substituting `t = tanh(0.5 * log(u))`
+  under which `f(u)` cleanly factors:
+
+  ```none
+  f(u) = 0.5 * (1 + u) * [2 * t * artanh(t) + log1p(-t^2)]
+  ```
+
+  This formulation of the Jensen-Shannon divergence appears in the quantum
+  information literature (e.g., Eq. 14 of Kurt [2]). Unlike the naive
+  expression, it guarantees non-negative outputs, and is cancellation-free:
+  Taylor expansion proves it loses at most one bit of precision.
+
+  For `|log(u)| >= 1`, we use the standard softplus formulation.
+
+  #### References
+
+  [1] Jianhua Lin. Divergence measures based on the Shannon entropy.
+      IEEE Transactions on Information Theory, 37(1):145-151, 1991.
+
+  [2] Arzu Kurt. Interplay between Non-Markovianity of Noise and Dynamics in
+      Quantum Systems. Entropy, 25(3):501, 2023.
 
   Args:
     logu: `float`-like `Tensor` representing `log(u)` from above.
@@ -381,13 +413,20 @@ def jensen_shannon(logu, self_normalized=False, name=None):
 
   with tf.name_scope(name or 'jensen_shannon'):
     logu = tf.convert_to_tensor(logu, name='logu')
-    y = tf.nn.softplus(logu)
     if self_normalized:
-      y -= np.log(2.)
-    # TODO(jvdillon): Maybe leverage the fact that:
-    # (x-sp(x))*exp(x) approx= expm1(-1.1x + 0.5) for x>12?
-    # Basically, take advantage of x approx= softplus(x) for x>>0.
-    return (logu - y) * tf.exp(logu) - y
+      use_hyperbolic = tf.math.abs(logu) < 1.0
+      safe_logu = tf.where(use_hyperbolic, logu, tf.zeros_like(logu))
+      u = tf.math.tanh(0.5 * safe_logu)
+      h = 2.0 * u * tf.math.atanh(u) + tf.math.log1p(-tf.math.square(u))
+      out_small = 0.5 * (1.0 + tf.math.exp(safe_logu)) * h
+
+      y = tf.nn.softplus(logu) - tf.cast(np.log(2.0), dtype=logu.dtype)
+      out_large = (logu - y) * tf.math.exp(logu) - y
+
+      return tf.where(use_hyperbolic, out_small, out_large)
+
+    y = tf.nn.softplus(logu)
+    return (logu - y) * tf.math.exp(logu) - y
 
 
 def arithmetic_geometric(logu, self_normalized=False, name=None):

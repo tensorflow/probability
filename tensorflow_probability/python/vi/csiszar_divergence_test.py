@@ -14,13 +14,12 @@
 # ============================================================================
 """Tests for Csiszar divergences."""
 
+import decimal
 import functools
 import re
 
 from absl.testing import parameterized
-
 import numpy as np
-
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import softplus
 from tensorflow_probability.python.distributions import joint_distribution_named as jdn
@@ -141,11 +140,22 @@ class JensenShannonTest(test_util.TestCase):
 
   def setUp(self):
     super(JensenShannonTest, self).setUp()
-    self._logu = np.linspace(-10., 10, 100)
+    self._logu = np.sort(
+        np.concatenate([
+            np.linspace(-10.0, 10.0, 101),
+            -np.logspace(-30, 0, 50),
+            np.logspace(-30, 0, 50),
+        ])
+    )
     self._u = np.exp(self._logu)
 
   def test_at_zero(self):
-    self.assertAllClose(self.evaluate(cd.jensen_shannon(0.)), np.log(0.25))
+    self.assertAllClose(self.evaluate(cd.jensen_shannon(0.0)), np.log(0.25))
+    self.assertAllClose(
+        self.evaluate(cd.jensen_shannon(0.0, self_normalized=True)),
+        0.0,
+        atol=0.0,
+    )
 
   def test_symmetric(self):
     self.assertAllClose(
@@ -160,14 +170,32 @@ class JensenShannonTest(test_util.TestCase):
                 self._logu,
                 lambda x: cd.jensen_shannon(x, self_normalized=True))))
 
-  def test_correct(self):
-    self.assertAllClose(
-        self.evaluate(cd.jensen_shannon(self._logu)),
-        (self._u * self._logu - (1 + self._u) * np.log1p(self._u)))
+  @parameterized.named_parameters(
+      ('unnormalized', False),
+      ('self_normalized', True),
+  )
+  def test_correct(self, self_normalized):
+    res = self.evaluate(
+        cd.jensen_shannon(self._logu, self_normalized=self_normalized)
+    )
 
-    self.assertAllClose(
-        self.evaluate(cd.jensen_shannon(self._logu, self_normalized=True)),
-        (self._u * self._logu - (1 + self._u) * np.log((1 + self._u) / 2)))
+    if self_normalized:
+      # For self_normalized=True, divergence must be strictly non-negative.
+      self.assertAllGreaterEqual(res, 0.0)
+
+    # Ground truth computed from the naive mathematical definition using
+    # standard library decimal at 80 digits of precision to avoid cancellation
+    # without requiring external dependencies (such as mpmath) in OSS.
+    with decimal.localcontext(decimal.Context(prec=80)):
+      denom = decimal.Decimal(2 if self_normalized else 1)
+
+      def naive_js_decimal(s):
+        d = decimal.Decimal(str(s))
+        u = d.exp()
+        return float(u * d - (1 + u) * ((1 + u) / denom).ln())
+
+      expected = np.array([naive_js_decimal(s) for s in self._logu])
+    self.assertAllClose(res, expected, rtol=1e-11, atol=0.0)
 
 
 @test_util.test_all_tf_execution_regimes
