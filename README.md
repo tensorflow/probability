@@ -91,10 +91,9 @@ for end-to-end examples. It includes tutorial notebooks such as:
 
 It also includes example scripts such as:
 
-  Representation learning with a latent code and variational inference.
 * [Vector-Quantized Autoencoder](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/examples/vq_vae.py).
   Discrete representation learning with vector quantization.
-* [Disentangled Sequential Variational Autoencoder](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/examples/disentangled_vae.py)
+* [Disentangled Sequential Variational Autoencoder](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/examples/disentangled_vae.py).
   Disentangled representation learning over sequences with variational inference.
 * [Bayesian Neural Networks](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/examples/bayesian_neural_network.py).
   Neural networks with uncertainty over their weights.
