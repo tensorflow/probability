@@ -19,5 +19,5 @@ mediapy == 1.2
 fun_mc @ git+https://github.com/tensorflow/probability.git#egg=fun_mc&subdirectory=spinoffs/fun_mc
 plotly == 5.23
 pythreejs == 2.4
-tqdm == 4.66
+tqdm == 4.66.3
 tfp-nightly==0.25.0.dev20240829
