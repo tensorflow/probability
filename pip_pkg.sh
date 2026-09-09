@@ -36,8 +36,8 @@ DEST=$(cd "$DEST" && pwd)
 # Use cp -L to resolve symlinks added as part of bazel build. Otherwise wheel
 # does not follow them and fails to include TFP on JAX/Numpy.
 pip_tmp="$(mktemp -d)"
-cp -L -R bazel-bin/pip_pkg.runfiles/tensorflow_probability "${pip_tmp}"
-cd "${pip_tmp}/tensorflow_probability"
+cp -L -R bazel-bin/pip_pkg.runfiles/_main "${pip_tmp}"
+cd "${pip_tmp}/_main"
 
 echo >>tensorflow_probability/python/version.py \
   "if __version__.endswith('dev'): __version__ += '$(date --utc +%Y%m%d)'"
