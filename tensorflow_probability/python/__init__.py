@@ -38,12 +38,9 @@ def _validate_tf_environment(package):
     import tensorflow as tf
   except (ImportError, ModuleNotFoundError):
     # Print more informative error message, then reraise.
-    print('\n\nFailed to import TensorFlow. Please note that TensorFlow is not '
-          'installed by default when you install TensorFlow Probability. This '
-          'is so that users can decide whether to install the GPU-enabled '
-          'TensorFlow package. To use TensorFlow Probability, please install '
-          'the most recent version of TensorFlow, by following instructions at '
-          'https://tensorflow.org/install.\n\n')
+    print('\n\nFailed to import TensorFlow, make sure it is installed. '
+          'For example, use `pip install tensorflow tf-keras` or follow'
+          'the instructions https://tensorflow.org/install.\n\n')
     raise
 
   import distutils.version
