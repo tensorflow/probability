@@ -2110,6 +2110,29 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "skew_generalized_normal",
+    srcs = ["skew_generalized_normal.py"],
+    deps = [
+        ":distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:chain",
+        "//tensorflow_probability/python/bijectors:exp",
+        "//tensorflow_probability/python/bijectors:scale",
+        "//tensorflow_probability/python/bijectors:shift",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:special_math",
+        "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "stopping_ratio_logistic",
     srcs = ["stopping_ratio_logistic.py"],
     deps = [
@@ -4455,6 +4478,21 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math:gradient",
         # tensorflow/compiler/jit dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "skew_generalized_normal_test",
+    size = "medium",
+    srcs = ["skew_generalized_normal_test.py"],
+    shard_count = 3,
+    deps = [
+        ":skew_generalized_normal",
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
     ],
 )
 
