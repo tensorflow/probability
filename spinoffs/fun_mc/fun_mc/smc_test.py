@@ -1238,10 +1238,10 @@ class SMCTest(tfp_test_util.TestCase):
           smc_state,
           kernel=functools.partial(
               smc.annealed_importance_sampling_kernel,
-              kernel=inner_kernel,
+              kernel=inner_kernel,  # pyrefly: ignore[bad-argument-type]
               make_target_log_probability_fn=functools.partial(
                   fun_mc.geometric_annealing_path,
-                  num_stages=num_steps,
+                  num_stages=num_steps,  # pyrefly: ignore[bad-argument-type]
                   initial_target_log_prob_fn=tlp_1,
                   final_target_log_prob_fn=tlp_2,
               ),
