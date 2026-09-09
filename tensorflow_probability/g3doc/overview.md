@@ -80,8 +80,6 @@ In addition to the
 [Python notebook tutorials](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/examples/jupyter_notebooks/){:.external}
 listed in the navigation, there are some example scripts available:
 
-* [Variational Autoencoders](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/examples/vae.py)
-  —Representation learning with a latent code and variational inference.
 * [Vector-Quantized Autoencoder](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/examples/vq_vae.py)
   —Discrete representation learning with vector quantization.
 * [Bayesian Neural Networks](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/examples/bayesian_neural_network.py)
