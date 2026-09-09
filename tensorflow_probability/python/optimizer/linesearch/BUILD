@@ -30,6 +30,7 @@ multi_substrate_py_library(
     srcs = ["__init__.py"],
     deps = [
         ":hager_zhang",
+        ":backtracking",
         "//tensorflow_probability/python/internal:all_util",
         "//tensorflow_probability/python/optimizer/linesearch/internal",
     ],
@@ -46,6 +47,16 @@ multi_substrate_py_library(
     ],
 )
 
+multi_substrate_py_library(
+    name = "backtracking",
+    srcs = ["backtracking.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        ],
+)
+
 multi_substrate_py_test(
     name = "hager_zhang_test",
     size = "medium",
@@ -57,6 +68,21 @@ multi_substrate_py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "backtracking_test",
+    size = "small",
+    srcs = ["backtracking_test.py"],
+    numpy_tags = ["notap"],
+    shard_count = 5,
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
