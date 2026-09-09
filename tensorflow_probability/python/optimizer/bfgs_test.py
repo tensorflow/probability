@@ -645,6 +645,32 @@ class BfgsTest(test_util.TestCase):
     self.assertAllTrue(results.failed)
     self.assertAllFinite(results.position)
 
+  def test_line_search_kwargs_are_forwarded(self):
+    """`line_search_kwargs` reach `hager_zhang` and affect the search."""
+    @_make_val_and_grad_fn
+    def rosenbrock(coord):
+      x, y = coord[0], coord[1]
+      return (1 - x)**2 + 100 * (y - x**2)**2
+
+    start = tf.constant([-1.2, 1.0])
+    default_results = self.evaluate(
+        bfgs.minimize(rosenbrock, initial_position=start, tolerance=1e-5))
+    small_step_results = self.evaluate(
+        bfgs.minimize(
+            rosenbrock, initial_position=start, tolerance=1e-5,
+            line_search_kwargs=dict(initial_step_size=0.1)))
+
+    # Both runs should still converge to the Rosenbrock minimum.
+    self.assertTrue(default_results.converged)
+    self.assertTrue(small_step_results.converged)
+    self.assertArrayNear(small_step_results.position,
+                         np.array([1.0, 1.0]), 1e-5)
+    # The default starts each line search at a unit step. Shrinking that to
+    # 0.1 must change the line search trajectory, and therefore the total
+    # number of objective evaluations.
+    self.assertNotEqual(default_results.num_objective_evaluations,
+                        small_step_results.num_objective_evaluations)
+
 
 if __name__ == '__main__':
   test_util.main()
