@@ -88,7 +88,6 @@ class TensorMetaClass(abc.ABCMeta):
 
   def __new__(mcs, name, bases, attrs):  # pylint: disable=bad-mcs-classmethod-argument
     operators = set(tf.Tensor.OVERLOADABLE_OPERATORS)
-    operators.difference_update({'__eq__', '__ne__'})
     operators.update({'__iter__'})
     attrs.update((attr, _wrap_method(attr)) for attr in operators)
 
