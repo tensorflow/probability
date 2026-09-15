@@ -1374,7 +1374,7 @@ class PersistentMetropolistHastingsExtra(NamedTuple):
 @util.named_call
 def persistent_metropolis_hastings_init(
     shape: Shape,
-    dtype: jnp.dtype = jnp.float32,
+    dtype: jnp.dtype = jnp.float32,  # pyrefly: ignore[bad-function-definition]
     init_level: float | FloatArray = 0.0,
 ) -> PersistentMetropolistHastingsState:
   """Initializes `PersistentMetropolistHastingsState`.
