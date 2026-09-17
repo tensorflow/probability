@@ -106,7 +106,8 @@ class QuapTestJDNamedTuple(test_util.TestCase):
 
     approx = rethinking.quap(model,
                              data=ModelSpec(a=None, b=2.),
-                             initial_position=ModelSpec(a=1.5, b=None))
+                             initial_position=ModelSpec(a=1.5, b=None),
+                             max_tries=10)
 
     dists, _ = approx.sample_distributions()
     # See, e.g., Bishop, equation 2.116
