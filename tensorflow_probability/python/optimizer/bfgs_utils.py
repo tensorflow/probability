@@ -148,7 +148,8 @@ def _is_negative_inf(x):
 
 def line_search_step(state, value_and_gradients_function, search_direction,
                      grad_tolerance, f_relative_tolerance, x_tolerance,
-                     stopping_condition, max_iterations, f_absolute_tolerance):
+                     stopping_condition, max_iterations, f_absolute_tolerance,
+                     line_search_kwargs=None):
   """Performs the line search step of the BFGS search procedure.
 
   Uses hager_zhang line search procedure to compute a suitable step size
@@ -182,6 +183,12 @@ def line_search_step(state, value_and_gradients_function, search_direction,
       iterations of the hager_zhang line search algorithm
     f_absolute_tolerance: Scalar `Tensor` of real dtype. Specifies the tolerance
       for the absolute change in the objective value.
+    line_search_kwargs: (Optional) Python `dict` of extra keyword arguments to
+      forward to the underlying `hager_zhang` line search, allowing the caller
+      to tune line search hyper-parameters such as `initial_step_size`,
+      `sufficient_decrease_param` or `curvature_param`. Keys that collide with
+      arguments controlled by the outer optimization loop (`value_at_zero`,
+      `converged`, `max_iterations`) will raise a `TypeError`.
 
   Returns:
     A copy of the input state with the following fields updated:
@@ -206,12 +213,14 @@ def line_search_step(state, value_and_gradients_function, search_direction,
                            df=derivative_at_start_pt,
                            full_gradient=state.objective_gradient)
   inactive = state.failed | state.converged
+  ls_kwargs = dict(line_search_kwargs) if line_search_kwargs else {}
+  ls_kwargs.setdefault('initial_step_size', _broadcast(1, state.position))
   ls_result = hager_zhang(
       line_search_value_grad_func,
-      initial_step_size=_broadcast(1, state.position),
       value_at_zero=val_0,
-      converged=inactive,
-      max_iterations=max_iterations)  # No search needed for these.
+      converged=inactive,  # No search needed for these.
+      max_iterations=max_iterations,
+      **ls_kwargs)
 
   state_after_ls = update_fields(
       state,
