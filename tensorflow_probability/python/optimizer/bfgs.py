@@ -312,7 +312,7 @@ def minimize(value_and_gradients_function,
         control_inputs)
     kwargs['inverse_hessian_estimate'] = initial_inv_hessian
     kwargs['scale_initial_inverse_hessian'] = scale_initial_inverse_hessian
-    kwargs['line_search_kwargs'] = line_search_kwargs
+    kwargs['line_search_kwargs'] = line_search_kwargs if line_search_kwargs is not None else {}
     initial_state = BfgsOptimizerResults(**kwargs)
     return tf.while_loop(
         cond=_cond,

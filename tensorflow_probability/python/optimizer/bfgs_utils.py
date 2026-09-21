@@ -203,6 +203,12 @@ def line_search_step(state, value_and_gradients_function, search_direction,
   """
   # Extract line_search_kwargs from state
   line_search_kwargs = state.line_search_kwargs
+  # Remove parameters that are set explicitly in the hager_zhang call to avoid conflicts
+  filtered_line_search_kwargs = {k: v for k, v in line_search_kwargs.items() 
+                                if k not in ['initial_step_size', 'value_at_initial_step', 'value_at_zero', 
+                                             'converged', 'threshold_use_approximate_wolfe_condition',
+                                             'shrinkage_param', 'expansion_param', 'sufficient_decrease_param',
+                                             'curvature_param', 'max_iterations', 'name']}
   line_search_value_grad_func = _restrict_along_direction(
       value_and_gradients_function, state.position, search_direction)
   derivative_at_start_pt = tf.reduce_sum(
@@ -218,7 +224,7 @@ def line_search_step(state, value_and_gradients_function, search_direction,
       value_at_zero=val_0,
       converged=inactive,
       max_iterations=max_iterations,
-      **(line_search_kwargs or {}))  # No search needed for these.
+      **(filtered_line_search_kwargs or {}))  # No search needed for these.
 
   state_after_ls = update_fields(
       state,
