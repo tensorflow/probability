@@ -57,7 +57,7 @@ jobs:
           ./testing/run_github_tests.sh
       - name: Upload test logs
         if: failure()
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v4
         with:
             name: testlogs-${{ matrix.shard }}
             path: bazel-testlogs
