@@ -317,6 +317,7 @@ CONSTRAINTS = {
     'Zipf': lambda d: dict(d, dtype=tf.float32),
     'FiniteDiscrete': fix_finite_discrete,
     'GeneralizedNormal.power': tfp_hps.softplus_plus_eps(),
+    'SkewGeneralizedNormal.peak': tfp_hps.softplus_plus_eps(1e-1),
     'TwoPieceNormal.skewness': tfp_hps.softplus_plus_eps(),
     'TwoPieceStudentT.skewness': tfp_hps.softplus_plus_eps(),
     'NoncentralChi2.noncentrality': tf.math.softplus,
