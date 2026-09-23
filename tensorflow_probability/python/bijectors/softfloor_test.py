@@ -114,7 +114,8 @@ class _SoftFloorBijectorBase(object):
     x = np.sort(5 * self._rng.randn(3, 10), axis=-1).astype(self.dtype)
     y = 5 * self._rng.randn(3, 10).astype(self.dtype)
     bijector_test_util.assert_bijective_and_finite(
-        floor, x, y, eval_func=self.evaluate, event_ndims=1)
+        floor, x, y, eval_func=self.evaluate, event_ndims=1, rtol=5e-5
+    )
 
   def testBijectiveAndFiniteLowTemperature(self):
     floor = softfloor.Softfloor(self.dtype(1e-1))

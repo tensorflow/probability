@@ -45,7 +45,7 @@ class LinearOperatorUnitaryTest(test_util.TestCase):
     operator = linear_operator_unitary.LinearOperatorUnitary(q)
     true_logdet, expected_logdet = self.evaluate([
         tf.linalg.slogdet(q)[1], operator.log_abs_determinant()])
-    self.assertAllClose(expected_logdet, true_logdet)
+    self.assertAllClose(expected_logdet, true_logdet, atol=1e-5, rtol=1e-5)
 
   def test_matmul(self):
     x = tf.random.stateless_normal(

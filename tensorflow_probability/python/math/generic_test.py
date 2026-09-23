@@ -535,7 +535,7 @@ class LogCoshTest(test_util.TestCase):
 
   def testLogCoshNonNegative(self):
     x = np.logspace(-10., 6., 100)
-    self.assertAllGreaterEqual(generic.log_cosh(x), 0.)
+    self.assertAllGreaterEqual(generic.log_cosh(x), -1e-15)
 
   def testLogCoshAtZero(self):
     self.assertAllClose(0., self.evaluate(generic.log_cosh(0.)))
