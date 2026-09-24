@@ -14,6 +14,8 @@
 # ============================================================================
 name: Tests
 on: [push, pull_request]
+permissions:
+  contents: read
 jobs:
   lints:
     name: Lints
@@ -23,11 +25,12 @@ jobs:
         python-version: [3.12]
     steps:
       - name: Checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 20
+          persist-credentials: false
       - name: Setup Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: ${{ matrix.python-version }}
       - name: Lints
@@ -45,11 +48,12 @@ jobs:
       NUM_SHARDS: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 1
+          persist-credentials: false
       - name: Setup Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: ${{ matrix.python-version }}
       - name: Tests
@@ -57,7 +61,7 @@ jobs:
           ./testing/run_github_tests.sh
       - name: Upload test logs
         if: failure()
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
             name: testlogs-${{ matrix.shard }}
             path: bazel-testlogs
