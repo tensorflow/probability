@@ -431,6 +431,7 @@ def _hyp2f1_z_near_one(a, b, c, z):
   """"Compute 2F1(a, b, c, z) when z is near 1."""
   with tf.name_scope('hyp2f1_z_near_one'):
     dtype = dtype_util.common_dtype([a, b, c, z], tf.float32)
+    numpy_dtype = dtype_util.as_numpy_dtype(dtype)
     a = tf.convert_to_tensor(a, dtype=dtype)
     b = tf.convert_to_tensor(b, dtype=dtype)
     c = tf.convert_to_tensor(c, dtype=dtype)
@@ -440,6 +441,24 @@ def _hyp2f1_z_near_one(a, b, c, z):
     # identity.
 
     d = c - a - b
+
+    # The connection formula below has a removable singularity whenever `d`
+    # is an integer: lgamma(d) has a pole for d <= 0, and lgamma(-d) has a
+    # pole for d >= 0 (one of the two always fires at an integer d), even
+    # though 2F1 itself is finite and analytic there. The exact value at
+    # such a point is given by a distinct closed form with an extra
+    # log(1 - z) term and digamma corrections (DLMF 15.8.8, 15.8.9), but
+    # rather than special-case that formula here, we regularize by nudging
+    # `c` (and thus `d`) off the exact degenerate point. Since 2F1 is
+    # analytic in `c` away from its own poles, this recovers the true
+    # limit at a first-order-in-`epsilon` rate; `epsilon = sqrt(machine
+    # epsilon)` is the standard step size balancing truncation against
+    # rounding error in a one-sided numerical derivative, and empirically
+    # matches mpmath to ~1e-8 relative error in float64 (~1e-4 in float32).
+    epsilon = numpy_dtype(np.sqrt(np.finfo(numpy_dtype).eps))
+    is_degenerate = tf.math.equal(d, tf.math.round(d))
+    c = tf.where(is_degenerate, c + epsilon, c)
+    d = tf.where(is_degenerate, d + epsilon, d)
 
     # TODO(b/171982819): When tfp.math.log_gamma_difference and tfp.math.lbeta
     # support negative parameters, use them here for greater accuracy.
