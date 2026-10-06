@@ -23,7 +23,7 @@ from fun_mc import using_jax as fun_mc
 try:
   # This module doesn't exist at the time static analysis is done.
   # pylint: disable=g-import-not-at-top
-  from fun_mc.dynamic.backend_jax import fun_mc_lib  # pytype: disable=import-error
+  from fun_mc.dynamic.backend_jax import fun_mc_lib  # pyrefly: ignore[missing-module-attribute]
 except ImportError:
   pass
 

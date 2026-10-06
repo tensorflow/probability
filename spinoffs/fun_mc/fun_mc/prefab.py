@@ -294,7 +294,7 @@ def adaptive_hamiltonian_monte_carlo_init(
   hmc_state = fun_mc.hamiltonian_monte_carlo_init(state, target_log_prob_fn)
   dtype = util.flatten_tree(hmc_state.state)[0].dtype
   chain_ndims = len(hmc_state.target_log_prob.shape)
-  running_var_state = fun_mc.running_variance_init(  # pytype: disable=wrong-keyword-args
+  running_var_state = fun_mc.running_variance_init(
       shape=util.map_tree(lambda s: s.shape[chain_ndims:], hmc_state.state),
       dtype=util.map_tree(lambda s: s.dtype, hmc_state.state),
   )
@@ -604,9 +604,7 @@ def adaptive_hamiltonian_monte_carlo_step(
 
 def _tqdm_progress_bar_fn(iterable: Iterable[Any]) -> Iterable[Any]:
   """The TQDM progress bar function."""
-  # pytype: disable=import-error
-  import tqdm  # pylint: disable=g-import-not-at-top
-  # pytype: enable=import-error
+  import tqdm  # pylint: disable=g-import-not-at-top  # pyrefly: ignore[missing-source-for-stubs]
   return tqdm.tqdm(iterable, leave=True)
 
 
@@ -1025,7 +1023,7 @@ def persistent_hamiltonian_monte_carlo_step(
 
   if log_uniform is None:
     # There's some lint error due to the wrapper here.
-    pmh_state, pmh_extra = fun_mc.persistent_metropolis_hastings_step(  # pytype: disable=wrong-keyword-args
+    pmh_state, pmh_extra = fun_mc.persistent_metropolis_hastings_step(
         pmh_state,
         current_state=phmc_state,
         proposed_state=proposed_state,

@@ -31,8 +31,7 @@ import tensorflow_probability.substrates.jax as tfp
 
 try:
   # pylint: disable=g-import-not-at-top
-  # pytype: disable=import-error
-  from fun_mc.dynamic.backend_jax import malt as malt_lib
+  from fun_mc.dynamic.backend_jax import malt as malt_lib  # pyrefly: ignore[missing-module-attribute]
 except ImportError:
   pass
 
@@ -139,15 +138,15 @@ def ccipca(sample: jnp.ndarray, r: jnp.ndarray) -> jnp.ndarray:
   return (act[:, jnp.newaxis] * sample).mean(0)
 
 
-def snaper_criterion(  # pytype: disable=annotation-type-mismatch  # jax-ndarray
+def snaper_criterion(
     previous_state: jnp.ndarray,
     proposed_state: jnp.ndarray,
     accept_prob: jnp.ndarray,
     trajectory_length: jnp.ndarray,
     principal: jnp.ndarray,
-    power: jnp.ndarray = 1.,
-    state_mean: jnp.ndarray = Optional[jnp.ndarray],
-    state_mean_weight: jnp.ndarray = 0.,
+    power: jnp.ndarray = 1.,  # pyrefly: ignore[bad-function-definition]
+    state_mean: jnp.ndarray = Optional[jnp.ndarray],  # pyrefly: ignore[bad-function-definition]
+    state_mean_weight: jnp.ndarray = 0.,  # pyrefly: ignore[bad-function-definition]
 ):
   """SNAPER criterion[1].
 
@@ -178,8 +177,8 @@ def snaper_criterion(  # pytype: disable=annotation-type-mismatch  # jax-ndarray
 
   no_state_mean = object()
   if state_mean is None:
-    state_mean = fun_mc.maybe_broadcast_structure(no_state_mean, previous_state)
-  state_mean_weight = fun_mc.maybe_broadcast_structure(state_mean_weight,
+    state_mean = fun_mc.maybe_broadcast_structure(no_state_mean, previous_state)  # pyrefly: ignore[missing-attribute]
+  state_mean_weight = fun_mc.maybe_broadcast_structure(state_mean_weight,  # pyrefly: ignore[missing-attribute]
                                                        previous_state)
   mx = state_mean
   mw = state_mean_weight
@@ -239,16 +238,16 @@ class AdaptiveMCMCState(NamedTuple):
     trajectory_length_rmean_state: Iterate averaging for trajectory length.
     step: Current step.
   """
-  mcmc_state: Union[fun_mc.HamiltonianMonteCarloState,
-                    fun_mc.prefab.MetropolisAdjustedLangevinTrajectoriesState]
-  rvar_state: fun_mc.RunningVarianceState
-  proj_rautocov_state: fun_mc.RunningCovarianceState
-  principal_rmean_state: fun_mc.RunningMeanState
-  precond_principal_rmean_state: fun_mc.RunningMeanState
-  log_step_size_opt_state: fun_mc.AdamState
-  log_trajectory_length_opt_state: fun_mc.AdamState
-  step_size_rmean_state: fun_mc.RunningMeanState
-  trajectory_length_rmean_state: fun_mc.RunningMeanState
+  mcmc_state: Union[fun_mc.HamiltonianMonteCarloState,  # pyrefly: ignore[missing-attribute]
+                    fun_mc.prefab.MetropolisAdjustedLangevinTrajectoriesState]  # pyrefly: ignore[missing-attribute]
+  rvar_state: fun_mc.RunningVarianceState  # pyrefly: ignore[missing-attribute]
+  proj_rautocov_state: fun_mc.RunningCovarianceState  # pyrefly: ignore[missing-attribute]
+  principal_rmean_state: fun_mc.RunningMeanState  # pyrefly: ignore[missing-attribute]
+  precond_principal_rmean_state: fun_mc.RunningMeanState  # pyrefly: ignore[missing-attribute]
+  log_step_size_opt_state: fun_mc.AdamState  # pyrefly: ignore[missing-attribute]
+  log_trajectory_length_opt_state: fun_mc.AdamState  # pyrefly: ignore[missing-attribute]
+  step_size_rmean_state: fun_mc.RunningMeanState  # pyrefly: ignore[missing-attribute]
+  trajectory_length_rmean_state: fun_mc.RunningMeanState  # pyrefly: ignore[missing-attribute]
   step: jnp.ndarray
 
 
@@ -268,15 +267,15 @@ class AdaptiveMCMCExtra(NamedTuple):
     num_integrator_steps: Number of integrator steps actually taken.
     damping: Damping that was used.
   """
-  mcmc_extra: Union[fun_mc.HamiltonianMonteCarloExtra,
-                    fun_mc.prefab.MetropolisAdjustedLangevinTrajectoriesExtra]
+  mcmc_extra: Union[fun_mc.HamiltonianMonteCarloExtra,  # pyrefly: ignore[missing-attribute]
+                    fun_mc.prefab.MetropolisAdjustedLangevinTrajectoriesExtra]  # pyrefly: ignore[missing-attribute]
   scalar_step_size: jnp.ndarray
   vector_step_size: jnp.ndarray
   power: jnp.ndarray
   principal: jnp.ndarray
   max_eigenvalue: jnp.ndarray
   mean_trajectory_length: jnp.ndarray
-  log_trajectory_length_opt_extra: fun_mc.AdamExtra
+  log_trajectory_length_opt_extra: fun_mc.AdamExtra  # pyrefly: ignore[missing-attribute]
   num_integrator_steps: jnp.ndarray
   damping: jnp.ndarray
   extra: Any
@@ -291,7 +290,7 @@ def halton(float_index: jnp.ndarray, max_bits: int = 10) -> jnp.ndarray:
 
 
 def adaptive_mcmc_init(state: jnp.ndarray,
-                       target_log_prob_fn: fun_mc.PotentialFn,
+                       target_log_prob_fn: fun_mc.PotentialFn,  # pyrefly: ignore[missing-attribute]
                        init_step_size: jnp.ndarray,
                        init_trajectory_length: jnp.ndarray,
                        rvar_smoothing: int,
@@ -310,44 +309,44 @@ def adaptive_mcmc_init(state: jnp.ndarray,
     Adaptive MCMC state.
   """
   if method == 'hmc':
-    mcmc_state = fun_mc.hamiltonian_monte_carlo_init(
+    mcmc_state = fun_mc.hamiltonian_monte_carlo_init(  # pyrefly: ignore[missing-attribute]
         state=state,
         target_log_prob_fn=target_log_prob_fn,
     )
   elif method == 'malt':
-    mcmc_state = fun_mc.prefab.metropolis_adjusted_langevin_trajectories_init(
+    mcmc_state = fun_mc.prefab.metropolis_adjusted_langevin_trajectories_init(  # pyrefly: ignore[missing-attribute]
         state=state,
         target_log_prob_fn=target_log_prob_fn,
     )
 
   return AdaptiveMCMCState(
-      mcmc_state=mcmc_state,
-      principal_rmean_state=fun_mc.running_mean_init(
+      mcmc_state=mcmc_state,  # pyrefly: ignore[unbound-name]
+      principal_rmean_state=fun_mc.running_mean_init(  # pyrefly: ignore[missing-attribute]
           state.shape[1:], state.dtype)._replace(
               mean=jax.random.normal(
                   jax.random.PRNGKey(0), state.shape[1:], state.dtype),
               num_points=rvar_smoothing),
-      precond_principal_rmean_state=fun_mc.running_mean_init(
+      precond_principal_rmean_state=fun_mc.running_mean_init(  # pyrefly: ignore[missing-attribute]
           state.shape[1:], state.dtype)._replace(
               mean=jax.random.normal(
                   jax.random.PRNGKey(0), state.shape[1:], state.dtype),
               num_points=rvar_smoothing),
-      rvar_state=fun_mc.running_variance_init(
+      rvar_state=fun_mc.running_variance_init(  # pyrefly: ignore[missing-attribute]
           state.shape[1:], state.dtype)._replace(num_points=rvar_smoothing),
-      proj_rautocov_state=fun_mc.running_covariance_init(
+      proj_rautocov_state=fun_mc.running_covariance_init(  # pyrefly: ignore[missing-attribute]
           [2], state.dtype)._replace(num_points=rvar_smoothing),
-      log_step_size_opt_state=fun_mc.adam_init(jnp.log(init_step_size)),
-      log_trajectory_length_opt_state=fun_mc.adam_init(
+      log_step_size_opt_state=fun_mc.adam_init(jnp.log(init_step_size)),  # pyrefly: ignore[missing-attribute]
+      log_trajectory_length_opt_state=fun_mc.adam_init(  # pyrefly: ignore[missing-attribute]
           jnp.log(init_trajectory_length)),
-      step_size_rmean_state=fun_mc.running_mean_init([], jnp.float32),
-      trajectory_length_rmean_state=fun_mc.running_mean_init([], jnp.float32),
+      step_size_rmean_state=fun_mc.running_mean_init([], jnp.float32),  # pyrefly: ignore[missing-attribute]
+      trajectory_length_rmean_state=fun_mc.running_mean_init([], jnp.float32),  # pyrefly: ignore[missing-attribute]
       step=jnp.array(0, jnp.int32),
   )
 
 
 def adaptive_mcmc_step(
     amcmc_state: AdaptiveMCMCState,
-    target_log_prob_fn: fun_mc.PotentialFn,
+    target_log_prob_fn: fun_mc.PotentialFn,  # pyrefly: ignore[missing-attribute]
     num_mala_steps: int,
     num_adaptation_steps: int,
     seed: jax.Array,
@@ -449,7 +448,7 @@ def adaptive_mcmc_step(
       cov = amcmc_state.proj_rautocov_state.covariance[1, 0]
       power = 0.5 * (1. + cov / var)
     else:
-      power = 1.
+      power = 1.  # pyrefly: ignore[bad-assignment]
 
   if principal is None:
     max_eigenvalue = jnp.linalg.norm(amcmc_state.principal_rmean_state.mean)
@@ -467,7 +466,7 @@ def adaptive_mcmc_step(
       traj_factor = halton(amcmc_state.step.astype(jnp.float32)) * 2.
     elif jitter_style == 'exponential':
       traj_factor = tfd.Exponential(1.).sample(
-          seed=jax.random.PRNGKey(amcmc_state.step))  # pytype: disable=wrong-arg-types  # jax-ndarray
+          seed=jax.random.PRNGKey(amcmc_state.step))
     elif jitter_style == 'halton_exponential':
       traj_factor = -jnp.log(halton(amcmc_state.step.astype(jnp.float32)))
   elif method == 'malt':
@@ -477,7 +476,7 @@ def adaptive_mcmc_step(
     mean_trajectory_length = jnp.where(
         adapt, jnp.exp(amcmc_state.log_trajectory_length_opt_state.state),
         amcmc_state.trajectory_length_rmean_state.mean)
-  trajectory_length = traj_factor * mean_trajectory_length
+  trajectory_length = traj_factor * mean_trajectory_length  # pyrefly: ignore[unbound-name]
   num_integrator_steps = jnp.ceil(trajectory_length / scalar_step_size)
   num_integrator_steps = jnp.where(
       jnp.isfinite(num_integrator_steps), num_integrator_steps, 1)
@@ -487,7 +486,7 @@ def adaptive_mcmc_step(
   # Apply a step of MCMC
   # ====================
   if method == 'hmc':
-    mcmc_state, mcmc_extra = fun_mc.hamiltonian_monte_carlo_step(
+    mcmc_state, mcmc_extra = fun_mc.hamiltonian_monte_carlo_step(  # pyrefly: ignore[missing-attribute]
         amcmc_state.mcmc_state,
         target_log_prob_fn=target_log_prob_fn,
         step_size=scalar_step_size * vector_step_size,
@@ -498,7 +497,7 @@ def adaptive_mcmc_step(
   elif method == 'malt':
     if damping is None:
       damping = damping_factor / (1e-10 + jnp.sqrt(max_eigenvalue))
-    mcmc_state, mcmc_extra = fun_mc.prefab.metropolis_adjusted_langevin_trajectories_step(
+    mcmc_state, mcmc_extra = fun_mc.prefab.metropolis_adjusted_langevin_trajectories_step(  # pyrefly: ignore[missing-attribute]
         amcmc_state.mcmc_state,
         target_log_prob_fn=target_log_prob_fn,
         step_size=scalar_step_size * vector_step_size,
@@ -516,7 +515,7 @@ def adaptive_mcmc_step(
     )
     proposed_state = mcmc_extra.proposed_malt_state.state
   # This assumes a N(0, I) momentum distribution
-  initial_momentum = mcmc_extra.initial_momentum
+  initial_momentum = mcmc_extra.initial_momentum  # pyrefly: ignore[unbound-name]
   final_momentum = mcmc_extra.integrator_extra.momentum_grads
 
   # ==========
@@ -524,16 +523,16 @@ def adaptive_mcmc_step(
   # ==========
 
   # Adjust running-variance estimate.
-  cand_rvar_state, _ = fun_mc.running_variance_step(
+  cand_rvar_state, _ = fun_mc.running_variance_step(  # pyrefly: ignore[missing-attribute]
       amcmc_state.rvar_state,
-      mcmc_state.state,
+      mcmc_state.state,  # pyrefly: ignore[unbound-name]
       axis=0,
       window_size=rvar_smoothing + num_chains * amcmc_state.step // rvar_factor)
-  rvar_state = fun_mc.choose(adapt, cand_rvar_state, amcmc_state.rvar_state)
+  rvar_state = fun_mc.choose(adapt, cand_rvar_state, amcmc_state.rvar_state)  # pyrefly: ignore[missing-attribute]
 
   # Adjust trajectory length.
   def log_trajectory_length_surrogate_loss_fn(log_trajectory_length):
-    log_trajectory_length = fun_mc.clip_grads(log_trajectory_length, 1e6)
+    log_trajectory_length = fun_mc.clip_grads(log_trajectory_length, 1e6)  # pyrefly: ignore[missing-attribute]
     mean_trajectory_length = jnp.exp(log_trajectory_length)
     trajectory_length = traj_factor * mean_trajectory_length
 
@@ -553,7 +552,7 @@ def adaptive_mcmc_step(
 
     criteria = []
     extras = []
-    for start_state, end_state, state_grads in start_end_grads:
+    for start_state, end_state, state_grads in start_end_grads:  # pyrefly: ignore[unbound-name]
       action = trajectory_length * vector_step_size * state_grads
       end_state_with_action = (
           end_state + action - jax.lax.stop_gradient(action))
@@ -570,10 +569,10 @@ def adaptive_mcmc_step(
           accept_prob=jnp.exp(jnp.minimum(0., -mcmc_extra.log_accept_ratio)),
           trajectory_length=trajectory_length + scalar_step_size,
           principal=principal,
-          power=power,
+          power=power,  # pyrefly: ignore[bad-argument-type]
           # These two expressions are a bit weird for the reverse direction...
           state_mean=amcmc_state.rvar_state.mean,
-          state_mean_weight=state_mean_weight,
+          state_mean_weight=state_mean_weight,  # pyrefly: ignore[bad-argument-type]
       )
       criteria.append(criterion)
       extras.append(extra)
@@ -585,7 +584,7 @@ def adaptive_mcmc_step(
         (1. - 0.95 * amcmc_state.step / num_adaptation_steps) *
         cur_adaptation_rate)
   (log_trajectory_length_opt_state, log_trajectory_length_opt_extra) = (
-      fun_mc.adam_step(
+      fun_mc.adam_step(  # pyrefly: ignore[missing-attribute]
           amcmc_state.log_trajectory_length_opt_state,
           log_trajectory_length_surrogate_loss_fn,
           cur_adaptation_rate,
@@ -605,7 +604,7 @@ def adaptive_mcmc_step(
       jnp.isfinite(log_accept_prob), log_accept_prob, min_log_accept_prob)
   accept_prob = jnp.exp(tfp.math.reduce_log_harmonic_mean_exp(log_accept_prob))
 
-  log_step_size_surrogate_loss_fn = fun_mc.make_surrogate_loss_fn(
+  log_step_size_surrogate_loss_fn = fun_mc.make_surrogate_loss_fn(  # pyrefly: ignore[missing-attribute]
       lambda _: (target_accept_prob - accept_prob, ()))
 
   cur_adaptation_rate = jnp.where(adapt, step_size_adaptation_rate, 0.)
@@ -614,7 +613,7 @@ def adaptive_mcmc_step(
         (1. - 0.95 * amcmc_state.step / num_adaptation_steps) *
         cur_adaptation_rate)
   (log_step_size_opt_state, _) = (
-      fun_mc.adam_step(
+      fun_mc.adam_step(  # pyrefly: ignore[missing-attribute]
           amcmc_state.log_step_size_opt_state,
           log_step_size_surrogate_loss_fn,
           cur_adaptation_rate,
@@ -633,26 +632,26 @@ def adaptive_mcmc_step(
   elif principal_mean_method == 'running_mean':
     mean = rvar_state.mean
 
-  cand_principal_rmean_state, _ = fun_mc.running_mean_step(
+  cand_principal_rmean_state, _ = fun_mc.running_mean_step(  # pyrefly: ignore[missing-attribute]
       amcmc_state.principal_rmean_state,
-      ccipca(mcmc_state.state - mean, amcmc_state.principal_rmean_state.mean),
+      ccipca(mcmc_state.state - mean, amcmc_state.principal_rmean_state.mean),  # pyrefly: ignore[unbound-name]
       window_size=rvar_smoothing + amcmc_state.step // principal_factor,
   )
-  principal_rmean_state = fun_mc.choose(adapt, cand_principal_rmean_state,
+  principal_rmean_state = fun_mc.choose(adapt, cand_principal_rmean_state,  # pyrefly: ignore[missing-attribute]
                                         amcmc_state.principal_rmean_state)
 
-  cand_precond_principal_rmean_state, _ = fun_mc.running_mean_step(
+  cand_precond_principal_rmean_state, _ = fun_mc.running_mean_step(  # pyrefly: ignore[missing-attribute]
       amcmc_state.precond_principal_rmean_state,
       ccipca((mcmc_state.state - mean) / vector_step_size,
              amcmc_state.precond_principal_rmean_state.mean),
       window_size=rvar_smoothing + amcmc_state.step // principal_factor,
   )
-  precond_principal_rmean_state = fun_mc.choose(
+  precond_principal_rmean_state = fun_mc.choose(  # pyrefly: ignore[missing-attribute]
       adapt, cand_precond_principal_rmean_state,
       amcmc_state.precond_principal_rmean_state)
 
   # Adjust auto-covariance of the squared projections.
-  cand_proj_rautocov_state, _ = fun_mc.running_covariance_step(
+  cand_proj_rautocov_state, _ = fun_mc.running_covariance_step(  # pyrefly: ignore[missing-attribute]
       amcmc_state.proj_rautocov_state,
       jnp.stack([
           log_trajectory_length_opt_extra.loss_extra[0]['proposed_projection']**
@@ -662,28 +661,28 @@ def adaptive_mcmc_step(
       ], -1),
       axis=0,
       window_size=rvar_smoothing + num_chains * amcmc_state.step // rvar_factor)
-  proj_rautocov_state = fun_mc.choose(adapt, cand_proj_rautocov_state,
+  proj_rautocov_state = fun_mc.choose(adapt, cand_proj_rautocov_state,  # pyrefly: ignore[missing-attribute]
                                       amcmc_state.proj_rautocov_state)
 
   # =================
   # Iterate averaging
   # =================
-  cand_step_size_rmean_state, _ = fun_mc.running_mean_step(
+  cand_step_size_rmean_state, _ = fun_mc.running_mean_step(  # pyrefly: ignore[missing-attribute]
       amcmc_state.step_size_rmean_state,
       scalar_step_size,
       window_size=amcmc_state.step // iterate_factor)
-  step_size_rmean_state = fun_mc.choose(adapt, cand_step_size_rmean_state,
+  step_size_rmean_state = fun_mc.choose(adapt, cand_step_size_rmean_state,  # pyrefly: ignore[missing-attribute]
                                         amcmc_state.step_size_rmean_state)
 
-  cand_trajectory_length_rmean_state, _ = fun_mc.running_mean_step(
+  cand_trajectory_length_rmean_state, _ = fun_mc.running_mean_step(  # pyrefly: ignore[missing-attribute]
       amcmc_state.trajectory_length_rmean_state,
       mean_trajectory_length,
       window_size=amcmc_state.step // iterate_factor)
-  trajectory_length_rmean_state = fun_mc.choose(
+  trajectory_length_rmean_state = fun_mc.choose(  # pyrefly: ignore[missing-attribute]
       adapt, cand_trajectory_length_rmean_state,
       amcmc_state.trajectory_length_rmean_state)
 
-  proposed_projection2 = ((proposed_state - mean) * principal).sum(-1)
+  proposed_projection2 = ((proposed_state - mean) * principal).sum(-1)  # pyrefly: ignore[unbound-name]
   previous_projection2 = ((amcmc_state.mcmc_state.state - mean) *
                           principal).sum(-1)
   amcmc_state = amcmc_state._replace(
@@ -703,9 +702,9 @@ def adaptive_mcmc_step(
       scalar_step_size=scalar_step_size,
       vector_step_size=vector_step_size,
       principal=principal,
-      power=power,
+      power=power,  # pyrefly: ignore[bad-argument-type]
       max_eigenvalue=max_eigenvalue,
-      damping=damping,
+      damping=damping,  # pyrefly: ignore[bad-argument-type]
       mean_trajectory_length=mean_trajectory_length,
       log_trajectory_length_opt_extra=log_trajectory_length_opt_extra,
       num_integrator_steps=num_integrator_steps,
@@ -733,9 +732,9 @@ def adaptive_mcmc_step(
 
 class AdaptiveNUTSState(NamedTuple):
   nuts_state: Tuple[jnp.ndarray, Any]
-  rvar_state: fun_mc.RunningVarianceState
-  log_step_size_opt_state: fun_mc.AdamState
-  step_size_rmean_state: fun_mc.RunningMeanState
+  rvar_state: fun_mc.RunningVarianceState  # pyrefly: ignore[missing-attribute]
+  log_step_size_opt_state: fun_mc.AdamState  # pyrefly: ignore[missing-attribute]
+  step_size_rmean_state: fun_mc.RunningMeanState  # pyrefly: ignore[missing-attribute]
   step: jnp.ndarray
 
 
@@ -749,7 +748,7 @@ class AdaptiveNUTSExtra(NamedTuple):
 
 
 def adaptive_nuts_init(state: jnp.ndarray,
-                       target_log_prob_fn: fun_mc.PotentialFn,
+                       target_log_prob_fn: fun_mc.PotentialFn,  # pyrefly: ignore[missing-attribute]
                        init_step_size: jnp.ndarray,
                        rvar_smoothing: int) -> AdaptiveNUTSState:
   """Initializes the Adaptive NUTS algorithm."""
@@ -765,17 +764,17 @@ def adaptive_nuts_init(state: jnp.ndarray,
 
   return AdaptiveNUTSState(
       nuts_state=nuts_state,
-      rvar_state=fun_mc.running_variance_init(
+      rvar_state=fun_mc.running_variance_init(  # pyrefly: ignore[missing-attribute]
           state.shape[1:], state.dtype)._replace(num_points=rvar_smoothing),
-      log_step_size_opt_state=fun_mc.adam_init(jnp.log(init_step_size)),
-      step_size_rmean_state=fun_mc.running_mean_init([], jnp.float32),
+      log_step_size_opt_state=fun_mc.adam_init(jnp.log(init_step_size)),  # pyrefly: ignore[missing-attribute]
+      step_size_rmean_state=fun_mc.running_mean_init([], jnp.float32),  # pyrefly: ignore[missing-attribute]
       step=jnp.array(0, jnp.int32),
   )
 
 
 def adaptive_nuts_step(
     anuts_state: AdaptiveNUTSState,
-    target_log_prob_fn: fun_mc.PotentialFn,
+    target_log_prob_fn: fun_mc.PotentialFn,  # pyrefly: ignore[missing-attribute]
     num_mala_steps: int,
     num_adaptation_steps: int,
     seed: jax.Array,
@@ -827,12 +826,12 @@ def adaptive_nuts_step(
   # ==========
 
   # Adjust running-variance estimate.
-  cand_rvar_state, _ = fun_mc.running_variance_step(
+  cand_rvar_state, _ = fun_mc.running_variance_step(  # pyrefly: ignore[missing-attribute]
       anuts_state.rvar_state,
       nuts_state[0],
       axis=0,
       window_size=rvar_smoothing + num_chains * anuts_state.step // rvar_factor)
-  rvar_state = fun_mc.choose(adapt, cand_rvar_state, anuts_state.rvar_state)
+  rvar_state = fun_mc.choose(adapt, cand_rvar_state, anuts_state.rvar_state)  # pyrefly: ignore[missing-attribute]
 
   # Adjust step size.
   log_accept_ratio = nuts_state[1].log_accept_ratio
@@ -844,7 +843,7 @@ def adaptive_nuts_step(
       jnp.isfinite(log_accept_prob), log_accept_prob, min_log_accept_prob)
   accept_prob = jnp.exp(tfp.math.reduce_log_harmonic_mean_exp(log_accept_prob))
 
-  log_step_size_surrogate_loss_fn = fun_mc.make_surrogate_loss_fn(
+  log_step_size_surrogate_loss_fn = fun_mc.make_surrogate_loss_fn(  # pyrefly: ignore[missing-attribute]
       lambda _: (target_accept_prob - accept_prob, ()))
 
   cur_adaptation_rate = jnp.where(adapt, step_size_adaptation_rate, 0.)
@@ -853,7 +852,7 @@ def adaptive_nuts_step(
         (1. - 0.95 * anuts_state.step / num_adaptation_steps) *
         cur_adaptation_rate)
   (log_step_size_opt_state, _) = (
-      fun_mc.adam_step(
+      fun_mc.adam_step(  # pyrefly: ignore[missing-attribute]
           anuts_state.log_step_size_opt_state,
           log_step_size_surrogate_loss_fn,
           cur_adaptation_rate,
@@ -863,11 +862,11 @@ def adaptive_nuts_step(
   # =================
   # Iterate averaging
   # =================
-  cand_step_size_rmean_state, _ = fun_mc.running_mean_step(
+  cand_step_size_rmean_state, _ = fun_mc.running_mean_step(  # pyrefly: ignore[missing-attribute]
       anuts_state.step_size_rmean_state,
       scalar_step_size,
       window_size=anuts_state.step // iterate_factor)
-  step_size_rmean_state = fun_mc.choose(adapt, cand_step_size_rmean_state,
+  step_size_rmean_state = fun_mc.choose(adapt, cand_step_size_rmean_state,  # pyrefly: ignore[missing-attribute]
                                         anuts_state.step_size_rmean_state)
 
   anuts_state = anuts_state._replace(
@@ -1012,7 +1011,7 @@ def estimate_largest_eigenvalue_of_covariance(x, remove_mean=True):
 
 
 class MeadsState(NamedTuple):
-  phmc_state: fun_mc.prefab.PersistentHamiltonianMonteCarloState
+  phmc_state: fun_mc.prefab.PersistentHamiltonianMonteCarloState  # pyrefly: ignore[missing-attribute]
   fold_to_skip: jnp.ndarray
   step: jnp.ndarray
 
@@ -1028,7 +1027,7 @@ class MeadsExtra(NamedTuple):
     num_integrator_steps: Number of integrator steps actually taken.
     damping: Damping that was used.
   """
-  phmc_extra: fun_mc.prefab.PersistentHamiltonianMonteCarloExtra
+  phmc_extra: fun_mc.prefab.PersistentHamiltonianMonteCarloExtra  # pyrefly: ignore[missing-attribute]
   scalar_step_size: jnp.ndarray
   vector_step_size: jnp.ndarray
   max_eigenvalue: jnp.ndarray
@@ -1039,7 +1038,7 @@ class MeadsExtra(NamedTuple):
   extra: Any
 
 
-def meads_init(state: jnp.ndarray, target_log_prob_fn: fun_mc.PotentialFn,
+def meads_init(state: jnp.ndarray, target_log_prob_fn: fun_mc.PotentialFn,  # pyrefly: ignore[missing-attribute]
                num_folds: int, seed: jax.Array):
   """Initializes MEADS."""
   num_dimensions = state.shape[-1]
@@ -1050,7 +1049,7 @@ def meads_init(state: jnp.ndarray, target_log_prob_fn: fun_mc.PotentialFn,
   m_seed, slice_seed = jax.random.split(seed)
   m = jax.random.normal(m_seed, state.shape)
   u = 2 * jax.random.uniform(slice_seed, state.shape[:-1]) - 1
-  phmc_state = fun_mc.prefab.persistent_hamiltonian_monte_carlo_init(
+  phmc_state = fun_mc.prefab.persistent_hamiltonian_monte_carlo_init(  # pyrefly: ignore[missing-attribute]
       state, target_log_prob_fn, m, u)
 
   return MeadsState(
@@ -1061,7 +1060,7 @@ def meads_init(state: jnp.ndarray, target_log_prob_fn: fun_mc.PotentialFn,
 
 
 def meads_step(meads_state: MeadsState,
-               target_log_prob_fn: fun_mc.PotentialFn,
+               target_log_prob_fn: fun_mc.PotentialFn,  # pyrefly: ignore[missing-attribute]
                seed: jax.Array,
                vector_step_size: Optional[jnp.ndarray] = None,
                damping: Optional[jnp.ndarray] = None,
@@ -1078,7 +1077,7 @@ def meads_step(meads_state: MeadsState,
   phmc_state = meads_state.phmc_state
 
   # Randomly refold the walkers.
-  perm = jax.random.permutation(jax.random.PRNGKey(step // 4), num_chains)  # pytype: disable=wrong-arg-types  # jax-ndarray
+  perm = jax.random.permutation(jax.random.PRNGKey(step // 4), num_chains)
   # TODO(mhoffman): This should really done with a scatter.
   unperm = jnp.eye(num_chains)[perm].argmax(0)
 
@@ -1134,7 +1133,7 @@ def meads_step(meads_state: MeadsState,
             jnp.roll(updated, -fold_to_skip, 0)
         ], 0), fold_to_skip, 0)
 
-  active_fold_state, phmc_extra = fun_mc.prefab.persistent_hamiltonian_monte_carlo_step(
+  active_fold_state, phmc_extra = fun_mc.prefab.persistent_hamiltonian_monte_carlo_step(  # pyrefly: ignore[missing-attribute]
       jax.tree.map(select_folds, phmc_state),
       target_log_prob_fn=target_log_prob_fn,
       step_size=select_folds(scalar_step_size[:, jnp.newaxis, jnp.newaxis] *
@@ -1154,13 +1153,13 @@ def meads_step(meads_state: MeadsState,
       step=step + 1,
   )
 
-  extra = MeadsExtra(  # pytype: disable=wrong-arg-types  # jax-ndarray
+  extra = MeadsExtra(
       phmc_extra=phmc_extra,
       scalar_step_size=scalar_step_size,
       vector_step_size=vector_step_size,
       damping=damping,
       max_eigenvalue=max_eigenvalue,
-      num_integrator_steps=1,
+      num_integrator_steps=1,  # pyrefly: ignore[bad-argument-type]
       level=phmc_state.pmh_state.level,
       extra={},
   )
@@ -1211,7 +1210,7 @@ def get_init_x(target: gym.targets.Model,
     init_point = b(
         jnp.zeros(b.inverse_event_shape(target.event_shape), target.dtype))
 
-  return jnp.tile(init_point[jnp.newaxis], [num_chains, 1])
+  return jnp.tile(init_point[jnp.newaxis], [num_chains, 1])  # pyrefly: ignore[unbound-name]
 
 
 @gin.configurable
@@ -1257,13 +1256,13 @@ def run_adaptive_mcmc_on_target(
      A tuple of final and traced results.
   """
   if init_x is None:
-    init_x = get_init_x(target, num_chains)
+    init_x = get_init_x(target, num_chains)  # pyrefly: ignore[bad-argument-type]
   init_z = target.default_event_space_bijector.inverse(init_x)
 
   def target_log_prob_fn(x):
     return target.unnormalized_log_prob(x), ()
 
-  target_log_prob_fn = fun_mc.transform_log_prob_fn(
+  target_log_prob_fn = fun_mc.transform_log_prob_fn(  # pyrefly: ignore[missing-attribute]
       target_log_prob_fn, target.default_event_space_bijector)
 
   def kernel(amcmc_state, seed):
@@ -1309,14 +1308,14 @@ def run_adaptive_mcmc_on_target(
   )
 
   if save_warmup:
-    _, trace = fun_mc.trace((amcmc_state, seed), kernel,
+    _, trace = fun_mc.trace((amcmc_state, seed), kernel,  # pyrefly: ignore[missing-attribute]
                             num_results + num_adaptation_steps)
   else:
-    state, _ = fun_mc.trace((amcmc_state, seed),
+    state, _ = fun_mc.trace((amcmc_state, seed),  # pyrefly: ignore[missing-attribute]
                             kernel,
                             num_adaptation_steps,
                             trace_fn=lambda *_: ())
-    _, trace = fun_mc.trace(state, kernel, num_results)
+    _, trace = fun_mc.trace(state, kernel, num_results)  # pyrefly: ignore[missing-attribute]
 
   warmed_up_steps = int(num_results * 0.8)
   warmed_up_state = trace['state'][-warmed_up_steps:]
@@ -1332,7 +1331,7 @@ def run_adaptive_mcmc_on_target(
     mean = ground_truth['stats']['m1']['mean']
     if save_warmup:
       bias = {
-          'bias': compute_bias(trace['state'], ground_truth, mean, principal)  # pytype: disable=wrong-arg-types  # jax-ndarray
+          'bias': compute_bias(trace['state'], ground_truth, mean, principal)  # pyrefly: ignore[bad-argument-type]
       }
     else:
       bias = {}
@@ -1343,7 +1342,7 @@ def run_adaptive_mcmc_on_target(
               state=warmed_up_state,
               num_grads=trace['num_integrator_steps'][-warmed_up_steps:].sum(),
               mean=mean,
-              principal=principal,
+              principal=principal,  # pyrefly: ignore[bad-argument-type]
           ),
       'final_x':
           target.default_event_space_bijector(trace['state'][-1]),
@@ -1388,13 +1387,13 @@ def run_adaptive_nuts_on_target(
      A tuple of final and traced results.
   """
   if init_x is None:
-    init_x = get_init_x(target, num_chains)
+    init_x = get_init_x(target, num_chains)  # pyrefly: ignore[bad-argument-type]
   init_z = target.default_event_space_bijector.inverse(init_x)
 
   def target_log_prob_fn(x):
     return target.unnormalized_log_prob(x), ()
 
-  target_log_prob_fn = fun_mc.transform_log_prob_fn(
+  target_log_prob_fn = fun_mc.transform_log_prob_fn(  # pyrefly: ignore[missing-attribute]
       target_log_prob_fn, target.default_event_space_bijector)
 
   def kernel(anuts_state, seed):
@@ -1429,14 +1428,14 @@ def run_adaptive_nuts_on_target(
   )
 
   if save_warmup:
-    _, trace = fun_mc.trace((anuts_state, seed), kernel,
+    _, trace = fun_mc.trace((anuts_state, seed), kernel,  # pyrefly: ignore[missing-attribute]
                             num_results + num_adaptation_steps)
   else:
-    state, _ = fun_mc.trace((anuts_state, seed),
+    state, _ = fun_mc.trace((anuts_state, seed),  # pyrefly: ignore[missing-attribute]
                             kernel,
                             num_adaptation_steps,
                             trace_fn=lambda *_: ())
-    _, trace = fun_mc.trace(state, kernel, num_results)
+    _, trace = fun_mc.trace(state, kernel, num_results)  # pyrefly: ignore[missing-attribute]
 
   warmed_up_steps = int(num_results * 0.8)
   warmed_up_state = trace['state'][-warmed_up_steps:]
@@ -1452,7 +1451,7 @@ def run_adaptive_nuts_on_target(
     mean = ground_truth['stats']['m1']['mean']
     if save_warmup:
       bias = {
-          'bias': compute_bias(trace['state'], ground_truth, mean, principal)  # pytype: disable=wrong-arg-types  # jax-ndarray
+          'bias': compute_bias(trace['state'], ground_truth, mean, principal)  # pyrefly: ignore[bad-argument-type]
       }
     else:
       bias = {}
@@ -1463,7 +1462,7 @@ def run_adaptive_nuts_on_target(
               state=warmed_up_state,
               num_grads=trace['num_integrator_steps'][-warmed_up_steps:].sum(),
               mean=mean,
-              principal=principal,
+              principal=principal,  # pyrefly: ignore[bad-argument-type]
           ),
       'final_x':
           target.default_event_space_bijector(trace['state'][-1]),
@@ -1506,13 +1505,13 @@ def run_meads_on_target(
      A tuple of final and traced results.
   """
   if init_x is None:
-    init_x = get_init_x(target, num_chains)
+    init_x = get_init_x(target, num_chains)  # pyrefly: ignore[bad-argument-type]
   init_z = target.default_event_space_bijector.inverse(init_x)
 
   def target_log_prob_fn(x):
     return target.unnormalized_log_prob(x), ()
 
-  target_log_prob_fn = fun_mc.transform_log_prob_fn(
+  target_log_prob_fn = fun_mc.transform_log_prob_fn(  # pyrefly: ignore[missing-attribute]
       target_log_prob_fn, target.default_event_space_bijector)
 
   def kernel(meads_state, seed):
@@ -1538,7 +1537,7 @@ def run_meads_on_target(
     return (meads_state, seed), traced
 
   def chunked_kernel(*state):
-    state, traced = fun_mc.trace(state, kernel, thinning, trace_mask=False)
+    state, traced = fun_mc.trace(state, kernel, thinning, trace_mask=False)  # pyrefly: ignore[missing-attribute]
     traced = traced.copy()
     traced['num_integrator_steps'] = thinning
     return state, traced
@@ -1553,14 +1552,14 @@ def run_meads_on_target(
   )
 
   if save_warmup:
-    _, trace = fun_mc.trace((meads_state, seed), chunked_kernel,
+    _, trace = fun_mc.trace((meads_state, seed), chunked_kernel,  # pyrefly: ignore[missing-attribute]
                             num_results + num_adaptation_steps)
   else:
-    state, _ = fun_mc.trace((meads_state, seed),
+    state, _ = fun_mc.trace((meads_state, seed),  # pyrefly: ignore[missing-attribute]
                             chunked_kernel,
                             num_adaptation_steps,
                             trace_fn=lambda *_: ())
-    _, trace = fun_mc.trace(state, chunked_kernel, num_results)
+    _, trace = fun_mc.trace(state, chunked_kernel, num_results)  # pyrefly: ignore[missing-attribute]
 
   warmed_up_steps = int(num_results * 0.8)
   warmed_up_state = trace['state'][-warmed_up_steps:]
@@ -1574,7 +1573,7 @@ def run_meads_on_target(
   else:
     principal = ground_truth['principal']
     mean = ground_truth['stats']['m1']['mean']
-    bias = {'bias': compute_bias(trace['state'], ground_truth, mean, principal)}  # pytype: disable=wrong-arg-types  # jax-ndarray
+    bias = {'bias': compute_bias(trace['state'], ground_truth, mean, principal)}  # pyrefly: ignore[bad-argument-type]
 
   final = {
       'stats':
@@ -1582,7 +1581,7 @@ def run_meads_on_target(
               state=warmed_up_state,
               num_grads=trace['num_integrator_steps'][-warmed_up_steps:].sum(),
               mean=mean,
-              principal=principal,
+              principal=principal,  # pyrefly: ignore[bad-argument-type]
           ),
       'final_x':
           target.default_event_space_bijector(trace['state'][-1]),
@@ -1626,7 +1625,7 @@ def run_fixed_mcmc_on_target(
   def target_log_prob_fn(x):
     return target.unnormalized_log_prob(x), ()
 
-  target_log_prob_fn = fun_mc.transform_log_prob_fn(
+  target_log_prob_fn = fun_mc.transform_log_prob_fn(  # pyrefly: ignore[missing-attribute]
       target_log_prob_fn, target.default_event_space_bijector)
 
   def kernel(mcmc_state, seed):
@@ -1635,7 +1634,7 @@ def run_fixed_mcmc_on_target(
     if method == 'hmc':
       cur_num_integrator_steps = jax.random.randint(jitter_seed, [], 1,
                                                     num_integrator_steps + 1)
-      mcmc_state, mcmc_extra = fun_mc.hamiltonian_monte_carlo_step(
+      mcmc_state, mcmc_extra = fun_mc.hamiltonian_monte_carlo_step(  # pyrefly: ignore[missing-attribute]
           mcmc_state,
           target_log_prob_fn=target_log_prob_fn,
           step_size=scalar_step_size * vector_step_size,
@@ -1644,7 +1643,7 @@ def run_fixed_mcmc_on_target(
       )
     elif method == 'malt':
       cur_num_integrator_steps = num_integrator_steps
-      mcmc_state, mcmc_extra = fun_mc.prefab.metropolis_adjusted_langevin_trajectories_step(
+      mcmc_state, mcmc_extra = fun_mc.prefab.metropolis_adjusted_langevin_trajectories_step(  # pyrefly: ignore[missing-attribute]
           mcmc_state,
           target_log_prob_fn=target_log_prob_fn,
           step_size=scalar_step_size * vector_step_size,
@@ -1663,25 +1662,25 @@ def run_fixed_mcmc_on_target(
 
     traced = {
         'state': mcmc_state.state,
-        'is_accepted': mcmc_extra.is_accepted,
+        'is_accepted': mcmc_extra.is_accepted,  # pyrefly: ignore[unbound-name]
         'log_accept_ratio': mcmc_extra.log_accept_ratio,
-        'num_integrator_steps': cur_num_integrator_steps,
+        'num_integrator_steps': cur_num_integrator_steps,  # pyrefly: ignore[unbound-name]
     }
 
     return (mcmc_state, seed), traced
 
   if method == 'hmc':
-    mcmc_state = fun_mc.hamiltonian_monte_carlo_init(
+    mcmc_state = fun_mc.hamiltonian_monte_carlo_init(  # pyrefly: ignore[missing-attribute]
         state=init_z,
         target_log_prob_fn=target_log_prob_fn,
     )
   elif method == 'malt':
-    mcmc_state = fun_mc.prefab.metropolis_adjusted_langevin_trajectories_init(
+    mcmc_state = fun_mc.prefab.metropolis_adjusted_langevin_trajectories_init(  # pyrefly: ignore[missing-attribute]
         state=init_z,
         target_log_prob_fn=target_log_prob_fn,
     )
 
-  _, trace = fun_mc.trace((mcmc_state, seed), kernel,
+  _, trace = fun_mc.trace((mcmc_state, seed), kernel,  # pyrefly: ignore[missing-attribute, unbound-name]
                           num_warmup_steps + num_results)
 
   warmed_up_state = trace['state'][num_warmup_steps:]
@@ -1739,7 +1738,7 @@ def run_vi_on_target(
 
   def kernel(opt_state, seed):
     seed, vi_seed = jax.random.split(seed)
-    opt_state, opt_extra = fun_mc.adam_step(
+    opt_state, opt_extra = fun_mc.adam_step(  # pyrefly: ignore[missing-attribute]
         opt_state, functools.partial(loss_fn, seed=vi_seed), learning_rate)
 
     traced = {
@@ -1750,10 +1749,10 @@ def run_vi_on_target(
 
     return (opt_state, seed), traced
 
-  opt_state = fun_mc.adam_init(
+  opt_state = fun_mc.adam_init(  # pyrefly: ignore[missing-attribute]
       (init_z, tfp.math.softplus_inverse(jnp.full_like(init_z, 1e-3))))
 
-  _, trace = fun_mc.trace((opt_state, seed), kernel, num_steps)
+  _, trace = fun_mc.trace((opt_state, seed), kernel, num_steps)  # pyrefly: ignore[missing-attribute]
 
   final = {
       'final_x': target.default_event_space_bijector.forward(trace['loc'][-1]),
@@ -1833,7 +1832,7 @@ def run_grid_element(mean_trajectory_length: jnp.ndarray,
   target = get_target(target_name)
   inits = load_inits(target_name, inits_dir)
 
-  seed = jax.random.PRNGKey(seed)
+  seed = jax.random.PRNGKey(seed)  # pyrefly: ignore[bad-assignment]
   res = []
   for i in range(num_replicas):
     with utils.delete_device_buffers():
@@ -1983,7 +1982,7 @@ def run_trial(
   ground_truth = utils.h5_to_dict(
       utils.load_h5py(os.path.join(ground_truth_dir, f'{target_name}.h5')))
 
-  seed = jax.random.PRNGKey(seed)
+  seed = jax.random.PRNGKey(seed)  # pyrefly: ignore[bad-assignment]
   res = []
   for i in range(num_replicas):
     with utils.delete_device_buffers():

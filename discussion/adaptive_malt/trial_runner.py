@@ -43,7 +43,7 @@ _HPARAMS = flags.DEFINE(utils.YAMLDictParser(), 'hparams', '',
 def experiment(output_dir: str):
   """Runs an experiment."""
   epath.Path(output_dir).mkdir(parents=True, exist_ok=True)
-  res = adaptive_malt.run_trial(  # pytype: disable=missing-parameter
+  res = adaptive_malt.run_trial(
   )
   utils.save_h5py(os.path.join(output_dir, 'trial.h5'), res)
 
@@ -54,9 +54,7 @@ def main(argv: Sequence[str]) -> None:
 
   utils.bind_hparams(_HPARAMS.value)
   # pylint: disable=no-value-for-parameter
-  # pytype: disable=missing-parameter
   experiment()
-  # pytype: enable=missing-parameter
 
 
 if __name__ == '__main__':

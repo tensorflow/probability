@@ -522,7 +522,7 @@ def recover_state_from_args(
   """Attempts to recover the state that was transmitted via *args, **kwargs."""
   orig_args = args
   if isinstance(state_structure, collections.abc.Mapping):
-    state = type(state_structure)()  # pyrefly: ignore[bad-instantiation]
+    state = type(state_structure)()
     # Mappings can be ordered and not ordered, and this information is lost when
     # passed via **kwargs. We iterate using the reference structure order so we
     # can reconstruct it. For unordered mappings the order doesn't matter. We
@@ -556,7 +556,7 @@ def recover_state_from_args(
               _tree_repr(state_structure)
           )
       )
-    return type(state_structure)(args)  # pyrefly: ignore[bad-argument-count, bad-instantiation]
+    return type(state_structure)(args)  # pyrefly: ignore[bad-argument-count]
   elif args:
     return args[0]
   elif kwargs:
@@ -3283,7 +3283,7 @@ def make_surrogate_loss_fn(
       new_args, new_kwargs = util.unflatten_tree(
           (args, kwargs), flat_args_kwargs
       )
-      g, e = grad_fn(*new_args, **new_kwargs)  # pytype: disable=wrong-arg-count
+      g, e = grad_fn(*new_args, **new_kwargs)
 
       def inner_grad_fn(*_):
         return tuple(util.flatten_tree(g))

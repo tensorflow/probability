@@ -697,9 +697,7 @@ class Registry:
   def _maybe_register_flax(self):
     """Registers Flax types if Flax is importable."""
     try:
-      # pytype: disable=import-error
-      import flax  # pylint: disable=g-import-not-at-top
-      # pytype: enable=import-error
+      import flax  # pylint: disable=g-import-not-at-top  # pyrefly: ignore[missing-import]
 
       self.register_mapping_type('flax_frozen_dict')(
           flax.core.frozen_dict.FrozenDict)
@@ -710,10 +708,7 @@ class Registry:
     """Registers JAX types if JAX is importable."""
 
     try:
-      # pytype: disable=import-error
-      import jax  # pylint: disable=g-import-not-at-top
-
-      # pytype: enable=import-error
+      import jax  # pylint: disable=g-import-not-at-top  # pyrefly: ignore[missing-import]
 
       def detect_jax_array(tree: Any, ctx: Context) -> Optional[str]:
         del ctx
@@ -730,10 +725,7 @@ class Registry:
     """Registers TensorFlow types if TensorFlow is importable."""
 
     try:
-      # pytype: disable=import-error
-      import tensorflow as tf  # pylint: disable=g-import-not-at-top
-
-      # pytype: enable=import-error
+      import tensorflow as tf  # pylint: disable=g-import-not-at-top  # pyrefly: ignore[missing-source-for-stubs]
 
       def detect_tf_tensor(tree: Any, ctx: Context) -> Optional[str]:
         del ctx
@@ -751,27 +743,21 @@ class Registry:
 
     structural_tuple = None
     try:
-      # pytype: disable=import-error
-      from tensorflow_probability.python.internal import structural_tuple  # pylint: disable=g-import-not-at-top
-      # pytype: enable=import-error
+      from tensorflow_probability.python.internal import structural_tuple  # pylint: disable=g-import-not-at-top  # pyrefly: ignore[missing-import]
     except ImportError:
       pass
 
     if structural_tuple is None:
       try:
-        # pytype: disable=import-error
-        import tensorflow_probability.substrates.jax as tfp  # pylint: disable=g-import-not-at-top
+        import tensorflow_probability.substrates.jax as tfp  # pylint: disable=g-import-not-at-top  # pyrefly: ignore[missing-import]
         structural_tuple = tfp.internal.structural_tuple
-        # pytype: enable=import-error
       except ImportError:
         pass
 
     if structural_tuple is None:
       try:
-        # pytype: disable=import-error
-        import tensorflow_probability.substrates.numpy as tfp  # pylint: disable=g-import-not-at-top
+        import tensorflow_probability.substrates.numpy as tfp  # pylint: disable=g-import-not-at-top  # pyrefly: ignore[missing-import]
         structural_tuple = tfp.internal.structural_tuple
-        # pytype: enable=import-error
       except ImportError:
         pass
 

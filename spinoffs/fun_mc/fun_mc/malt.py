@@ -285,7 +285,7 @@ def metropolis_adjusted_langevin_trajectories_step(
               len(target_log_prob.shape)
               if target_log_prob.shape is not None
               else len(target_log_prob.shape)
-          ),  # pytype: disable=attribute-error
+          ),
           named_axis=named_axis,
       )
     if energy_change_fn is None:
@@ -294,7 +294,7 @@ def metropolis_adjusted_langevin_trajectories_step(
       )
     if momentum_sample_fn is None:
       momentum_sample_fn = lambda seed: fun_mc.gaussian_momentum_sample(  # pylint: disable=g-long-lambda
-          state=malt_state.state, seed=seed, named_axis=named_axis  # pytype: disable=attribute-error
+          state=malt_state.state, seed=seed, named_axis=named_axis
       )
     if momentum_refresh_fn is None:
       momentum_refresh_fn = lambda m, seed: _gaussian_momentum_refresh_fn(  # pylint: disable=g-long-lambda

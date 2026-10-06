@@ -687,7 +687,7 @@ def stochastic_gradient_ascent_hmc_step(
         params, sga_hmc_state.step, sample_seed
     )
 
-    hmc_state, hmc_extra = hamiltonian_monte_carlo_with_state_grads_step(  # pytype: disable=wrong-keyword-args
+    hmc_state, hmc_extra = hamiltonian_monte_carlo_with_state_grads_step(
         sga_hmc_state.hmc_state,
         trajectory_length=trajectory_length,
         scalar_step_size=scalar_step_size,

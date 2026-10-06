@@ -554,7 +554,7 @@ def sequential_monte_carlo_step(
 
   new_log_weights = log_weights_after_resampling + incremental_log_weights
 
-  smc_state = smc_state.replace(  # pytype: disable=attribute-error
+  smc_state = smc_state.replace(  # pyrefly: ignore[missing-attribute]
       state=state,
       log_weights=new_log_weights,
       step=smc_state.step + 1,

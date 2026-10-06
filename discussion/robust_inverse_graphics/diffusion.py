@@ -352,4 +352,4 @@ def linear_log_snr(
     log_snr_end: jax.typing.ArrayLike = -6.0,
 ) -> jnp.ndarray:
   """Linear log signal-to-noise ratio function."""
-  return log_snr_start + (log_snr_end - log_snr_start) * t  # pytype: disable=bad-return-type  # numpy-scalars
+  return log_snr_start + (log_snr_end - log_snr_start) * t  # pyrefly: ignore[bad-return, unsupported-operation]

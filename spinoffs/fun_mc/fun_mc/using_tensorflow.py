@@ -16,9 +16,9 @@
 
 # Need to register the rewrite hooks.
 from fun_mc.backends import rewrite
-from fun_mc.dynamic.backend_tensorflow import api  # pytype: disable=import-error
+from fun_mc.dynamic.backend_tensorflow import api  # pyrefly: ignore[missing-module-attribute]
 # pylint: disable=wildcard-import
-from fun_mc.dynamic.backend_tensorflow.api import *  # pytype: disable=import-error
+from fun_mc.dynamic.backend_tensorflow.api import *  # pyrefly: ignore[missing-import]
 
 del rewrite
 
