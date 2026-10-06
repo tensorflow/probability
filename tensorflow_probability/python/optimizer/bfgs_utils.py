@@ -61,14 +61,14 @@ def get_initial_state_args(value_and_gradients_function,
   Returns:
     An dictionary with values for the following keys:
       converged: True if the convergence check finds that the initial position
-        is already an argmin of the objective function.
+         is already an argmin of the objective function.
       failed: Initialized to False.
       num_objective_evaluations: Initialized to 1.
       position: Initialized to the initial position.
       objective_value: Initialized to the value of the objective function at
-        the initial position.
+         the initial position.
       objective_gradient: Initialized to the gradient of the objective
-        function at the initial position.
+         function at the initial position.
   """
   if control_inputs:
     with tf.control_dependencies(control_inputs):
@@ -148,7 +148,8 @@ def _is_negative_inf(x):
 
 def line_search_step(state, value_and_gradients_function, search_direction,
                      grad_tolerance, f_relative_tolerance, x_tolerance,
-                     stopping_condition, max_iterations, f_absolute_tolerance):
+                     stopping_condition, max_iterations, f_absolute_tolerance,
+                     line_search_kwargs=None):
   """Performs the line search step of the BFGS search procedure.
 
   Uses hager_zhang line search procedure to compute a suitable step size
@@ -164,7 +165,7 @@ def line_search_step(state, value_and_gradients_function, search_direction,
     value_and_gradients_function: A Python callable that accepts a point as a
       real `Tensor` of shape `[..., n]` and returns a tuple of two tensors of
       the same dtype: the objective function value, a real `Tensor` of shape
-        `[...]`, and its derivative, another real `Tensor` of shape `[..., n]`.
+      `[...]`, and its derivative, another real `Tensor` of shape `[..., n]`.
     search_direction: A real `Tensor` of shape `[..., n]`. The direction along
       which to perform line search.
     grad_tolerance: Scalar `Tensor` of real dtype. Specifies the gradient
@@ -182,6 +183,9 @@ def line_search_step(state, value_and_gradients_function, search_direction,
       iterations of the hager_zhang line search algorithm
     f_absolute_tolerance: Scalar `Tensor` of real dtype. Specifies the tolerance
       for the absolute change in the objective value.
+    line_search_kwargs: A dict of keyword arguments to pass to the line
+        search algorithm. These arguments are passed directly to the underlying
+        line search implementation (e.g., the Hager-Zhang line search).
 
   Returns:
     A copy of the input state with the following fields updated:
@@ -197,6 +201,14 @@ def line_search_step(state, value_and_gradients_function, search_direction,
         updated by computing the new position and evaluating the objective
         function at that position.
   """
+  # Extract line_search_kwargs from state
+  line_search_kwargs = state.line_search_kwargs
+  # Remove parameters that are set explicitly in the hager_zhang call to avoid conflicts
+  filtered_line_search_kwargs = {k: v for k, v in line_search_kwargs.items() 
+                                if k not in ['initial_step_size', 'value_at_initial_step', 'value_at_zero', 
+                                             'converged', 'threshold_use_approximate_wolfe_condition',
+                                             'shrinkage_param', 'expansion_param', 'sufficient_decrease_param',
+                                             'curvature_param', 'max_iterations', 'name']}
   line_search_value_grad_func = _restrict_along_direction(
       value_and_gradients_function, state.position, search_direction)
   derivative_at_start_pt = tf.reduce_sum(
@@ -211,7 +223,8 @@ def line_search_step(state, value_and_gradients_function, search_direction,
       initial_step_size=_broadcast(1, state.position),
       value_at_zero=val_0,
       converged=inactive,
-      max_iterations=max_iterations)  # No search needed for these.
+      max_iterations=max_iterations,
+      **(filtered_line_search_kwargs or {}))  # No search needed for these.
 
   state_after_ls = update_fields(
       state,

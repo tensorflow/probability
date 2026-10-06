@@ -62,10 +62,15 @@ BfgsOptimizerResults = collections.namedtuple(
                                # below the tolerance.
         'inverse_hessian_estimate',  # A tensor containing the inverse of the
                                      # estimated Hessian.
-        'scale_initial_inverse_hessian'  # Should the initial inverse Hessian
+        'scale_initial_inverse_hessian',  # Should the initial inverse Hessian
                                          # be rescaled on the first iteration,
                                          # as per Chapter 6 of Nocedal and
                                          # Wright.
+        'line_search_kwargs',  # A dict of keyword arguments to pass to the
+                               # line search algorithm. These arguments are
+                               # passed directly to the underlying line search
+                               # implementation (e.g., the Hager-Zhang line
+                               # search).
     ])
 
 
@@ -81,6 +86,7 @@ def minimize(value_and_gradients_function,
              stopping_condition=None,
              validate_args=True,
              max_line_search_iterations=50,
+             line_search_kwargs=None,
              f_absolute_tolerance=0,
              name=None):
   """Applies the BFGS algorithm to minimize a differentiable function.
@@ -174,6 +180,14 @@ def minimize(value_and_gradients_function,
       outputs.
     max_line_search_iterations: Python int. The maximum number of iterations
       for the `hager_zhang` line search algorithm.
+    line_search_kwargs: A dict of keyword arguments to pass to the line
+        search algorithm. These arguments are passed directly to the underlying
+        line search implementation (e.g., the Hager-Zhang line search).
+        Common parameters include initial_step_size, value_at_initial_step,
+        value_at_zero, threshold_use_approximate_wolfe_condition,
+        shrinkage_param, expansion_param, sufficient_decrease_param,
+        curvature_param, and max_iterations. If not supplied, the line
+        search uses its default parameters.
     f_absolute_tolerance: Scalar `Tensor` of real dtype. If the absolute change
       in the objective value between one iteration and the next is smaller
       than this value, the algorithm is stopped.
@@ -286,7 +300,7 @@ def minimize(value_and_gradients_function,
       next_state = bfgs_utils.line_search_step(
           current_state, value_and_gradients_function, actual_search_direction,
           tolerance, f_relative_tolerance, x_tolerance, stopping_condition,
-          max_line_search_iterations, f_absolute_tolerance)
+          max_line_search_iterations, f_absolute_tolerance, line_search_kwargs=current_state.line_search_kwargs)
 
       # Update the inverse Hessian if needed and continue.
       return [_update_inv_hessian(current_state, next_state)]
@@ -298,6 +312,7 @@ def minimize(value_and_gradients_function,
         control_inputs)
     kwargs['inverse_hessian_estimate'] = initial_inv_hessian
     kwargs['scale_initial_inverse_hessian'] = scale_initial_inverse_hessian
+    kwargs['line_search_kwargs'] = line_search_kwargs if line_search_kwargs is not None else {}
     initial_state = BfgsOptimizerResults(**kwargs)
     return tf.while_loop(
         cond=_cond,
