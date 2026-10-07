@@ -65,6 +65,7 @@ from tensorflow_probability.python.distributions.horseshoe import Horseshoe
 from tensorflow_probability.python.distributions.independent import Independent
 from tensorflow_probability.python.distributions.inflated import Inflated
 from tensorflow_probability.python.distributions.inflated import ZeroInflatedNegativeBinomial
+from tensorflow_probability.python.distributions.inflated import ZeroInflatedPoisson
 from tensorflow_probability.python.distributions.inverse_gamma import InverseGamma
 from tensorflow_probability.python.distributions.inverse_gaussian import InverseGaussian
 from tensorflow_probability.python.distributions.johnson_su import JohnsonSU
@@ -302,5 +303,6 @@ __all__ = [
     'WishartLinearOperator',
     'WishartTriL',
     'ZeroInflatedNegativeBinomial',
+    'ZeroInflatedPoisson',
     'Zipf',
 ]
