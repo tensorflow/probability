@@ -32,26 +32,10 @@ __all__ = [
 JAX_MODE = False  # Overwritten by rewrite script.
 
 
-# TODO(b/155501444): Remove this when tf.nn.softplus is fixed.
-if JAX_MODE:
-  _stable_grad_softplus = tf.nn.softplus
-else:
-
-  @tf.custom_gradient
-  def _stable_grad_softplus(x):
-    """A (more) numerically stable softplus than `tf.nn.softplus`."""
-    x = tf.convert_to_tensor(x)
-    if x.dtype == tf.float64:
-      cutoff = -20
-    else:
-      cutoff = -9
-
-    y = tf.where(x < cutoff, tf.math.log1p(tf.exp(x)), tf.nn.softplus(x))
-
-    def grad_fn(dy):
-      return dy * tf.where(x < cutoff, tf.exp(x), tf.nn.sigmoid(x))
-
-    return y, grad_fn
+# tf.nn.softplus is now numerically stable (uses log1p and sigmoid since 2019-2020)
+# and does not require a custom gradient. The previous custom_gradient wrapper
+# leaked memory by capturing tensors in TF's gradient registry. See b/155501444.
+_stable_grad_softplus = tf.nn.softplus
 
 
 class Softplus(
