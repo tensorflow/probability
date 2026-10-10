@@ -352,8 +352,11 @@ def real_nvp_default_template(hidden_layers,
         512]`.
     shift_only: Python `bool` indicating if only the `shift` term shall be
       computed (i.e. NICE bijector). Default: `False`.
-    activation: Activation function (callable). Explicitly setting to `None`
-      implies a linear activation.
+    activation: Activation function (callable) applied to each hidden layer.
+      The final layer is always linear regardless of this setting. Explicitly
+      setting to `None` implies a linear activation for the hidden layers as
+      well. Do not also pass `activation` via `**kwargs`; doing so will raise
+      a `TypeError`.
     name: A name for ops managed by this function. Default:
       'real_nvp_default_template'.
     *args: `tf.layers.dense` arguments.
