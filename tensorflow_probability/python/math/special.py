@@ -2208,7 +2208,7 @@ def _owens_t_method2(h, a, m):
     should_stop = index >= num_iterations
     return should_stop, index + 2., new_summand, new_term, new_series_sum
 
-  initial_summand = -0.5 * tf.math.erf(a * h) / h
+  initial_summand = 0.5 * tf.math.erf(a * h / numpy_dtype(np.sqrt(2.))) / h
   initial_sum = initial_summand
   initial_term = a * tf.math.exp(
       -0.5 * tf.math.square(a * h)) / numpy_dtype(np.sqrt(2 * np.pi))
