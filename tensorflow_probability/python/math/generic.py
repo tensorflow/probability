@@ -742,22 +742,18 @@ def _log_cosh_impl(x):
   # x)) - log(2)
   # This gives us abs(x) + softplus(-2 * abs(x)) - log(2)
 
-  # For x close to zero, we can write the taylor series of softplus(
-  # -2 * abs(x)) to see that we get;
-  # log(2) - abs(x) + x**2 / 2. - x**4 / 12 + x**6 / 45. + O(x**8)
-  # We can cancel out terms to get:
-  # x ** 2 / 2.  * (1. - x ** 2 / 6) + x ** 6 / 45. + O(x**8)
-  # For x < 45 * sixthroot(smallest normal), all higher level terms
-  # disappear and we can use the above expression.
+  # For small |x|, the expression above cancels to ~0 and loses precision.
+  # Use the identity log(cosh(x)) = 0.5 * log1p(sinh(x)^2) instead.
   numpy_dtype = dtype_util.as_numpy_dtype(x.dtype)
   abs_x = tf.math.abs(x)
   logcosh = abs_x + tf.math.softplus(-2 * abs_x) - np.log(2).astype(
       numpy_dtype)
-  bound = 45. * np.power(np.finfo(numpy_dtype).tiny, 1 / 6.)
+  small_x = tf.minimum(abs_x, 1.0)
   return tf.where(
-      abs_x <= bound,
-      tf.math.exp(tf.math.log(abs_x) + tf.math.log1p(-tf.square(abs_x) / 6.)),
-      logcosh)
+      abs_x <= 1.0,
+      0.5 * tf.math.log1p(tf.math.square(tf.math.sinh(small_x))),
+      logcosh,
+  )
 
 
 def _log_cosh_jvp(primals, tangents):

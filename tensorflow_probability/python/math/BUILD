@@ -165,6 +165,7 @@ multi_substrate_py_test(
         ":gradient",
         ":linalg",
         # absl/testing:parameterized dep,
+        # mpmath dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:categorical",

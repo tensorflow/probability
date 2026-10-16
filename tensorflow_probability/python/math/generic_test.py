@@ -19,9 +19,9 @@ import itertools
 import os
 
 from absl.testing import parameterized
+import mpmath
 import numpy as np
 from scipy import special as sp_special
-
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import categorical
@@ -552,17 +552,15 @@ class LogCoshTest(test_util.TestCase):
         np.zeros(x.shape, dtype=np.bool_),
         self.evaluate(tf.math.is_inf(generic.log_cosh(x))))
 
-  def testLogCosh(self):
-    x = np.linspace(10., 40., 100)
-    self.assertAllClose(np.log(np.cosh(x)), self.evaluate(generic.log_cosh(x)))
-
-    # Test for small values
-    x = np.logspace(-10, -2, 100)
-    self.assertAllClose(np.log(np.cosh(x)), self.evaluate(generic.log_cosh(x)))
-
-    # Test for larger values.
-    x = np.logspace(1., 2., 100)
-    self.assertAllClose(np.log(np.cosh(x)), self.evaluate(generic.log_cosh(x)))
+  @parameterized.named_parameters(
+      ('float32', np.float32),
+      ('float64', np.float64),
+  )
+  def testLogCosh(self, dtype):
+    x = np.logspace(-18.0, 18.0, 1000, dtype=dtype)
+    with mpmath.workdps(50):
+      expected = [float(mpmath.log(mpmath.cosh(float(xi)))) for xi in x]
+    self.assertAllClose(expected, self.evaluate(generic.log_cosh(x)), atol=0.0)
 
   @test_util.numpy_disable_gradient_test
   def testLogCoshGrad(self):
