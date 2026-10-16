@@ -292,7 +292,7 @@ def _make_gradient_fn_of_y(fn, x):
   def _grad_fn_of_y_fwd(unused_y, *args):
     dy_dx, *dy_dargs = _grad_fn(x, *args)
     return [
-        (dy_dx, *dy_dargs),  # Actual return values.
+        [dy_dx, *dy_dargs],  # Actual return values.
         (dy_dx, dy_dargs, args)  # Auxiliary values for the backward pass.
     ]
 
@@ -475,7 +475,7 @@ def _make_gradient_fn_of_y(fn, x):
         tangent_out += tangents[j] * jacobian[i][j]
       tangents_out.append(tangent_out)
 
-    return (dy_dx, *dy_dargs), tuple(tangents_out)
+    return [dy_dx, *dy_dargs], tangents_out
 
   @tfp_custom_gradient.custom_gradient(
       vjp_fwd=_grad_fn_of_y_fwd,
