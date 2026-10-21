@@ -106,6 +106,7 @@ class DenseVariational(tf_keras.layers.Layer):
           last_dim * self.units,
           self.units if self.use_bias else 0,
           dtype)
+
     with tf.name_scope('prior'):
       self._prior = self._make_prior_fn(
           last_dim * self.units,
@@ -159,10 +160,25 @@ class DenseVariational(tf_keras.layers.Layer):
     input_shape = input_shape.with_rank_at_least(2)
     if input_shape[-1] is None:
       raise ValueError(
-          f'The innermost dimension of input_shape must be defined, but saw: {input_shape}'
+          f'The innermost dimension of input_shape must be defined, '
+          f'but saw: {input_shape}'
       )
     return input_shape[:-1].concatenate(self.units)
 
+  def get_config(self):
+    base_config = super(DenseVariational, self).get_config()
+    config = {
+      'units': self.units,
+      'make_posterior_fn': self._make_posterior_fn,
+      'make_prior_fn': self._make_prior_fn,
+      'activation': self.activation,
+      'use_bias': self.use_bias,
+    }
+    return dict(list(base_config.items()) + list(config.items()))
+
+  @classmethod
+  def from_config(cls, config):
+    return cls(**config)
 
 def _make_kl_divergence_penalty(
     use_exact_kl=False,
