@@ -82,6 +82,7 @@ def minimize(value_and_gradients_function,
              validate_args=True,
              max_line_search_iterations=50,
              f_absolute_tolerance=0,
+             line_search_kwargs=None,
              name=None):
   """Applies the BFGS algorithm to minimize a differentiable function.
 
@@ -177,6 +178,11 @@ def minimize(value_and_gradients_function,
     f_absolute_tolerance: Scalar `Tensor` of real dtype. If the absolute change
       in the objective value between one iteration and the next is smaller
       than this value, the algorithm is stopped.
+    line_search_kwargs: (Optional) Python `dict` of extra keyword arguments to
+      forward to the underlying `hager_zhang` line search, allowing the caller
+      to tune line search hyper-parameters such as `sufficient_decrease_param`
+      or `curvature_param`. See `tfp.optimizer.linesearch.hager_zhang` for the
+      full list of accepted parameters.
     name: (Optional) Python str. The name prefixed to the ops created by this
       function. If not supplied, the default name 'minimize' is used.
 
@@ -286,7 +292,8 @@ def minimize(value_and_gradients_function,
       next_state = bfgs_utils.line_search_step(
           current_state, value_and_gradients_function, actual_search_direction,
           tolerance, f_relative_tolerance, x_tolerance, stopping_condition,
-          max_line_search_iterations, f_absolute_tolerance)
+          max_line_search_iterations, f_absolute_tolerance,
+          line_search_kwargs=line_search_kwargs)
 
       # Update the inverse Hessian if needed and continue.
       return [_update_inv_hessian(current_state, next_state)]
