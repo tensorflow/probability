@@ -144,6 +144,7 @@ multi_substrate_py_library(
         ":sigmoid_beta",
         ":sinh_arcsinh",
         ":skellam",
+        ":skew_normal",
         ":spherical_uniform",
         ":stopping_ratio_logistic",
         ":student_t",
@@ -2369,6 +2370,26 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "skew_normal",
+    srcs = ["skew_normal.py"],
+    deps = [
+        ":distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math:special",
     ],
 )
 
@@ -4704,6 +4725,18 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math:gradient",
         # tensorflow/compiler/jit dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "skew_normal_test",
+    srcs = ["skew_normal_test.py"],
+    deps = [
+        ":skew_normal",
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
