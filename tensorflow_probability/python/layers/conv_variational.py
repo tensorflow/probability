@@ -185,28 +185,28 @@ class _ConvVariational(tf_keras.layers.Layer):
     # Must have a posterior kernel.
     self.kernel_posterior = self.kernel_posterior_fn(
         dtype, kernel_shape, 'kernel_posterior',
-        self.trainable, self.add_variable)
+        self.trainable, self.add_weight)
 
     if self.kernel_prior_fn is None:
       self.kernel_prior = None
     else:
       self.kernel_prior = self.kernel_prior_fn(
           dtype, kernel_shape, 'kernel_prior',
-          self.trainable, self.add_variable)
+          self.trainable, self.add_weight)
 
     if self.bias_posterior_fn is None:
       self.bias_posterior = None
     else:
       self.bias_posterior = self.bias_posterior_fn(
           dtype, (self.filters,), 'bias_posterior',
-          self.trainable, self.add_variable)
+          self.trainable, self.add_weight)
 
     if self.bias_prior_fn is None:
       self.bias_prior = None
     else:
       self.bias_prior = self.bias_prior_fn(
           dtype, (self.filters,), 'bias_prior',
-          self.trainable, self.add_variable)
+          self.trainable, self.add_weight)
 
     self.input_spec = tf_keras.layers.InputSpec(
         ndim=self.rank + 2, axes={channel_axis: input_dim})
