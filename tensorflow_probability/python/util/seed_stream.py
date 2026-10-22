@@ -206,6 +206,16 @@ class SeedStream(object):
       seed: A fresh integer usable as a seed in downstream operations,
         or `None`.
     """
+    # Under JAX_MODE, `_seed` has already been converted (in `__init__`) into
+    # a real `jax.random.PRNGKey`, not a plain int/None -- so this must
+    # dispatch to `_call_jax`, which correctly derives a new key via
+    # `jaxrand.fold_in`, rather than falling through to the SHA512-of-a-
+    # string-repr path below, which was previously reachable even under
+    # JAX_MODE and returns a plain Python int that is not a valid JAX PRNG
+    # key (confirmed: passing that int straight to e.g. `jax.random.normal`
+    # raises `TypeError: JAX encountered invalid PRNG key data`).
+    if JAX_MODE:
+      return self._call_jax()
     self._counter += 1
     if self._seed is None:
       return None
