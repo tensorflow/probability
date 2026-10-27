@@ -1130,7 +1130,6 @@ multi_substrate_py_test(
         ":reciprocal",
         ":scale",
         ":shift",
-        # mock dep,
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
