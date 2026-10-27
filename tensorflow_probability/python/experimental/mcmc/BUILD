@@ -535,7 +535,7 @@ py_test(
 #     strict_deps = False,  # DisableOnExport
     tags = [
         "nozapfhahn",
-        "requires-gpu-nvidia",
+        "requires-gpu-sm90",
     ],
     deps = [
         ":nuts_autobatching",

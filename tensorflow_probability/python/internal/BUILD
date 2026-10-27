@@ -376,7 +376,7 @@ py_test(
     srcs = ["implementation_selection_test.py"],
     main = "implementation_selection_test.py",
 #     strict_deps = False,  # DisableOnExport
-    tags = ["requires-gpu-nvidia"],
+    tags = ["requires-gpu-sm90"],
     deps = [
         ":implementation_selection",
         "//tensorflow_probability/python/internal:test_util",

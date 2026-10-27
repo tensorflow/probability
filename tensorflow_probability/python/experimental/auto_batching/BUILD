@@ -256,7 +256,7 @@ py_test(
 #     strict_deps = False,  # DisableOnExport
     tags = [
         "nozapfhahn",
-        "requires-gpu-nvidia",
+        "requires-gpu-sm90",
     ],
     deps = [
         "//tensorflow_probability/python/experimental/auto_batching:numpy_backend",

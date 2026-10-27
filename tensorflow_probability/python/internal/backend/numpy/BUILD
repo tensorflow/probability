@@ -533,7 +533,7 @@ py_test(
 #     strict_deps = False,  # DisableOnExport
     tags = [
         "no-oss-ci",
-        "requires-gpu-nvidia",
+        "requires-gpu-sm90",
         "tfp_xla",
     ],
     deps = [

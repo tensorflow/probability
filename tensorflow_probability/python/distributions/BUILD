@@ -2729,7 +2729,7 @@ py_test(
     main = "binomial_test.py",
     shard_count = 3,
 #     strict_deps = False,  # DisableOnExport
-    tags = ["requires-gpu-nvidia"],
+    tags = ["requires-gpu-sm90"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -3106,7 +3106,7 @@ py_test(
     main = "gamma_test.py",
     shard_count = 2,
 #     strict_deps = False,  # DisableOnExport
-    tags = ["requires-gpu-nvidia"],
+    tags = ["requires-gpu-sm90"],
     deps = [
         ":gamma",
         ":kullback_leibler",
@@ -4254,7 +4254,7 @@ py_test(
     srcs = ["poisson_test.py"],
     main = "poisson_test.py",
 #     strict_deps = False,  # DisableOnExport
-    tags = ["requires-gpu-nvidia"],
+    tags = ["requires-gpu-sm90"],
     deps = [
         ":poisson",
         # numpy dep,
