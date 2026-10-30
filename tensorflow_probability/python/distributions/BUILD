@@ -3330,7 +3330,7 @@ multi_substrate_py_test(
     disabled_substrates = ["numpy"],
     jax_size = "medium",
     main = "independent_test.py",
-    tags = ["requires-gpu-nvidia"],
+    tags = ["requires-gpu-sm90"],
     deps = [
         ":bernoulli",
         ":exponential",
@@ -4402,7 +4402,7 @@ multi_substrate_py_test(
     disabled_substrates = ["numpy"],
     jax_size = "medium",
     main = "sample_test.py",
-    tags = ["requires-gpu-nvidia"],
+    tags = ["requires-gpu-sm90"],
     deps = [
         ":cholesky_lkj",
         ":exponential",
