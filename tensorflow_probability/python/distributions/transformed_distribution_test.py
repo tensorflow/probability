@@ -577,6 +577,21 @@ class TransformedDistributionTest(test_util.TestCase):
         NotImplementedError, r'their bijectors are not equal'):
       kullback_leibler.kl_divergence(d1, d2)
 
+  def testTransformedKLNonInjectiveBijectorFails(self):
+    # |X| has the same law for X ~ N(-1, 1) and X ~ N(1, 1), while the KL of
+    # the base distributions is 2, so the base KL must not be returned when
+    # the shared bijector is not injective.
+    d1 = transformed_distribution.TransformedDistribution(
+        normal_lib.Normal(loc=-1., scale=1.),
+        bijector=absolute_value.AbsoluteValue(),
+        validate_args=True)
+    d2 = transformed_distribution.TransformedDistribution(
+        normal_lib.Normal(loc=1., scale=1.),
+        bijector=absolute_value.AbsoluteValue(),
+        validate_args=True)
+    with self.assertRaisesRegex(NotImplementedError, r'is not injective'):
+      kullback_leibler.kl_divergence(d1, d2)
+
   def testTransformedNormalNormalKL(self):
     batch_size = 6
     mu_a = np.array([3.0] * batch_size).astype(np.float32)
