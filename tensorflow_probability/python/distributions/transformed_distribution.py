@@ -747,6 +747,10 @@ def _kl_transformed_transformed(a, b, name=None):
   """
   with tf.name_scope(name or 'kl_transformed_transformed'):
     if a.bijector == b.bijector:
+      if not a.bijector._is_injective:  # pylint: disable=protected-access
+        raise NotImplementedError(
+            'Unable to calculate KL divergence between {} and {} because '
+            'their bijector {} is not injective.'.format(a, b, a.bijector))
       return kullback_leibler.kl_divergence(a.distribution, b.distribution)
   raise NotImplementedError(
       'Unable to calculate KL divergence between {} and {} because '
