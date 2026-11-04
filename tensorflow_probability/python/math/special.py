@@ -99,7 +99,7 @@ def _betainc_naive(a, b, x):
   dtype_orig = dtype_util.common_dtype([a, b, x], tf.float32)
   # We promote bfloat16 and float16 to float32 to make this function consistent
   # with the XLA implementation of betainc.
-  should_promote_dtype = (dtype_orig in _f16bit_dtypes)
+  should_promote_dtype = dtype_orig in _f16bit_dtypes
   dtype = tf.float32 if should_promote_dtype else dtype_orig
 
   a, b, x = [tf.convert_to_tensor(z, dtype=dtype_orig) for z in [a, b, x]]
@@ -356,7 +356,7 @@ def _betainc_der_power_series(a, b, x, dtype, use_power_series):
   # When x >= a / (a + b), we must apply the symmetry relation given here:
   # https://dlmf.nist.gov/8.17.E4
   #   betainc(a, b, x) = 1 - betainc(b, a, 1 - x)
-  use_symmetry_relation = (safe_x >= safe_a / (safe_a + safe_b))
+  use_symmetry_relation = safe_x >= safe_a / (safe_a + safe_b)
   safe_a_orig = safe_a
   safe_a = tf.where(use_symmetry_relation, safe_b, safe_a)
   safe_b = tf.where(use_symmetry_relation, safe_a_orig, safe_b)
@@ -433,7 +433,7 @@ def _betainc_partials(a, b, x):
   dtype_orig = dtype_util.common_dtype([a, b, x], tf.float32)
   # We promote bfloat16 and float16 to float32 to make this function consistent
   # with betainc.
-  should_promote_dtype = (dtype_orig in _f16bit_dtypes)
+  should_promote_dtype = dtype_orig in _f16bit_dtypes
   dtype = tf.float32 if should_promote_dtype else dtype_orig
   numpy_dtype = dtype_util.as_numpy_dtype(dtype)
   zero = tf.constant(0., dtype=dtype)
@@ -645,7 +645,7 @@ def _betaincinv_computation(a, b, y):
   dtype_orig = dtype_util.common_dtype([a, b, y], tf.float32)
   # We promote bfloat16 and float16 to float32 to make this function consistent
   # with betainc.
-  should_promote_dtype = (dtype_orig in _f16bit_dtypes)
+  should_promote_dtype = dtype_orig in _f16bit_dtypes
   dtype = tf.float32 if should_promote_dtype else dtype_orig
   numpy_dtype = dtype_util.as_numpy_dtype(dtype)
   zero = numpy_dtype(0.)
@@ -677,7 +677,7 @@ def _betaincinv_computation(a, b, y):
     use_symmetry_relation = (error_at_half < zero) & a_and_b_are_small & (
         error_at_mean < zero)
   else:
-    use_symmetry_relation = (error_at_half < zero)
+    use_symmetry_relation = error_at_half < zero
 
   a_orig, y_orig = (a, y)
   a = tf.where(use_symmetry_relation, b, a)
@@ -727,7 +727,7 @@ def _betaincinv_computation(a, b, y):
             halley_candidate))
 
     new_delta = candidate - new_candidate
-    new_delta_is_negative = (new_delta < zero)
+    new_delta_is_negative = new_delta < zero
     new_low = tf.where(new_delta_is_negative, candidate, low)
     new_high = tf.where(new_delta_is_negative, high, candidate)
 
@@ -782,7 +782,7 @@ def _betaincinv_partials(a, b, y, return_value=False):
   dtype_orig = dtype_util.common_dtype([a, b, y], tf.float32)
   # We promote bfloat16 and float16 to float32 to make this function consistent
   # with betaincinv.
-  should_promote_dtype = (dtype_orig in _f16bit_dtypes)
+  should_promote_dtype = dtype_orig in _f16bit_dtypes
   dtype = tf.float32 if should_promote_dtype else dtype_orig
 
   a, b, y = [tf.convert_to_tensor(z, dtype=dtype_orig) for z in [a, b, y]]
@@ -1787,12 +1787,9 @@ def _lambert_bwd(aux, g):
   """Reverse mode impl for lambert."""
   z, = aux
   wz = _lambert_custom_gradient(z)
-  # At z = 0 the analytic expressions for the gradient results in a 0/0
-  # expression.  However, the continuous expansion (l'Hospital rule) gives a
-  # derivative of 1.0 at z = 0.  This case has to be handled separately with
-  # a where clause.
-  return g * tf.where(
-      tf.equal(z, 0.), tf.ones([], wz.dtype), wz / (z * (1. + wz)))
+  # Using z = wz * exp(wz) avoids a removable singularity at z = 0,
+  # including when differentiating this expression for higher-order gradients.
+  return g * tf.math.exp(-wz) / (1. + wz)
 
 
 def _lambert_jvp(primals, tangents):
@@ -1801,11 +1798,9 @@ def _lambert_jvp(primals, tangents):
   dz, = tangents
   wz = _lambert_custom_gradient(z)
 
-  # At z = 0 the analytic expressions for the gradient results in a 0/0
-  # expression.  However, the continuous expansion (l'Hospital rule) gives a
-  # derivative of 1.0 at z = 0.  This case has to be handled separately with
-  # a where clause.
-  pz = tf.where(tf.equal(z, 0.), tf.ones([], wz.dtype), wz / (z * (1. + wz)))
+  # Using z = wz * exp(wz) avoids a removable singularity at z = 0,
+  # including when differentiating this expression for higher-order gradients.
+  pz = tf.math.exp(-wz) / (1. + wz)
   return wz, pz * dz
 
 
