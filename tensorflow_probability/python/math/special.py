@@ -1787,12 +1787,9 @@ def _lambert_bwd(aux, g):
   """Reverse mode impl for lambert."""
   z, = aux
   wz = _lambert_custom_gradient(z)
-  # At z = 0 the analytic expressions for the gradient results in a 0/0
-  # expression.  However, the continuous expansion (l'Hospital rule) gives a
-  # derivative of 1.0 at z = 0.  This case has to be handled separately with
-  # a where clause.
-  return g * tf.where(
-      tf.equal(z, 0.), tf.ones([], wz.dtype), wz / (z * (1. + wz)))
+  # Using z = wz * exp(wz) avoids a removable singularity at z = 0,
+  # including when differentiating this expression for higher-order gradients.
+  return g * tf.math.exp(-wz) / (1. + wz)
 
 
 def _lambert_jvp(primals, tangents):
@@ -1801,11 +1798,9 @@ def _lambert_jvp(primals, tangents):
   dz, = tangents
   wz = _lambert_custom_gradient(z)
 
-  # At z = 0 the analytic expressions for the gradient results in a 0/0
-  # expression.  However, the continuous expansion (l'Hospital rule) gives a
-  # derivative of 1.0 at z = 0.  This case has to be handled separately with
-  # a where clause.
-  pz = tf.where(tf.equal(z, 0.), tf.ones([], wz.dtype), wz / (z * (1. + wz)))
+  # Using z = wz * exp(wz) avoids a removable singularity at z = 0,
+  # including when differentiating this expression for higher-order gradients.
+  pz = tf.math.exp(-wz) / (1. + wz)
   return wz, pz * dz
 
 

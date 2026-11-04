@@ -1356,6 +1356,29 @@ class SpecialTest(test_util.TestCase):
     _, dy_dx = gradient.value_and_gradient(special.lambertw, x)
     self.assertAllClose(dy_dx, expected)
 
+  @parameterized.parameters(tf.float32, tf.float64)
+  @test_util.numpy_disable_gradient_test
+  def testLambertWHigherOrderGradientsAtZero(self, dtype):
+    # The Taylor series is sum_n (-n)**(n - 1) * z**n / n!.
+    derivative = special.lambertw
+    x = tf.constant(0., dtype=dtype)
+    for expected in [1., -2., 9., -64.]:
+      previous_derivative = derivative
+      derivative = lambda z, fn=previous_derivative: (
+          gradient.value_and_gradient(fn, z)[1])
+      self.assertAllClose(self.evaluate(derivative(x)), expected)
+
+  @parameterized.parameters(tf.float32, tf.float64)
+  @test_util.numpy_disable_gradient_test
+  def testLambertWSecondDerivative(self, dtype):
+    # Parameterize by W(z) to obtain independent reference values.
+    w = np.array([[-0.5, 0., 0.5], [0., 1., 2.]])
+    x = tf.constant(w * np.exp(w), dtype=dtype)
+    derivative = lambda z: gradient.value_and_gradient(special.lambertw, z)[1]
+    _, second_derivative = gradient.value_and_gradient(derivative, x)
+    expected = -np.exp(-2. * w) * (w + 2.) / (w + 1.)**3
+    self.assertAllClose(self.evaluate(second_derivative), expected)
+
   def testLogGammaCorrection(self):
     x = half_cauchy.HalfCauchy(
         loc=8., scale=10.).sample(int(1e3), test_util.test_seed())
