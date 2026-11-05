@@ -81,13 +81,22 @@ def atan_difference(x, y, name=None):
     x = tf.convert_to_tensor(x, dtype=dtype)
     y = tf.convert_to_tensor(y, dtype=dtype)
 
-    difference = tf.math.atan((x - y) / (1 + x * y))
+    product = x * y
+    product_is_negative_one = tf.math.equal(product, -1.)
+    # Keep inactive arithmetic finite when vmap lowers a conditional to selects.
+    denominator = tf.where(
+        product_is_negative_one, tf.ones_like(product), 1. + product)
+    difference = tf.math.atan((x - y) / denominator)
     difference = difference + tf.where(
-        x * y < - 1., np.pi * tf.math.sign(x), 0.)
-    difference = tf.where(
-        tf.math.equal(x * y, -1.), np.pi * tf.math.sign(x) / 2., difference)
+        product < -1., np.pi * tf.math.sign(x), 0.)
 
-    return difference
+    # The extra arctangents are only needed at opposite-sign poles, where their
+    # difference has no cancellation and retains the smooth partial derivatives.
+    return ps.cond(
+        tf.reduce_any(product_is_negative_one),
+        lambda: tf.where(product_is_negative_one,
+                         tf.math.atan(x) - tf.math.atan(y), difference),
+        lambda: difference)
 
 
 # 16-bit (half precision) floating-point dtypes available on current backend.
@@ -99,7 +108,7 @@ def _betainc_naive(a, b, x):
   dtype_orig = dtype_util.common_dtype([a, b, x], tf.float32)
   # We promote bfloat16 and float16 to float32 to make this function consistent
   # with the XLA implementation of betainc.
-  should_promote_dtype = (dtype_orig in _f16bit_dtypes)
+  should_promote_dtype = dtype_orig in _f16bit_dtypes
   dtype = tf.float32 if should_promote_dtype else dtype_orig
 
   a, b, x = [tf.convert_to_tensor(z, dtype=dtype_orig) for z in [a, b, x]]
@@ -356,7 +365,7 @@ def _betainc_der_power_series(a, b, x, dtype, use_power_series):
   # When x >= a / (a + b), we must apply the symmetry relation given here:
   # https://dlmf.nist.gov/8.17.E4
   #   betainc(a, b, x) = 1 - betainc(b, a, 1 - x)
-  use_symmetry_relation = (safe_x >= safe_a / (safe_a + safe_b))
+  use_symmetry_relation = safe_x >= safe_a / (safe_a + safe_b)
   safe_a_orig = safe_a
   safe_a = tf.where(use_symmetry_relation, safe_b, safe_a)
   safe_b = tf.where(use_symmetry_relation, safe_a_orig, safe_b)
@@ -433,7 +442,7 @@ def _betainc_partials(a, b, x):
   dtype_orig = dtype_util.common_dtype([a, b, x], tf.float32)
   # We promote bfloat16 and float16 to float32 to make this function consistent
   # with betainc.
-  should_promote_dtype = (dtype_orig in _f16bit_dtypes)
+  should_promote_dtype = dtype_orig in _f16bit_dtypes
   dtype = tf.float32 if should_promote_dtype else dtype_orig
   numpy_dtype = dtype_util.as_numpy_dtype(dtype)
   zero = tf.constant(0., dtype=dtype)
@@ -645,7 +654,7 @@ def _betaincinv_computation(a, b, y):
   dtype_orig = dtype_util.common_dtype([a, b, y], tf.float32)
   # We promote bfloat16 and float16 to float32 to make this function consistent
   # with betainc.
-  should_promote_dtype = (dtype_orig in _f16bit_dtypes)
+  should_promote_dtype = dtype_orig in _f16bit_dtypes
   dtype = tf.float32 if should_promote_dtype else dtype_orig
   numpy_dtype = dtype_util.as_numpy_dtype(dtype)
   zero = numpy_dtype(0.)
@@ -677,7 +686,7 @@ def _betaincinv_computation(a, b, y):
     use_symmetry_relation = (error_at_half < zero) & a_and_b_are_small & (
         error_at_mean < zero)
   else:
-    use_symmetry_relation = (error_at_half < zero)
+    use_symmetry_relation = error_at_half < zero
 
   a_orig, y_orig = (a, y)
   a = tf.where(use_symmetry_relation, b, a)
@@ -727,7 +736,7 @@ def _betaincinv_computation(a, b, y):
             halley_candidate))
 
     new_delta = candidate - new_candidate
-    new_delta_is_negative = (new_delta < zero)
+    new_delta_is_negative = new_delta < zero
     new_low = tf.where(new_delta_is_negative, candidate, low)
     new_high = tf.where(new_delta_is_negative, high, candidate)
 
@@ -782,7 +791,7 @@ def _betaincinv_partials(a, b, y, return_value=False):
   dtype_orig = dtype_util.common_dtype([a, b, y], tf.float32)
   # We promote bfloat16 and float16 to float32 to make this function consistent
   # with betaincinv.
-  should_promote_dtype = (dtype_orig in _f16bit_dtypes)
+  should_promote_dtype = dtype_orig in _f16bit_dtypes
   dtype = tf.float32 if should_promote_dtype else dtype_orig
 
   a, b, y = [tf.convert_to_tensor(z, dtype=dtype_orig) for z in [a, b, y]]

@@ -1134,6 +1134,34 @@ class SpecialTest(test_util.TestCase):
     x_, y_, atan_diff_ = self.evaluate([x, y, special.atan_difference(x, y)])
     self.assertAllClose(np.arctan(x_) - np.arctan(y_), atan_diff_)
 
+  @test_util.numpy_disable_gradient_test
+  @parameterized.product(
+      dtype=[np.float32, np.float64], broadcast=[False, True])
+  def testAtanDifferenceGradientsAtNegativeOneProduct(self, dtype, broadcast):
+    x = np.array([1., 2., -1., -2.], dtype=dtype)
+    y = -1. / x
+    if broadcast:
+      y = y[:, np.newaxis]
+    x_tensor = tf.convert_to_tensor(x)
+    y_tensor = tf.convert_to_tensor(y)
+    value, (dx, dy) = gradient.value_and_gradient(
+        special.atan_difference, [x_tensor, y_tensor])
+    value, dx, dy = self.evaluate([value, dx, dy])
+    multiplicity = 4. if broadcast else 1.
+    self.assertAllClose(np.arctan(x) - np.arctan(y), value)
+    self.assertAllClose(multiplicity / (1. + x ** 2), dx)
+    self.assertAllClose(-multiplicity / (1. + y ** 2), dy)
+
+    # ForwardAccumulator does not work under tf1.Graph (b/197680518).
+    if test_util.TF_MODE and tf.executing_eagerly():
+      with tf.autodiff.ForwardAccumulator(
+          primals=(x_tensor, y_tensor),
+          tangents=(tf.ones_like(x_tensor), tf.zeros_like(y_tensor))) as acc:
+        traced_value = tf.function(special.atan_difference)(x_tensor, y_tensor)
+      self.assertAllClose(
+          np.broadcast_to(1. / (1. + x ** 2), value.shape),
+          self.evaluate(acc.jvp(traced_value)))
+
   @parameterized.parameters(np.float32, np.float64)
   def testErfcinvPreservesDtype(self, dtype):
     x = self.evaluate(
