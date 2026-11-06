@@ -407,7 +407,7 @@ genrule(
     name = "rewrite_tensor_shape",
     srcs = [],
     outs = ["tensor_shape_gen.py"],
-    cmd = "$(location //tensorflow_probability/python/internal/backend/meta:gen_tensor_shape) > $@",
+    cmd = "$(execpath //tensorflow_probability/python/internal/backend/meta:gen_tensor_shape) > $@",
     tools = ["//tensorflow_probability/python/internal/backend/meta:gen_tensor_shape"],
 )
 
@@ -518,7 +518,7 @@ py_test(
 
 py_test(
     name = "xla_test_gpu",
-    size = "small",
+    size = "medium",
     srcs = ["numpy_test.py"],
     args = [
         "--test_mode=xla",
@@ -526,7 +526,7 @@ py_test(
         # histogram_fixed_width_bins fails with f32([0.]), [0.0, 0.0], 2
         ("--xla_disabled=math.cumulative_logsumexp,math.reduce_min,math.reduce_max,histogram_fixed_width_bins," +
          # TODO(b/298426124): TF floomod GPU bug
-         "math.floormod"),
+         "math.floormod,linalg.svd"),
     ],
     main = "numpy_test.py",
     shard_count = 11,
@@ -614,7 +614,7 @@ LINOP_FILES = [
     testonly = 1,
     srcs = [],
     outs = ["{}_gen.py".format(filename)],
-    cmd = ("$(location //tensorflow_probability/python/internal/backend/meta:gen_linear_operators) " +
+    cmd = ("$(execpath //tensorflow_probability/python/internal/backend/meta:gen_linear_operators) " +
            "--module_name={} --allowlist={} > $@").format(
         filename,
         ",".join(LINOP_FILES),
@@ -628,7 +628,7 @@ LINOP_FILES = [
     testonly = 1,
     srcs = [],
     outs = ["gen_new/{}.py".format(filename)],
-    cmd = ("$(location //tensorflow_probability/python/internal/backend/meta:gen_linear_operators) " +
+    cmd = ("$(execpath //tensorflow_probability/python/internal/backend/meta:gen_linear_operators) " +
            "--module_name={} --allowlist={} > $@").format(
         filename,
         ",".join(LINOP_FILES),

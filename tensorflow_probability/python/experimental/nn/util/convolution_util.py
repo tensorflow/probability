@@ -801,7 +801,7 @@ def _get_output_shape(rank, strides, padding, dilations, input_shape,
         stride=strides[i],
         dilation=dilations[i]))
   event_shape.append(output_size)
-  batch_shape = input_shape[:-rank-1]
+  batch_shape = ps.cast(input_shape[:-rank-1], tf.int32)
   output_shape = ps.concat([batch_shape, event_shape], axis=0)
   strides = ps.pad(strides, paddings=[[1, 1]], constant_values=1)
   return output_shape, strides

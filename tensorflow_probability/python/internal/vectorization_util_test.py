@@ -152,7 +152,7 @@ class VectorizationTest(test_util.TestCase):
     vectorized_matvec = vectorization_util.make_rank_polymorphic(
         tf.linalg.matvec, core_ndims=(2, 1))
     with self.assertRaisesRegex(
-        ValueError, 'Shape must be rank 2 but is rank 1'):
+        ValueError, 'must be (at least )?rank 2.*rank 1'):
       vectorized_matvec(tf.zeros([5]), tf.zeros([2, 1, 5]))
 
   def test_can_escape_vectorization_with_none_ndims(self):

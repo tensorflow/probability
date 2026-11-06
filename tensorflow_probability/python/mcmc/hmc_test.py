@@ -765,13 +765,14 @@ class _LogCorrectionTest(object):
     self.assertAllEqual(expected_log_acceptance_correction,
                         actual_log_acceptance_correction)
 
-    # Ensure gradient is finite.
-    g = grads_[0].reshape([len(x), len(x)])[:, 0]
+    # Ensure gradient is finite. safe_sum masks ±inf kinetic energies to -inf
+    # with zero gradient and TF's _PowGrad returns finite 0. for 0 * inf, so
+    # all non-NaN states produce finite gradients.
+    g = grads_[0].reshape([len(x), len(x)])[:, :-1]
     self.assertAllEqual(np.ones_like(g, dtype=np.bool_), np.isfinite(g))
 
-    # The remaining gradients are nan because the momentum was itself nan or
-    # inf.
-    g = grads_[0].reshape([len(x), len(x)])[:, 1:]
+    # Only the NaN state at -1 produces NaN gradients.
+    g = grads_[0].reshape([len(x), len(x)])[:, -1:]
     self.assertAllEqual(np.ones_like(g, dtype=np.bool_), np.isnan(g))
 
 

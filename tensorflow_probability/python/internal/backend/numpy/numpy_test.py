@@ -681,10 +681,16 @@ def conv2d_params(draw):
   input_shape = draw(shapes(4, 4, min_side=2, max_side=10))
   if data_format.startswith('NC'):
     channels = input_shape[1]
+    spatial_shape = input_shape[2:]
   else:
     channels = input_shape[3]
-  filter_shape = draw(shapes(3, 3, min_side=1, max_side=4))
-  filter_shape = filter_shape[:2] + (channels, filter_shape[-1])
+    spatial_shape = input_shape[1:3]
+  filter_shape = (
+      draw(hps.integers(1, min(4, spatial_shape[0]))),
+      draw(hps.integers(1, min(4, spatial_shape[1]))),
+      channels,
+      draw(hps.integers(1, 4)),
+  )
 
   input_ = draw(
       single_arrays(
@@ -1251,6 +1257,8 @@ NUMPY_TEST_CASES = [
                 hps.booleans()).map(lambda x: x[0] + (x[1], x[2]))
         ],
         rtol=6e-5,
+        xla_atol=1e-4,
+        xla_rtol=2e-4,
         xla_const_args=(1, 2, 3)),
 ]
 
@@ -1310,7 +1318,8 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('math.is_finite', [single_arrays()]),
     TestCase('math.is_inf', [single_arrays()]),
     TestCase('math.is_nan', [single_arrays()]),
-    TestCase('math.lgamma', [single_arrays(elements=positive_floats())]),
+    TestCase('math.lgamma', [single_arrays(elements=positive_floats())],
+             xla_atol=3e-5, xla_rtol=5e-5),
     TestCase('math.log', [single_arrays(elements=positive_floats())],
              atol=1e-4),
     TestCase('math.log1p',

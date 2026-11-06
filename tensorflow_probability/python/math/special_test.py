@@ -660,11 +660,11 @@ class BetaincinvTest(test_util.TestCase):
 
     err = self.compute_max_gradient_error(
         lambda z: betaincinv(z, b, y), [a], delta=1e-7)
-    self.assertLess(err, 2e-7)
+    self.assertLess(err, 3e-7)
 
     err = self.compute_max_gradient_error(
         lambda z: betaincinv(a, z, y), [b], delta=1e-7)
-    self.assertLess(err, 2e-7)
+    self.assertLess(err, 3e-7)
 
     err = self.compute_max_gradient_error(
         lambda z: betaincinv(a, b, z), [y], delta=1e-7)

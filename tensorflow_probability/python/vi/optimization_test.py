@@ -320,9 +320,10 @@ class StatelessOptimizationTests(test_util.TestCase):
     model = jdab.JointDistributionCoroutineAutoBatched(model_fn)
     pinned = model.experimental_pin(y=observed_counts)
 
-    initial_parameters = (0., 0., 0.,  # Raw kernel parameters.
-                          tf.zeros_like(observed_counts),  # `logit_locs`
-                          tf.zeros_like(observed_counts))  # `logit_raw_scales`
+    initial_parameters = (
+        np.float32(0.), np.float32(0.), np.float32(0.),  # Raw kernel params.
+        tf.zeros_like(observed_counts),  # `logit_locs`
+        tf.zeros_like(observed_counts))  # `logit_raw_scales`
 
     def build_surrogate_posterior_fn(
         raw_kernel_amplitude, raw_kernel_lengthscale,

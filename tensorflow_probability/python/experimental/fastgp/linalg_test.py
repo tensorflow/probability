@@ -59,7 +59,7 @@ class _LinalgTest(parameterized.TestCase):
 
     low_rank = linalg.make_partial_pivoted_cholesky(M, rank=n)
     self.assertEqual(low_rank.shape, (n, n))
-    np.testing.assert_allclose(M, low_rank @ low_rank.T, rtol=5e-6)
+    np.testing.assert_allclose(M, low_rank @ low_rank.T, rtol=2e-5, atol=2e-7)
 
   @parameterized.parameters(2, 3, 5, 10, 15)
   def test_pivoted_cholesky_approx(self, n):

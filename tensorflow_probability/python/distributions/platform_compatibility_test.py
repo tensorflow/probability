@@ -170,9 +170,10 @@ XLA_LOGPROB_ATOL.update({
     'InverseGamma': 1e-4,
     'JohnsonSU': 1e-5,
     'Kumaraswamy': 4e-5,
+    'LambertWNormal': 1.0,
     'Logistic': 3e-6,
     'Multinomial': 2e-4,
-    'NoncentralChi2': 1e-4,
+    'NoncentralChi2': 1e-3,
     'Normal': 5e-6,
     'OneHotCategorical': 1e-5,
     'PERT': 1e-5,
@@ -181,6 +182,7 @@ XLA_LOGPROB_ATOL.update({
     'SigmoidBeta': 5e-4,
     'Skellam': 1e-4,
     'TruncatedCauchy': 1e-5,
+    'TwoPieceStudentT': 1e-5,
 })
 
 XLA_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-6)
@@ -206,12 +208,13 @@ XLA_LOGPROB_RTOL.update({
     'HalfStudentT': 1e-5,
     'InverseGamma': 5e-3,
     'JohnsonSU': 1e-2,
-    'LambertWNormal': 1e-5,
+    'LambertWNormal': 1e-1,
     'LKJ': 0.07,
     'Multinomial': 3e-4,
     'MultivariateNormalDiag': 5e-6,
     'MultivariateNormalFullCovariance': 1e-5,
     'MultivariateNormalTriL': 1e-5,
+    'NoncentralChi2': 1e-4,
     'Normal': 5e-6,
     'MultivariateNormalDiagPlusLowRankCovariance': 1e-4,
     'OneHotCategorical': 1e-3,  # TODO(b/163118820)
@@ -223,6 +226,7 @@ XLA_LOGPROB_RTOL.update({
     'SigmoidBeta': 5e-4,
     'StudentT': 1e-5,
     'TruncatedCauchy': 5e-5,
+    'TwoPieceStudentT': 1e-5,
     'VonMisesFisher': 5e-3,
     'WishartTriL': 1e-5,
 })

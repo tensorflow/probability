@@ -13,9 +13,8 @@
 # limitations under the License.
 # ============================================================================
 """Tests for Weibull distribution."""
-import math
-
 import numpy as np
+from scipy import special as scipy_special
 from scipy import stats
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import gamma
@@ -282,7 +281,9 @@ class _WeibullTest(object):
         )
         + (
             (a_scale / b_scale) ** b_concentration
-            * np.exp(math.lgamma(b_concentration / a_concentration + 1.0))
+            * np.exp(
+                scipy_special.gammaln(b_concentration / a_concentration + 1.0)
+            )
         )
         - 1.0
     )

@@ -545,7 +545,7 @@ class FlatDirichlet(Dirichlet):
     tshape = self._concentration_shape
     # rand_shape = [n] + tshape[:-1] + [tshape[-1] - 1]
     rand_shape = ps.tensor_scatter_nd_sub(
-        ps.concat([[n], tshape], 0), indices=[-1], updates=[1]
+        ps.concat([[n], tshape], 0), indices=[[-1]], updates=[1]
     )
     rand_values = samplers.uniform(
         rand_shape,
@@ -556,7 +556,7 @@ class FlatDirichlet(Dirichlet):
     )
     # sentinel_shape = [n] + tshape[:-1] + [1]
     sentinel_shape = ps.tensor_scatter_nd_update(
-        ps.concat([[n], tshape], 0), indices=[-1], updates=[1]
+        ps.concat([[n], tshape], 0), indices=[[-1]], updates=[1]
     )
     padded_values = tf.concat(
         [
