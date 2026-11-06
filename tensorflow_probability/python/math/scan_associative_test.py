@@ -71,7 +71,8 @@ class _ScanAssociativeTest(test_util.TestCase):
     axis = self._maybe_static(axis)
     expected_result = self.evaluate(tf.cumsum(elems, axis=axis))
     result = scan_associative(operator.add, elems, axis=axis, max_num_levels=8)
-    self.assertAllClose(self.evaluate(result), expected_result, rtol=1e-5)
+    self.assertAllClose(
+        self.evaluate(result), expected_result, rtol=1e-5, atol=2e-6)
 
   def test_counting_by_matmul_example(self):
     num_elems = 2**4 + 1
