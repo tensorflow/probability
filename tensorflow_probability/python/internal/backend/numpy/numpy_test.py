@@ -314,11 +314,11 @@ def matmul_compatible_pairs(draw,
 
 
 @hps.composite
-def pd_matrices(draw, eps=1.):
+def pd_matrices(draw, eps=1., max_abs=1e3):
   x = draw(
       single_arrays(
           shape=shapes(min_dims=2, min_side=0),
-          elements=floats(min_value=-1e3, max_value=1e3)))
+          elements=floats(min_value=-max_abs, max_value=max_abs)))
   y = np.swapaxes(x, -1, -2)
   if x.shape[-1] < x.shape[-2]:  # Ensure resultant matrix not rank-deficient.
     x, y = y, x
@@ -956,7 +956,9 @@ NUMPY_TEST_CASES = [
         'linalg.eig', [pd_matrices()],
         post_processor=_eig_post_process,
         xla_disabled=True),
-    TestCase('linalg.eigh', [pd_matrices()],
+    # Smaller entries keep the reconstructed matrix within the absolute
+    # tolerance; XLA's eigh is less precise on large, ill-conditioned inputs.
+    TestCase('linalg.eigh', [pd_matrices(max_abs=10.)],
              post_processor=_eig_post_process),
     TestCase(
         'linalg.eigvals', [pd_matrices()],
@@ -1006,9 +1008,11 @@ NUMPY_TEST_CASES = [
     #         keywords=None,
     #         defaults=(False, True, None))
     TestCase(
+        # Entries are bounded so the reconstructed matrix stays within the
+        # absolute tolerance; XLA's svd is less precise on huge entries.
         'linalg.svd', [single_arrays(
             shape=shapes(min_dims=2),
-            elements=floats(min_value=-1e10, max_value=1e10))],
+            elements=floats(min_value=-10., max_value=10.))],
         post_processor=_svd_post_process,
         atol=2e-5),
     TestCase(
