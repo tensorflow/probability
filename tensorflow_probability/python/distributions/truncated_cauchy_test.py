@@ -21,10 +21,25 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import cauchy
 from tensorflow_probability.python.distributions import truncated_cauchy
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
 
 
 @test_util.test_all_tf_execution_regimes
 class TruncatedCauchyTest(test_util.TestCase):
+
+  @test_util.numpy_disable_gradient_test
+  @parameterized.parameters(np.float32, np.float64)
+  def testLogProbGradientsAtNegativeOneProduct(self, dtype):
+    def log_prob(loc, scale):
+      return truncated_cauchy.TruncatedCauchy(
+          loc=loc, scale=scale, low=-1., high=1.).log_prob(.25)
+
+    _, (dloc, dscale) = gradient.value_and_gradient(
+        log_prob, [tf.convert_to_tensor(0., dtype),
+                   tf.convert_to_tensor(1., dtype)])
+    dloc, dscale = self.evaluate([dloc, dscale])
+    self.assertAllClose(8. / 17., dloc)
+    self.assertAllClose(-15. / 17. + 2. / np.pi, dscale)
 
   def testBatchSampling(self):
     """Check (empirically) that different parameters in a batch are respected.
