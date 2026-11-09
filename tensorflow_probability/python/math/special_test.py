@@ -958,6 +958,14 @@ class IgammainvTest(test_util.TestCase):
 class OwensTTest(test_util.TestCase):
 
   @parameterized.parameters(np.float32, np.float64)
+  def testOwensTMethod2(self, dtype):
+    h = dtype(5.)
+    a = np.array([0.05, 0.1, 0.4], dtype=dtype)
+    self.assertAllClose(
+        scipy_special.owens_t(h, a),
+        self.evaluate(special.owens_t(h, a)), rtol=1e-6, atol=0.)
+
+  @parameterized.parameters(np.float32, np.float64)
   def testOwensTOddEven(self, dtype):
     seed_stream = test_util.test_seed_stream()
     a = self.evaluate(
