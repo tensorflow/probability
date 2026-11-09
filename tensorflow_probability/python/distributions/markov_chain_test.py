@@ -357,7 +357,7 @@ class MarkovChainBijectorTest(test_util.TestCase):
               batch_ndims=2,
               model={
                   'a':
-                      gamma.Gamma(tf.zeros([5]), 1.),
+                      gamma.Gamma(tf.ones([5]), 1.),
                   'b':
                       lambda a: (reshape.Reshape(
                           event_shape_in=[4, 3], event_shape_out=[2, 3, 2])
