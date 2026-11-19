@@ -195,6 +195,31 @@ class BinomialTest(test_util.TestCase):
     cdf = binom.cdf(counts)
     self.assertAllEqual([[0., 1.]], self.evaluate(cdf))
 
+  def testSurvivalFunctionUpperTail(self):
+    # `1 - cdf` rounds to zero here; see GitHub issue #2040.
+    n = np.array([50., 1000., 20.], dtype=np.float64)
+    p = np.array([0.01, 0.3, 0.5], dtype=np.float64)
+    counts = np.array([25., 600., 10.], dtype=np.float64)
+    expected_sf = stats.binom.sf(counts, n, p)
+    for binom in [
+        binomial_lib.Binomial(total_count=n, probs=p, validate_args=True),
+        binomial_lib.Binomial(
+            total_count=n, logits=np.log(p) - np.log1p(-p),
+            validate_args=True)]:
+      self.assertAllClose(
+          self.evaluate(binom.survival_function(counts)), expected_sf,
+          rtol=1e-10, atol=0.)
+      self.assertAllClose(
+          self.evaluate(binom.log_survival_function(counts)),
+          np.log(expected_sf), rtol=1e-10, atol=0.)
+
+  def testSurvivalFunctionBeyondSupport(self):
+    p = [[0.1, 0.9, 0.5]]
+    counts = [[-1., 3., 4.]]
+    binom = binomial_lib.Binomial(total_count=3., probs=p, validate_args=False)
+    sf = binom.survival_function(counts)
+    self.assertAllEqual([[1., 0., 0.]], self.evaluate(sf))
+
   def testBinomialMean(self):
     n = 5.
     p = [0.1, 0.2, 0.7]

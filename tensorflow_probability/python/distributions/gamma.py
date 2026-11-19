@@ -303,6 +303,19 @@ class Gamma(distribution.AutoCompositeTensorDistribution):
     cdf = tf.math.igamma(self.concentration, self._rate_parameter() * x)
     return distribution_util.extend_cdf_outside_support(x, cdf, low=0.)
 
+  def _survival_function(self, x):
+    # Use the complementary regularized incomplete gamma function directly;
+    # `1 - cdf` rounds to zero in the upper tail.
+    # Double-where trick: for x <= 0 the answer is 1, and evaluating `igammac`
+    # at a safe interior point keeps gradients finite there.
+    safe_x = tf.where(x > 0., x, tf.ones_like(x))
+    survival = tf.math.igammac(
+        self.concentration, self._rate_parameter() * safe_x)
+    return tf.where(x > 0., survival, tf.ones_like(survival))
+
+  def _log_survival_function(self, x):
+    return tf.math.log(self._survival_function(x))
+
   def _quantile(self, p):
     return special.igammainv(self.concentration, p) / self._rate_parameter()
 

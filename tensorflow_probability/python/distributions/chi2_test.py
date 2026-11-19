@@ -72,6 +72,19 @@ class Chi2Test(test_util.TestCase):
     self.assertEqual(cdf.shape, (6,))
     self.assertAllClose(self.evaluate(cdf), expected_cdf)
 
+  def testChi2SurvivalFunctionUpperTail(self):
+    # `1 - cdf` rounds to zero here; see GitHub issue #2040.
+    df = np.array([1.80006, 20., 3.], dtype=np.float64)
+    x = np.array([90.5982, 100., 1300.], dtype=np.float64)
+    dist = chi2.Chi2(df=df, validate_args=True)
+    expected_sf = stats.chi2.sf(x, df)
+    self.assertAllClose(
+        self.evaluate(dist.survival_function(x)), expected_sf, rtol=1e-12,
+        atol=0.)
+    self.assertAllClose(
+        self.evaluate(dist.log_survival_function(x)), np.log(expected_sf),
+        rtol=1e-12, atol=0.)
+
   def testChi2Quantile(self):
     batch_size = 6
     df = np.linspace(1., 20., batch_size).astype(np.float64)[..., np.newaxis]

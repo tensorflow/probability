@@ -332,6 +332,38 @@ class Beta(distribution.AutoCompositeTensorDistribution):
         x, answer, low=0., high=1.)
 
   @distribution_util.AppendDocstring(_beta_sample_note)
+  def _log_survival_function(self, x):
+    return tf.math.log(self._survival_function(x))
+
+  @distribution_util.AppendDocstring(_beta_sample_note)
+  def _survival_function(self, x):
+    # Two formulas for `P[X > x]`:
+    #   direct:     1 - I_x(a, b), whose absolute error is about eps * cdf;
+    #   complement: I_{1-x}(b, a), whose absolute error is about
+    #               eps * ((1 - x) * pdf(x) + sf), from rounding `1 - x`.
+    # The direct form rounds to zero in the upper tail, and the complement
+    # form loses `x` when `x` is tiny.  Pick the form with the smaller error
+    # bound, and feed each branch a safe input so gradients stay finite.
+    concentration1 = tf.convert_to_tensor(self.concentration1)
+    concentration0 = tf.convert_to_tensor(self.concentration0)
+    inside = tf.logical_and(x > 0, x < 1)
+    safe_x = tf.where(inside, x, 0.5)
+    cdf = special.betainc(concentration1, concentration0, safe_x)
+    pdf = tf.math.exp(
+        self._log_unnormalized_prob(safe_x, concentration1, concentration0) -
+        self._log_normalization(concentration1, concentration0))
+    use_complement = (1. - safe_x) * pdf + (1. - cdf) < cdf
+    half = 0.5 * tf.ones_like(safe_x)
+    x_complement = tf.where(use_complement, safe_x, half)
+    x_direct = tf.where(use_complement, half, safe_x)
+    answer = tf.where(
+        use_complement,
+        special.betainc(concentration0, concentration1, 1. - x_complement),
+        1. - special.betainc(concentration1, concentration0, x_direct))
+    answer = tf.where(x <= 0, tf.ones_like(answer), answer)
+    return tf.where(x >= 1, tf.zeros_like(answer), answer)
+
+  @distribution_util.AppendDocstring(_beta_sample_note)
   def _quantile(self, p):
     concentration1 = tf.convert_to_tensor(self.concentration1)
     concentration0 = tf.convert_to_tensor(self.concentration0)

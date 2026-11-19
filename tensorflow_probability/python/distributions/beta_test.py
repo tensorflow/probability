@@ -303,6 +303,35 @@ class BetaTest(test_util.TestCase):
     cdf = beta.Beta(2., 3., validate_args=False).cdf([-3.7, 1.03])
     self.assertAllEqual([0., 1.], self.evaluate(cdf))
 
+  def testBetaSurvivalFunctionUpperTail(self):
+    # `1 - cdf` rounds to zero here; see GitHub issue #2040.
+    a = np.array([50., 2., 0.5], dtype=np.float64)
+    b = np.array([200., 3., 30.], dtype=np.float64)
+    x = np.array([0.5, 0.999999, 0.97], dtype=np.float64)
+    dist = beta.Beta(a, b, validate_args=True)
+    expected_sf = sp_stats.beta.sf(x, a, b)
+    self.assertAllClose(
+        self.evaluate(dist.survival_function(x)), expected_sf, rtol=1e-10,
+        atol=0.)
+    self.assertAllClose(
+        self.evaluate(dist.log_survival_function(x)), np.log(expected_sf),
+        rtol=1e-10, atol=0.)
+
+  def testBetaSurvivalFunctionNearZero(self):
+    # `1 - x` rounds to 1 here, so the complement formula alone is wrong.
+    a = np.array([0.01, 1e-4, 1e-4], dtype=np.float64)
+    b = np.array([1., 1., 1.], dtype=np.float64)
+    x = np.array([1e-20, 1e-15, 1e-300], dtype=np.float64)
+    dist = beta.Beta(a, b, validate_args=True)
+    self.assertAllClose(
+        self.evaluate(dist.survival_function(x)), sp_stats.beta.sf(x, a, b),
+        rtol=1e-10, atol=0.)
+
+  def testBetaSurvivalFunctionBeyondSupport(self):
+    sf = beta.Beta(2., 3., validate_args=False).survival_function(
+        [-3.7, 0., 1., 1.03])
+    self.assertAllEqual([1., 1., 0., 0.], self.evaluate(sf))
+
   @parameterized.parameters((np.float32, 5e-3), (np.float64, 1e-4))
   def testBetaQuantile(self, dt, rtol):
     shape = (30, 4, 5)
