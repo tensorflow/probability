@@ -165,6 +165,39 @@ class GammaTest(test_util.TestCase):
     self.assertAllClose(cdf, expected_cdf)
     self.assertAllClose(gamma_lr.cdf(x), expected_cdf)
 
+  def testGammaSurvivalFunctionUpperTail(self):
+    # `1 - cdf` rounds to zero here; see GitHub issue #2040.
+    concentration = np.array([2., 0.5, 50.], dtype=np.float64)
+    rate = np.array([3., 1., 0.25], dtype=np.float64)
+    x = np.array([20., 45., 700.], dtype=np.float64)
+    expected_sf = sp_stats.gamma.sf(x, concentration, scale=1 / rate)
+    for dist in [
+        gamma_lib.Gamma(concentration=concentration, rate=rate,
+                        validate_args=True),
+        gamma_lib.Gamma(concentration=concentration, log_rate=np.log(rate),
+                        validate_args=True)]:
+      self.assertAllClose(
+          self.evaluate(dist.survival_function(x)), expected_sf, rtol=1e-12,
+          atol=0.)
+      self.assertAllClose(
+          self.evaluate(dist.log_survival_function(x)), np.log(expected_sf),
+          rtol=1e-12, atol=0.)
+
+  def testGammaSurvivalFunctionBeyondSupport(self):
+    dist = gamma_lib.Gamma(concentration=2., rate=3., validate_args=False)
+    self.assertAllEqual(
+        [1., 1.], self.evaluate(dist.survival_function([-3.7, 0.])))
+
+  @test_util.numpy_disable_gradient_test
+  def testGammaSurvivalFunctionGradientsBeyondSupport(self):
+    x = tf.constant([-3.7, 0.])
+    _, grads = gradient.value_and_gradient(
+        lambda c, r: gamma_lib.Gamma(  # pylint: disable=g-long-lambda
+            concentration=c, rate=r,
+            validate_args=False).survival_function(x),
+        [tf.constant(0.5), tf.constant(3.)])
+    self.assertAllEqual([0., 0.], self.evaluate(grads))
+
   def testGammaQuantile(self):
     batch_size = 6
     concentration = np.linspace(

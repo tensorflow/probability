@@ -67,6 +67,24 @@ class ExponentialTest(test_util.TestCase):
     expected_cdf = sp_stats.expon.cdf(x, scale=1 / lam_v)
     self.assertAllClose(self.evaluate(cdf), expected_cdf)
 
+  def testExponentialSurvivalFunctionUpperTail(self):
+    # `1 - cdf` rounds to zero here; see GitHub issue #2040.
+    lam = np.array([2., 0.5], dtype=np.float64)
+    x = np.array([20., 600.], dtype=np.float64)
+    dist = exponential.Exponential(rate=lam, validate_args=True)
+    self.assertAllClose(
+        self.evaluate(dist.survival_function(x)),
+        sp_stats.expon.sf(x, scale=1 / lam), rtol=1e-12, atol=0.)
+
+  @test_util.numpy_disable_gradient_test
+  def testExponentialSurvivalFunctionGradientBeyondSupport(self):
+    x = tf.constant([-1., 0.])
+    _, grad = gradient.value_and_gradient(
+        lambda r: exponential.Exponential(  # pylint: disable=g-long-lambda
+            rate=r, validate_args=False).survival_function(x),
+        tf.constant(2.))
+    self.assertAllEqual(0., self.evaluate(grad))
+
   def testExponentialLogSurvival(self):
     batch_size = 7
     lam = tf.constant([2.0] * batch_size)

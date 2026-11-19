@@ -65,6 +65,28 @@ def _bdtr(k, n, p):
   return distribution_util.extend_cdf_outside_support(k, dk, low=0, high=n)
 
 
+def _bdtrc(k, n, p):
+  """The binomial complemented cumulative distribution function.
+
+  Args:
+    k: floating point `Tensor`.
+    n: floating point `Tensor`.
+    p: floating point `Tensor`.
+
+  Returns:
+    `sum_{j=k+1}^n p^j (1 - p)^(n - j)`, computed as `betainc(k + 1, n - k, p)`
+    so that the upper tail does not round to zero as `1 - _bdtr` does.
+  """
+  # Same double-where trick as in `_bdtr` for safe gradients.
+  unsafe = tf.logical_or(k < 0, k >= n)
+  ones = tf.ones_like(n - k)
+  safe_dn = tf.where(unsafe, ones, n - k)
+  safe_k1 = tf.where(unsafe, ones, k + 1)
+  dk = special.betainc(a=safe_k1, b=safe_dn, x=p)
+  dk = tf.where(k < 0, tf.ones_like(dk), dk)
+  return tf.where(k >= n, tf.zeros_like(dk), dk)
+
+
 def _random_binomial_cpu(
     shape,
     counts,
@@ -434,6 +456,16 @@ class Binomial(
     probs, counts = _maybe_broadcast(probs, counts)
 
     return _bdtr(k=counts, n=total_count, p=probs)
+
+  def _survival_function(self, counts):
+    total_count = tf.convert_to_tensor(self.total_count)
+    probs = self._probs_parameter_no_checks(total_count=total_count)
+    probs, counts = _maybe_broadcast(probs, counts)
+
+    return _bdtrc(k=counts, n=total_count, p=probs)
+
+  def _log_survival_function(self, counts):
+    return tf.math.log(self._survival_function(counts))
 
   @distribution_util.AppendDocstring(_binomial_sample_note)
   def _sample_n(self, n, seed=None):

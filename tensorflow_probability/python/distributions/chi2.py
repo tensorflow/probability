@@ -135,6 +135,14 @@ class Chi2(distribution.AutoCompositeTensorDistribution):
   def _cdf(self, x):
     return tf.math.igamma(0.5 * self.df, 0.5 * x)
 
+  def _survival_function(self, x):
+    # Use the complementary regularized incomplete gamma function directly;
+    # `1 - cdf` rounds to zero in the upper tail.
+    return tf.math.igammac(0.5 * self.df, 0.5 * x)
+
+  def _log_survival_function(self, x):
+    return tf.math.log(self._survival_function(x))
+
   def _quantile(self, p):
     return 2. * special.igammainv(0.5 * self.df, p)
 
