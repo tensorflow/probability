@@ -46,14 +46,15 @@ def _validate_tf_environment(package):
           'https://tensorflow.org/install.\n\n')
     raise
 
-  import distutils.version
+  import re
   import packaging.version
 
   def _loose_version(version: str):
     try:
       return packaging.version.Version(version)
     except packaging.version.InvalidVersion:
-      return distutils.version.LooseVersion(version)
+      # Use the leading release number, e.g. '2.19.0' in '2.19.0-custom-build'.
+      return packaging.version.Version(re.match(r'\d+(\.\d+)*', version)[0])
 
   #
   # Update this whenever we need to depend on a newer TensorFlow release.
