@@ -18,6 +18,7 @@
 #   meant to evolve over time.
 
 # Placeholder: py_library
+# Placeholder: py_test
 
 licenses(["notice"])
 
@@ -35,7 +36,6 @@ py_library(
     visibility = ["//tensorflow_probability:__pkg__"],
     deps = [
         ":version",
-        # distutils dep,
         # packaging dep,
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/debugging",
@@ -55,6 +55,17 @@ py_library(
         "//tensorflow_probability/python/sts",
         "//tensorflow_probability/python/util",
         "//tensorflow_probability/python/vi",
+    ],
+)
+
+py_test(
+    name = "init_test",
+    size = "small",
+    srcs = ["init_test.py"],
+    deps = [
+        ":python",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
